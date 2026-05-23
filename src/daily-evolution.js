@@ -7,6 +7,7 @@ import { runEvolutionBacktest } from "./evolution-backtest.js";
 import { assertMarketRequirements, buildMarketCoverageStatus } from "./market-data-store.js";
 import { runRealtimeFootballCrawler } from "./realtime-source-gate.js";
 import { deliverDailyReportToWechat } from "./wechat-delivery.js";
+import { syncFootballArtifacts } from "./artifact-sync.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = join(rootDir, "data", "exports");
@@ -15,8 +16,9 @@ const date = readArg("--date") ?? todayInShanghai();
 const withWeb = !args.includes("--no-web");
 const offlineDemo = args.includes("--offline-demo");
 const allowMissingOdds = args.includes("--allow-missing-odds") || process.env.ODDS_ALLOW_MISSING === "1";
+const syncArtifacts = !args.includes("--no-sync") && process.env.FOOTBALL_ARTIFACT_SYNC !== "0";
 
-const result = { date, startedAt: new Date().toISOString(), realtimeCrawler: null, market: null, package: null, evolutionBacktest: null, wechat: null, ok: false, error: null };
+const result = { date, startedAt: new Date().toISOString(), realtimeCrawler: null, market: null, package: null, evolutionBacktest: null, wechat: null, sync: null, ok: false, error: null };
 try {
   if (!withWeb && !offlineDemo) {
     throw new Error("正式生成禁止 --no-web：每次生成前必须实时抓取并通过数据源闸门。如需离线演示，请显式使用 --offline-demo。");
@@ -45,6 +47,14 @@ try {
   const statusPath = join(exportDir, `daily-evolution-status-${date}.json`);
   writeFileSync(statusPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
   writeFileSync(join(exportDir, "daily-evolution-status.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");
+  if (result.ok && syncArtifacts) {
+    result.sync = syncFootballArtifacts(date, {
+      git: !args.includes("--no-git-sync"),
+      obsidian: !args.includes("--no-obsidian-sync")
+    });
+    writeFileSync(statusPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+    writeFileSync(join(exportDir, "daily-evolution-status.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");
+  }
   console.log(JSON.stringify({ ...result, statusPath }, null, 2));
 }
 

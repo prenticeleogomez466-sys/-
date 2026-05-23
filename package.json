@@ -23,6 +23,7 @@
     "daily": "node src/daily-evolution.js",
     "daily:allow-missing": "node src/daily-evolution.js --allow-missing-odds",
     "daily:no-web": "node src/daily-evolution.js --allow-missing-odds",
+    "sync:artifacts": "node src/artifact-sync.js",
     "auto:health": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-football-automation.ps1 -Mode health",
     "auto:daily": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-football-automation.ps1 -Mode daily",
     "auto:recap": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-football-automation.ps1 -Mode recap",
