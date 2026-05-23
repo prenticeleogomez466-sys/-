@@ -1,0 +1,17 @@
+data/local.env
+.env
+.env.*
+!.env.example
+data/*.secret
+data/wechat/
+data/exports/wechat-*.json
+*.pem
+*.key
+*.p12
+*.pfx
+node_modules/
+*.log
+*.tmp
+*.bak
+Thumbs.db
+.DS_Store

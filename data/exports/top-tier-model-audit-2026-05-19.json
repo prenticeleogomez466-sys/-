@@ -1,0 +1,163 @@
+{
+  "ok": false,
+  "topTierReady": false,
+  "date": "2026-05-19",
+  "generatedAt": "2026-05-19T12:25:26.566Z",
+  "summary": {
+    "checks": 9,
+    "errors": 2,
+    "warnings": 4,
+    "advancedReadiness": 0.4,
+    "missingRequired": [
+      "伤停与阵容",
+      "预计首发",
+      "xG/射门质量"
+    ]
+  },
+  "market": {
+    "ok": true,
+    "fixtures": 19,
+    "snapshots": 5,
+    "usable": 5,
+    "complete": 0,
+    "realtime": 5
+  },
+  "advancedDataPath": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\advanced\\2026-05-19.json",
+  "advancedLayers": [
+    {
+      "key": "elo",
+      "label": "Elo/球队强度",
+      "env": "TEAM_ELO_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": true,
+      "source": "synced",
+      "count": 4,
+      "status": "configured"
+    },
+    {
+      "key": "form",
+      "label": "近期状态/赛程强度",
+      "env": "TEAM_FORM_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": true,
+      "source": "synced",
+      "count": 2,
+      "status": "configured"
+    },
+    {
+      "key": "injuries",
+      "label": "伤停与阵容",
+      "env": "INJURY_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-required"
+    },
+    {
+      "key": "lineups",
+      "label": "预计首发",
+      "env": "LINEUP_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-required"
+    },
+    {
+      "key": "xg",
+      "label": "xG/射门质量",
+      "env": "XG_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-required"
+    },
+    {
+      "key": "weather",
+      "label": "天气/场地/旅行",
+      "env": "WEATHER_SOURCE_URL",
+      "requiredForTopTier": false,
+      "configured": true,
+      "source": "synced",
+      "count": 2,
+      "status": "configured"
+    },
+    {
+      "key": "news",
+      "label": "新闻舆情/战意",
+      "env": "NEWS_SOURCE_URL",
+      "requiredForTopTier": false,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-optional"
+    }
+  ],
+  "checks": [
+    {
+      "layer": "数据完整度",
+      "name": "官方赛程+实时赔率闸门",
+      "ok": false,
+      "level": "error",
+      "detail": "0/19 完整，5/19 实时"
+    },
+    {
+      "layer": "市场微结构",
+      "name": "欧赔+亚盘+让球胜平负",
+      "ok": false,
+      "level": "error",
+      "detail": "0/19"
+    },
+    {
+      "layer": "球队强度",
+      "name": "Elo/实力评级",
+      "ok": true,
+      "level": "ok",
+      "detail": "已同步 ClubElo public API，覆盖 4 场"
+    },
+    {
+      "layer": "球队状态",
+      "name": "近期状态/赛程强度",
+      "ok": true,
+      "level": "ok",
+      "detail": "已同步 football-data.co.uk CSV，覆盖 2 场"
+    },
+    {
+      "layer": "伤停信息",
+      "name": "伤停名单",
+      "ok": false,
+      "level": "warning",
+      "detail": "缺 INJURY_SOURCE_URL，且本地同步层无可用数据"
+    },
+    {
+      "layer": "预计首发",
+      "name": "首发阵容",
+      "ok": false,
+      "level": "warning",
+      "detail": "缺 LINEUP_SOURCE_URL，且本地同步层无可用数据"
+    },
+    {
+      "layer": "技战术质量",
+      "name": "xG/射门质量",
+      "ok": false,
+      "level": "warning",
+      "detail": "缺 XG_SOURCE_URL，且本地同步层无可用数据"
+    },
+    {
+      "layer": "概率校准",
+      "name": "回测校准与 Brier/LogLoss",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在回测摘要"
+    },
+    {
+      "layer": "资金风险",
+      "name": "EV/凯利/回撤约束",
+      "ok": false,
+      "level": "warning",
+      "detail": "缺 BANKROLL_RISK_POLICY=1"
+    }
+  ]
+}

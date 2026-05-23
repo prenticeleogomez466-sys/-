@@ -1,0 +1,620 @@
+{
+  "date": "2026-05-19",
+  "fixtures": 19,
+  "sources": [
+    {
+      "name": "The Odds API",
+      "fetched": 0,
+      "ok": false,
+      "error": "缺少 ODDS_API_KEY"
+    },
+    {
+      "name": "Odds1x2 public odds",
+      "fetched": 3,
+      "ok": true
+    },
+    {
+      "name": "新浪胜负彩欧洲四大机构",
+      "fetched": 0,
+      "ok": false,
+      "error": "未发现匹配期号的14场欧洲赔率"
+    },
+    {
+      "name": "新浪胜负彩澳盘",
+      "fetched": 0,
+      "ok": false,
+      "error": "未发现匹配期号的14场澳盘"
+    },
+    {
+      "name": "Sina euro-asian contrast",
+      "fetched": 0,
+      "ok": false,
+      "error": "no matching euro-asian contrast article"
+    },
+    {
+      "name": "500.com shengfucai european odds",
+      "fetched": 6,
+      "ok": true
+    },
+    {
+      "name": "500.com shengfucai asian odds",
+      "fetched": 6,
+      "ok": true
+    },
+    {
+      "name": "football-data.co.uk CSV",
+      "fetched": 0,
+      "ok": false,
+      "error": "no matching rows for date/fixtures"
+    },
+    {
+      "name": "捷报比分公开赔率",
+      "fetched": 0,
+      "ok": false,
+      "error": "未发现可匹配场次"
+    },
+    {
+      "name": "CubeGoal公开赔率",
+      "fetched": 8,
+      "ok": true
+    }
+  ],
+  "fetched": 23,
+  "matched": 23,
+  "saved": true,
+  "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\market\\2026-05-19.json",
+  "snapshots": [
+    {
+      "id": "2026-05-19-jc-2026-05-19-周二001-伯恩茅斯-曼城-1",
+      "date": "2026-05-19",
+      "fixtureId": "jc-2026-05-19-周二001-伯恩茅斯-曼城",
+      "sequence": "周二001",
+      "marketType": "jingcai",
+      "competition": "英超",
+      "homeTeam": "伯恩茅斯",
+      "awayTeam": "曼城",
+      "collectedAt": "2026-05-19T13:19:15.141Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 3.9,
+          "draw": 4.16,
+          "away": 1.58
+        },
+        "current": {
+          "home": 4.75,
+          "draw": 4.12,
+          "away": 1.48
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.75,
+          "homeWater": 2.05,
+          "awayWater": 1.8
+        },
+        "current": {
+          "line": 0.75,
+          "homeWater": 2.05,
+          "awayWater": 1.8
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 2.08,
+          "draw": 3.7,
+          "away": 2.65
+        },
+        "current": {
+          "home": 2.27,
+          "draw": 3.37,
+          "away": 2.55
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+CubeGoal public match filter API https://www.cubegoal.com/odds/84648.html"
+    },
+    {
+      "id": "2026-05-19-jc-2026-05-19-周二002-切尔西-热刺-1",
+      "date": "2026-05-19",
+      "fixtureId": "jc-2026-05-19-周二002-切尔西-热刺",
+      "sequence": "周二002",
+      "marketType": "jingcai",
+      "competition": "英超",
+      "homeTeam": "切尔西",
+      "awayTeam": "热刺",
+      "collectedAt": "2026-05-19T13:19:15.142Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.88,
+          "draw": 3.35,
+          "away": 3.35
+        },
+        "current": {
+          "home": 1.86,
+          "draw": 3.15,
+          "away": 3.65
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.5,
+          "homeWater": 1.92,
+          "awayWater": 1.92
+        },
+        "current": {
+          "line": -0.5,
+          "homeWater": 1.92,
+          "awayWater": 1.92
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 3.65,
+          "draw": 3.75,
+          "away": 1.7
+        },
+        "current": {
+          "home": 3.75,
+          "draw": 3.6,
+          "away": 1.71
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+CubeGoal public match filter API https://www.cubegoal.com/odds/84649.html"
+    },
+    {
+      "id": "2026-05-19-jc-2026-05-19-周二003-弗鲁米嫩-玻利瓦尔-1",
+      "date": "2026-05-19",
+      "fixtureId": "jc-2026-05-19-周二003-弗鲁米嫩-玻利瓦尔",
+      "sequence": "周二003",
+      "marketType": "jingcai",
+      "competition": "解放者杯",
+      "homeTeam": "弗鲁米嫩",
+      "awayTeam": "玻利瓦尔",
+      "collectedAt": "2026-05-19T13:18:34.881Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.18,
+          "draw": 5.4,
+          "away": 10.5
+        },
+        "current": {
+          "home": 1.16,
+          "draw": 6,
+          "away": 10
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1.75,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "current": {
+          "line": -1.75,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 1.7,
+          "draw": 3.65,
+          "away": 3.75
+        },
+        "current": {
+          "home": 1.6,
+          "draw": 3.93,
+          "away": 4
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+Odds1x2 public odds https://www.odds1x2.com/football/copa-libertadores/odds/fluminense-vs-bolivar/"
+    },
+    {
+      "id": "2026-05-19-jc-2026-05-19-周二004-罗萨里奥-中央大学-1",
+      "date": "2026-05-19",
+      "fixtureId": "jc-2026-05-19-周二004-罗萨里奥-中央大学",
+      "sequence": "周二004",
+      "marketType": "jingcai",
+      "competition": "解放者杯",
+      "homeTeam": "罗萨里奥",
+      "awayTeam": "中央大学",
+      "collectedAt": "2026-05-19T13:18:35.646Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.153,
+          "draw": 7.1,
+          "away": 18
+        },
+        "current": {
+          "home": 1.153,
+          "draw": 7.1,
+          "away": 18
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1.75,
+          "homeWater": 1.95,
+          "awayWater": 1.9
+        },
+        "current": {
+          "line": -1.75,
+          "homeWater": 1.95,
+          "awayWater": 1.9
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 2.07,
+          "draw": 3.8,
+          "away": 2.61
+        },
+        "current": {
+          "home": 2.27,
+          "draw": 3.5,
+          "away": 2.48
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+Odds1x2 public odds https://www.odds1x2.com/football/copa-libertadores/odds/rosario-central-vs-ucv-fc/"
+    },
+    {
+      "id": "2026-05-19-jc-2026-05-19-周二005-时刻准备-米拉索尔-1",
+      "date": "2026-05-19",
+      "fixtureId": "jc-2026-05-19-周二005-时刻准备-米拉索尔",
+      "sequence": "周二005",
+      "marketType": "jingcai",
+      "competition": "解放者杯",
+      "homeTeam": "时刻准备",
+      "awayTeam": "米拉索尔",
+      "collectedAt": "2026-05-19T13:18:36.415Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 6.25,
+          "draw": 4.1,
+          "away": 1.38
+        },
+        "current": {
+          "home": 5.93,
+          "draw": 4.05,
+          "away": 1.4
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.75,
+          "homeWater": 1.95,
+          "awayWater": 1.9
+        },
+        "current": {
+          "line": 0.75,
+          "homeWater": 1.95,
+          "awayWater": 1.9
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 2.56,
+          "draw": 3.4,
+          "away": 2.25
+        },
+        "current": {
+          "home": 2.5,
+          "draw": 3.3,
+          "away": 2.35
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+Odds1x2 public odds https://www.odds1x2.com/football/copa-libertadores/odds/club-always-ready-vs-mirassol/"
+    },
+    {
+      "id": "2026-05-19-sf-26081-05-埃尔夫斯堡-赫根-1",
+      "date": "2026-05-19",
+      "fixtureId": "sf-26081-05-埃尔夫斯堡-赫根",
+      "sequence": "5",
+      "marketType": "shengfucai",
+      "competition": "瑞超",
+      "homeTeam": "埃尔夫斯堡",
+      "awayTeam": "赫根",
+      "collectedAt": "2026-05-19T13:19:16.480Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.401,
+          "draw": 3.424,
+          "away": 2.6
+        },
+        "current": {
+          "home": 2.323,
+          "draw": 3.442,
+          "away": 2.681
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0,
+          "homeWater": 1.95,
+          "awayWater": 1.85
+        },
+        "current": {
+          "line": 0,
+          "homeWater": 1.95,
+          "awayWater": 1.85
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "CubeGoal public match filter API https://www.cubegoal.com/odds/84862.html+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1362671.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1362671.shtml"
+    },
+    {
+      "id": "2026-05-19-sf-26081-10-桑纳菲尤尔-腓特烈斯塔-1",
+      "date": "2026-05-19",
+      "fixtureId": "sf-26081-10-桑纳菲尤尔-腓特烈斯塔",
+      "sequence": "10",
+      "marketType": "shengfucai",
+      "competition": "挪超",
+      "homeTeam": "桑纳菲尤尔",
+      "awayTeam": "腓特烈斯塔",
+      "collectedAt": "2026-05-19T13:19:16.480Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.816,
+          "draw": 3.759,
+          "away": 3.758
+        },
+        "current": {
+          "home": 1.824,
+          "draw": 3.671,
+          "away": 3.775
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.75,
+          "homeWater": 2,
+          "awayWater": 1.8
+        },
+        "current": {
+          "line": -0.75,
+          "homeWater": 2,
+          "awayWater": 1.8
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "CubeGoal public match filter API https://www.cubegoal.com/odds/84860.html+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363933.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363933.shtml"
+    },
+    {
+      "id": "2026-05-19-sf-26081-08-特罗姆瑟-奥勒松-1",
+      "date": "2026-05-19",
+      "fixtureId": "sf-26081-08-特罗姆瑟-奥勒松",
+      "sequence": "8",
+      "marketType": "shengfucai",
+      "competition": "挪超",
+      "homeTeam": "特罗姆瑟",
+      "awayTeam": "奥勒松",
+      "collectedAt": "2026-05-19T13:19:17.646Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.447,
+          "draw": 4.272,
+          "away": 6.129
+        },
+        "current": {
+          "home": 1.45,
+          "draw": 4.247,
+          "away": 6.1
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1.25,
+          "homeWater": 1.92,
+          "awayWater": 1.88
+        },
+        "current": {
+          "line": -1.25,
+          "homeWater": 1.92,
+          "awayWater": 1.88
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "CubeGoal public match filter API https://www.cubegoal.com/odds/84856.html+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363965.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363965.shtml"
+    },
+    {
+      "id": "2026-05-19-sf-26081-06-奥斯陆kfum-罗森博格-1",
+      "date": "2026-05-19",
+      "fixtureId": "sf-26081-06-奥斯陆kfum-罗森博格",
+      "sequence": "6",
+      "marketType": "shengfucai",
+      "competition": "挪超",
+      "homeTeam": "奥斯陆KFUM",
+      "awayTeam": "罗森博格",
+      "collectedAt": "2026-05-19T13:19:17.646Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.225,
+          "draw": 3.439,
+          "away": 2.897
+        },
+        "current": {
+          "home": 2.245,
+          "draw": 3.411,
+          "away": 2.87
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.25,
+          "homeWater": 1.95,
+          "awayWater": 1.85
+        },
+        "current": {
+          "line": -0.25,
+          "homeWater": 1.95,
+          "awayWater": 1.85
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "CubeGoal public match filter API https://www.cubegoal.com/odds/84858.html+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1364084.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1364084.shtml"
+    },
+    {
+      "id": "2026-05-19-sf-26081-09-汉坎-利勒斯特罗姆-1",
+      "date": "2026-05-19",
+      "fixtureId": "sf-26081-09-汉坎-利勒斯特罗姆",
+      "sequence": "9",
+      "marketType": "shengfucai",
+      "competition": "挪超",
+      "homeTeam": "汉坎",
+      "awayTeam": "利勒斯特罗姆",
+      "collectedAt": "2026-05-19T13:19:17.646Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 3.163,
+          "draw": 3.479,
+          "away": 2.062
+        },
+        "current": {
+          "home": 3.135,
+          "draw": 3.483,
+          "away": 2.064
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.25,
+          "homeWater": 2.02,
+          "awayWater": 1.78
+        },
+        "current": {
+          "line": 0.25,
+          "homeWater": 2.02,
+          "awayWater": 1.78
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "CubeGoal public match filter API https://www.cubegoal.com/odds/84859.html+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363692.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363692.shtml"
+    },
+    {
+      "id": "2026-05-19-sf-26081-01-水晶宫-巴列卡诺-1",
+      "date": "2026-05-19",
+      "fixtureId": "sf-26081-01-水晶宫-巴列卡诺",
+      "sequence": "1",
+      "marketType": "shengfucai",
+      "competition": "欧协联",
+      "homeTeam": "水晶宫",
+      "awayTeam": "巴列卡诺",
+      "collectedAt": "2026-05-19T13:17:52.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.916,
+          "draw": 3.382,
+          "away": 3.981
+        },
+        "current": {
+          "home": 1.907,
+          "draw": 3.368,
+          "away": 4.019
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.519,
+          "homeWater": 1.92,
+          "awayWater": 1.883
+        },
+        "current": {
+          "line": -0.519,
+          "homeWater": 1.932,
+          "awayWater": 1.882
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1410977.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1410977.shtml"
+    },
+    {
+      "id": "2026-05-19-sf-26081-07-萨尔普斯堡-莫尔德-1",
+      "date": "2026-05-19",
+      "fixtureId": "sf-26081-07-萨尔普斯堡-莫尔德",
+      "sequence": "7",
+      "marketType": "shengfucai",
+      "competition": "挪超",
+      "homeTeam": "萨尔普斯堡",
+      "awayTeam": "莫尔德",
+      "collectedAt": "2026-05-19T13:19:17.646Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.487,
+          "draw": 3.646,
+          "away": 2.453
+        },
+        "current": {
+          "home": 2.6,
+          "draw": 3.596,
+          "away": 2.37
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0,
+          "homeWater": 1.9,
+          "awayWater": 1.9
+        },
+        "current": {
+          "line": 0,
+          "homeWater": 1.9,
+          "awayWater": 1.9
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363613.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84857.html+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363613.shtml"
+    }
+  ]
+}

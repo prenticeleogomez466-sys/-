@@ -1,0 +1,2742 @@
+{
+  "date": "2026-05-20",
+  "layers": {
+    "form": {
+      "ok": true,
+      "source": "football-data.co.uk CSV",
+      "count": 7,
+      "fixtureData": {
+        "jc-2026-05-20-周三001-坦山猫-国际图尔": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三002-斯达-博德闪耀": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三003-库奥皮奥-雅罗": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三004-盖斯-哈马比": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三005-利勒斯特-克里斯蒂": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三006-赛哈海湾-吉达国民": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三007-奥勒松-布兰": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三008-弗赖堡-维拉": {
+          "home": {
+            "matches": 8,
+            "points": 13,
+            "pointsPerMatch": 1.625,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 8,
+            "points": 11,
+            "pointsPerMatch": 1.375,
+            "goalDiff": 1
+          }
+        },
+        "jc-2026-05-20-周三009-弗拉门戈-拉普大学": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三010-帕梅拉斯-波特诺": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "jc-2026-05-20-周三011-威廉二世-福伦丹": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 8,
+            "points": 5,
+            "pointsPerMatch": 0.625,
+            "goalDiff": -5
+          }
+        },
+        "jc-2026-05-20-周三012-托林斯-卡萨皮亚": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 8,
+            "points": 6,
+            "pointsPerMatch": 0.75,
+            "goalDiff": -4
+          }
+        },
+        "sf-26081-01-水晶宫-巴列卡诺": {
+          "home": {
+            "matches": 8,
+            "points": 7,
+            "pointsPerMatch": 0.875,
+            "goalDiff": -7
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-02-帕德博恩-沃尔夫斯堡": {
+          "home": {
+            "matches": 8,
+            "points": 14,
+            "pointsPerMatch": 1.75,
+            "goalDiff": 1
+          },
+          "away": {
+            "matches": 8,
+            "points": 8,
+            "pointsPerMatch": 1,
+            "goalDiff": -3
+          }
+        },
+        "sf-26081-03-菲尔特-埃森": {
+          "home": {
+            "matches": 8,
+            "points": 8,
+            "pointsPerMatch": 1,
+            "goalDiff": -2
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-04-圣埃蒂安-尼斯": {
+          "home": {
+            "matches": 8,
+            "points": 11,
+            "pointsPerMatch": 1.375,
+            "goalDiff": 4
+          },
+          "away": {
+            "matches": 8,
+            "points": 5,
+            "pointsPerMatch": 0.625,
+            "goalDiff": -7
+          }
+        },
+        "sf-26081-05-埃尔夫斯堡-赫根": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-06-奥斯陆kfum-罗森博格": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-07-萨尔普斯堡-莫尔德": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-08-特罗姆瑟-奥勒松": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-09-汉坎-利勒斯特罗姆": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-10-桑纳菲尤尔-腓特烈斯塔": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-11-拉努斯-米拉索尔": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-12-弗拉门戈-库斯科": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-13-德尔瓦耶独立-罗萨里奥中央": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "sf-26081-14-科林蒂安-普拉滕斯": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        }
+      },
+      "warning": null
+    },
+    "elo": {
+      "ok": true,
+      "source": "ClubElo public API",
+      "count": 16,
+      "fixtureData": {
+        "jc-2026-05-20-周三001-坦山猫-国际图尔": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Inter Turku",
+            "Country": "FIN",
+            "Level": "0",
+            "Elo": "1216.47924805",
+            "From": "2022-11-04",
+            "To": "2023-01-01"
+          }
+        },
+        "jc-2026-05-20-周三002-斯达-博德闪耀": {
+          "home": {
+            "Rank": "None",
+            "Club": "Start",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1294.83154297",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": null
+        },
+        "jc-2026-05-20-周三003-库奥皮奥-雅罗": {
+          "home": null,
+          "away": null
+        },
+        "jc-2026-05-20-周三004-盖斯-哈马比": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Hammarby",
+            "Country": "SWE",
+            "Level": "1",
+            "Elo": "1507.66381836",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "jc-2026-05-20-周三005-利勒斯特-克里斯蒂": {
+          "home": {
+            "Rank": "None",
+            "Club": "Lillestrom",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1363.40356445",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Kristiansund",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1353.01513672",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "jc-2026-05-20-周三006-赛哈海湾-吉达国民": {
+          "home": null,
+          "away": null
+        },
+        "jc-2026-05-20-周三007-奥勒松-布兰": {
+          "home": {
+            "Rank": "None",
+            "Club": "Aalesund",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1291.39440918",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Brann",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1528.16894531",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "jc-2026-05-20-周三008-弗赖堡-维拉": {
+          "home": {
+            "Rank": "43",
+            "Club": "Freiburg",
+            "Country": "GER",
+            "Level": "1",
+            "Elo": "1734.07983398",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "8",
+            "Club": "Aston Villa",
+            "Country": "ENG",
+            "Level": "1",
+            "Elo": "1900.12805176",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "jc-2026-05-20-周三009-弗拉门戈-拉普大学": {
+          "home": null,
+          "away": null
+        },
+        "jc-2026-05-20-周三010-帕梅拉斯-波特诺": {
+          "home": null,
+          "away": null
+        },
+        "jc-2026-05-20-周三011-威廉二世-福伦丹": {
+          "home": {
+            "Rank": "None",
+            "Club": "Willem II",
+            "Country": "NED",
+            "Level": "1",
+            "Elo": "1324.4510498",
+            "From": "2025-05-19",
+            "To": "2025-07-05"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Volendam",
+            "Country": "NED",
+            "Level": "1",
+            "Elo": "1335.65087891",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "jc-2026-05-20-周三012-托林斯-卡萨皮亚": {
+          "home": null,
+          "away": null
+        },
+        "sf-26081-01-水晶宫-巴列卡诺": {
+          "home": {
+            "Rank": "26",
+            "Club": "Crystal Palace",
+            "Country": "ENG",
+            "Level": "1",
+            "Elo": "1798.14025879",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "52",
+            "Club": "Rayo Vallecano",
+            "Country": "ESP",
+            "Level": "1",
+            "Elo": "1706.79943848",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-02-帕德博恩-沃尔夫斯堡": {
+          "home": {
+            "Rank": "None",
+            "Club": "Paderborn",
+            "Country": "GER",
+            "Level": "2",
+            "Elo": "1527.51147461",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Wolfsburg",
+            "Country": "GER",
+            "Level": "1",
+            "Elo": "1601.71386719",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-03-菲尔特-埃森": {
+          "home": null,
+          "away": null
+        },
+        "sf-26081-04-圣埃蒂安-尼斯": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Nice",
+            "Country": "FRA",
+            "Level": "1",
+            "Elo": "1581.42358398",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-05-埃尔夫斯堡-赫根": {
+          "home": {
+            "Rank": "None",
+            "Club": "Elfsborg",
+            "Country": "SWE",
+            "Level": "1",
+            "Elo": "1388.13391113",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": null
+        },
+        "sf-26081-06-奥斯陆kfum-罗森博格": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Rosenborg",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1427.67407227",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-07-萨尔普斯堡-莫尔德": {
+          "home": {
+            "Rank": "None",
+            "Club": "Sarpsborg",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1403.36450195",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Molde",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1467.12402344",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-08-特罗姆瑟-奥勒松": {
+          "home": {
+            "Rank": "None",
+            "Club": "Tromso",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1496.79101562",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Aalesund",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1291.39440918",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-09-汉坎-利勒斯特罗姆": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Lillestrom",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1363.40356445",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-10-桑纳菲尤尔-腓特烈斯塔": {
+          "home": {
+            "Rank": "None",
+            "Club": "Sandefjord",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1423.67443848",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Fredrikstad",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1412.80065918",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "sf-26081-11-拉努斯-米拉索尔": {
+          "home": null,
+          "away": null
+        },
+        "sf-26081-12-弗拉门戈-库斯科": {
+          "home": null,
+          "away": null
+        },
+        "sf-26081-13-德尔瓦耶独立-罗萨里奥中央": {
+          "home": null,
+          "away": null
+        },
+        "sf-26081-14-科林蒂安-普拉滕斯": {
+          "home": null,
+          "away": null
+        }
+      },
+      "warning": null
+    },
+    "injuries": {
+      "ok": false,
+      "source": "injuries",
+      "count": 0,
+      "fixtureData": {},
+      "skipped": true,
+      "warning": "缺 INJURY_SOURCE_URL"
+    },
+    "lineups": {
+      "ok": false,
+      "source": "lineups",
+      "count": 0,
+      "fixtureData": {},
+      "skipped": true,
+      "warning": "缺 LINEUP_SOURCE_URL"
+    },
+    "xg": {
+      "ok": false,
+      "source": "xg",
+      "count": 0,
+      "fixtureData": {},
+      "skipped": true,
+      "warning": "缺 XG_SOURCE_URL"
+    },
+    "weather": {
+      "ok": true,
+      "source": "Open-Meteo geocoding+forecast",
+      "count": 24,
+      "fixtureData": {
+        "sf-26081-06-奥斯陆kfum-罗森博格": {
+          "place": "奥斯陆KFUM",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-20-周三004-盖斯-哈马比": {
+          "place": "盖斯",
+          "warning": "geocode-not-found"
+        },
+        "sf-26081-05-埃尔夫斯堡-赫根": {
+          "place": "Boras",
+          "latitude": 57.72101,
+          "longitude": 12.9401,
+          "country": "Sweden",
+          "timezone": "Europe/Stockholm",
+          "hourly": {
+            "date": "2026-05-26",
+            "temperature2m": {
+              "min": 9.4,
+              "max": 16.3,
+              "avg": 13.3
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0.1,
+              "avg": 0.025
+            },
+            "windSpeed10m": {
+              "min": 14.8,
+              "max": 24.7,
+              "avg": 19.108
+            }
+          }
+        },
+        "jc-2026-05-20-周三007-奥勒松-布兰": {
+          "place": "Alesund",
+          "latitude": 62.47225,
+          "longitude": 6.15492,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 10.8,
+              "max": 15,
+              "avg": 13.117
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 2.9,
+              "max": 24.8,
+              "avg": 8.492
+            }
+          }
+        },
+        "sf-26081-02-帕德博恩-沃尔夫斯堡": {
+          "place": "Paderborn",
+          "latitude": 51.71905,
+          "longitude": 8.75439,
+          "country": "Germany",
+          "timezone": "Europe/Berlin",
+          "hourly": {
+            "date": "2026-05-26",
+            "temperature2m": {
+              "min": 12.8,
+              "max": 28.9,
+              "avg": 21.767
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 5.1,
+              "max": 10.8,
+              "avg": 7.596
+            }
+          }
+        },
+        "sf-26081-03-菲尔特-埃森": {
+          "place": "Furth",
+          "latitude": 49.47593,
+          "longitude": 10.98856,
+          "country": "Germany",
+          "timezone": "Europe/Berlin",
+          "hourly": {}
+        },
+        "jc-2026-05-20-周三006-赛哈海湾-吉达国民": {
+          "place": "Saihat",
+          "latitude": 22.48,
+          "longitude": 88.60583,
+          "country": "India",
+          "timezone": "Asia/Kolkata",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 28.5,
+              "max": 36.5,
+              "avg": 31.575
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 1.8,
+              "avg": 0.15
+            },
+            "windSpeed10m": {
+              "min": 2.1,
+              "max": 14.1,
+              "avg": 8.025
+            }
+          }
+        },
+        "jc-2026-05-20-周三002-斯达-博德闪耀": {
+          "place": "Kristiansand",
+          "latitude": 58.14671,
+          "longitude": 7.9956,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 10.5,
+              "max": 18.7,
+              "avg": 13.796
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 5.8,
+              "max": 22.3,
+              "avg": 12.129
+            }
+          }
+        },
+        "jc-2026-05-20-周三011-威廉二世-福伦丹": {
+          "place": "Tilburg",
+          "latitude": 51.55551,
+          "longitude": 5.0913,
+          "country": "The Netherlands",
+          "timezone": "Europe/Amsterdam",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 12.6,
+              "max": 21.7,
+              "avg": 17.063
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 5,
+              "max": 14.4,
+              "avg": 9.313
+            }
+          }
+        },
+        "jc-2026-05-20-周三003-库奥皮奥-雅罗": {
+          "place": "Kuopio",
+          "latitude": 62.89238,
+          "longitude": 27.67703,
+          "country": "Finland",
+          "timezone": "Europe/Helsinki",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 15.1,
+              "max": 21.8,
+              "avg": 18.246
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 3.6,
+              "max": 14.8,
+              "avg": 8.904
+            }
+          }
+        },
+        "sf-26081-08-特罗姆瑟-奥勒松": {
+          "place": "Tromso",
+          "latitude": 69.66761,
+          "longitude": 18.9258,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-25",
+            "temperature2m": {
+              "min": 5.7,
+              "max": 9,
+              "avg": 7.163
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 1.3,
+              "avg": 0.475
+            },
+            "windSpeed10m": {
+              "min": 7.6,
+              "max": 19.9,
+              "avg": 13.913
+            }
+          }
+        },
+        "jc-2026-05-20-周三001-坦山猫-国际图尔": {
+          "place": "Tampere",
+          "latitude": 61.49911,
+          "longitude": 23.78712,
+          "country": "Finland",
+          "timezone": "Europe/Helsinki",
+          "hourly": {
+            "date": "2026-05-20",
+            "temperature2m": {
+              "min": 14.2,
+              "max": 19,
+              "avg": 15.554
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0.2,
+              "avg": 0.013
+            },
+            "windSpeed10m": {
+              "min": 3.2,
+              "max": 15.8,
+              "avg": 11.042
+            }
+          }
+        },
+        "sf-26081-01-水晶宫-巴列卡诺": {
+          "place": "London",
+          "latitude": 51.50853,
+          "longitude": -0.12574,
+          "country": "United Kingdom",
+          "timezone": "Europe/London",
+          "hourly": {}
+        },
+        "sf-26081-04-圣埃蒂安-尼斯": {
+          "place": "Saint-Etienne",
+          "latitude": 45.43389,
+          "longitude": 4.39,
+          "country": "France",
+          "timezone": "Europe/Paris",
+          "hourly": {}
+        },
+        "sf-26081-10-桑纳菲尤尔-腓特烈斯塔": {
+          "place": "Sandefjord",
+          "latitude": 59.13118,
+          "longitude": 10.21665,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-26",
+            "temperature2m": {
+              "min": 11.3,
+              "max": 19,
+              "avg": 15.404
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 10.6,
+              "max": 21.7,
+              "avg": 16.479
+            }
+          }
+        },
+        "sf-26081-11-拉努斯-米拉索尔": {
+          "place": "Lanus",
+          "latitude": -34.70757,
+          "longitude": -58.39132,
+          "country": "Argentina",
+          "timezone": "America/Argentina/Buenos_Aires",
+          "hourly": {}
+        },
+        "sf-26081-12-弗拉门戈-库斯科": {
+          "place": "Rio de Janeiro",
+          "latitude": -22.90642,
+          "longitude": -43.18223,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {}
+        },
+        "jc-2026-05-20-周三009-弗拉门戈-拉普大学": {
+          "place": "Rio de Janeiro",
+          "latitude": -22.90642,
+          "longitude": -43.18223,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 20.1,
+              "max": 21.9,
+              "avg": 20.896
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 2.9,
+              "avg": 0.633
+            },
+            "windSpeed10m": {
+              "min": 2.1,
+              "max": 17.3,
+              "avg": 9.767
+            }
+          }
+        },
+        "jc-2026-05-20-周三005-利勒斯特-克里斯蒂": {
+          "place": "Lillestrom",
+          "latitude": 50.26676,
+          "longitude": -105.86787,
+          "country": "Canada",
+          "timezone": "America/Regina",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 5.9,
+              "max": 16.1,
+              "avg": 10.5
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 6.9,
+              "max": 20.5,
+              "avg": 14.408
+            }
+          }
+        },
+        "sf-26081-07-萨尔普斯堡-莫尔德": {
+          "place": "Sarpsborg",
+          "latitude": 59.28391,
+          "longitude": 11.10962,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-25",
+            "temperature2m": {
+              "min": 11.6,
+              "max": 20.8,
+              "avg": 16.588
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 8,
+              "max": 17.5,
+              "avg": 13.717
+            }
+          }
+        },
+        "jc-2026-05-20-周三008-弗赖堡-维拉": {
+          "place": "Freiburg im Breisgau",
+          "latitude": 47.9959,
+          "longitude": 7.85222,
+          "country": "Germany",
+          "timezone": "Europe/Berlin",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 11.7,
+              "max": 23.4,
+              "avg": 17.567
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 2.8,
+              "max": 13,
+              "avg": 8.304
+            }
+          }
+        },
+        "sf-26081-09-汉坎-利勒斯特罗姆": {
+          "place": "Hamar",
+          "latitude": 60.7945,
+          "longitude": 11.06798,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-25",
+            "temperature2m": {
+              "min": 11.6,
+              "max": 19.2,
+              "avg": 15.25
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 7.8,
+              "max": 19.2,
+              "avg": 14.146
+            }
+          }
+        },
+        "jc-2026-05-20-周三012-托林斯-卡萨皮亚": {
+          "place": "Torres Vedras",
+          "latitude": 39.09109,
+          "longitude": -9.2586,
+          "country": "Portugal",
+          "timezone": "Europe/Lisbon",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 14.4,
+              "max": 30.9,
+              "avg": 21.863
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 0.7,
+              "max": 14.5,
+              "avg": 6.9
+            }
+          }
+        },
+        "sf-26081-13-德尔瓦耶独立-罗萨里奥中央": {
+          "place": "Quito",
+          "latitude": -0.22985,
+          "longitude": -78.52495,
+          "country": "Ecuador",
+          "timezone": "America/Guayaquil",
+          "hourly": {}
+        },
+        "sf-26081-14-科林蒂安-普拉滕斯": {
+          "place": "Sao Paulo",
+          "latitude": -23.5475,
+          "longitude": -46.63611,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {}
+        },
+        "jc-2026-05-20-周三010-帕梅拉斯-波特诺": {
+          "place": "Sao Paulo",
+          "latitude": -23.5475,
+          "longitude": -46.63611,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 13.7,
+              "max": 17,
+              "avg": 15.325
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0.1,
+              "avg": 0.013
+            },
+            "windSpeed10m": {
+              "min": 4.1,
+              "max": 12.5,
+              "avg": 9.279
+            }
+          }
+        }
+      },
+      "warning": null
+    },
+    "news": {
+      "ok": false,
+      "source": "GDELT DOC 2.1",
+      "count": 0,
+      "fixtureData": {
+        "sf-26081-13-德尔瓦耶独立-罗萨里奥中央": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三001-坦山猫-国际图尔": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三002-斯达-博德闪耀": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三004-盖斯-哈马比": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三005-利勒斯特-克里斯蒂": {
+          "articles": []
+        },
+        "sf-26081-12-弗拉门戈-库斯科": {
+          "articles": []
+        },
+        "sf-26081-11-拉努斯-米拉索尔": {
+          "articles": []
+        },
+        "sf-26081-10-桑纳菲尤尔-腓特烈斯塔": {
+          "articles": []
+        },
+        "sf-26081-09-汉坎-利勒斯特罗姆": {
+          "articles": []
+        },
+        "sf-26081-08-特罗姆瑟-奥勒松": {
+          "articles": []
+        },
+        "sf-26081-06-奥斯陆kfum-罗森博格": {
+          "articles": []
+        },
+        "sf-26081-05-埃尔夫斯堡-赫根": {
+          "articles": []
+        },
+        "sf-26081-03-菲尔特-埃森": {
+          "articles": []
+        },
+        "sf-26081-02-帕德博恩-沃尔夫斯堡": {
+          "articles": []
+        },
+        "sf-26081-01-水晶宫-巴列卡诺": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三012-托林斯-卡萨皮亚": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三011-威廉二世-福伦丹": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三010-帕梅拉斯-波特诺": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三008-弗赖堡-维拉": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三006-赛哈海湾-吉达国民": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三009-弗拉门戈-拉普大学": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三007-奥勒松-布兰": {
+          "articles": []
+        },
+        "sf-26081-04-圣埃蒂安-尼斯": {
+          "articles": []
+        },
+        "jc-2026-05-20-周三003-库奥皮奥-雅罗": {
+          "articles": []
+        },
+        "sf-26081-07-萨尔普斯堡-莫尔德": {
+          "articles": []
+        },
+        "sf-26081-14-科林蒂安-普拉滕斯": {
+          "articles": []
+        }
+      },
+      "warning": "GDELT 未匹配到新闻"
+    }
+  },
+  "fixtures": [
+    {
+      "fixtureId": "jc-2026-05-20-周三001-坦山猫-国际图尔",
+      "sequence": "周三001",
+      "homeTeam": "坦山猫",
+      "awayTeam": "国际图尔",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Inter Turku",
+            "Country": "FIN",
+            "Level": "0",
+            "Elo": "1216.47924805",
+            "From": "2022-11-04",
+            "To": "2023-01-01"
+          }
+        },
+        "weather": {
+          "place": "Tampere",
+          "latitude": 61.49911,
+          "longitude": 23.78712,
+          "country": "Finland",
+          "timezone": "Europe/Helsinki",
+          "hourly": {
+            "date": "2026-05-20",
+            "temperature2m": {
+              "min": 14.2,
+              "max": 19,
+              "avg": 15.554
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0.2,
+              "avg": 0.013
+            },
+            "windSpeed10m": {
+              "min": 3.2,
+              "max": 15.8,
+              "avg": 11.042
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三002-斯达-博德闪耀",
+      "sequence": "周三002",
+      "homeTeam": "斯达",
+      "awayTeam": "博德闪耀",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Start",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1294.83154297",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": null
+        },
+        "weather": {
+          "place": "Kristiansand",
+          "latitude": 58.14671,
+          "longitude": 7.9956,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 10.5,
+              "max": 18.7,
+              "avg": 13.796
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 5.8,
+              "max": 22.3,
+              "avg": 12.129
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三003-库奥皮奥-雅罗",
+      "sequence": "周三003",
+      "homeTeam": "库奥皮奥",
+      "awayTeam": "雅罗",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Kuopio",
+          "latitude": 62.89238,
+          "longitude": 27.67703,
+          "country": "Finland",
+          "timezone": "Europe/Helsinki",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 15.1,
+              "max": 21.8,
+              "avg": 18.246
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 3.6,
+              "max": 14.8,
+              "avg": 8.904
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三004-盖斯-哈马比",
+      "sequence": "周三004",
+      "homeTeam": "盖斯",
+      "awayTeam": "哈马比",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Hammarby",
+            "Country": "SWE",
+            "Level": "1",
+            "Elo": "1507.66381836",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "盖斯",
+          "warning": "geocode-not-found"
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三005-利勒斯特-克里斯蒂",
+      "sequence": "周三005",
+      "homeTeam": "利勒斯特",
+      "awayTeam": "克里斯蒂",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Lillestrom",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1363.40356445",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Kristiansund",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1353.01513672",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Lillestrom",
+          "latitude": 50.26676,
+          "longitude": -105.86787,
+          "country": "Canada",
+          "timezone": "America/Regina",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 5.9,
+              "max": 16.1,
+              "avg": 10.5
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 6.9,
+              "max": 20.5,
+              "avg": 14.408
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三006-赛哈海湾-吉达国民",
+      "sequence": "周三006",
+      "homeTeam": "赛哈海湾",
+      "awayTeam": "吉达国民",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Saihat",
+          "latitude": 22.48,
+          "longitude": 88.60583,
+          "country": "India",
+          "timezone": "Asia/Kolkata",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 28.5,
+              "max": 36.5,
+              "avg": 31.575
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 1.8,
+              "avg": 0.15
+            },
+            "windSpeed10m": {
+              "min": 2.1,
+              "max": 14.1,
+              "avg": 8.025
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三007-奥勒松-布兰",
+      "sequence": "周三007",
+      "homeTeam": "奥勒松",
+      "awayTeam": "布兰",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Aalesund",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1291.39440918",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Brann",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1528.16894531",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Alesund",
+          "latitude": 62.47225,
+          "longitude": 6.15492,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 10.8,
+              "max": 15,
+              "avg": 13.117
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 2.9,
+              "max": 24.8,
+              "avg": 8.492
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三008-弗赖堡-维拉",
+      "sequence": "周三008",
+      "homeTeam": "弗赖堡",
+      "awayTeam": "维拉",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 8,
+            "points": 13,
+            "pointsPerMatch": 1.625,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 8,
+            "points": 11,
+            "pointsPerMatch": 1.375,
+            "goalDiff": 1
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "43",
+            "Club": "Freiburg",
+            "Country": "GER",
+            "Level": "1",
+            "Elo": "1734.07983398",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "8",
+            "Club": "Aston Villa",
+            "Country": "ENG",
+            "Level": "1",
+            "Elo": "1900.12805176",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Freiburg im Breisgau",
+          "latitude": 47.9959,
+          "longitude": 7.85222,
+          "country": "Germany",
+          "timezone": "Europe/Berlin",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 11.7,
+              "max": 23.4,
+              "avg": 17.567
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 2.8,
+              "max": 13,
+              "avg": 8.304
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三009-弗拉门戈-拉普大学",
+      "sequence": "周三009",
+      "homeTeam": "弗拉门戈",
+      "awayTeam": "拉普大学",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Rio de Janeiro",
+          "latitude": -22.90642,
+          "longitude": -43.18223,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 20.1,
+              "max": 21.9,
+              "avg": 20.896
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 2.9,
+              "avg": 0.633
+            },
+            "windSpeed10m": {
+              "min": 2.1,
+              "max": 17.3,
+              "avg": 9.767
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三010-帕梅拉斯-波特诺",
+      "sequence": "周三010",
+      "homeTeam": "帕梅拉斯",
+      "awayTeam": "波特诺",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Sao Paulo",
+          "latitude": -23.5475,
+          "longitude": -46.63611,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 13.7,
+              "max": 17,
+              "avg": 15.325
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0.1,
+              "avg": 0.013
+            },
+            "windSpeed10m": {
+              "min": 4.1,
+              "max": 12.5,
+              "avg": 9.279
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三011-威廉二世-福伦丹",
+      "sequence": "周三011",
+      "homeTeam": "威廉二世",
+      "awayTeam": "福伦丹",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 8,
+            "points": 5,
+            "pointsPerMatch": 0.625,
+            "goalDiff": -5
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Willem II",
+            "Country": "NED",
+            "Level": "1",
+            "Elo": "1324.4510498",
+            "From": "2025-05-19",
+            "To": "2025-07-05"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Volendam",
+            "Country": "NED",
+            "Level": "1",
+            "Elo": "1335.65087891",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Tilburg",
+          "latitude": 51.55551,
+          "longitude": 5.0913,
+          "country": "The Netherlands",
+          "timezone": "Europe/Amsterdam",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 12.6,
+              "max": 21.7,
+              "avg": 17.063
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 5,
+              "max": 14.4,
+              "avg": 9.313
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "jc-2026-05-20-周三012-托林斯-卡萨皮亚",
+      "sequence": "周三012",
+      "homeTeam": "托林斯",
+      "awayTeam": "卡萨皮亚",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 8,
+            "points": 6,
+            "pointsPerMatch": 0.75,
+            "goalDiff": -4
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Torres Vedras",
+          "latitude": 39.09109,
+          "longitude": -9.2586,
+          "country": "Portugal",
+          "timezone": "Europe/Lisbon",
+          "hourly": {
+            "date": "2026-05-21",
+            "temperature2m": {
+              "min": 14.4,
+              "max": 30.9,
+              "avg": 21.863
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 0.7,
+              "max": 14.5,
+              "avg": 6.9
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-01-水晶宫-巴列卡诺",
+      "sequence": "1",
+      "homeTeam": "水晶宫",
+      "awayTeam": "巴列卡诺",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 8,
+            "points": 7,
+            "pointsPerMatch": 0.875,
+            "goalDiff": -7
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "26",
+            "Club": "Crystal Palace",
+            "Country": "ENG",
+            "Level": "1",
+            "Elo": "1798.14025879",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "52",
+            "Club": "Rayo Vallecano",
+            "Country": "ESP",
+            "Level": "1",
+            "Elo": "1706.79943848",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "London",
+          "latitude": 51.50853,
+          "longitude": -0.12574,
+          "country": "United Kingdom",
+          "timezone": "Europe/London",
+          "hourly": {}
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-02-帕德博恩-沃尔夫斯堡",
+      "sequence": "2",
+      "homeTeam": "帕德博恩",
+      "awayTeam": "沃尔夫斯堡",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 8,
+            "points": 14,
+            "pointsPerMatch": 1.75,
+            "goalDiff": 1
+          },
+          "away": {
+            "matches": 8,
+            "points": 8,
+            "pointsPerMatch": 1,
+            "goalDiff": -3
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Paderborn",
+            "Country": "GER",
+            "Level": "2",
+            "Elo": "1527.51147461",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Wolfsburg",
+            "Country": "GER",
+            "Level": "1",
+            "Elo": "1601.71386719",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Paderborn",
+          "latitude": 51.71905,
+          "longitude": 8.75439,
+          "country": "Germany",
+          "timezone": "Europe/Berlin",
+          "hourly": {
+            "date": "2026-05-26",
+            "temperature2m": {
+              "min": 12.8,
+              "max": 28.9,
+              "avg": 21.767
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 5.1,
+              "max": 10.8,
+              "avg": 7.596
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-03-菲尔特-埃森",
+      "sequence": "3",
+      "homeTeam": "菲尔特",
+      "awayTeam": "埃森",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 8,
+            "points": 8,
+            "pointsPerMatch": 1,
+            "goalDiff": -2
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Furth",
+          "latitude": 49.47593,
+          "longitude": 10.98856,
+          "country": "Germany",
+          "timezone": "Europe/Berlin",
+          "hourly": {}
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-04-圣埃蒂安-尼斯",
+      "sequence": "4",
+      "homeTeam": "圣埃蒂安",
+      "awayTeam": "尼斯",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 8,
+            "points": 11,
+            "pointsPerMatch": 1.375,
+            "goalDiff": 4
+          },
+          "away": {
+            "matches": 8,
+            "points": 5,
+            "pointsPerMatch": 0.625,
+            "goalDiff": -7
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Nice",
+            "Country": "FRA",
+            "Level": "1",
+            "Elo": "1581.42358398",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Saint-Etienne",
+          "latitude": 45.43389,
+          "longitude": 4.39,
+          "country": "France",
+          "timezone": "Europe/Paris",
+          "hourly": {}
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-05-埃尔夫斯堡-赫根",
+      "sequence": "5",
+      "homeTeam": "埃尔夫斯堡",
+      "awayTeam": "赫根",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Elfsborg",
+            "Country": "SWE",
+            "Level": "1",
+            "Elo": "1388.13391113",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": null
+        },
+        "weather": {
+          "place": "Boras",
+          "latitude": 57.72101,
+          "longitude": 12.9401,
+          "country": "Sweden",
+          "timezone": "Europe/Stockholm",
+          "hourly": {
+            "date": "2026-05-26",
+            "temperature2m": {
+              "min": 9.4,
+              "max": 16.3,
+              "avg": 13.3
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0.1,
+              "avg": 0.025
+            },
+            "windSpeed10m": {
+              "min": 14.8,
+              "max": 24.7,
+              "avg": 19.108
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-06-奥斯陆kfum-罗森博格",
+      "sequence": "6",
+      "homeTeam": "奥斯陆KFUM",
+      "awayTeam": "罗森博格",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Rosenborg",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1427.67407227",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "奥斯陆KFUM",
+          "warning": "geocode-not-found"
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-07-萨尔普斯堡-莫尔德",
+      "sequence": "7",
+      "homeTeam": "萨尔普斯堡",
+      "awayTeam": "莫尔德",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Sarpsborg",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1403.36450195",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Molde",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1467.12402344",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Sarpsborg",
+          "latitude": 59.28391,
+          "longitude": 11.10962,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-25",
+            "temperature2m": {
+              "min": 11.6,
+              "max": 20.8,
+              "avg": 16.588
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 8,
+              "max": 17.5,
+              "avg": 13.717
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-08-特罗姆瑟-奥勒松",
+      "sequence": "8",
+      "homeTeam": "特罗姆瑟",
+      "awayTeam": "奥勒松",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Tromso",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1496.79101562",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Aalesund",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1291.39440918",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Tromso",
+          "latitude": 69.66761,
+          "longitude": 18.9258,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-25",
+            "temperature2m": {
+              "min": 5.7,
+              "max": 9,
+              "avg": 7.163
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 1.3,
+              "avg": 0.475
+            },
+            "windSpeed10m": {
+              "min": 7.6,
+              "max": 19.9,
+              "avg": 13.913
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-09-汉坎-利勒斯特罗姆",
+      "sequence": "9",
+      "homeTeam": "汉坎",
+      "awayTeam": "利勒斯特罗姆",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": {
+            "Rank": "None",
+            "Club": "Lillestrom",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1363.40356445",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Hamar",
+          "latitude": 60.7945,
+          "longitude": 11.06798,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-25",
+            "temperature2m": {
+              "min": 11.6,
+              "max": 19.2,
+              "avg": 15.25
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 7.8,
+              "max": 19.2,
+              "avg": 14.146
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-10-桑纳菲尤尔-腓特烈斯塔",
+      "sequence": "10",
+      "homeTeam": "桑纳菲尤尔",
+      "awayTeam": "腓特烈斯塔",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": {
+            "Rank": "None",
+            "Club": "Sandefjord",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1423.67443848",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          },
+          "away": {
+            "Rank": "None",
+            "Club": "Fredrikstad",
+            "Country": "NOR",
+            "Level": "1",
+            "Elo": "1412.80065918",
+            "From": "2026-05-31",
+            "To": "2026-12-31"
+          }
+        },
+        "weather": {
+          "place": "Sandefjord",
+          "latitude": 59.13118,
+          "longitude": 10.21665,
+          "country": "Norway",
+          "timezone": "Europe/Oslo",
+          "hourly": {
+            "date": "2026-05-26",
+            "temperature2m": {
+              "min": 11.3,
+              "max": 19,
+              "avg": 15.404
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 10.6,
+              "max": 21.7,
+              "avg": 16.479
+            }
+          }
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-11-拉努斯-米拉索尔",
+      "sequence": "11",
+      "homeTeam": "拉努斯",
+      "awayTeam": "米拉索尔",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Lanus",
+          "latitude": -34.70757,
+          "longitude": -58.39132,
+          "country": "Argentina",
+          "timezone": "America/Argentina/Buenos_Aires",
+          "hourly": {}
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-12-弗拉门戈-库斯科",
+      "sequence": "12",
+      "homeTeam": "弗拉门戈",
+      "awayTeam": "库斯科",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Rio de Janeiro",
+          "latitude": -22.90642,
+          "longitude": -43.18223,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {}
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-13-德尔瓦耶独立-罗萨里奥中央",
+      "sequence": "13",
+      "homeTeam": "德尔瓦耶独立",
+      "awayTeam": "罗萨里奥中央",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Quito",
+          "latitude": -0.22985,
+          "longitude": -78.52495,
+          "country": "Ecuador",
+          "timezone": "America/Guayaquil",
+          "hourly": {}
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    },
+    {
+      "fixtureId": "sf-26081-14-科林蒂安-普拉滕斯",
+      "sequence": "14",
+      "homeTeam": "科林蒂安",
+      "awayTeam": "普拉滕斯",
+      "data": {
+        "form": {
+          "home": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          },
+          "away": {
+            "matches": 0,
+            "points": 0,
+            "pointsPerMatch": null,
+            "goalDiff": 0
+          }
+        },
+        "elo": {
+          "home": null,
+          "away": null
+        },
+        "weather": {
+          "place": "Sao Paulo",
+          "latitude": -23.5475,
+          "longitude": -46.63611,
+          "country": "Brazil",
+          "timezone": "America/Sao_Paulo",
+          "hourly": {}
+        },
+        "news": {
+          "articles": []
+        }
+      }
+    }
+  ],
+  "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\advanced\\2026-05-20.json"
+}

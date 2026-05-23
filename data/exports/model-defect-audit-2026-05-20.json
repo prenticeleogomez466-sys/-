@@ -1,0 +1,488 @@
+{
+  "ok": false,
+  "date": "2026-05-20",
+  "generatedAt": "2026-05-20T13:11:35.201Z",
+  "summary": {
+    "ok": false,
+    "defects": 7,
+    "bySeverity": {
+      "P0": 2,
+      "P1": 4,
+      "P2": 1
+    },
+    "fixtures": 26,
+    "marketUsable": 20,
+    "marketComplete": 12,
+    "predictions": 26,
+    "advancedRequiredReady": 2,
+    "advancedRequiredTotal": 5
+  },
+  "defects": [
+    {
+      "severity": "P0",
+      "layer": "赔率层",
+      "title": "可用赔率不完整：20/26；缺口=帕德博恩 对 沃尔夫斯堡、菲尔特 对 埃森、拉努斯 对 米拉索尔、弗拉门戈 对 库斯科、德尔瓦耶独立 对 罗萨里奥中央、科林蒂安 对 普拉滕斯",
+      "remediation": "正式推荐前必须补齐每场至少一个真实盘口/赔率快照。"
+    },
+    {
+      "severity": "P1",
+      "layer": "赔率层",
+      "title": "完整赔率不完整：12/26；缺口=坦山猫 对 国际图尔、库奥皮奥 对 雅罗、利勒斯特 对 克里斯蒂、赛哈海湾 对 吉达国民、弗赖堡 对 维拉、弗拉门戈 对 拉普大学 等14场",
+      "remediation": "继续补欧洲赔率、亚洲盘口、竞彩让球/14场核心盘口。"
+    },
+    {
+      "severity": "P0",
+      "layer": "实时闸门",
+      "title": "实时赔率不足：20/26；缺口=帕德博恩 对 沃尔夫斯堡、菲尔特 对 埃森、拉努斯 对 米拉索尔、弗拉门戈 对 库斯科、德尔瓦耶独立 对 罗萨里奥中央、科林蒂安 对 普拉滕斯",
+      "remediation": "重新跑 realtime crawler，过期快照不得进入正式版。"
+    },
+    {
+      "severity": "P1",
+      "layer": "高级数据层",
+      "title": "缺少伤停与阵容",
+      "remediation": "配置 INJURY_SOURCE_URL 或补入合法公开/授权数据源。"
+    },
+    {
+      "severity": "P1",
+      "layer": "高级数据层",
+      "title": "缺少预计首发",
+      "remediation": "配置 LINEUP_SOURCE_URL 或补入合法公开/授权数据源。"
+    },
+    {
+      "severity": "P1",
+      "layer": "高级数据层",
+      "title": "缺少xG/射门质量",
+      "remediation": "配置 XG_SOURCE_URL 或补入合法公开/授权数据源。"
+    },
+    {
+      "severity": "P2",
+      "layer": "高级数据层",
+      "title": "可选层未完全覆盖：新闻舆情/战意",
+      "remediation": "可继续补天气/新闻等免费公开源，提高冷门解释能力。"
+    }
+  ],
+  "marketStatus": {
+    "date": "2026-05-20",
+    "fixtures": 26,
+    "snapshots": 20,
+    "usable": 20,
+    "complete": 12,
+    "missing": 6,
+    "coverage": 0.7692,
+    "completeCoverage": 0.4615,
+    "rows": [
+      {
+        "fixtureId": "jc-2026-05-20-周三001-坦山猫-国际图尔",
+        "sequence": "周三001",
+        "match": "坦山猫 对 国际图尔",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.153Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三002-斯达-博德闪耀",
+        "sequence": "周三002",
+        "match": "斯达 对 博德闪耀",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:02.674Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三003-库奥皮奥-雅罗",
+        "sequence": "周三003",
+        "match": "库奥皮奥 对 雅罗",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.153Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三004-盖斯-哈马比",
+        "sequence": "周三004",
+        "match": "盖斯 对 哈马比",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:02.674Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三005-利勒斯特-克里斯蒂",
+        "sequence": "周三005",
+        "match": "利勒斯特 对 克里斯蒂",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.154Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三006-赛哈海湾-吉达国民",
+        "sequence": "周三006",
+        "match": "赛哈海湾 对 吉达国民",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.154Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三007-奥勒松-布兰",
+        "sequence": "周三007",
+        "match": "奥勒松 对 布兰",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:02.674Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三008-弗赖堡-维拉",
+        "sequence": "周三008",
+        "match": "弗赖堡 对 维拉",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.154Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三009-弗拉门戈-拉普大学",
+        "sequence": "周三009",
+        "match": "弗拉门戈 对 拉普大学",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.154Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三010-帕梅拉斯-波特诺",
+        "sequence": "周三010",
+        "match": "帕梅拉斯 对 波特诺",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.154Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三011-威廉二世-福伦丹",
+        "sequence": "周三011",
+        "match": "威廉二世 对 福伦丹",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:02.674Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "jc-2026-05-20-周三012-托林斯-卡萨皮亚",
+        "sequence": "周三012",
+        "match": "托林斯 对 卡萨皮亚",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:51:30.154Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "sf-26081-01-水晶宫-巴列卡诺",
+        "sequence": "1",
+        "match": "水晶宫 对 巴列卡诺",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（23分钟前）",
+        "collectedAt": "2026-05-20T12:48:36.000Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-02-帕德博恩-沃尔夫斯堡",
+        "sequence": "2",
+        "match": "帕德博恩 对 沃尔夫斯堡",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26081-03-菲尔特-埃森",
+        "sequence": "3",
+        "match": "菲尔特 对 埃森",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26081-04-圣埃蒂安-尼斯",
+        "sequence": "4",
+        "match": "圣埃蒂安 对 尼斯",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:04.184Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-05-埃尔夫斯堡-赫根",
+        "sequence": "5",
+        "match": "埃尔夫斯堡 对 赫根",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:03.672Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-06-奥斯陆kfum-罗森博格",
+        "sequence": "6",
+        "match": "奥斯陆KFUM 对 罗森博格",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:04.747Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-07-萨尔普斯堡-莫尔德",
+        "sequence": "7",
+        "match": "萨尔普斯堡 对 莫尔德",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:04.747Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-08-特罗姆瑟-奥勒松",
+        "sequence": "8",
+        "match": "特罗姆瑟 对 奥勒松",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:04.747Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-09-汉坎-利勒斯特罗姆",
+        "sequence": "9",
+        "match": "汉坎 对 利勒斯特罗姆",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:04.747Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-10-桑纳菲尤尔-腓特烈斯塔",
+        "sequence": "10",
+        "match": "桑纳菲尤尔 对 腓特烈斯塔",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（20分钟前）",
+        "collectedAt": "2026-05-20T12:52:03.672Z",
+        "usable": true,
+        "complete": true,
+        "missing": []
+      },
+      {
+        "fixtureId": "sf-26081-11-拉努斯-米拉索尔",
+        "sequence": "11",
+        "match": "拉努斯 对 米拉索尔",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26081-12-弗拉门戈-库斯科",
+        "sequence": "12",
+        "match": "弗拉门戈 对 库斯科",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26081-13-德尔瓦耶独立-罗萨里奥中央",
+        "sequence": "13",
+        "match": "德尔瓦耶独立 对 罗萨里奥中央",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26081-14-科林蒂安-普拉滕斯",
+        "sequence": "14",
+        "match": "科林蒂安 对 普拉滕斯",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      }
+    ]
+  },
+  "advancedLayers": [
+    {
+      "key": "elo",
+      "label": "Elo/球队强度",
+      "env": "TEAM_ELO_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": true,
+      "source": "synced",
+      "count": 16,
+      "status": "configured"
+    },
+    {
+      "key": "form",
+      "label": "近期状态/赛程强度",
+      "env": "TEAM_FORM_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": true,
+      "source": "synced",
+      "count": 7,
+      "status": "configured"
+    },
+    {
+      "key": "injuries",
+      "label": "伤停与阵容",
+      "env": "INJURY_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-required"
+    },
+    {
+      "key": "lineups",
+      "label": "预计首发",
+      "env": "LINEUP_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-required"
+    },
+    {
+      "key": "xg",
+      "label": "xG/射门质量",
+      "env": "XG_SOURCE_URL",
+      "requiredForTopTier": true,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-required"
+    },
+    {
+      "key": "weather",
+      "label": "天气/场地/旅行",
+      "env": "WEATHER_SOURCE_URL",
+      "requiredForTopTier": false,
+      "configured": true,
+      "source": "synced",
+      "count": 24,
+      "status": "configured"
+    },
+    {
+      "key": "news",
+      "label": "新闻舆情/战意",
+      "env": "NEWS_SOURCE_URL",
+      "requiredForTopTier": false,
+      "configured": false,
+      "source": "",
+      "count": 0,
+      "status": "missing-optional"
+    }
+  ]
+}

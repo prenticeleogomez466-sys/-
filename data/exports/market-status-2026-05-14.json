@@ -1,0 +1,282 @@
+{
+  "crawler": null,
+  "status": {
+    "date": "2026-05-14",
+    "fixtures": 19,
+    "snapshots": 5,
+    "usable": 7,
+    "complete": 0,
+    "missing": 12,
+    "coverage": 0.3684,
+    "completeCoverage": 0,
+    "rows": [
+      {
+        "fixtureId": "jc-2026-05-14-周四001-巴伦西亚-巴列卡诺",
+        "sequence": "周四001",
+        "match": "巴伦西亚 对 巴列卡诺",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（0分钟前）",
+        "collectedAt": "2026-05-14T15:58:47.421Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-周四002-达曼协定-吉达联合",
+        "sequence": "周四002",
+        "match": "达曼协定 对 吉达联合",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（0分钟前）",
+        "collectedAt": "2026-05-14T15:58:47.422Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-周四003-胡巴卡德-拉斯决心",
+        "sequence": "周四003",
+        "match": "胡巴卡德 对 拉斯决心",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（0分钟前）",
+        "collectedAt": "2026-05-14T15:58:47.422Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-周四004-赫罗纳-皇家社会",
+        "sequence": "周四004",
+        "match": "赫罗纳 对 皇家社会",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（0分钟前）",
+        "collectedAt": "2026-05-14T15:58:47.422Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-周四005-皇马-奥维耶多",
+        "sequence": "周四005",
+        "match": "皇马 对 奥维耶多",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（0分钟前）",
+        "collectedAt": "2026-05-14T15:58:47.422Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-01-曼彻斯特城-水晶宫",
+        "sequence": "1",
+        "match": "曼彻斯特城 对 水晶宫",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-02-拉齐奥-国际米兰",
+        "sequence": "2",
+        "match": "拉齐奥 对 国际米兰",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-03-西班牙人-毕尔巴鄂竞技",
+        "sequence": "3",
+        "match": "西班牙人 对 毕尔巴鄂竞技",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-04-比利亚雷亚尔-塞维利亚",
+        "sequence": "4",
+        "match": "比利亚雷亚尔 对 塞维利亚",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-05-阿拉维斯-巴塞罗那",
+        "sequence": "5",
+        "match": "阿拉维斯 对 巴塞罗那",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-06-赫塔费-马洛卡",
+        "sequence": "6",
+        "match": "赫塔费 对 马洛卡",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-07-巴伦西亚-巴列卡诺",
+        "sequence": "7",
+        "match": "巴伦西亚 对 巴列卡诺",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（0分钟前）",
+        "collectedAt": "2026-05-14T15:58:47.421Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-08-赫罗纳-皇家社会",
+        "sequence": "8",
+        "match": "赫罗纳 对 皇家社会",
+        "hasSnapshot": true,
+        "realTime": true,
+        "freshness": "实时赔率有效（0分钟前）",
+        "collectedAt": "2026-05-14T15:58:47.422Z",
+        "usable": true,
+        "complete": false,
+        "missing": [
+          "亚洲盘口"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-09-皇家马德里-皇家奥维耶多",
+        "sequence": "9",
+        "match": "皇家马德里 对 皇家奥维耶多",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-10-布雷斯特-斯特拉斯堡",
+        "sequence": "10",
+        "match": "布雷斯特 对 斯特拉斯堡",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-11-朗斯-巴黎圣日尔曼",
+        "sequence": "11",
+        "match": "朗斯 对 巴黎圣日尔曼",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-12-辛辛那提fc-迈阿密国际",
+        "sequence": "12",
+        "match": "辛辛那提FC 对 迈阿密国际",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-13-圣路易斯城-洛杉矶fc",
+        "sequence": "13",
+        "match": "圣路易斯城 对 洛杉矶FC",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26075-14-西雅图海湾人-圣何塞地震",
+        "sequence": "14",
+        "match": "西雅图海湾人 对 圣何塞地震",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      }
+    ]
+  },
+  "requirements": null
+}

@@ -1,0 +1,322 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-19T12:31:38.517Z",
+  "defaultPolicy": "free-only",
+  "summary": {
+    "total": 19,
+    "production": 19,
+    "connected": 15,
+    "needsCredential": 13
+  },
+  "policy": {
+    "ok": true,
+    "failures": [],
+    "mode": "free-only",
+    "requirements": {
+      "freeOddsSource": true,
+      "handicapOdds": true,
+      "fixturesResults": true,
+      "requireHandicap": false
+    }
+  },
+  "rows": [
+    {
+      "name": "中国体彩网竞彩足球计算器（公开官方源）",
+      "priority": "P0",
+      "layers": [
+        "fixtures-jingcai",
+        "odds-win-draw-loss",
+        "odds-handicap-win-draw-loss",
+        "score-odds",
+        "half-full-odds"
+      ],
+      "env": [],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "ok",
+      "productionUsable": true,
+      "nextAction": "已接入免费模式每日健康检查"
+    },
+    {
+      "name": "竞彩网传统足彩公告（14场官方源）",
+      "priority": "P0",
+      "layers": [
+        "fixtures-shengfucai",
+        "issue-14",
+        "announcement"
+      ],
+      "env": [],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "ok",
+      "productionUsable": true,
+      "nextAction": "已接入免费模式每日健康检查"
+    },
+    {
+      "name": "竞彩网赛事公告（竞彩开售停售）",
+      "priority": "P0",
+      "layers": [
+        "sales-window",
+        "bulletin"
+      ],
+      "env": [],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "ok",
+      "productionUsable": true,
+      "nextAction": "已接入免费模式每日健康检查"
+    },
+    {
+      "name": "The Odds API 免费层",
+      "priority": "P0",
+      "layers": [
+        "odds-european",
+        "odds-asian"
+      ],
+      "env": [
+        "ODDS_API_KEY"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 ODDS_API_KEY"
+    },
+    {
+      "name": "Odds-API.io 免费层",
+      "priority": "P0",
+      "layers": [
+        "odds-european",
+        "odds-asian"
+      ],
+      "env": [
+        "ODDS_API_IO_KEY"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 ODDS_API_IO_KEY"
+    },
+    {
+      "name": "API-Football 免费层",
+      "priority": "P0",
+      "layers": [
+        "fixtures",
+        "results",
+        "odds"
+      ],
+      "env": [
+        "API_FOOTBALL_KEY"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 API_FOOTBALL_KEY"
+    },
+    {
+      "name": "football-data.org 免费层",
+      "priority": "P1",
+      "layers": [
+        "fixtures",
+        "results"
+      ],
+      "env": [
+        "FOOTBALL_DATA_ORG_TOKEN"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 FOOTBALL_DATA_ORG_TOKEN"
+    },
+    {
+      "name": "football-data.co.uk 免费 CSV",
+      "priority": "P1",
+      "layers": [
+        "historical-results",
+        "historical-odds"
+      ],
+      "env": [
+        "FOOTBALL_DATA_CO_UK_ENABLED"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "ok",
+      "productionUsable": true,
+      "nextAction": "已接入免费模式每日健康检查"
+    },
+    {
+      "name": "ClubElo 公共评级",
+      "priority": "P1",
+      "layers": [
+        "team-elo",
+        "team-strength"
+      ],
+      "env": [],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "ok",
+      "productionUsable": true,
+      "nextAction": "已接入免费模式每日健康检查"
+    },
+    {
+      "name": "Open-Meteo 免费天气",
+      "priority": "P1",
+      "layers": [
+        "weather",
+        "geo-coding"
+      ],
+      "env": [],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "ok",
+      "productionUsable": true,
+      "nextAction": "已接入免费模式每日健康检查"
+    },
+    {
+      "name": "GDELT DOC 新闻检索",
+      "priority": "P2",
+      "layers": [
+        "news",
+        "motivation-signal"
+      ],
+      "env": [],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "ok",
+      "productionUsable": true,
+      "nextAction": "已接入免费模式每日健康检查"
+    },
+    {
+      "name": "OpenLigaDB 免费公开 API",
+      "priority": "P2",
+      "layers": [
+        "fixtures",
+        "results",
+        "germany-leagues"
+      ],
+      "env": [
+        "OPENLIGADB_ENABLED"
+      ],
+      "adapterStatus": "candidate",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 OPENLIGADB_ENABLED"
+    },
+    {
+      "name": "ScoreBat 免费视频/资讯 API",
+      "priority": "P3",
+      "layers": [
+        "match-videos",
+        "news-context"
+      ],
+      "env": [
+        "SCOREBAT_ENABLED"
+      ],
+      "adapterStatus": "candidate",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 SCOREBAT_ENABLED"
+    },
+    {
+      "name": "StatsBomb Open Data",
+      "priority": "P2",
+      "layers": [
+        "historical-events",
+        "historical-xg",
+        "model-training"
+      ],
+      "env": [
+        "STATSBOMB_OPEN_DATA_ENABLED"
+      ],
+      "adapterStatus": "candidate",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 STATSBOMB_OPEN_DATA_ENABLED"
+    },
+    {
+      "name": "openfootball GitHub 公共数据",
+      "priority": "P2",
+      "layers": [
+        "historical-fixtures",
+        "historical-results"
+      ],
+      "env": [
+        "OPENFOOTBALL_DATA_ENABLED"
+      ],
+      "adapterStatus": "candidate",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 OPENFOOTBALL_DATA_ENABLED"
+    },
+    {
+      "name": "授权伤停 JSON 源",
+      "priority": "P0",
+      "layers": [
+        "injuries"
+      ],
+      "env": [
+        "INJURY_SOURCE_URL"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 INJURY_SOURCE_URL"
+    },
+    {
+      "name": "授权首发 JSON 源",
+      "priority": "P0",
+      "layers": [
+        "lineups"
+      ],
+      "env": [
+        "LINEUP_SOURCE_URL"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 LINEUP_SOURCE_URL"
+    },
+    {
+      "name": "授权 xG JSON 源",
+      "priority": "P0",
+      "layers": [
+        "xg",
+        "shot-quality"
+      ],
+      "env": [
+        "XG_SOURCE_URL"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 XG_SOURCE_URL"
+    },
+    {
+      "name": "自有免费 JSON/CSV 赔率源",
+      "priority": "P0",
+      "layers": [
+        "odds-european",
+        "odds-asian",
+        "odds-handicap"
+      ],
+      "env": [
+        "ODDS_JSON_URL 或 ODDS_CSV_URL"
+      ],
+      "adapterStatus": "connected",
+      "freeDefault": true,
+      "credential": "missing-env",
+      "productionUsable": false,
+      "nextAction": "配置 ODDS_JSON_URL 或 ODDS_CSV_URL"
+    }
+  ]
+}

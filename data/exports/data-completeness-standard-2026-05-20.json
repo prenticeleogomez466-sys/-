@@ -1,0 +1,87 @@
+{
+  "ok": false,
+  "date": "2026-05-20",
+  "generatedAt": "2026-05-20T13:11:35.217Z",
+  "standard": {
+    "baselineDate": "2026-05-15",
+    "baselineTimezone": "Asia/Shanghai",
+    "requireFreshRealtimeGate": true,
+    "requireMarketCoverageRatio": 1,
+    "requireCompleteCoverageRatio": 1,
+    "requireRealtimeCoverageRatio": 1,
+    "requireRecommendationErrors": 0,
+    "requireRecommendationWarnings": 0,
+    "requireModelErrors": 0,
+    "jingcaiRequiredLayers": [
+      "europeanOdds",
+      "asianHandicap",
+      "handicapOdds"
+    ],
+    "shengfucaiRequiredLayers": [
+      "europeanOdds",
+      "asianHandicap"
+    ]
+  },
+  "summary": {
+    "fixtures": 26,
+    "snapshots": 20,
+    "usable": 20,
+    "complete": 12,
+    "realtime": 20,
+    "recommendationErrors": 6,
+    "recommendationWarnings": 0,
+    "modelErrors": 0
+  },
+  "checks": [
+    {
+      "name": "fresh-realtime-gate",
+      "ok": true,
+      "detail": "ageMinutes=20"
+    },
+    {
+      "name": "market-usable-coverage",
+      "ok": false,
+      "detail": "20/26"
+    },
+    {
+      "name": "market-complete-coverage",
+      "ok": false,
+      "detail": "12/26"
+    },
+    {
+      "name": "market-realtime-coverage",
+      "ok": false,
+      "detail": "20/26"
+    },
+    {
+      "name": "market-missing-zero",
+      "ok": false,
+      "detail": "missing=6"
+    },
+    {
+      "name": "market-requirements",
+      "ok": false,
+      "detail": "真实赔率覆盖不完整：20/26; 玩法赔率不完整：12/26，竞彩足球需欧洲赔率、亚洲盘口、让球胜平负；14场需欧洲赔率、亚洲盘口; 实时赔率不完整：20/26"
+    },
+    {
+      "name": "recommendation-errors-zero",
+      "ok": false,
+      "detail": "errors=6"
+    },
+    {
+      "name": "recommendation-warnings-zero",
+      "ok": true,
+      "detail": "warnings=0"
+    },
+    {
+      "name": "recommendation-count-matches-fixtures",
+      "ok": true,
+      "detail": "26/26"
+    },
+    {
+      "name": "model-errors-zero",
+      "ok": true,
+      "detail": "errors=0"
+    }
+  ]
+}

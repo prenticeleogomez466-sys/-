@@ -1,0 +1,92 @@
+{
+  "version": "2026-05-20",
+  "policy": {
+    "freeOnly": true,
+    "noBypassOrCracking": true,
+    "note": "只登记免费公开源、免费官方 API 或用户自有授权 URL；伤停、预计首发、实时 xG 不伪造。"
+  },
+  "sources": [
+    {
+      "id": "clubelo-public",
+      "name": "ClubElo public API",
+      "layers": ["elo", "team-strength"],
+      "env": "CLUBELO_ENABLED=1",
+      "requiresKey": false,
+      "url": "http://api.clubelo.com/",
+      "status": "connected"
+    },
+    {
+      "id": "football-data-co-uk",
+      "name": "football-data.co.uk public CSV",
+      "layers": ["form", "schedule-strength", "historical-odds"],
+      "env": "FOOTBALL_DATA_CO_UK_ENABLED=1",
+      "requiresKey": false,
+      "url": "https://www.football-data.co.uk/data.php",
+      "status": "connected"
+    },
+    {
+      "id": "open-meteo",
+      "name": "Open-Meteo",
+      "layers": ["weather", "travel-context"],
+      "env": "OPEN_METEO_ENABLED=1",
+      "requiresKey": false,
+      "url": "https://open-meteo.com/",
+      "status": "connected"
+    },
+    {
+      "id": "gdelt-doc",
+      "name": "GDELT DOC 2.1",
+      "layers": ["news", "motivation-context"],
+      "env": "GDELT_NEWS_ENABLED=1",
+      "requiresKey": false,
+      "url": "https://www.gdeltproject.org/",
+      "status": "connected-when-matched"
+    },
+    {
+      "id": "api-football-free",
+      "name": "API-Football / API-SPORTS free tier",
+      "layers": ["injuries", "lineups", "fixture-statistics", "odds"],
+      "env": "API_FOOTBALL_KEY",
+      "requiresKey": true,
+      "freeLimit": "free tier quota; suitable for selective match-day refresh",
+      "url": "https://www.api-football.com/",
+      "status": "ready-when-free-key-is-set"
+    },
+    {
+      "id": "authorized-injury-url",
+      "name": "User authorized injury JSON",
+      "layers": ["injuries"],
+      "env": "INJURY_SOURCE_URL",
+      "requiresKey": false,
+      "format": "JSON rows with fixture/homeTeam/awayTeam fields",
+      "status": "ready-when-url-is-set"
+    },
+    {
+      "id": "authorized-lineup-url",
+      "name": "User authorized lineup JSON",
+      "layers": ["lineups"],
+      "env": "LINEUP_SOURCE_URL",
+      "requiresKey": false,
+      "format": "JSON rows with fixture/homeTeam/awayTeam fields",
+      "status": "ready-when-url-is-set"
+    },
+    {
+      "id": "authorized-xg-url",
+      "name": "User authorized xG JSON",
+      "layers": ["xg", "shot-quality"],
+      "env": "XG_SOURCE_URL",
+      "requiresKey": false,
+      "format": "JSON rows with fixture/homeTeam/awayTeam fields",
+      "status": "ready-when-url-is-set"
+    },
+    {
+      "id": "statsbomb-open-data",
+      "name": "StatsBomb Open Data",
+      "layers": ["historical-xg", "model-training", "calibration"],
+      "env": "STATSBOMB_OPEN_DATA_ENABLED",
+      "requiresKey": false,
+      "url": "https://github.com/statsbomb/open-data",
+      "status": "historical-training-only"
+    }
+  ]
+}

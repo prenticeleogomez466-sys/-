@@ -1,0 +1,356 @@
+{
+  "ok": true,
+  "date": "2026-05-21",
+  "generatedAt": "2026-05-21T12:44:39.989Z",
+  "summary": {
+    "total": 49,
+    "errors": 0,
+    "warnings": 0,
+    "passed": 49
+  },
+  "checks": [
+    {
+      "layer": "结构层",
+      "name": "关键文件 package.json",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/china-web-sources.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/realtime-source-gate.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/prediction-engine.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/monte-carlo-simulator.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/daily-report.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/recommendation-audit.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/evolution-backtest.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/server.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/wechat-channel.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/wechat-delivery.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 src/wechat-smoke.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 WECHAT_CHANNEL_SECURITY.md",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 scripts/run-football-automation.ps1",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "结构层",
+      "name": "关键文件 scripts/install-football-automation-tasks.ps1",
+      "ok": true,
+      "level": "ok",
+      "detail": "存在"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 crawler:realtime",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/realtime-crawler-runner.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 crawler:realtime:strict",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/realtime-crawler-runner.js --require-external-odds --require-full-odds"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 china:sources",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/china-web-source-runner.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 china:sources:sync",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/china-web-source-runner.js --sync-fixtures"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 daily",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/daily-evolution.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 daily:allow-missing",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/daily-evolution.js --allow-missing-odds"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 advanced:sync",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/advanced-data-runner.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 model:top-tier-audit",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/top-tier-model-audit.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 model:defect-audit",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/model-defect-audit.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 model:stage-audit",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/model-stage-audit.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 backtest:evolution",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/evolution-backtest.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 auto:health",
+      "ok": true,
+      "level": "ok",
+      "detail": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-football-automation.ps1 -Mode health"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 auto:daily",
+      "ok": true,
+      "level": "ok",
+      "detail": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-football-automation.ps1 -Mode daily"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 auto:install",
+      "ok": true,
+      "level": "ok",
+      "detail": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-football-automation-tasks.ps1"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 wechat:check",
+      "ok": true,
+      "level": "ok",
+      "detail": "node src/wechat-smoke.js"
+    },
+    {
+      "layer": "脚本层",
+      "name": "npm 脚本 test",
+      "ok": true,
+      "level": "ok",
+      "detail": "node --test"
+    },
+    {
+      "layer": "数据层",
+      "name": "赛程总量",
+      "ok": true,
+      "level": "ok",
+      "detail": "22 场"
+    },
+    {
+      "layer": "数据层",
+      "name": "竞彩足球场次",
+      "ok": true,
+      "level": "ok",
+      "detail": "8 场"
+    },
+    {
+      "layer": "数据层",
+      "name": "14场完整性",
+      "ok": true,
+      "level": "ok",
+      "detail": "14/14"
+    },
+    {
+      "layer": "数据层",
+      "name": "官方数据来源",
+      "ok": true,
+      "level": "ok",
+      "detail": "china-official-web:sporttery+lottery-gov-cn"
+    },
+    {
+      "layer": "赔率层",
+      "name": "市场快照",
+      "ok": true,
+      "level": "ok",
+      "detail": "22 个快照"
+    },
+    {
+      "layer": "赔率层",
+      "name": "实时赔率覆盖",
+      "ok": true,
+      "level": "ok",
+      "detail": "22/22"
+    },
+    {
+      "layer": "闸门层",
+      "name": "实时数据源闸门",
+      "ok": true,
+      "level": "ok",
+      "detail": "通过"
+    },
+    {
+      "layer": "闸门层",
+      "name": "闸门新鲜度",
+      "ok": true,
+      "level": "ok",
+      "detail": "0 分钟"
+    },
+    {
+      "layer": "输出层",
+      "name": "每日推荐 XLSX",
+      "ok": true,
+      "level": "ok",
+      "detail": "65439 bytes"
+    },
+    {
+      "layer": "输出层",
+      "name": "复盘总表 XLSX",
+      "ok": true,
+      "level": "ok",
+      "detail": "96688 bytes"
+    },
+    {
+      "layer": "输出层",
+      "name": "微信 outbox",
+      "ok": true,
+      "level": "ok",
+      "detail": "626 bytes"
+    },
+    {
+      "layer": "中文层",
+      "name": "用户可见中文 src/prediction-engine.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "正常中文"
+    },
+    {
+      "layer": "中文层",
+      "name": "用户可见中文 src/daily-report.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "正常中文"
+    },
+    {
+      "layer": "中文层",
+      "name": "用户可见中文 src/recommendation-audit.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "正常中文"
+    },
+    {
+      "layer": "中文层",
+      "name": "用户可见中文 src/wechat-channel.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "正常中文"
+    },
+    {
+      "layer": "中文层",
+      "name": "用户可见中文 src/wechat-smoke.js",
+      "ok": true,
+      "level": "ok",
+      "detail": "正常中文"
+    },
+    {
+      "layer": "中文层",
+      "name": "用户可见中文 WECHAT_CHANNEL_SECURITY.md",
+      "ok": true,
+      "level": "ok",
+      "detail": "正常中文"
+    },
+    {
+      "layer": "中文层",
+      "name": "用户可见中文 package.json",
+      "ok": true,
+      "level": "ok",
+      "detail": "正常中文"
+    }
+  ]
+}

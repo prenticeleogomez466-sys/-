@@ -1,0 +1,1005 @@
+{
+  "date": "2026-05-21",
+  "source": "SGOdds public odds+BetExplorer public odds+新浪胜负彩欧洲四大机构+新浪胜负彩澳盘+500.com shengfucai european odds+500.com shengfucai asian odds+CubeGoal公开赔率",
+  "importedAt": "2026-05-21T13:25:46.168Z",
+  "snapshots": [
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四001-埃夫斯堡-米亚尔比-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四001-埃夫斯堡-米亚尔比",
+      "sequence": "周四001",
+      "marketType": "jingcai",
+      "competition": "瑞超",
+      "homeTeam": "埃夫斯堡",
+      "awayTeam": "米亚尔比",
+      "collectedAt": "2026-05-21T13:25:41.559Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.85,
+          "draw": 3.02,
+          "away": 2.24
+        },
+        "current": {
+          "home": 2.53,
+          "draw": 2.8,
+          "away": 2.65
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0,
+          "homeWater": 1.85,
+          "awayWater": 1.95
+        },
+        "current": {
+          "line": 0,
+          "homeWater": 1.85,
+          "awayWater": 1.95
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 1.49,
+          "draw": 3.75,
+          "away": 5.25
+        },
+        "current": {
+          "home": 1.35,
+          "draw": 4.35,
+          "away": 6.3
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+CubeGoal public match filter API https://www.cubegoal.com/odds/84745.html"
+    },
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四002-迈季宽广-利雅新月-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四002-迈季宽广-利雅新月",
+      "sequence": "周四002",
+      "marketType": "jingcai",
+      "competition": "沙职",
+      "homeTeam": "迈季宽广",
+      "awayTeam": "利雅新月",
+      "collectedAt": "2026-05-21T13:25:13.517Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 8.5,
+          "draw": 5,
+          "away": 1.27
+        },
+        "current": {
+          "home": 12,
+          "draw": 6,
+          "away": 1.15
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 1.5,
+          "homeWater": 1.87,
+          "awayWater": 1.77
+        },
+        "current": {
+          "line": 1.5,
+          "homeWater": 2.3,
+          "awayWater": 1.5
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 2.45,
+          "draw": 3.9,
+          "away": 2.15
+        },
+        "current": {
+          "home": 2.46,
+          "draw": 3.67,
+          "away": 2.22
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+SGOdds public odds https://sgodds.com/football/current-odds/Al-Fayha-vs-Al-Hilal-(KSA)-139225"
+    },
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四003-吉达联合-胡巴卡德-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四003-吉达联合-胡巴卡德",
+      "sequence": "周四003",
+      "marketType": "jingcai",
+      "competition": "沙职",
+      "homeTeam": "吉达联合",
+      "awayTeam": "胡巴卡德",
+      "collectedAt": "2026-05-21T13:25:14.318Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.2,
+          "draw": 3.5,
+          "away": 2.6
+        },
+        "current": {
+          "home": 2.85,
+          "draw": 3.2,
+          "away": 2.15
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 1.5,
+          "homeWater": 1.12,
+          "awayWater": 4.8
+        },
+        "current": {
+          "line": 1.5,
+          "homeWater": 1.18,
+          "awayWater": 4
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 1.55,
+          "draw": 4,
+          "away": 4.28
+        },
+        "current": {
+          "home": 1.5,
+          "draw": 4.2,
+          "away": 4.45
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+SGOdds public odds https://sgodds.com/football/current-odds/Al-Ittihad-vs-Al-Qadsiah-(KSA)-139224"
+    },
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四004-利雅胜利-达马克-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四004-利雅胜利-达马克",
+      "sequence": "周四004",
+      "marketType": "jingcai",
+      "competition": "沙职",
+      "homeTeam": "利雅胜利",
+      "awayTeam": "达马克",
+      "collectedAt": "2026-05-21T13:25:15.115Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.1,
+          "draw": 8,
+          "away": 15
+        },
+        "current": {
+          "home": 1.1,
+          "draw": 7,
+          "away": 11
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -2.5,
+          "homeWater": 2.1,
+          "awayWater": 1.6
+        },
+        "current": {
+          "line": -2.5,
+          "homeWater": 2.1,
+          "awayWater": 1.6
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 1.85,
+          "draw": 4,
+          "away": 2.95
+        },
+        "current": {
+          "home": 2.04,
+          "draw": 3.65,
+          "away": 2.74
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+SGOdds public odds https://sgodds.com/football/current-odds/Al-Nassr-(KSA)-vs-Damac-139226"
+    },
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四005-佩纳罗尔-科林蒂安-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四005-佩纳罗尔-科林蒂安",
+      "sequence": "周四005",
+      "marketType": "jingcai",
+      "competition": "解放者杯",
+      "homeTeam": "佩纳罗尔",
+      "awayTeam": "科林蒂安",
+      "collectedAt": "2026-05-21T13:25:15.829Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.5,
+          "draw": 2.85,
+          "away": 2.7
+        },
+        "current": {
+          "home": 2.65,
+          "draw": 2.7,
+          "away": 2.65
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1.5,
+          "homeWater": 5.2,
+          "awayWater": 1.1
+        },
+        "current": {
+          "line": -1.5,
+          "homeWater": 5.2,
+          "awayWater": 1.1
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 1.38,
+          "draw": 3.9,
+          "away": 6.75
+        },
+        "current": {
+          "home": 1.39,
+          "draw": 3.95,
+          "away": 6.4
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+SGOdds public odds https://sgodds.com/football/current-odds/Penarol-vs-Corinthians-139383"
+    },
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四006-阿贾克斯-格罗宁根-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四006-阿贾克斯-格罗宁根",
+      "sequence": "周四006",
+      "marketType": "jingcai",
+      "competition": "荷甲",
+      "homeTeam": "阿贾克斯",
+      "awayTeam": "格罗宁根",
+      "collectedAt": "2026-05-21T13:25:41.559Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.75,
+          "draw": 3.63,
+          "away": 3.55
+        },
+        "current": {
+          "home": 1.64,
+          "draw": 3.78,
+          "away": 3.92
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.75,
+          "homeWater": 2.05,
+          "awayWater": 1.75
+        },
+        "current": {
+          "line": -0.75,
+          "homeWater": 2.05,
+          "awayWater": 1.75
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 3.2,
+          "draw": 3.7,
+          "away": 1.83
+        },
+        "current": {
+          "home": 3,
+          "draw": 3.53,
+          "away": 1.95
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+CubeGoal public match filter API https://www.cubegoal.com/odds/84923.html"
+    },
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四007-沃夫斯堡-帕德博恩-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四007-沃夫斯堡-帕德博恩",
+      "sequence": "周四007",
+      "marketType": "jingcai",
+      "competition": "德甲",
+      "homeTeam": "沃夫斯堡",
+      "awayTeam": "帕德博恩",
+      "collectedAt": "2026-05-21T13:25:41.559Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.74,
+          "draw": 3.4,
+          "away": 3.83
+        },
+        "current": {
+          "home": 1.52,
+          "draw": 3.75,
+          "away": 4.9
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.75,
+          "homeWater": 1.92,
+          "awayWater": 1.92
+        },
+        "current": {
+          "line": -0.75,
+          "homeWater": 1.92,
+          "awayWater": 1.92
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 3.22,
+          "draw": 3.55,
+          "away": 1.86
+        },
+        "current": {
+          "home": 2.89,
+          "draw": 3.12,
+          "away": 2.16
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+CubeGoal public match filter API https://www.cubegoal.com/odds/84938.html"
+    },
+    {
+      "id": "2026-05-21-jc-2026-05-21-周四008-乌德勒支-海伦芬-1",
+      "date": "2026-05-21",
+      "fixtureId": "jc-2026-05-21-周四008-乌德勒支-海伦芬",
+      "sequence": "周四008",
+      "marketType": "jingcai",
+      "competition": "荷甲",
+      "homeTeam": "乌德勒支",
+      "awayTeam": "海伦芬",
+      "collectedAt": "2026-05-21T13:25:41.559Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.78,
+          "draw": 3.65,
+          "away": 3.42
+        },
+        "current": {
+          "home": 1.71,
+          "draw": 3.6,
+          "away": 3.75
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.5,
+          "homeWater": 1.9,
+          "awayWater": 1.9
+        },
+        "current": {
+          "line": -0.5,
+          "homeWater": 1.9,
+          "awayWater": 1.9
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 3.22,
+          "draw": 3.8,
+          "away": 1.8
+        },
+        "current": {
+          "home": 3.15,
+          "draw": 3.65,
+          "away": 1.86
+        },
+        "final": null
+      },
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "中国体彩网竞彩足球计算器+CubeGoal public match filter API https://www.cubegoal.com/odds/84924.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-01-赫尔城-南安普敦-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-01-赫尔城-南安普敦",
+      "sequence": "1",
+      "marketType": "shengfucai",
+      "competition": "英冠",
+      "homeTeam": "赫尔城",
+      "awayTeam": "南安普敦",
+      "collectedAt": "2026-05-21T13:25:44.308Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.327,
+          "draw": 5.547,
+          "away": 7.155
+        },
+        "current": {
+          "home": 1.356,
+          "draw": 5.253,
+          "away": 6.691
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.5,
+          "homeWater": 2.02,
+          "awayWater": 1.82
+        },
+        "current": {
+          "line": 0.5,
+          "homeWater": 2.02,
+          "awayWater": 1.82
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1408159.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1408159.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84867.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-02-拜仁慕尼黑-斯图加特-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-02-拜仁慕尼黑-斯图加特",
+      "sequence": "2",
+      "marketType": "shengfucai",
+      "competition": "德国杯",
+      "homeTeam": "拜仁慕尼黑",
+      "awayTeam": "斯图加特",
+      "collectedAt": "2026-05-21T13:23:27.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 3.002,
+          "draw": 3.647,
+          "away": 2.187
+        },
+        "current": {
+          "home": 3.74,
+          "draw": 3.878,
+          "away": 1.862
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.516,
+          "homeWater": 1.935,
+          "awayWater": 1.896
+        },
+        "current": {
+          "line": 0.25,
+          "homeWater": 1.899,
+          "awayWater": 1.926
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1199719.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1199719.shtml"
+    },
+    {
+      "id": "2026-05-21-sf-26079-03-博洛尼亚-国际米兰-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-03-博洛尼亚-国际米兰",
+      "sequence": "3",
+      "marketType": "shengfucai",
+      "competition": "意甲",
+      "homeTeam": "博洛尼亚",
+      "awayTeam": "国际米兰",
+      "collectedAt": "2026-05-21T13:25:44.961Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.544,
+          "draw": 4.144,
+          "away": 5.65
+        },
+        "current": {
+          "home": 1.486,
+          "draw": 4.274,
+          "away": 6.148
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.25,
+          "homeWater": 1.9,
+          "awayWater": 1.95
+        },
+        "current": {
+          "line": 0.25,
+          "homeWater": 1.9,
+          "awayWater": 1.95
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1199722.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1199722.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84816.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-04-拉齐奥-比萨-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-04-拉齐奥-比萨",
+      "sequence": "4",
+      "marketType": "shengfucai",
+      "competition": "意甲",
+      "homeTeam": "拉齐奥",
+      "awayTeam": "比萨",
+      "collectedAt": "2026-05-21T13:25:44.962Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.77,
+          "draw": 3.628,
+          "away": 4.451
+        },
+        "current": {
+          "home": 1.899,
+          "draw": 3.518,
+          "away": 3.85
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1,
+          "homeWater": 1.98,
+          "awayWater": 1.88
+        },
+        "current": {
+          "line": -1,
+          "homeWater": 1.98,
+          "awayWater": 1.88
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1215800.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1215800.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84813.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-05-维戈塞尔塔-塞维利亚-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-05-维戈塞尔塔-塞维利亚",
+      "sequence": "5",
+      "marketType": "shengfucai",
+      "competition": "西甲",
+      "homeTeam": "维戈塞尔塔",
+      "awayTeam": "塞维利亚",
+      "collectedAt": "2026-05-21T13:25:44.962Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.437,
+          "draw": 2.744,
+          "away": 3.446
+        },
+        "current": {
+          "home": 2.37,
+          "draw": 2.817,
+          "away": 3.434
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.75,
+          "homeWater": 1.98,
+          "awayWater": 1.88
+        },
+        "current": {
+          "line": -0.75,
+          "homeWater": 1.98,
+          "awayWater": 1.88
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1215780.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84825.html+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1215780.shtml"
+    },
+    {
+      "id": "2026-05-21-sf-26079-06-赫塔费-奥萨苏纳-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-06-赫塔费-奥萨苏纳",
+      "sequence": "6",
+      "marketType": "shengfucai",
+      "competition": "西甲",
+      "homeTeam": "赫塔费",
+      "awayTeam": "奥萨苏纳",
+      "collectedAt": "2026-05-21T13:25:44.964Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.787,
+          "draw": 3.849,
+          "away": 4.085
+        },
+        "current": {
+          "home": 1.844,
+          "draw": 3.738,
+          "away": 3.848
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.25,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "current": {
+          "line": -0.25,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1215783.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1215783.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84830.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-07-赫罗纳-埃尔切-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-07-赫罗纳-埃尔切",
+      "sequence": "7",
+      "marketType": "shengfucai",
+      "competition": "西甲",
+      "homeTeam": "赫罗纳",
+      "awayTeam": "埃尔切",
+      "collectedAt": "2026-05-21T13:25:44.965Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.205,
+          "draw": 3.254,
+          "away": 3.263
+        },
+        "current": {
+          "home": 2.016,
+          "draw": 3.757,
+          "away": 3.278
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.75,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "current": {
+          "line": -0.75,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1215793.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1215793.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84831.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-09-哈尔姆斯塔德-厄尔格里特-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-09-哈尔姆斯塔德-厄尔格里特",
+      "sequence": "9",
+      "marketType": "shengfucai",
+      "competition": "瑞超",
+      "homeTeam": "哈尔姆斯塔德",
+      "awayTeam": "厄尔格里特",
+      "collectedAt": "2026-05-21T13:25:44.307Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.123,
+          "draw": 3.369,
+          "away": 3.207
+        },
+        "current": {
+          "home": 2.134,
+          "draw": 3.374,
+          "away": 3.14
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.5,
+          "homeWater": 2.08,
+          "awayWater": 1.72
+        },
+        "current": {
+          "line": -0.5,
+          "homeWater": 2.08,
+          "awayWater": 1.72
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1362673.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1362673.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84776.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-10-卡尔马-代格福什-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-10-卡尔马-代格福什",
+      "sequence": "10",
+      "marketType": "shengfucai",
+      "competition": "瑞超",
+      "homeTeam": "卡尔马",
+      "awayTeam": "代格福什",
+      "collectedAt": "2026-05-21T13:25:44.306Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.02,
+          "draw": 3.083,
+          "away": 3.533
+        },
+        "current": {
+          "home": 2.017,
+          "draw": 3.1,
+          "away": 3.533
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.5,
+          "homeWater": 1.92,
+          "awayWater": 1.88
+        },
+        "current": {
+          "line": -0.5,
+          "homeWater": 1.92,
+          "awayWater": 1.88
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1362675.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1362675.shtml+CubeGoal public match filter API https://www.cubegoal.com/odds/84775.html"
+    },
+    {
+      "id": "2026-05-21-sf-26079-11-坦佩雷山猫-赫尔辛基火花-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-11-坦佩雷山猫-赫尔辛基火花",
+      "sequence": "11",
+      "marketType": "shengfucai",
+      "competition": "芬超",
+      "homeTeam": "坦佩雷山猫",
+      "awayTeam": "赫尔辛基火花",
+      "collectedAt": "2026-05-21T13:23:14.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.001,
+          "draw": 3.536,
+          "away": 3.33
+        },
+        "current": {
+          "home": 1.717,
+          "draw": 3.932,
+          "away": 4.142
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.607,
+          "homeWater": 1.893,
+          "awayWater": 1.918
+        },
+        "current": {
+          "line": -0.464,
+          "homeWater": 1.974,
+          "awayWater": 1.831
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363340.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363340.shtml"
+    },
+    {
+      "id": "2026-05-21-sf-26079-12-雅罗-玛丽港-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-12-雅罗-玛丽港",
+      "sequence": "12",
+      "marketType": "shengfucai",
+      "competition": "芬超",
+      "homeTeam": "雅罗",
+      "awayTeam": "玛丽港",
+      "collectedAt": "2026-05-21T13:23:14.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.926,
+          "draw": 3.405,
+          "away": 3.726
+        },
+        "current": {
+          "home": 1.868,
+          "draw": 3.52,
+          "away": 3.762
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.538,
+          "homeWater": 1.944,
+          "awayWater": 1.845
+        },
+        "current": {
+          "line": -0.481,
+          "homeWater": 1.928,
+          "awayWater": 1.871
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363345.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363345.shtml"
+    },
+    {
+      "id": "2026-05-21-sf-26079-13-库奥皮奥-拉赫蒂-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-13-库奥皮奥-拉赫蒂",
+      "sequence": "13",
+      "marketType": "shengfucai",
+      "competition": "芬超",
+      "homeTeam": "库奥皮奥",
+      "awayTeam": "拉赫蒂",
+      "collectedAt": "2026-05-21T13:23:14.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.562,
+          "draw": 3.896,
+          "away": 5.421
+        },
+        "current": {
+          "home": 1.601,
+          "draw": 3.756,
+          "away": 5.132
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.865,
+          "homeWater": 1.896,
+          "awayWater": 1.822
+        },
+        "current": {
+          "line": -0.962,
+          "homeWater": 1.962,
+          "awayWater": 1.765
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363348.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363348.shtml"
+    },
+    {
+      "id": "2026-05-21-sf-26079-14-塞伊奈约基-ac-奥卢-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-14-塞伊奈约基-ac-奥卢",
+      "sequence": "14",
+      "marketType": "shengfucai",
+      "competition": "芬超",
+      "homeTeam": "塞伊奈约基",
+      "awayTeam": "AC 奥卢",
+      "collectedAt": "2026-05-21T13:23:14.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.615,
+          "draw": 3.437,
+          "away": 2.42
+        },
+        "current": {
+          "home": 2.474,
+          "draw": 3.415,
+          "away": 2.543
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.1,
+          "homeWater": 1.842,
+          "awayWater": 1.845
+        },
+        "current": {
+          "line": 0.067,
+          "homeWater": 1.926,
+          "awayWater": 1.775
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfcw6024864.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-21/doc-inhyrfct6503168.shtml+500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1363353.shtml+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1363353.shtml"
+    },
+    {
+      "id": "2026-05-21-sf-26079-08-福伦丹-威廉二世-1",
+      "date": "2026-05-21",
+      "fixtureId": "sf-26079-08-福伦丹-威廉二世",
+      "sequence": "8",
+      "marketType": "shengfucai",
+      "competition": "荷乙",
+      "homeTeam": "福伦丹",
+      "awayTeam": "威廉二世",
+      "collectedAt": "2026-05-21T13:23:33.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.364,
+          "draw": 3.478,
+          "away": 2.653
+        },
+        "current": {
+          "home": 2.368,
+          "draw": 3.484,
+          "away": 2.64
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.036,
+          "homeWater": 1.824,
+          "awayWater": 1.94
+        },
+        "current": {
+          "line": -0.036,
+          "homeWater": 1.81,
+          "awayWater": 1.944
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "scoreOdds": null,
+      "halfFullOdds": null,
+      "source": "500.com shengfucai european odds https://odds.500.com/fenxi/ouzhi-1411762.shtml+BetExplorer public Asian Handicap https://www.betexplorer.com/football/netherlands/eredivisie/fc-volendam-willem-ii/QTu8I0fU/asian-handicap/+500.com shengfucai asian odds https://odds.500.com/fenxi/yazhi-1411762.shtml"
+    }
+  ]
+}

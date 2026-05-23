@@ -1,0 +1,275 @@
+{
+  "ok": true,
+  "date": "2026-05-21",
+  "generatedAt": "2026-05-21T12:46:32.424Z",
+  "summary": {
+    "stages": 7,
+    "p0": 0,
+    "p1": 3,
+    "p2": 2,
+    "stageScores": {
+      "fixtures": 92,
+      "market": 100,
+      "advanced": 0,
+      "prediction": 100,
+      "derivatives": 82,
+      "bankroll": 100,
+      "output": 1
+    }
+  },
+  "stages": [
+    {
+      "key": "fixtures",
+      "label": "赛程与官方源",
+      "score": 92,
+      "status": "ready",
+      "details": {
+        "fixtures": 22,
+        "jingcai": 8,
+        "shengfucai": 14,
+        "source": "china-official-web:sporttery+lottery-gov-cn"
+      },
+      "findings": []
+    },
+    {
+      "key": "market",
+      "label": "赔率与盘口",
+      "score": 100,
+      "status": "ready",
+      "details": {
+        "fixtures": 22,
+        "usable": 22,
+        "complete": 22,
+        "realtime": 22,
+        "missingExamples": []
+      },
+      "findings": []
+    },
+    {
+      "key": "advanced",
+      "label": "高级数据特征",
+      "score": 0,
+      "status": "needs-data",
+      "details": {
+        "generatedAt": "2026-05-21T11:37:56.749Z",
+        "layers": [
+          {
+            "key": "elo",
+            "label": "Elo/球队强度",
+            "env": "TEAM_ELO_SOURCE_URL",
+            "requiredForTopTier": true,
+            "configured": true,
+            "source": "synced",
+            "count": 3,
+            "status": "configured"
+          },
+          {
+            "key": "form",
+            "label": "近期状态/赛程强度",
+            "env": "TEAM_FORM_SOURCE_URL",
+            "requiredForTopTier": true,
+            "configured": true,
+            "source": "synced",
+            "count": 2,
+            "status": "configured"
+          },
+          {
+            "key": "injuries",
+            "label": "伤停与阵容",
+            "env": "INJURY_SOURCE_URL",
+            "requiredForTopTier": true,
+            "configured": false,
+            "source": "",
+            "count": 0,
+            "status": "missing-required"
+          },
+          {
+            "key": "lineups",
+            "label": "预计首发",
+            "env": "LINEUP_SOURCE_URL",
+            "requiredForTopTier": true,
+            "configured": false,
+            "source": "",
+            "count": 0,
+            "status": "missing-required"
+          },
+          {
+            "key": "xg",
+            "label": "xG/射门质量",
+            "env": "XG_SOURCE_URL",
+            "requiredForTopTier": true,
+            "configured": false,
+            "source": "",
+            "count": 0,
+            "status": "missing-required"
+          },
+          {
+            "key": "weather",
+            "label": "天气/场地/旅行",
+            "env": "WEATHER_SOURCE_URL",
+            "requiredForTopTier": false,
+            "configured": true,
+            "source": "synced",
+            "count": 4,
+            "status": "configured"
+          },
+          {
+            "key": "news",
+            "label": "新闻舆情/战意",
+            "env": "NEWS_SOURCE_URL",
+            "requiredForTopTier": false,
+            "configured": false,
+            "source": "",
+            "count": 0,
+            "status": "missing-optional"
+          }
+        ],
+        "fixtureCoverage": [
+          {
+            "key": "elo",
+            "label": "Elo/球队强度",
+            "count": 3,
+            "coverage": 0.1364
+          },
+          {
+            "key": "form",
+            "label": "近期状态/赛程强度",
+            "count": 2,
+            "coverage": 0.0909
+          },
+          {
+            "key": "injuries",
+            "label": "伤停与阵容",
+            "count": 0,
+            "coverage": 0
+          },
+          {
+            "key": "lineups",
+            "label": "预计首发",
+            "count": 0,
+            "coverage": 0
+          },
+          {
+            "key": "xg",
+            "label": "xG/射门质量",
+            "count": 0,
+            "coverage": 0
+          }
+        ]
+      },
+      "findings": [
+        {
+          "severity": "P1",
+          "title": "缺少高级层：伤停与阵容",
+          "remediation": "配置 INJURY_SOURCE_URL 或接入合法免费/授权数据。"
+        },
+        {
+          "severity": "P1",
+          "title": "缺少高级层：预计首发",
+          "remediation": "配置 LINEUP_SOURCE_URL 或接入合法免费/授权数据。"
+        },
+        {
+          "severity": "P1",
+          "title": "缺少高级层：xG/射门质量",
+          "remediation": "配置 XG_SOURCE_URL 或接入合法免费/授权数据。"
+        },
+        {
+          "severity": "P2",
+          "title": "可选层未覆盖：新闻舆情/战意",
+          "remediation": "继续补天气、新闻等上下文源。"
+        }
+      ]
+    },
+    {
+      "key": "prediction",
+      "label": "胜平负预测",
+      "score": 100,
+      "status": "ready",
+      "details": {
+        "predictions": 22,
+        "normalized": 22,
+        "simulations": 22,
+        "quality": {
+          "D": 17,
+          "C": 5
+        }
+      },
+      "findings": []
+    },
+    {
+      "key": "derivatives",
+      "label": "比分/半全场/14场派生",
+      "score": 82,
+      "status": "watch",
+      "details": {
+        "conflicts": [],
+        "fourteenSelections": 14,
+        "bankers": 0
+      },
+      "findings": [
+        {
+          "severity": "P2",
+          "title": "14场内部仍有派生字段：14",
+          "remediation": "表格输出层必须继续只输出胜平负/胆双全，不输出比分半全场。"
+        }
+      ]
+    },
+    {
+      "key": "bankroll",
+      "label": "资金与回撤",
+      "score": 100,
+      "status": "ready",
+      "details": {
+        "enabled": 22,
+        "total": 22,
+        "candidateEntries": 0,
+        "riskyEntries": []
+      },
+      "findings": []
+    },
+    {
+      "key": "output",
+      "label": "输出与自动化",
+      "score": 1,
+      "status": "ready",
+      "details": {
+        "gateOk": true,
+        "standardOk": true,
+        "dailyOk": true
+      },
+      "findings": []
+    }
+  ],
+  "findings": [
+    {
+      "stage": "advanced",
+      "severity": "P1",
+      "title": "缺少高级层：伤停与阵容",
+      "remediation": "配置 INJURY_SOURCE_URL 或接入合法免费/授权数据。"
+    },
+    {
+      "stage": "advanced",
+      "severity": "P1",
+      "title": "缺少高级层：预计首发",
+      "remediation": "配置 LINEUP_SOURCE_URL 或接入合法免费/授权数据。"
+    },
+    {
+      "stage": "advanced",
+      "severity": "P1",
+      "title": "缺少高级层：xG/射门质量",
+      "remediation": "配置 XG_SOURCE_URL 或接入合法免费/授权数据。"
+    },
+    {
+      "stage": "advanced",
+      "severity": "P2",
+      "title": "可选层未覆盖：新闻舆情/战意",
+      "remediation": "继续补天气、新闻等上下文源。"
+    },
+    {
+      "stage": "derivatives",
+      "severity": "P2",
+      "title": "14场内部仍有派生字段：14",
+      "remediation": "表格输出层必须继续只输出胜平负/胆双全，不输出比分半全场。"
+    }
+  ]
+}

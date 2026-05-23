@@ -1,0 +1,796 @@
+{
+  "date": "2026-05-15",
+  "source": "新浪胜负彩欧洲四大机构+新浪胜负彩澳盘+捷报比分公开赔率+CubeGoal公开赔率",
+  "importedAt": "2026-05-15T15:48:13.899Z",
+  "snapshots": [
+    {
+      "id": "2026-05-15-jc-2026-05-15-周五001-阿德莱德-奥克兰fc-1",
+      "date": "2026-05-15",
+      "fixtureId": "jc-2026-05-15-周五001-阿德莱德-奥克兰fc",
+      "sequence": "周五001",
+      "marketType": "",
+      "competition": "澳超",
+      "homeTeam": "阿德莱德",
+      "awayTeam": "奥克兰FC",
+      "collectedAt": "2026-05-14T19:00:11.366Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.15,
+          "draw": 3.4,
+          "away": 2.7
+        },
+        "current": {
+          "home": 2.15,
+          "draw": 3.33,
+          "away": 2.75
+        },
+        "final": null
+      },
+      "asianHandicap": null,
+      "handicapOdds": {
+        "initial": {
+          "home": 4.5,
+          "draw": 3.95,
+          "away": 1.53
+        },
+        "current": {
+          "home": 4.5,
+          "draw": 3.95,
+          "away": 1.53
+        },
+        "final": null
+      },
+      "source": "中国体彩网竞彩足球计算器"
+    },
+    {
+      "id": "2026-05-15-jc-2026-05-15-周五002-达马克-迈季宽广-29",
+      "date": "2026-05-15",
+      "fixtureId": "jc-2026-05-15-周五002-达马克-迈季宽广",
+      "sequence": "周五002",
+      "marketType": "jingcai",
+      "competition": "沙职",
+      "homeTeam": "达马克",
+      "awayTeam": "迈季宽广",
+      "collectedAt": "2026-05-15T15:48:09.378Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.68,
+          "draw": 3.45,
+          "away": 4.1
+        },
+        "current": {
+          "home": 1.74,
+          "draw": 3.05,
+          "away": 4.4
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.517,
+          "homeWater": 0.885,
+          "awayWater": 0.965
+        },
+        "current": {
+          "line": -0.45,
+          "homeWater": 0.97,
+          "awayWater": 0.88
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 3.25,
+          "draw": 3.35,
+          "away": 1.92
+        },
+        "current": {
+          "home": 3.62,
+          "draw": 3.3,
+          "away": 1.82
+        },
+        "final": null
+      },
+      "source": "中国体彩网竞彩足球计算器+捷报比分公开赔率 https://live.nowscore.com/analysis/odds/2852351.htm"
+    },
+    {
+      "id": "2026-05-15-jc-2026-05-15-周五003-布赖合作-利雅得-30",
+      "date": "2026-05-15",
+      "fixtureId": "jc-2026-05-15-周五003-布赖合作-利雅得",
+      "sequence": "周五003",
+      "marketType": "jingcai",
+      "competition": "沙职",
+      "homeTeam": "布赖合作",
+      "awayTeam": "利雅得",
+      "collectedAt": "2026-05-15T15:48:10.499Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.48,
+          "draw": 4.05,
+          "away": 4.85
+        },
+        "current": {
+          "home": 1.46,
+          "draw": 4.1,
+          "away": 5
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.85,
+          "homeWater": 0.967,
+          "awayWater": 0.883
+        },
+        "current": {
+          "line": -0.617,
+          "homeWater": 0.902,
+          "awayWater": 0.948
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 2.54,
+          "draw": 3.4,
+          "away": 2.27
+        },
+        "current": {
+          "home": 2.64,
+          "draw": 3.1,
+          "away": 2.34
+        },
+        "final": null
+      },
+      "source": "中国体彩网竞彩足球计算器+捷报比分公开赔率 https://live.nowscore.com/analysis/odds/2852350.htm"
+    },
+    {
+      "id": "2026-05-15-jc-2026-05-15-周五004-圣埃蒂安-罗德兹-32",
+      "date": "2026-05-15",
+      "fixtureId": "jc-2026-05-15-周五004-圣埃蒂安-罗德兹",
+      "sequence": "周五004",
+      "marketType": "jingcai",
+      "competition": "法甲",
+      "homeTeam": "圣埃蒂安",
+      "awayTeam": "罗德兹",
+      "collectedAt": "2026-05-15T15:48:12.892Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.61,
+          "draw": 3.65,
+          "away": 4.3
+        },
+        "current": {
+          "home": 1.65,
+          "draw": 3.37,
+          "away": 4.42
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.75,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "current": {
+          "line": -0.75,
+          "homeWater": 2,
+          "awayWater": 1.85
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 2.9,
+          "draw": 3.45,
+          "away": 2.02
+        },
+        "current": {
+          "home": 3.25,
+          "draw": 3.3,
+          "away": 1.93
+        },
+        "final": null
+      },
+      "source": "中国体彩网竞彩足球计算器+CubeGoal公开赔率 https://www.cubegoal.com/odds/84868.html"
+    },
+    {
+      "id": "2026-05-15-jc-2026-05-15-周五005-维拉-利物浦-31",
+      "date": "2026-05-15",
+      "fixtureId": "jc-2026-05-15-周五005-维拉-利物浦",
+      "sequence": "周五005",
+      "marketType": "jingcai",
+      "competition": "英超",
+      "homeTeam": "维拉",
+      "awayTeam": "利物浦",
+      "collectedAt": "2026-05-15T15:48:11.610Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.79,
+          "draw": 3.5,
+          "away": 2.06
+        },
+        "current": {
+          "home": 2.85,
+          "draw": 3.01,
+          "away": 2.24
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.233,
+          "homeWater": 0.82,
+          "awayWater": 1.03
+        },
+        "current": {
+          "line": 0.483,
+          "homeWater": 0.877,
+          "awayWater": 0.973
+        },
+        "final": null
+      },
+      "handicapOdds": {
+        "initial": {
+          "home": 1.59,
+          "draw": 3.9,
+          "away": 4.1
+        },
+        "current": {
+          "home": 1.48,
+          "draw": 4.05,
+          "away": 4.85
+        },
+        "final": null
+      },
+      "source": "中国体彩网竞彩足球计算器+捷报比分公开赔率 https://live.nowscore.com/analysis/odds/2789490.htm"
+    },
+    {
+      "id": "2026-05-15-sf-26076-01-切尔西-曼彻斯特城-15",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-01-切尔西-曼彻斯特城",
+      "sequence": "1",
+      "marketType": "shengfucai",
+      "competition": "英足总杯",
+      "homeTeam": "切尔西",
+      "awayTeam": "曼彻斯特城",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 4.283,
+          "draw": 3.65,
+          "away": 1.763
+        },
+        "current": {
+          "home": 4.613,
+          "draw": 3.925,
+          "away": 1.682
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.75,
+          "homeWater": 1.8,
+          "awayWater": 1.98
+        },
+        "current": {
+          "line": 0.75,
+          "homeWater": 1.88,
+          "awayWater": 1.9
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-02-拜仁慕尼黑-科隆-16",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-02-拜仁慕尼黑-科隆",
+      "sequence": "2",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "拜仁慕尼黑",
+      "awayTeam": "科隆",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.208,
+          "draw": 6.875,
+          "away": 9.75
+        },
+        "current": {
+          "home": 1.143,
+          "draw": 8.75,
+          "away": 12.5
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -2.5,
+          "homeWater": 2.01,
+          "awayWater": 1.83
+        },
+        "current": {
+          "line": -2.5,
+          "homeWater": 1.92,
+          "awayWater": 1.92
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-03-弗赖堡-莱比锡红牛-17",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-03-弗赖堡-莱比锡红牛",
+      "sequence": "3",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "弗赖堡",
+      "awayTeam": "莱比锡红牛",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.963,
+          "draw": 3.763,
+          "away": 2.113
+        },
+        "current": {
+          "home": 2.64,
+          "draw": 3.875,
+          "away": 2.28
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.25,
+          "homeWater": 1.81,
+          "awayWater": 2.03
+        },
+        "current": {
+          "line": 0.25,
+          "homeWater": 1.81,
+          "awayWater": 2.03
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-04-法兰克福-斯图加特-18",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-04-法兰克福-斯图加特",
+      "sequence": "4",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "法兰克福",
+      "awayTeam": "斯图加特",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 3.188,
+          "draw": 4.075,
+          "away": 1.935
+        },
+        "current": {
+          "home": 3.338,
+          "draw": 4.158,
+          "away": 1.86
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.5,
+          "homeWater": 1.93,
+          "awayWater": 1.91
+        },
+        "current": {
+          "line": 0.5,
+          "homeWater": 1.93,
+          "awayWater": 1.91
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-05-海登海姆-美因茨-19",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-05-海登海姆-美因茨",
+      "sequence": "5",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "海登海姆",
+      "awayTeam": "美因茨",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.11,
+          "draw": 3.85,
+          "away": 3.05
+        },
+        "current": {
+          "home": 1.888,
+          "draw": 4.082,
+          "away": 3.363
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -0.5,
+          "homeWater": 1.93,
+          "awayWater": 1.91
+        },
+        "current": {
+          "line": -0.5,
+          "homeWater": 1.93,
+          "awayWater": 1.91
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-06-勒沃库森-汉堡-20",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-06-勒沃库森-汉堡",
+      "sequence": "6",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "勒沃库森",
+      "awayTeam": "汉堡",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.345,
+          "draw": 5.325,
+          "away": 6.875
+        },
+        "current": {
+          "home": 1.25,
+          "draw": 6.25,
+          "away": 9
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1.75,
+          "homeWater": 1.95,
+          "awayWater": 1.89
+        },
+        "current": {
+          "line": -1.75,
+          "homeWater": 1.88,
+          "awayWater": 1.96
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-07-门兴格拉德巴赫-霍芬海姆-21",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-07-门兴格拉德巴赫-霍芬海姆",
+      "sequence": "7",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "门兴格拉德巴赫",
+      "awayTeam": "霍芬海姆",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 3.825,
+          "draw": 4.15,
+          "away": 1.745
+        },
+        "current": {
+          "home": 4.058,
+          "draw": 4.375,
+          "away": 1.67
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.75,
+          "homeWater": 2.02,
+          "awayWater": 1.82
+        },
+        "current": {
+          "line": 0.75,
+          "homeWater": 2.02,
+          "awayWater": 1.82
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-08-圣保利-沃尔夫斯堡-22",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-08-圣保利-沃尔夫斯堡",
+      "sequence": "8",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "圣保利",
+      "awayTeam": "沃尔夫斯堡",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.475,
+          "draw": 3.55,
+          "away": 2.53
+        },
+        "current": {
+          "home": 2.775,
+          "draw": 3.588,
+          "away": 2.3
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.25,
+          "homeWater": 1.74,
+          "awayWater": 2.1
+        },
+        "current": {
+          "line": 0.25,
+          "homeWater": 1.78,
+          "awayWater": 2.06
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-09-柏林联合-奥格斯堡-23",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-09-柏林联合-奥格斯堡",
+      "sequence": "9",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "柏林联合",
+      "awayTeam": "奥格斯堡",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 2.413,
+          "draw": 3.65,
+          "away": 2.563
+        },
+        "current": {
+          "home": 2.575,
+          "draw": 3.738,
+          "away": 2.403
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0,
+          "homeWater": 1.91,
+          "awayWater": 1.93
+        },
+        "current": {
+          "line": 0,
+          "homeWater": 1.98,
+          "awayWater": 1.86
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-10-云达不来梅-多特蒙德-24",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-10-云达不来梅-多特蒙德",
+      "sequence": "10",
+      "marketType": "shengfucai",
+      "competition": "德甲",
+      "homeTeam": "云达不来梅",
+      "awayTeam": "多特蒙德",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 3.425,
+          "draw": 3.95,
+          "away": 1.888
+        },
+        "current": {
+          "home": 3.308,
+          "draw": 3.95,
+          "away": 1.94
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 0.5,
+          "homeWater": 1.88,
+          "awayWater": 1.96
+        },
+        "current": {
+          "line": 0.5,
+          "homeWater": 1.88,
+          "awayWater": 1.96
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-11-布拉加-阿马多拉-25",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-11-布拉加-阿马多拉",
+      "sequence": "11",
+      "marketType": "shengfucai",
+      "competition": "葡超",
+      "homeTeam": "布拉加",
+      "awayTeam": "阿马多拉",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.56,
+          "draw": 4.175,
+          "away": 4.895
+        },
+        "current": {
+          "home": 1.623,
+          "draw": 3.9,
+          "away": 4.888
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1,
+          "homeWater": 2.04,
+          "awayWater": 1.74
+        },
+        "current": {
+          "line": -1,
+          "homeWater": 2.04,
+          "awayWater": 1.74
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-12-埃斯托里尔-本菲卡-26",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-12-埃斯托里尔-本菲卡",
+      "sequence": "12",
+      "marketType": "shengfucai",
+      "competition": "葡超",
+      "homeTeam": "埃斯托里尔",
+      "awayTeam": "本菲卡",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 8.875,
+          "draw": 5.438,
+          "away": 1.28
+        },
+        "current": {
+          "home": 7.875,
+          "draw": 5.125,
+          "away": 1.32
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": 1.5,
+          "homeWater": 1.92,
+          "awayWater": 1.86
+        },
+        "current": {
+          "line": 1.5,
+          "homeWater": 1.92,
+          "awayWater": 1.86
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-13-里斯本竞技-吉维森特-27",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-13-里斯本竞技-吉维森特",
+      "sequence": "13",
+      "marketType": "shengfucai",
+      "competition": "葡超",
+      "homeTeam": "里斯本竞技",
+      "awayTeam": "吉维森特",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.198,
+          "draw": 6.125,
+          "away": 11.875
+        },
+        "current": {
+          "home": 1.243,
+          "draw": 5.825,
+          "away": 10.125
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1.75,
+          "homeWater": 1.95,
+          "awayWater": 1.83
+        },
+        "current": {
+          "line": -1.75,
+          "homeWater": 1.95,
+          "awayWater": 1.83
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    },
+    {
+      "id": "2026-05-15-sf-26076-14-莫尔德-克里斯蒂安松-28",
+      "date": "2026-05-15",
+      "fixtureId": "sf-26076-14-莫尔德-克里斯蒂安松",
+      "sequence": "14",
+      "marketType": "shengfucai",
+      "competition": "挪超",
+      "homeTeam": "莫尔德",
+      "awayTeam": "克里斯蒂安松",
+      "collectedAt": "2026-05-15T09:00:05.000Z",
+      "europeanOdds": {
+        "initial": {
+          "home": 1.353,
+          "draw": 4.888,
+          "away": 6.625
+        },
+        "current": {
+          "home": 1.41,
+          "draw": 4.613,
+          "away": 6
+        },
+        "final": null
+      },
+      "asianHandicap": {
+        "initial": {
+          "line": -1.25,
+          "homeWater": 1.82,
+          "awayWater": 1.96
+        },
+        "current": {
+          "line": -1.25,
+          "homeWater": 1.82,
+          "awayWater": 1.96
+        },
+        "final": null
+      },
+      "handicapOdds": null,
+      "source": "新浪胜负彩欧洲四大机构 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihv4053618.shtml+新浪胜负彩澳盘 https://sports.sina.com.cn/l/2026-05-14/doc-inhxvihq0196708.shtml"
+    }
+  ]
+}

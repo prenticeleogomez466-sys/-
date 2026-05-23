@@ -1,0 +1,315 @@
+{
+  "date": "2026-05-14",
+  "startedAt": "2026-05-14T15:32:10.715Z",
+  "authorizedFixtures": null,
+  "oddsCrawler": null,
+  "market": {
+    "date": "2026-05-14",
+    "fixtures": 19,
+    "snapshots": 0,
+    "usable": 0,
+    "complete": 0,
+    "missing": 19,
+    "coverage": 0,
+    "completeCoverage": 0,
+    "rows": [
+      {
+        "fixtureId": "jc-2026-05-14-001-valencia-rayo",
+        "sequence": "周四001",
+        "match": "Valencia 对 Rayo Vallecano",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-002-ettifaq-ittihad",
+        "sequence": "周四002",
+        "match": "Al Ettifaq 对 Al Ittihad",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-003-qadsiah-hazem",
+        "sequence": "周四003",
+        "match": "Al Qadsiah 对 Al Hazem",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-004-girona-sociedad",
+        "sequence": "周四004",
+        "match": "Girona 对 Real Sociedad",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "jc-2026-05-14-005-real-madrid-oviedo",
+        "sequence": "周四005",
+        "match": "Real Madrid 对 Real Oviedo",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-01-chelsea-man-city",
+        "sequence": "1",
+        "match": "Chelsea 对 Manchester City",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-02-bayern-cologne",
+        "sequence": "2",
+        "match": "Bayern Munich 对 Koln",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-03-freiburg-leipzig",
+        "sequence": "3",
+        "match": "Freiburg 对 RB Leipzig",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-04-frankfurt-stuttgart",
+        "sequence": "4",
+        "match": "Eintracht Frankfurt 对 Stuttgart",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-05-heidenheim-mainz",
+        "sequence": "5",
+        "match": "Heidenheim 对 Mainz",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-06-leverkusen-hamburg",
+        "sequence": "6",
+        "match": "Bayer Leverkusen 对 Hamburger SV",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-07-gladbach-hoffenheim",
+        "sequence": "7",
+        "match": "Borussia Monchengladbach 对 Hoffenheim",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-08-st-pauli-wolfsburg",
+        "sequence": "8",
+        "match": "St Pauli 对 Wolfsburg",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-09-union-augsburg",
+        "sequence": "9",
+        "match": "Union Berlin 对 Augsburg",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-10-bremen-dortmund",
+        "sequence": "10",
+        "match": "Werder Bremen 对 Borussia Dortmund",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-11-braga-amadora",
+        "sequence": "11",
+        "match": "Braga 对 Estrela Amadora",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-12-estoril-benfica",
+        "sequence": "12",
+        "match": "Estoril 对 Benfica",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-13-sporting-gil-vicente",
+        "sequence": "13",
+        "match": "Sporting CP 对 Gil Vicente",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      },
+      {
+        "fixtureId": "sf-26076-14-molde-kristiansund",
+        "sequence": "14",
+        "match": "Molde 对 Kristiansund",
+        "hasSnapshot": false,
+        "realTime": false,
+        "freshness": "未接入真实赔率源",
+        "collectedAt": null,
+        "usable": false,
+        "complete": false,
+        "missing": [
+          "赔率快照"
+        ]
+      }
+    ]
+  },
+  "package": {
+    "date": "2026-05-14",
+    "dailyPath": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\exports\\football-recommendations-2026-05-14.xlsx",
+    "masterPath": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\exports\\football-recap-master.xlsx",
+    "auditPath": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\exports\\recommendation-audit-2026-05-14.json",
+    "audit": {
+      "totalChecks": 19,
+      "errors": 0,
+      "warnings": 0,
+      "predictions": 19,
+      "fourteen": 14
+    },
+    "fixtures": 19,
+    "ledgerRows": 19
+  },
+  "evolutionBacktest": {
+    "total": 19,
+    "settled": 0,
+    "winDrawLoss": {
+      "hit": 0,
+      "accuracy": null
+    }
+  },
+  "wechat": {
+    "mode": "local-outbox",
+    "ok": true,
+    "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\exports\\wechat-outbox-latest.json"
+  },
+  "ok": true,
+  "error": null,
+  "finishedAt": "2026-05-14T15:32:10.724Z"
+}

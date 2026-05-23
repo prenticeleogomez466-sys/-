@@ -1,0 +1,305 @@
+{
+  "ok": true,
+  "generatedAt": "2026-05-20T12:16:30.410Z",
+  "policy": {
+    "freeOddsOnly": true,
+    "paidSourcesAllowedByDefault": false,
+    "note": "默认只使用免费层、免费公开下载或自有免费授权 URL；不再把付费/企业源作为默认生产门槛。"
+  },
+  "summary": {
+    "total": 17,
+    "configured": 6,
+    "freeOnly": true,
+    "hasLiveOdds": true,
+    "hasHistorical": true
+  },
+  "rows": [
+    {
+      "id": "api-football-free",
+      "name": "API-Football / API-SPORTS 免费层",
+      "type": "free-api-key",
+      "env": "API_FOOTBALL_KEY",
+      "layers": [
+        "fixtures",
+        "results",
+        "odds"
+      ],
+      "freeLimit": "100 requests/day",
+      "officialUrl": "https://api-sports.io/sports/football",
+      "notes": "官方说明免费层包含每日请求额度，API-SPORTS 站点说明赛前和滚球赔率在所有计划中可用。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 API_FOOTBALL_KEY"
+    },
+    {
+      "id": "odds-api-io-free",
+      "name": "Odds-API.io 免费层",
+      "type": "free-api-key",
+      "env": "ODDS_API_IO_KEY",
+      "layers": [
+        "live-odds",
+        "pre-match-odds",
+        "moneyline",
+        "spreads",
+        "totals"
+      ],
+      "freeLimit": "100 requests/hour",
+      "officialUrl": "https://odds-api.io/pricing/free",
+      "notes": "免费层适合测试、学习、个人项目；商业生产需按官方条款确认。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 ODDS_API_IO_KEY"
+    },
+    {
+      "id": "the-odds-api-free",
+      "name": "The Odds API 免费层",
+      "type": "free-api-key",
+      "env": "ODDS_API_KEY",
+      "layers": [
+        "live-odds",
+        "pre-match-odds"
+      ],
+      "freeLimit": "limited free tier",
+      "officialUrl": "https://the-odds-api.com/liveapi/guides/v4/",
+      "notes": "官方 V4 文档提供 JSON odds API；免费层额度有限，作为免费候选源。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 ODDS_API_KEY"
+    },
+    {
+      "id": "football-data-co-uk-free",
+      "name": "football-data.co.uk 免费 CSV",
+      "type": "free-public-download",
+      "env": "FOOTBALL_DATA_CO_UK_ENABLED",
+      "layers": [
+        "historical-results",
+        "historical-odds",
+        "fixtures-csv",
+        "asian-handicap-archive"
+      ],
+      "freeLimit": "public CSV downloads",
+      "officialUrl": "https://www.football-data.co.uk/data.php",
+      "notes": "更适合训练、回测、历史赔率；不是稳定实时赔率主源。",
+      "configured": true,
+      "defaultAllowed": true,
+      "nextAction": "已可用于免费模式"
+    },
+    {
+      "id": "clubelo-public",
+      "name": "ClubElo 公共球队评级",
+      "type": "free-public-api",
+      "env": "",
+      "layers": [
+        "team-elo",
+        "team-strength"
+      ],
+      "freeLimit": "public CSV-style API",
+      "officialUrl": "http://clubelo.com/",
+      "notes": "用于球队强度基线，已在 advanced:sync 中接入。",
+      "configured": true,
+      "defaultAllowed": true,
+      "nextAction": "已可用于免费模式"
+    },
+    {
+      "id": "open-meteo-free",
+      "name": "Open-Meteo 免费天气 API",
+      "type": "free-public-api",
+      "env": "",
+      "layers": [
+        "weather",
+        "geo-coding"
+      ],
+      "freeLimit": "free for non-commercial/open usage per official terms",
+      "officialUrl": "https://open-meteo.com/",
+      "notes": "用于比赛天气、风速、降水，已在 advanced:sync 中接入。",
+      "configured": true,
+      "defaultAllowed": true,
+      "nextAction": "已可用于免费模式"
+    },
+    {
+      "id": "gdelt-doc",
+      "name": "GDELT DOC 2.1 新闻检索",
+      "type": "free-public-api",
+      "env": "",
+      "layers": [
+        "news",
+        "motivation-context"
+      ],
+      "freeLimit": "public API",
+      "officialUrl": "https://www.gdeltproject.org/",
+      "notes": "用于新闻/战意上下文，结果不稳定时仅作为辅助信号。",
+      "configured": true,
+      "defaultAllowed": true,
+      "nextAction": "已可用于免费模式"
+    },
+    {
+      "id": "openligadb",
+      "name": "OpenLigaDB 免费公开 API",
+      "type": "free-public-api",
+      "env": "OPENLIGADB_ENABLED",
+      "layers": [
+        "fixtures",
+        "results"
+      ],
+      "freeLimit": "public API",
+      "officialUrl": "https://www.openligadb.de/",
+      "notes": "适合作为德语区赛程赛果补源；目前登记为候选源。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 OPENLIGADB_ENABLED"
+    },
+    {
+      "id": "statsbomb-open-data",
+      "name": "StatsBomb Open Data",
+      "type": "free-public-download",
+      "env": "STATSBOMB_OPEN_DATA_ENABLED",
+      "layers": [
+        "historical-events",
+        "historical-xg",
+        "model-training"
+      ],
+      "freeLimit": "GitHub open data license",
+      "officialUrl": "https://github.com/statsbomb/open-data",
+      "notes": "适合训练和校准 xG/事件模型；不是实时赛前源。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 STATSBOMB_OPEN_DATA_ENABLED"
+    },
+    {
+      "id": "openfootball-json",
+      "name": "openfootball JSON 公共数据",
+      "type": "free-public-download",
+      "env": "OPENFOOTBALL_DATA_ENABLED",
+      "layers": [
+        "historical-fixtures",
+        "historical-results"
+      ],
+      "freeLimit": "GitHub public data",
+      "officialUrl": "https://github.com/openfootball/football.json",
+      "notes": "适合作为历史赛程/赛果训练补源；目前登记为候选源。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 OPENFOOTBALL_DATA_ENABLED"
+    },
+    {
+      "id": "scorebat-video-api",
+      "name": "ScoreBat 免费视频 API",
+      "type": "free-public-api",
+      "env": "SCOREBAT_ENABLED",
+      "layers": [
+        "match-videos",
+        "news-context"
+      ],
+      "freeLimit": "public video API",
+      "officialUrl": "https://www.scorebat.com/video-api/",
+      "notes": "只作为资讯/视频上下文，不作为赔率或硬预测源。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 SCOREBAT_ENABLED"
+    },
+    {
+      "id": "sina-sfc-public",
+      "name": "新浪胜负彩欧洲四大机构公开页",
+      "type": "free-public-web",
+      "env": "",
+      "layers": [
+        "14场胜负彩",
+        "pre-match-odds",
+        "odds-european"
+      ],
+      "freeLimit": "public web pages",
+      "officialUrl": "https://lottery.sina.com.cn/",
+      "notes": "用于14场胜负彩欧洲赔率快照，按期号匹配公开页面；只提供胜平负欧赔，不替代竞彩官方赔率。",
+      "configured": true,
+      "defaultAllowed": true,
+      "nextAction": "已可用于免费模式"
+    },
+    {
+      "id": "odds1x2-public-odds",
+      "name": "Odds1x2 ?????",
+      "type": "free-public-web",
+      "env": "ODDS1X2_ODDS_ENABLED",
+      "layers": [
+        "pre-match-odds",
+        "odds-european",
+        "odds-asian"
+      ],
+      "freeLimit": "public web pages, polite crawl required",
+      "officialUrl": "https://www.odds1x2.com/",
+      "notes": "??????????????????????????????????????",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 ODDS1X2_ODDS_ENABLED"
+    },
+    {
+      "id": "fivehundred-sfc-public-odds",
+      "name": "500??????????",
+      "type": "free-public-web",
+      "env": "FIVEHUNDRED_SFC_ASIAN_ENABLED",
+      "layers": [
+        "14????",
+        "pre-match-odds",
+        "odds-european",
+        "odds-asian"
+      ],
+      "freeLimit": "public web pages, may throttle requests",
+      "officialUrl": "https://zx.500.com/zc/",
+      "notes": "??????????????/?????????????????????????",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 FIVEHUNDRED_SFC_ASIAN_ENABLED"
+    },
+    {
+      "id": "cubegoal-public-match-filter",
+      "name": "CubeGoal ??????",
+      "type": "free-public-web-api",
+      "env": "CUBEGOAL_ODDS_ENABLED",
+      "layers": [
+        "pre-match-odds",
+        "odds-asian",
+        "totals",
+        "match-discovery"
+      ],
+      "freeLimit": "public web API, polite crawl required",
+      "officialUrl": "https://www.cubegoal.com/live/zuqiu",
+      "notes": "????????????????????????????? 0 ??????",
+      "configured": true,
+      "defaultAllowed": true,
+      "nextAction": "已可用于免费模式"
+    },
+    {
+      "id": "own-free-json",
+      "name": "自有免费 JSON 赔率源",
+      "type": "owned-or-authorized-free-url",
+      "env": "ODDS_JSON_URL",
+      "layers": [
+        "odds-european",
+        "odds-asian",
+        "odds-handicap"
+      ],
+      "freeLimit": "由你自己的授权源决定",
+      "officialUrl": "",
+      "notes": "可用于你自己整理的免费公开/授权数据，不使用付费企业源。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 ODDS_JSON_URL"
+    },
+    {
+      "id": "own-free-csv",
+      "name": "自有免费 CSV 赔率源",
+      "type": "owned-or-authorized-free-url",
+      "env": "ODDS_CSV_URL",
+      "layers": [
+        "odds-european",
+        "odds-asian",
+        "odds-handicap"
+      ],
+      "freeLimit": "由你自己的授权源决定",
+      "officialUrl": "",
+      "notes": "可承接免费爬虫或手工审核后的 CSV 输出。",
+      "configured": false,
+      "defaultAllowed": true,
+      "nextAction": "配置 ODDS_CSV_URL"
+    }
+  ]
+}

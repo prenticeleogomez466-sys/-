@@ -1,0 +1,10 @@
+{
+  "total": 77,
+  "settled": 0,
+  "probabilistic": 0,
+  "winDrawLoss": {
+    "hit": 0,
+    "accuracy": null
+  },
+  "probabilityMetrics": null
+}

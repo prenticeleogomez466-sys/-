@@ -1,0 +1,69 @@
+{
+  "ok": true,
+  "summary": {
+    "totalChecks": 19,
+    "errors": 0,
+    "warnings": 0,
+    "predictions": 19,
+    "fourteen": 14
+  },
+  "checks": [
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    },
+    {
+      "level": "info",
+      "message": "14场内部不输出比分/半全场，只用于竞彩分表"
+    }
+  ],
+  "errors": []
+}

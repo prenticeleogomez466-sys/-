@@ -1,0 +1,367 @@
+{
+  "date": "2026-05-15",
+  "source": "china-official-web:sporttery+lottery-gov-cn",
+  "importedAt": "2026-05-15T15:48:08.456Z",
+  "fixtures": [
+    {
+      "id": "jc-2026-05-15-周五002-达马克-迈季宽广",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16 00:15",
+      "competition": "沙职",
+      "homeTeam": "达马克",
+      "awayTeam": "迈季宽广",
+      "round": "",
+      "marketType": "jingcai",
+      "sequence": "周五002",
+      "tags": [
+        "竞彩足球",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方业务日期=2026-05-15; 比赛日期=2026-05-16; 赛事编号=周五002",
+      "source": "lottery.gov.cn/jc/jsq/zqspf",
+      "officialStatus": "official-web",
+      "officialFixtureId": 2039742,
+      "result": null
+    },
+    {
+      "id": "jc-2026-05-15-周五003-布赖合作-利雅得",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16 02:00",
+      "competition": "沙职",
+      "homeTeam": "布赖合作",
+      "awayTeam": "利雅得",
+      "round": "",
+      "marketType": "jingcai",
+      "sequence": "周五003",
+      "tags": [
+        "竞彩足球",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方业务日期=2026-05-15; 比赛日期=2026-05-16; 赛事编号=周五003",
+      "source": "lottery.gov.cn/jc/jsq/zqspf",
+      "officialStatus": "official-web",
+      "officialFixtureId": 2039743,
+      "result": null
+    },
+    {
+      "id": "jc-2026-05-15-周五004-圣埃蒂安-罗德兹",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16 02:30",
+      "competition": "法甲",
+      "homeTeam": "圣埃蒂安",
+      "awayTeam": "罗德兹",
+      "round": "",
+      "marketType": "jingcai",
+      "sequence": "周五004",
+      "tags": [
+        "竞彩足球",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方业务日期=2026-05-15; 比赛日期=2026-05-16; 赛事编号=周五004",
+      "source": "lottery.gov.cn/jc/jsq/zqspf",
+      "officialStatus": "official-web",
+      "officialFixtureId": 2039744,
+      "result": null
+    },
+    {
+      "id": "jc-2026-05-15-周五005-维拉-利物浦",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16 03:00",
+      "competition": "英超",
+      "homeTeam": "维拉",
+      "awayTeam": "利物浦",
+      "round": "",
+      "marketType": "jingcai",
+      "sequence": "周五005",
+      "tags": [
+        "竞彩足球",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方业务日期=2026-05-15; 比赛日期=2026-05-16; 赛事编号=周五005",
+      "source": "lottery.gov.cn/jc/jsq/zqspf",
+      "officialStatus": "official-web",
+      "officialFixtureId": 2039745,
+      "result": null
+    },
+    {
+      "id": "sf-26076-01-切尔西-曼彻斯特城",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "英足总杯",
+      "homeTeam": "切尔西",
+      "awayTeam": "曼彻斯特城",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "1",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-1",
+      "result": null
+    },
+    {
+      "id": "sf-26076-02-拜仁慕尼黑-科隆",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "拜仁慕尼黑",
+      "awayTeam": "科隆",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "2",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-2",
+      "result": null
+    },
+    {
+      "id": "sf-26076-03-弗赖堡-莱比锡红牛",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "弗赖堡",
+      "awayTeam": "莱比锡红牛",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "3",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-3",
+      "result": null
+    },
+    {
+      "id": "sf-26076-04-法兰克福-斯图加特",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "法兰克福",
+      "awayTeam": "斯图加特",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "4",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-4",
+      "result": null
+    },
+    {
+      "id": "sf-26076-05-海登海姆-美因茨",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "海登海姆",
+      "awayTeam": "美因茨",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "5",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-5",
+      "result": null
+    },
+    {
+      "id": "sf-26076-06-勒沃库森-汉堡",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "勒沃库森",
+      "awayTeam": "汉堡",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "6",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-6",
+      "result": null
+    },
+    {
+      "id": "sf-26076-07-门兴格拉德巴赫-霍芬海姆",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "门兴格拉德巴赫",
+      "awayTeam": "霍芬海姆",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "7",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-7",
+      "result": null
+    },
+    {
+      "id": "sf-26076-08-圣保利-沃尔夫斯堡",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "圣保利",
+      "awayTeam": "沃尔夫斯堡",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "8",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-8",
+      "result": null
+    },
+    {
+      "id": "sf-26076-09-柏林联合-奥格斯堡",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "柏林联合",
+      "awayTeam": "奥格斯堡",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "9",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-9",
+      "result": null
+    },
+    {
+      "id": "sf-26076-10-云达不来梅-多特蒙德",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "德甲",
+      "homeTeam": "云达不来梅",
+      "awayTeam": "多特蒙德",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "10",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-10",
+      "result": null
+    },
+    {
+      "id": "sf-26076-11-布拉加-阿马多拉",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-17",
+      "competition": "葡超",
+      "homeTeam": "布拉加",
+      "awayTeam": "阿马多拉",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "11",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-17; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-11",
+      "result": null
+    },
+    {
+      "id": "sf-26076-12-埃斯托里尔-本菲卡",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-17",
+      "competition": "葡超",
+      "homeTeam": "埃斯托里尔",
+      "awayTeam": "本菲卡",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "12",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-17; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-12",
+      "result": null
+    },
+    {
+      "id": "sf-26076-13-里斯本竞技-吉维森特",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-17",
+      "competition": "葡超",
+      "homeTeam": "里斯本竞技",
+      "awayTeam": "吉维森特",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "13",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-17; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-13",
+      "result": null
+    },
+    {
+      "id": "sf-26076-14-莫尔德-克里斯蒂安松",
+      "date": "2026-05-15",
+      "kickoff": "2026-05-16",
+      "competition": "挪超",
+      "homeTeam": "莫尔德",
+      "awayTeam": "克里斯蒂安松",
+      "round": "",
+      "marketType": "shengfucai",
+      "sequence": "14",
+      "tags": [
+        "14场胜负彩",
+        "中国竞彩网官方"
+      ],
+      "notes": "官方期号=第26076期; 开售=2026-05-13T12:00:00.000Z; 停售=2026-05-16T13:00:00.000Z; 比赛日期=2026-05-16; 14场主输出胜平负/胆双选全选，比分和半全场必须从已定胜平负派生",
+      "source": "https://www.sporttery.cn/ctzc/zcgg/20260512/10053639.html",
+      "officialStatus": "official-web",
+      "officialFixtureId": "第26076期-14",
+      "result": null
+    }
+  ]
+}

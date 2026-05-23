@@ -1,0 +1,408 @@
+import { loadFixtures } from "./fixture-store.js";
+import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
+import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
+import { loadAdvancedData } from "./advanced-data-store.js";
+import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
+import { buildBankrollRisk } from "./bankroll-risk.js";
+
+const OUTCOMES = [
+  { key: "home", code: "3", label: "主胜" },
+  { key: "draw", code: "1", label: "平局" },
+  { key: "away", code: "0", label: "客胜" }
+];
+
+const SCORE_POOLS = {
+  "3": ["2-0", "2-1", "1-0"],
+  "1": ["1-1", "0-0", "2-2"],
+  "0": ["0-1", "1-2", "0-2"]
+};
+
+const HALF_FULL_POOLS = {
+  "3": ["主胜-主胜", "平局-主胜", "客胜-主胜"],
+  "1": ["平局-平局", "主胜-平局", "客胜-平局"],
+  "0": ["客胜-客胜", "平局-客胜", "主胜-客胜"]
+};
+
+const FOURTEEN_DEFAULT_MAX_BANKERS = 4;
+const FOURTEEN_DEFAULT_BANKER_MIN_GAP = 0.22;
+const FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE = 60;
+const FOURTEEN_DEFAULT_DOUBLE_MIN_GAP = 0.08;
+
+export function recommendFixtures(date) {
+  const fixtureSet = loadFixtures(date);
+  const marketSnapshots = loadMarketSnapshots(fixtureSet.date).snapshots;
+  const advancedData = loadAdvancedData(fixtureSet.date);
+  const predictions = fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData }));
+  return {
+    date: fixtureSet.date,
+    generatedAt: new Date().toISOString(),
+    fixtures: predictions.length,
+    predictions,
+    fourteen: buildFourteenPlan(predictions)
+  };
+}
+
+export function predictFixture(fixture, marketSnapshots = [], index = 0, options = {}) {
+  const snapshot = findMarketSnapshot(fixture, marketSnapshots);
+  const baseProbabilities = snapshot?.europeanOdds?.current ? probabilitiesFromOdds(snapshot.europeanOdds.current) : seededProbabilities(fixture, index);
+  const probabilityAdjustment = adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
+  const probabilities = probabilityAdjustment.probabilities;
+  const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);
+  const ranked = OUTCOMES.map((outcome) => ({ ...outcome, probability: probabilities[outcome.key] })).sort((a, b) => b.probability - a.probability);
+  const gap = ranked[0].probability - ranked[1].probability;
+  const advancedFeatures = buildAdvancedFixtureFeatures(fixture, snapshot, probabilities, options);
+  const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations });
+  const risk = riskWithAdvancedSignals(gap, advancedFeatures);
+  const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
+  const prediction = {
+    fixture,
+    baseProbabilities,
+    probabilities,
+    probabilityAdjustment,
+    simulation,
+    marketSnapshot: snapshot,
+    advancedFeatures,
+    bankroll: null,
+    pick: ranked[0],
+    secondaryPick: ranked[1],
+    risk,
+    confidence,
+    scorePicks: buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index),
+    halfFullPicks: buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index),
+    rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
+  };
+  prediction.bankroll = buildBankrollRisk(prediction, options.env ?? process.env);
+  const consistencyErrors = validatePredictionConsistency(prediction);
+  if (consistencyErrors.length) throw new Error(`推荐派生市场冲突：${fixture.homeTeam} 对 ${fixture.awayTeam}；${consistencyErrors.join("；")}`);
+  return prediction;
+}
+
+function advancedFixtureData(advancedData, fixture) {
+  return advancedData?.fixtures?.find((row) => row.fixtureId === fixture.id)?.data ?? {};
+}
+
+export function outcomeCodeToChinese(code) {
+  return code === "3" ? "主胜" : code === "1" ? "平局" : code === "0" ? "客胜" : "";
+}
+
+export function scoreOutcomeCode(score) {
+  const match = String(score ?? "").trim().match(/^(\d+)\s*[-:]\s*(\d+)$/);
+  if (!match) return "";
+  const home = Number(match[1]);
+  const away = Number(match[2]);
+  if (home > away) return "3";
+  if (home === away) return "1";
+  return "0";
+}
+
+export function halfFullFinalOutcomeCode(value) {
+  const finalLabel = normalizeHalfFull(value).split("-").at(-1)?.trim();
+  return chineseOutcomeToCode(finalLabel);
+}
+
+export function validatePredictionConsistency(prediction) {
+  const checks = [
+    ["比分首选", prediction.scorePicks?.primary, prediction.pick?.code, scoreOutcomeCode],
+    ["比分次选", prediction.scorePicks?.secondary, prediction.secondaryPick?.code, scoreOutcomeCode],
+    ["半全场首选", prediction.halfFullPicks?.primary, prediction.pick?.code, halfFullFinalOutcomeCode],
+    ["半全场次选", prediction.halfFullPicks?.secondary, prediction.secondaryPick?.code, halfFullFinalOutcomeCode]
+  ];
+  return checks.flatMap(([label, value, expectedCode, parser]) => {
+    const actualCode = parser(value);
+    if (!expectedCode || actualCode === expectedCode) return [];
+    return `${label} ${value || "缺失"} 与 ${outcomeCodeToChinese(expectedCode)} 不一致`;
+  });
+}
+
+function probabilitiesFromOdds(odds) {
+  const raw = { home: 1 / odds.home, draw: 1 / odds.draw, away: 1 / odds.away };
+  const total = raw.home + raw.draw + raw.away;
+  return { home: round(raw.home / total), draw: round(raw.draw / total), away: round(raw.away / total) };
+}
+
+function adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, advancedData) {
+  const fixtureData = advancedData?.fixtures?.find((row) => row.fixtureId === fixture.id)?.data ?? {};
+  const signals = [];
+  let weights = { ...baseProbabilities };
+  const elo = eloSignal(fixtureData.elo);
+  if (elo) {
+    weights.home *= Math.exp(elo.score);
+    weights.away *= Math.exp(-elo.score);
+    weights.draw *= Math.exp(-Math.abs(elo.score) * 0.25);
+    signals.push(elo);
+  }
+  const form = formSignal(fixtureData.form);
+  if (form) {
+    weights.home *= Math.exp(form.score);
+    weights.away *= Math.exp(-form.score);
+    weights.draw *= Math.exp(-Math.abs(form.score) * 0.3);
+    signals.push(form);
+  }
+  const weather = weatherSignal(fixtureData.weather);
+  if (weather) {
+    weights.home *= weather.homeMultiplier;
+    weights.draw *= weather.drawMultiplier;
+    weights.away *= weather.awayMultiplier;
+    signals.push(weather);
+  }
+  if (!signals.length) return { applied: false, probabilities: baseProbabilities, signals: [] };
+  const adjusted = capProbabilityShift(baseProbabilities, normalizeProbabilities(weights), 0.08);
+  return {
+    applied: true,
+    probabilities: adjusted,
+    signals,
+    maxShift: round(Math.max(...["home", "draw", "away"].map((key) => Math.abs(adjusted[key] - baseProbabilities[key]))))
+  };
+}
+
+function eloSignal(elo) {
+  const home = Number(elo?.home?.Elo);
+  const away = Number(elo?.away?.Elo);
+  if (!Number.isFinite(home) || !Number.isFinite(away)) return null;
+  const diff = clamp(home - away, -450, 450);
+  return {
+    key: "elo",
+    home,
+    away,
+    diff: round(diff),
+    score: round((diff / 400) * 0.18)
+  };
+}
+
+function formSignal(form) {
+  const home = form?.home;
+  const away = form?.away;
+  if ((home?.matches ?? 0) < 4 || (away?.matches ?? 0) < 4) return null;
+  const ppgDiff = clamp((home.pointsPerMatch ?? 0) - (away.pointsPerMatch ?? 0), -2, 2);
+  const goalDiffPerMatch = clamp((home.goalDiff / home.matches) - (away.goalDiff / away.matches), -3, 3);
+  return {
+    key: "form",
+    homePointsPerMatch: round(home.pointsPerMatch),
+    awayPointsPerMatch: round(away.pointsPerMatch),
+    ppgDiff: round(ppgDiff),
+    goalDiffPerMatch: round(goalDiffPerMatch),
+    score: round(ppgDiff * 0.08 + goalDiffPerMatch * 0.025)
+  };
+}
+
+function weatherSignal(weather) {
+  const precipitation = Number(weather?.hourly?.precipitation?.avg);
+  const wind = Number(weather?.hourly?.windSpeed10m?.avg);
+  if (!Number.isFinite(precipitation) && !Number.isFinite(wind)) return null;
+  const badWeather = (Number.isFinite(precipitation) && precipitation >= 0.8) || (Number.isFinite(wind) && wind >= 22);
+  if (!badWeather) return null;
+  return {
+    key: "weather",
+    precipitation: Number.isFinite(precipitation) ? round(precipitation) : null,
+    windSpeed10m: Number.isFinite(wind) ? round(wind) : null,
+    homeMultiplier: 0.98,
+    drawMultiplier: 1.04,
+    awayMultiplier: 0.98
+  };
+}
+
+function normalizeProbabilities(values) {
+  const total = (values.home ?? 0) + (values.draw ?? 0) + (values.away ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return { home: 1 / 3, draw: 1 / 3, away: 1 / 3 };
+  return { home: values.home / total, draw: values.draw / total, away: values.away / total };
+}
+
+function capProbabilityShift(base, adjusted, maxShift) {
+  const maxActualShift = Math.max(...["home", "draw", "away"].map((key) => Math.abs(adjusted[key] - base[key])));
+  if (maxActualShift <= maxShift) return roundedProbabilitySet(adjusted);
+  const scale = maxShift / maxActualShift;
+  return roundedProbabilitySet(Object.fromEntries(["home", "draw", "away"].map((key) => [key, base[key] + (adjusted[key] - base[key]) * scale])));
+}
+
+function roundedProbabilitySet(values) {
+  const home = round(values.home);
+  const draw = round(values.draw);
+  return { home, draw, away: round(1 - home - draw) };
+}
+
+function seededProbabilities(fixture, index) {
+  const seed = hash(`${fixture.homeTeam}-${fixture.awayTeam}-${index}`);
+  const home = 0.35 + (seed % 21) / 100;
+  const draw = 0.24 + ((seed >> 3) % 10) / 100;
+  const away = Math.max(0.12, 1 - home - draw);
+  const total = home + draw + away;
+  return { home: round(home / total), draw: round(draw / total), away: round(away / total) };
+}
+
+function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0) {
+  const primary = scoreFromMarket(snapshot, code);
+  const secondary = scoreFromMarket(snapshot, secondaryCode, new Set(primary ? [primary] : []));
+  return {
+    primary: primary ?? scoreForOutcome(code, 0, probabilities, index),
+    secondary: secondary ?? scoreForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
+  };
+}
+
+function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0) {
+  const primary = halfFullFromMarket(snapshot, code);
+  const secondary = halfFullFromMarket(snapshot, secondaryCode, new Set(primary ? [primary] : []));
+  return {
+    primary: primary ?? halfFullForOutcome(code, 0, probabilities, index),
+    secondary: secondary ?? halfFullForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
+  };
+}
+
+function scoreFromMarket(snapshot, code, excluded = new Set()) {
+  const rows = snapshot?.scoreOdds?.top ?? [];
+  return rows
+    .map((row) => String(row.score ?? "").replace(":", "-").trim())
+    .filter((score) => scoreOutcomeCode(score) === code && !excluded.has(score))
+    .at(0);
+}
+
+function halfFullFromMarket(snapshot, code, excluded = new Set()) {
+  const rows = snapshot?.halfFullOdds?.top ?? [];
+  return rows
+    .map((row) => normalizeHalfFull(row.halfFull))
+    .filter((halfFull) => halfFullFinalOutcomeCode(halfFull) === code && !excluded.has(halfFull))
+    .at(0);
+}
+
+function scoreForOutcome(code, variant = 0, probabilities = {}, index = 0) {
+  const favoriteStrength = Math.max(probabilities.home ?? 0, probabilities.draw ?? 0, probabilities.away ?? 0);
+  const variantIndex = Math.abs(index + variant) % 3;
+  if (code === "3") {
+    if (favoriteStrength >= 0.72) return variantIndex === 1 ? "3-0" : "2-0";
+    if (favoriteStrength >= 0.58) return variantIndex === 2 ? "3-1" : "2-0";
+    return variantIndex === 0 ? "1-0" : "2-1";
+  }
+  if (code === "0") {
+    if (favoriteStrength >= 0.72) return variantIndex === 1 ? "0-3" : "0-2";
+    if (favoriteStrength >= 0.58) return variantIndex === 2 ? "1-3" : "0-2";
+    return variantIndex === 0 ? "0-1" : "1-2";
+  }
+  if ((probabilities.home ?? 0) + (probabilities.away ?? 0) > 0.72) return variantIndex === 1 ? "2-2" : "1-1";
+  return variantIndex === 2 ? "0-0" : "1-1";
+}
+
+function halfFullForOutcome(code, variant = 0, probabilities = {}, index = 0) {
+  const favoriteStrength = Math.max(probabilities.home ?? 0, probabilities.draw ?? 0, probabilities.away ?? 0);
+  const variantIndex = Math.abs(index + variant) % 3;
+  if (code === "3") return favoriteStrength >= 0.62 ? "主胜-主胜" : (variantIndex === 0 ? "平局-主胜" : "客胜-主胜");
+  if (code === "0") return favoriteStrength >= 0.62 ? "客胜-客胜" : (variantIndex === 0 ? "平局-客胜" : "主胜-客胜");
+  if (variantIndex === 1 && (probabilities.home ?? 0) > (probabilities.away ?? 0)) return "主胜-平局";
+  if (variantIndex === 2 && (probabilities.away ?? 0) > (probabilities.home ?? 0)) return "客胜-平局";
+  return "平局-平局";
+}
+
+function chineseOutcomeToCode(value) {
+  const normalized = String(value ?? "").trim();
+  if (["主胜", "胜"].includes(normalized)) return "3";
+  if (["平局", "平"].includes(normalized)) return "1";
+  if (["客胜", "负"].includes(normalized)) return "0";
+  if (["主胜", "胜", "3"].includes(value)) return "3";
+  if (["平局", "平", "1"].includes(value)) return "1";
+  if (["客胜", "负", "0"].includes(value)) return "0";
+  return "";
+}
+
+function normalizeHalfFull(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (raw.includes("-")) {
+    return raw.split("-").map((part) => outcomeCodeToChinese(chineseOutcomeToCode(part.trim())) || part.trim()).join("-");
+  }
+  const compact = raw.replace(/\s+/g, "");
+  if (compact.length === 2) {
+    const first = outcomeCodeToChinese(chineseOutcomeToCode(compact[0]));
+    const second = outcomeCodeToChinese(chineseOutcomeToCode(compact[1]));
+    if (first && second) return `${first}-${second}`;
+  }
+  return raw;
+}
+
+function buildFourteenPlan(predictions) {
+  const selected = predictions.filter((prediction) => prediction.fixture.marketType === "shengfucai" || prediction.fixture.tags.includes("14场胜负彩")).slice(0, 14);
+  const source = selected.length ? selected : predictions.slice(0, 14);
+  const rules = fourteenSelectionRules();
+  const bankerIndexes = new Set(
+    source
+      .map((prediction, index) => ({ index, prediction, gap: prediction.pick.probability - prediction.secondaryPick.probability }))
+      .filter((item) => item.gap >= rules.bankerMinGap && item.prediction.confidence >= rules.bankerMinConfidence)
+      .filter((item) => item.prediction.risk !== "高" && (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62)
+      .sort((a, b) => b.gap - a.gap || b.prediction.confidence - a.prediction.confidence)
+      .slice(0, rules.maxBankers)
+      .map((item) => item.index)
+  );
+  const selections = source.map((prediction, index) => {
+    const gap = prediction.pick.probability - prediction.secondaryPick.probability;
+    const isBanker = bankerIndexes.has(index);
+    const codes = isBanker ? [prediction.pick.code] : gap >= rules.doubleMinGap ? [prediction.pick.code, prediction.secondaryPick.code] : ["3", "1", "0"];
+    return {
+      index: index + 1,
+      match: `${prediction.fixture.homeTeam} 对 ${prediction.fixture.awayTeam}`,
+      single: outcomeCodeToChinese(prediction.pick.code),
+      compound: codes.map(outcomeCodeToChinese).join("/"),
+      type: codes.length === 1 ? "胆" : codes.length === 2 ? "双选" : "全选",
+      risk: prediction.risk,
+      confidence: prediction.confidence,
+      reason: `概率差 ${Math.round(gap * 100)}%；14场严格定胆规则：${isBanker ? "进入强胆池" : "未入强胆池，降为覆盖"}；${prediction.rationale}`
+    };
+  });
+  return {
+    count: selections.length,
+    singleLine: selections.map((item) => item.single).join(" "),
+    compoundLine: selections.map((item) => item.compound).join(" "),
+    selections
+  };
+}
+
+export function fourteenSelectionRules(env = process.env) {
+  return {
+    maxBankers: wholeNumber(env.FOURTEEN_MAX_BANKERS, FOURTEEN_DEFAULT_MAX_BANKERS),
+    bankerMinGap: finiteNumber(env.FOURTEEN_BANKER_MIN_GAP, FOURTEEN_DEFAULT_BANKER_MIN_GAP),
+    bankerMinConfidence: finiteNumber(env.FOURTEEN_BANKER_MIN_CONFIDENCE, FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE),
+    doubleMinGap: finiteNumber(env.FOURTEEN_DOUBLE_MIN_GAP, FOURTEEN_DEFAULT_DOUBLE_MIN_GAP)
+  };
+}
+
+function wholeNumber(value, fallback) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : fallback;
+}
+
+function finiteNumber(value, fallback) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function buildReason(fixture, snapshot, primary, secondary, risk) {
+  const oddsText = snapshot ? "已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正" : "缺少完整实时赔率，仅允许降级/演示模式，不允许作为严格正式推荐";
+  return `经模型综合分析：${fixture.competition}，${primary.label}概率领先${secondary.label}；风险${risk}；${oddsText}`;
+}
+
+function riskWithAdvancedSignals(gap, advancedFeatures) {
+  const base = gap >= 0.16 ? "低" : gap >= 0.08 ? "中" : "高";
+  const tags = advancedFeatures?.riskTags ?? [];
+  const hardRisk = tags.some((tag) => ["missing-european-odds", "missing-asian-handicap", "large-odds-drift", "large-asian-line-move"].includes(tag));
+  if (hardRisk) return "高";
+  if (base === "低" && tags.includes("missing-top-tier-team-intelligence")) return "中";
+  return base;
+}
+
+function confidenceWithAdvancedSignals(primaryProbability, gap, advancedFeatures) {
+  const base = primaryProbability * 72 + gap * 90;
+  const quality = advancedFeatures?.quality?.score ?? 65;
+  const penalty = Math.max(0, (88 - quality) * 0.35);
+  const bounded = Math.max(0, Math.min(100, base - penalty));
+  return Math.round(bounded * 100) / 100;
+}
+
+function hash(value) {
+  let result = 0;
+  for (const char of String(value)) result = (result * 31 + char.charCodeAt(0)) >>> 0;
+  return result;
+}
+
+function round(value) {
+  return Math.round((value + Number.EPSILON) * 10000) / 10000;
+}

@@ -1,0 +1,87 @@
+{
+  "ok": true,
+  "date": "2026-05-15",
+  "generatedAt": "2026-05-15T12:49:41.634Z",
+  "standard": {
+    "baselineDate": "2026-05-15",
+    "baselineTimezone": "Asia/Shanghai",
+    "requireFreshRealtimeGate": true,
+    "requireMarketCoverageRatio": 1,
+    "requireCompleteCoverageRatio": 1,
+    "requireRealtimeCoverageRatio": 1,
+    "requireRecommendationErrors": 0,
+    "requireRecommendationWarnings": 0,
+    "requireModelErrors": 0,
+    "jingcaiRequiredLayers": [
+      "europeanOdds",
+      "asianHandicap",
+      "handicapOdds"
+    ],
+    "shengfucaiRequiredLayers": [
+      "europeanOdds",
+      "asianHandicap"
+    ]
+  },
+  "summary": {
+    "fixtures": 18,
+    "snapshots": 19,
+    "usable": 18,
+    "complete": 18,
+    "realtime": 18,
+    "recommendationErrors": 0,
+    "recommendationWarnings": 0,
+    "modelErrors": 0
+  },
+  "checks": [
+    {
+      "name": "fresh-realtime-gate",
+      "ok": true,
+      "detail": "ageMinutes=19"
+    },
+    {
+      "name": "market-usable-coverage",
+      "ok": true,
+      "detail": "18/18"
+    },
+    {
+      "name": "market-complete-coverage",
+      "ok": true,
+      "detail": "18/18"
+    },
+    {
+      "name": "market-realtime-coverage",
+      "ok": true,
+      "detail": "18/18"
+    },
+    {
+      "name": "market-missing-zero",
+      "ok": true,
+      "detail": "missing=0"
+    },
+    {
+      "name": "market-requirements",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "name": "recommendation-errors-zero",
+      "ok": true,
+      "detail": "errors=0"
+    },
+    {
+      "name": "recommendation-warnings-zero",
+      "ok": true,
+      "detail": "warnings=0"
+    },
+    {
+      "name": "recommendation-count-matches-fixtures",
+      "ok": true,
+      "detail": "18/18"
+    },
+    {
+      "name": "model-errors-zero",
+      "ok": true,
+      "detail": "errors=0"
+    }
+  ]
+}

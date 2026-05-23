@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "summary": {
+    "totalChecks": 44,
+    "errors": 0,
+    "warnings": 0,
+    "predictions": 44,
+    "fourteen": 14,
+    "fourteenBankers": 4,
+    "fourteenMaxBankers": 4
+  },
+  "checks": [],
+  "errors": []
+}
