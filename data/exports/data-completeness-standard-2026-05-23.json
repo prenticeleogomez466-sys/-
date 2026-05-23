@@ -1,7 +1,7 @@
 {
   "ok": true,
   "date": "2026-05-23",
-  "generatedAt": "2026-05-23T13:59:55.818Z",
+  "generatedAt": "2026-05-23T14:08:03.899Z",
   "standard": {
     "baselineDate": "2026-05-15",
     "baselineTimezone": "Asia/Shanghai",
@@ -23,11 +23,11 @@
     ]
   },
   "summary": {
-    "fixtures": 37,
+    "fixtures": 33,
     "snapshots": 43,
-    "usable": 37,
-    "complete": 37,
-    "realtime": 37,
+    "usable": 33,
+    "complete": 33,
+    "realtime": 33,
     "recommendationErrors": 0,
     "recommendationWarnings": 0,
     "modelErrors": 0
@@ -41,17 +41,17 @@
     {
       "name": "market-usable-coverage",
       "ok": true,
-      "detail": "37/37"
+      "detail": "33/33"
     },
     {
       "name": "market-complete-coverage",
       "ok": true,
-      "detail": "37/37"
+      "detail": "33/33"
     },
     {
       "name": "market-realtime-coverage",
       "ok": true,
-      "detail": "37/37"
+      "detail": "33/33"
     },
     {
       "name": "market-missing-zero",
@@ -76,7 +76,7 @@
     {
       "name": "recommendation-count-matches-fixtures",
       "ok": true,
-      "detail": "37/37"
+      "detail": "33/33"
     },
     {
       "name": "model-errors-zero",

@@ -1,6 +1,6 @@
 {
   "date": "2026-05-23",
-  "fixtures": 37,
+  "fixtures": 33,
   "sources": [
     {
       "name": "The Odds API",
@@ -43,7 +43,7 @@
     },
     {
       "name": "Sina euro-asian contrast",
-      "fetched": 24,
+      "fetched": 22,
       "ok": true
     },
     {
@@ -64,7 +64,7 @@
     },
     {
       "name": "捷报比分公开赔率",
-      "fetched": 9,
+      "fetched": 7,
       "ok": true
     },
     {
@@ -73,8 +73,8 @@
       "ok": true
     }
   ],
-  "fetched": 103,
-  "matched": 103,
+  "fetched": 99,
+  "matched": 99,
   "saved": true,
   "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\market\\2026-05-23.json",
   "snapshots": [
@@ -617,7 +617,7 @@
       "competition": "英冠",
       "homeTeam": "赫尔城",
       "awayTeam": "米堡",
-      "collectedAt": "2026-05-23T14:00:52.590Z",
+      "collectedAt": "2026-05-23T14:08:36.820Z",
       "europeanOdds": {
         "initial": {
           "home": 4.65,
@@ -670,7 +670,7 @@
       "competition": "意甲",
       "homeTeam": "博洛尼亚",
       "awayTeam": "国际米兰",
-      "collectedAt": "2026-05-23T14:00:53.678Z",
+      "collectedAt": "2026-05-23T14:08:39.508Z",
       "europeanOdds": {
         "initial": {
           "home": 2.88,
@@ -723,7 +723,7 @@
       "competition": "德国杯",
       "homeTeam": "拜仁",
       "awayTeam": "斯图加特",
-      "collectedAt": "2026-05-23T14:00:20.622Z",
+      "collectedAt": "2026-05-23T14:08:05.661Z",
       "europeanOdds": {
         "initial": {
           "home": 1.33,
@@ -776,7 +776,7 @@
       "competition": "荷乙",
       "homeTeam": "福伦丹",
       "awayTeam": "威廉二世",
-      "collectedAt": "2026-05-23T14:00:53.678Z",
+      "collectedAt": "2026-05-23T14:08:39.508Z",
       "europeanOdds": {
         "initial": {
           "home": 2.12,
@@ -829,7 +829,7 @@
       "competition": "意甲",
       "homeTeam": "拉齐奥",
       "awayTeam": "比萨",
-      "collectedAt": "2026-05-23T14:00:53.680Z",
+      "collectedAt": "2026-05-23T14:08:39.510Z",
       "europeanOdds": {
         "initial": {
           "home": 1.57,
@@ -882,7 +882,7 @@
       "competition": "西甲",
       "homeTeam": "赫罗纳",
       "awayTeam": "埃尔切",
-      "collectedAt": "2026-05-23T14:00:53.688Z",
+      "collectedAt": "2026-05-23T14:08:39.517Z",
       "europeanOdds": {
         "initial": {
           "home": 1.77,
@@ -935,12 +935,12 @@
       "competition": "西甲",
       "homeTeam": "马洛卡",
       "awayTeam": "奥维耶多",
-      "collectedAt": "2026-05-23T14:00:44.708Z",
+      "collectedAt": "2026-05-23T14:08:26.881Z",
       "europeanOdds": {
         "initial": {
           "home": 1.465,
-          "draw": 4.371,
-          "away": 6.835
+          "draw": 4.373,
+          "away": 6.837
         },
         "current": {
           "home": 1.466,
@@ -951,9 +951,9 @@
       },
       "asianHandicap": {
         "initial": {
-          "line": -1.792,
-          "homeWater": 0.964,
-          "awayWater": 2.26
+          "line": -1.812,
+          "homeWater": 0.987,
+          "awayWater": 2.236
         },
         "current": {
           "line": -1.769,
@@ -988,7 +988,7 @@
       "competition": "西甲",
       "homeTeam": "西班牙人",
       "awayTeam": "皇家社会",
-      "collectedAt": "2026-05-23T14:00:53.683Z",
+      "collectedAt": "2026-05-23T14:08:39.513Z",
       "europeanOdds": {
         "initial": {
           "home": 2.3,
@@ -1041,12 +1041,12 @@
       "competition": "西甲",
       "homeTeam": "皇马",
       "awayTeam": "毕尔巴鄂",
-      "collectedAt": "2026-05-23T14:00:45.772Z",
+      "collectedAt": "2026-05-23T14:08:27.948Z",
       "europeanOdds": {
         "initial": {
-          "home": 1.487,
-          "draw": 4.655,
-          "away": 5.638
+          "home": 1.49,
+          "draw": 4.646,
+          "away": 5.615
         },
         "current": {
           "home": 1.435,
@@ -1058,8 +1058,8 @@
       "asianHandicap": {
         "initial": {
           "line": -1.638,
-          "homeWater": 0.985,
-          "awayWater": 1.664
+          "homeWater": 0.986,
+          "awayWater": 1.663
         },
         "current": {
           "line": -1.815,
@@ -1094,7 +1094,7 @@
       "competition": "西甲",
       "homeTeam": "赫塔费",
       "awayTeam": "奥萨苏纳",
-      "collectedAt": "2026-05-23T14:00:53.687Z",
+      "collectedAt": "2026-05-23T14:08:39.517Z",
       "europeanOdds": {
         "initial": {
           "home": 2.3,
@@ -1147,7 +1147,7 @@
       "competition": "西甲",
       "homeTeam": "塞尔塔",
       "awayTeam": "塞维利亚",
-      "collectedAt": "2026-05-23T14:00:20.623Z",
+      "collectedAt": "2026-05-23T14:08:05.662Z",
       "europeanOdds": {
         "initial": {
           "home": 1.74,
@@ -1200,7 +1200,7 @@
       "competition": "西甲",
       "homeTeam": "阿拉维斯",
       "awayTeam": "巴列卡诺",
-      "collectedAt": "2026-05-23T14:00:53.686Z",
+      "collectedAt": "2026-05-23T14:08:39.515Z",
       "europeanOdds": {
         "initial": {
           "home": 2.32,
@@ -1253,12 +1253,12 @@
       "competition": "西甲",
       "homeTeam": "巴伦西亚",
       "awayTeam": "巴萨",
-      "collectedAt": "2026-05-23T14:00:46.841Z",
+      "collectedAt": "2026-05-23T14:08:29.020Z",
       "europeanOdds": {
         "initial": {
-          "home": 3.236,
-          "draw": 3.918,
-          "away": 2.001
+          "home": 3.235,
+          "draw": 3.92,
+          "away": 2.002
         },
         "current": {
           "home": 3.512,
@@ -1270,8 +1270,8 @@
       "asianHandicap": {
         "initial": {
           "line": -0.158,
-          "homeWater": 1.203,
-          "awayWater": 1.191
+          "homeWater": 1.202,
+          "awayWater": 1.192
         },
         "current": {
           "line": -0.181,
@@ -1306,7 +1306,7 @@
       "competition": "西甲",
       "homeTeam": "贝蒂斯",
       "awayTeam": "莱万特",
-      "collectedAt": "2026-05-23T14:00:20.623Z",
+      "collectedAt": "2026-05-23T14:08:05.662Z",
       "europeanOdds": {
         "initial": {
           "home": 2.27,
@@ -1359,7 +1359,7 @@
       "competition": "美职",
       "homeTeam": "明尼苏达",
       "awayTeam": "盐湖城",
-      "collectedAt": "2026-05-23T14:00:47.901Z",
+      "collectedAt": "2026-05-23T14:08:30.095Z",
       "europeanOdds": {
         "initial": {
           "home": 2.113,
@@ -1376,8 +1376,8 @@
       "asianHandicap": {
         "initial": {
           "line": -0.762,
-          "homeWater": 1.064,
-          "awayWater": 1.287
+          "homeWater": 1.065,
+          "awayWater": 1.286
         },
         "current": {
           "line": -0.754,
@@ -1412,12 +1412,12 @@
       "competition": "美职",
       "homeTeam": "夏洛特FC",
       "awayTeam": "新英格兰",
-      "collectedAt": "2026-05-23T14:00:48.959Z",
+      "collectedAt": "2026-05-23T14:08:31.156Z",
       "europeanOdds": {
         "initial": {
-          "home": 1.854,
-          "draw": 3.713,
-          "away": 3.746
+          "home": 1.852,
+          "draw": 3.714,
+          "away": 3.753
         },
         "current": {
           "home": 1.865,
@@ -1429,8 +1429,8 @@
       "asianHandicap": {
         "initial": {
           "line": -0.973,
-          "homeWater": 0.977,
-          "awayWater": 1.436
+          "homeWater": 0.975,
+          "awayWater": 1.438
         },
         "current": {
           "line": -0.95,
@@ -1465,10 +1465,10 @@
       "competition": "美职",
       "homeTeam": "华盛顿",
       "awayTeam": "蒙特利尔",
-      "collectedAt": "2026-05-23T14:00:50.023Z",
+      "collectedAt": "2026-05-23T14:08:32.218Z",
       "europeanOdds": {
         "initial": {
-          "home": 2.005,
+          "home": 2.012,
           "draw": 3.598,
           "away": 3.313
         },
@@ -1482,7 +1482,7 @@
       "asianHandicap": {
         "initial": {
           "line": -0.923,
-          "homeWater": 1.123,
+          "homeWater": 1.124,
           "awayWater": 1.245
         },
         "current": {
@@ -1518,7 +1518,7 @@
       "competition": "美职",
       "homeTeam": "纳什维尔",
       "awayTeam": "纽约城",
-      "collectedAt": "2026-05-23T14:00:54.112Z",
+      "collectedAt": "2026-05-23T14:08:40.806Z",
       "europeanOdds": {
         "initial": {
           "home": 1.61,
@@ -1571,12 +1571,12 @@
       "competition": "美职",
       "homeTeam": "波特兰",
       "awayTeam": "圣何塞",
-      "collectedAt": "2026-05-23T14:00:51.078Z",
+      "collectedAt": "2026-05-23T14:08:33.291Z",
       "europeanOdds": {
         "initial": {
           "home": 2.395,
           "draw": 3.897,
-          "away": 2.495
+          "away": 2.497
         },
         "current": {
           "home": 2.31,
@@ -1588,8 +1588,8 @@
       "asianHandicap": {
         "initial": {
           "line": -0.585,
-          "homeWater": 1.124,
-          "awayWater": 1.17
+          "homeWater": 1.121,
+          "awayWater": 1.173
         },
         "current": {
           "line": -0.662,
@@ -1624,12 +1624,12 @@
       "competition": "荷乙",
       "homeTeam": "福伦丹",
       "awayTeam": "威廉二世",
-      "collectedAt": "2026-05-23T13:58:43.000Z",
+      "collectedAt": "2026-05-23T14:05:29.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 2.192,
-          "draw": 3.537,
-          "away": 2.969
+          "home": 2.196,
+          "draw": 3.533,
+          "away": 2.963
         },
         "current": {
           "home": 2.303,
@@ -1646,8 +1646,8 @@
         },
         "current": {
           "line": -0.281,
-          "homeWater": 1.952,
-          "awayWater": 1.892
+          "homeWater": 1.971,
+          "awayWater": 1.853
         },
         "final": null
       },
@@ -1665,12 +1665,12 @@
       "competition": "英冠",
       "homeTeam": "赫尔城",
       "awayTeam": "南安普敦",
-      "collectedAt": "2026-05-23T14:00:52.592Z",
+      "collectedAt": "2026-05-23T14:08:36.821Z",
       "europeanOdds": {
         "initial": {
           "home": 1.368,
-          "draw": 5.611,
-          "away": 6.415
+          "draw": 5.603,
+          "away": 6.424
         },
         "current": {
           "home": 1.356,
@@ -1706,12 +1706,12 @@
       "competition": "德国杯",
       "homeTeam": "拜仁慕尼黑",
       "awayTeam": "斯图加特",
-      "collectedAt": "2026-05-23T13:58:54.000Z",
+      "collectedAt": "2026-05-23T14:05:42.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 3.272,
-          "draw": 3.534,
-          "away": 2.138
+          "home": 3.262,
+          "draw": 3.522,
+          "away": 2.145
         },
         "current": {
           "home": 3.709,
@@ -1728,8 +1728,8 @@
         },
         "current": {
           "line": 0.281,
-          "homeWater": 1.958,
-          "awayWater": 1.833
+          "homeWater": 1.955,
+          "awayWater": 1.838
         },
         "final": null
       },
@@ -1747,12 +1747,12 @@
       "competition": "意甲",
       "homeTeam": "博洛尼亚",
       "awayTeam": "国际米兰",
-      "collectedAt": "2026-05-23T13:59:03.000Z",
+      "collectedAt": "2026-05-23T14:05:50.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 1.718,
-          "draw": 3.803,
-          "away": 4.727
+          "home": 1.721,
+          "draw": 3.781,
+          "away": 4.734
         },
         "current": {
           "home": 1.491,
@@ -1769,8 +1769,8 @@
         },
         "current": {
           "line": -0.719,
-          "homeWater": 1.918,
-          "awayWater": 1.929
+          "homeWater": 1.917,
+          "awayWater": 1.93
         },
         "final": null
       },
@@ -1788,12 +1788,12 @@
       "competition": "意甲",
       "homeTeam": "拉齐奥",
       "awayTeam": "比萨",
-      "collectedAt": "2026-05-23T13:59:04.000Z",
+      "collectedAt": "2026-05-23T14:05:51.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 1.94,
-          "draw": 3.457,
-          "away": 3.997
+          "home": 1.947,
+          "draw": 3.448,
+          "away": 3.977
         },
         "current": {
           "home": 1.89,
@@ -1809,9 +1809,9 @@
           "awayWater": 1.876
         },
         "current": {
-          "line": -0.531,
-          "homeWater": 1.927,
-          "awayWater": 1.869
+          "line": -0.5,
+          "homeWater": 1.912,
+          "awayWater": 1.831
         },
         "final": null
       },
@@ -1829,12 +1829,12 @@
       "competition": "西甲",
       "homeTeam": "维戈塞尔塔",
       "awayTeam": "塞维利亚",
-      "collectedAt": "2026-05-23T14:00:53.683Z",
+      "collectedAt": "2026-05-23T14:08:39.513Z",
       "europeanOdds": {
         "initial": {
-          "home": 2.74,
-          "draw": 2.713,
-          "away": 3.096
+          "home": 2.75,
+          "draw": 2.707,
+          "away": 3.095
         },
         "current": {
           "home": 2.369,
@@ -1870,11 +1870,11 @@
       "competition": "西甲",
       "homeTeam": "赫塔费",
       "awayTeam": "奥萨苏纳",
-      "collectedAt": "2026-05-23T13:59:04.000Z",
+      "collectedAt": "2026-05-23T14:05:51.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 1.813,
-          "draw": 3.86,
+          "home": 1.811,
+          "draw": 3.868,
           "away": 4.06
         },
         "current": {
@@ -1891,9 +1891,9 @@
           "awayWater": 1.936
         },
         "current": {
-          "line": -0.578,
-          "homeWater": 1.887,
-          "awayWater": 1.958
+          "line": -0.562,
+          "homeWater": 1.876,
+          "awayWater": 1.968
         },
         "final": null
       },
@@ -1911,12 +1911,12 @@
       "competition": "西甲",
       "homeTeam": "赫罗纳",
       "awayTeam": "埃尔切",
-      "collectedAt": "2026-05-23T13:59:04.000Z",
+      "collectedAt": "2026-05-23T14:05:51.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 2.31,
-          "draw": 3.421,
-          "away": 3.036
+          "home": 2.312,
+          "draw": 3.423,
+          "away": 3.034
         },
         "current": {
           "home": 2.04,
@@ -1933,8 +1933,8 @@
         },
         "current": {
           "line": -0.25,
-          "homeWater": 2.02,
-          "awayWater": 1.846
+          "homeWater": 2.024,
+          "awayWater": 1.844
         },
         "final": null
       },
@@ -1952,7 +1952,7 @@
       "competition": "瑞超",
       "homeTeam": "哈尔姆斯塔德",
       "awayTeam": "厄尔格里特",
-      "collectedAt": "2026-05-23T14:00:52.588Z",
+      "collectedAt": "2026-05-23T14:08:36.819Z",
       "europeanOdds": {
         "initial": {
           "home": 2.017,
@@ -1993,7 +1993,7 @@
       "competition": "瑞超",
       "homeTeam": "卡尔马",
       "awayTeam": "代格福什",
-      "collectedAt": "2026-05-23T14:00:52.587Z",
+      "collectedAt": "2026-05-23T14:08:36.818Z",
       "europeanOdds": {
         "initial": {
           "home": 1.897,
@@ -2034,12 +2034,12 @@
       "competition": "芬超",
       "homeTeam": "坦佩雷山猫",
       "awayTeam": "赫尔辛基火花",
-      "collectedAt": "2026-05-23T13:58:37.000Z",
+      "collectedAt": "2026-05-23T14:05:22.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 2.076,
-          "draw": 3.538,
-          "away": 3.159
+          "home": 2.086,
+          "draw": 3.534,
+          "away": 3.144
         },
         "current": {
           "home": 1.778,
@@ -2055,9 +2055,9 @@
           "awayWater": 1.923
         },
         "current": {
-          "line": -0.283,
-          "homeWater": 1.875,
-          "awayWater": 1.948
+          "line": -0.3,
+          "homeWater": 1.903,
+          "awayWater": 1.921
         },
         "final": null
       },
@@ -2075,7 +2075,7 @@
       "competition": "芬超",
       "homeTeam": "雅罗",
       "awayTeam": "玛丽港",
-      "collectedAt": "2026-05-23T13:58:37.000Z",
+      "collectedAt": "2026-05-23T14:05:22.000Z",
       "europeanOdds": {
         "initial": {
           "home": 1.852,
@@ -2116,7 +2116,7 @@
       "competition": "芬超",
       "homeTeam": "库奥皮奥",
       "awayTeam": "拉赫蒂",
-      "collectedAt": "2026-05-23T13:58:38.000Z",
+      "collectedAt": "2026-05-23T14:05:23.000Z",
       "europeanOdds": {
         "initial": {
           "home": 1.507,
@@ -2157,12 +2157,12 @@
       "competition": "芬超",
       "homeTeam": "塞伊奈约基",
       "awayTeam": "AC 奥卢",
-      "collectedAt": "2026-05-23T13:58:38.000Z",
+      "collectedAt": "2026-05-23T14:05:23.000Z",
       "europeanOdds": {
         "initial": {
-          "home": 2.391,
-          "draw": 3.468,
-          "away": 2.688
+          "home": 2.393,
+          "draw": 3.494,
+          "away": 2.667
         },
         "current": {
           "home": 2.484,
@@ -2178,9 +2178,9 @@
           "awayWater": 1.847
         },
         "current": {
-          "line": 0.016,
-          "homeWater": 1.804,
-          "awayWater": 1.964
+          "line": 0,
+          "homeWater": 1.818,
+          "awayWater": 1.949
         },
         "final": null
       },

@@ -1,11 +1,11 @@
 {
   "date": "2026-05-23",
-  "startedAt": "2026-05-23T14:00:18.966Z",
+  "startedAt": "2026-05-23T14:08:04.152Z",
   "chinaOfficial": {
     "date": "2026-05-23",
     "ok": true,
-    "startedAt": "2026-05-23T14:00:18.966Z",
-    "generatedAt": "2026-05-23T14:00:21.022Z",
+    "startedAt": "2026-05-23T14:08:04.152Z",
+    "generatedAt": "2026-05-23T14:08:05.974Z",
     "registry": {
       "policy": "仅读取公开网页/API；不绕过登录、验证码、付费墙或反爬安全策略；500.com 默认禁用，避免把不稳定来源混进生产数据。",
       "sources": [
@@ -71,11 +71,11 @@
         "pageUrl": "https://www.lottery.gov.cn/jc/jsq/zqspf/",
         "apiUrl": "https://webapi.sporttery.cn/gateway/uniform/football/getMatchCalculatorV1.qry?channel=c",
         "ok": true,
-        "fetchedAt": "2026-05-23T14:00:18.966Z",
+        "fetchedAt": "2026-05-23T14:08:04.152Z",
         "lastUpdateTime": "2026-05-23 21:58:11",
-        "rawMatches": 60,
-        "dateMatches": 23,
-        "marketSnapshots": 23
+        "rawMatches": 56,
+        "dateMatches": 19,
+        "marketSnapshots": 19
       },
       {
         "id": "sporttery-cn-jc-bulletin",
@@ -83,7 +83,7 @@
         "pageUrl": "https://www.sporttery.cn/ssgg/",
         "apiUrl": "https://webapi.sporttery.cn/gateway/jc/common/gmBulletin.qry?page=1&pageSize=50&isShowHis=1",
         "ok": true,
-        "fetchedAt": "2026-05-23T14:00:20.623Z",
+        "fetchedAt": "2026-05-23T14:08:05.662Z",
         "rows": 2
       },
       {
@@ -91,7 +91,7 @@
         "name": "竞彩网传统足彩公告",
         "pageUrl": "https://www.sporttery.cn/ctzc/zcgg/",
         "ok": true,
-        "fetchedAt": "2026-05-23T14:00:20.645Z",
+        "fetchedAt": "2026-05-23T14:08:05.691Z",
         "articleCandidates": 5,
         "parsedArticles": 5,
         "selectedIssue": "第26079期",
@@ -99,9 +99,9 @@
       }
     ],
     "summary": {
-      "jingcaiMatches": 23,
-      "jingcaiMarketSnapshots": 23,
-      "jingcaiOddsHistoryMatches": 23,
+      "jingcaiMatches": 19,
+      "jingcaiMarketSnapshots": 19,
+      "jingcaiOddsHistoryMatches": 19,
       "shengfucaiIssue": "第26079期",
       "shengfucaiMatches": 14,
       "bulletins": 2,
@@ -118,716 +118,8 @@
       "ok": true,
       "withHistories": true,
       "lastUpdateTime": "2026-05-23 21:58:11",
-      "totalCount": 60,
+      "totalCount": 56,
       "matches": [
-        {
-          "matchId": 2039902,
-          "sequence": "周六008",
-          "businessDate": "2026-05-23",
-          "matchDate": "2026-05-23",
-          "matchTime": "22:00",
-          "competition": "芬超",
-          "homeTeam": "坦山猫",
-          "awayTeam": "赫尔火花",
-          "officialOdds": {
-            "had": {
-              "home": 1.93,
-              "draw": 3.4,
-              "away": 3.15,
-              "goalLine": "",
-              "updateTime": "2026-05-23T13:13:41.000Z"
-            },
-            "hhad": {
-              "home": 3.9,
-              "draw": 3.75,
-              "away": 1.65,
-              "goalLine": "-1",
-              "updateTime": "2026-05-23T13:13:44.000Z"
-            },
-            "scoreTop": [
-              {
-                "score": "1-1",
-                "odds": 7.5
-              },
-              {
-                "score": "2-1",
-                "odds": 7.5
-              },
-              {
-                "score": "1-0",
-                "odds": 9
-              },
-              {
-                "score": "1-2",
-                "odds": 10
-              },
-              {
-                "score": "2-2",
-                "odds": 10.5
-              }
-            ],
-            "halfFullTop": [
-              {
-                "halfFull": "胜胜",
-                "odds": 2.85
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 4.9
-              },
-              {
-                "halfFull": "负负",
-                "odds": 5.3
-              },
-              {
-                "halfFull": "平平",
-                "odds": 6.25
-              },
-              {
-                "halfFull": "平负",
-                "odds": 7.75
-              }
-            ]
-          },
-          "historyStatus": {
-            "had": true,
-            "hhad": true,
-            "hadPoints": 4,
-            "hhadPoints": 5,
-            "oddsUpdatedAt": "2026-05-23T13:13:44.000Z"
-          },
-          "fixture": {
-            "id": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
-            "date": "2026-05-23",
-            "sequence": "周六008",
-            "kickoff": "2026-05-23 22:00",
-            "competition": "芬超",
-            "homeTeam": "坦山猫",
-            "awayTeam": "赫尔火花",
-            "marketType": "jingcai",
-            "tags": [
-              "竞彩足球",
-              "中国竞彩网官方"
-            ],
-            "source": "lottery.gov.cn/jc/jsq/zqspf",
-            "officialStatus": "official-web",
-            "officialFixtureId": 2039902,
-            "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六008"
-          },
-          "marketSnapshot": {
-            "date": "2026-05-23",
-            "fixtureId": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
-            "sequence": "周六008",
-            "competition": "芬超",
-            "homeTeam": "坦山猫",
-            "awayTeam": "赫尔火花",
-            "collectedAt": "2026-05-23T14:00:20.622Z",
-            "europeanOdds": {
-              "initial": {
-                "home": 1.78,
-                "draw": 3.55,
-                "away": 3.5
-              },
-              "current": {
-                "home": 1.93,
-                "draw": 3.4,
-                "away": 3.15
-              }
-            },
-            "handicapOdds": {
-              "initial": {
-                "home": 3.35,
-                "draw": 3.55,
-                "away": 1.82
-              },
-              "current": {
-                "home": 3.9,
-                "draw": 3.75,
-                "away": 1.65
-              }
-            },
-            "scoreOdds": {
-              "top": [
-                {
-                  "score": "1-1",
-                  "odds": 7.5
-                },
-                {
-                  "score": "2-1",
-                  "odds": 7.5
-                },
-                {
-                  "score": "1-0",
-                  "odds": 9
-                },
-                {
-                  "score": "1-2",
-                  "odds": 10
-                },
-                {
-                  "score": "2-2",
-                  "odds": 10.5
-                }
-              ]
-            },
-            "halfFullOdds": {
-              "top": [
-                {
-                  "halfFull": "胜胜",
-                  "odds": 2.85
-                },
-                {
-                  "halfFull": "平胜",
-                  "odds": 4.9
-                },
-                {
-                  "halfFull": "负负",
-                  "odds": 5.3
-                },
-                {
-                  "halfFull": "平平",
-                  "odds": 6.25
-                },
-                {
-                  "halfFull": "平负",
-                  "odds": 7.75
-                }
-              ]
-            },
-            "source": "中国体彩网竞彩足球计算器"
-          }
-        },
-        {
-          "matchId": 2039903,
-          "sequence": "周六009",
-          "businessDate": "2026-05-23",
-          "matchDate": "2026-05-23",
-          "matchTime": "22:00",
-          "competition": "芬超",
-          "homeTeam": "塞伊奈",
-          "awayTeam": "AC奥卢",
-          "officialOdds": {
-            "had": {
-              "home": 2.32,
-              "draw": 3.2,
-              "away": 2.6,
-              "goalLine": "",
-              "updateTime": "2026-05-23T13:07:15.000Z"
-            },
-            "hhad": {
-              "home": 5.3,
-              "draw": 4,
-              "away": 1.45,
-              "goalLine": "-1",
-              "updateTime": "2026-05-23T13:07:21.000Z"
-            },
-            "scoreTop": [
-              {
-                "score": "1-1",
-                "odds": 6.5
-              },
-              {
-                "score": "2-1",
-                "odds": 7.75
-              },
-              {
-                "score": "1-2",
-                "odds": 8
-              },
-              {
-                "score": "1-0",
-                "odds": 9.5
-              },
-              {
-                "score": "0-1",
-                "odds": 10
-              }
-            ],
-            "halfFullTop": [
-              {
-                "halfFull": "胜胜",
-                "odds": 3.7
-              },
-              {
-                "halfFull": "负负",
-                "odds": 4
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 5.75
-              },
-              {
-                "halfFull": "平平",
-                "odds": 5.85
-              },
-              {
-                "halfFull": "平负",
-                "odds": 6.25
-              }
-            ]
-          },
-          "historyStatus": {
-            "had": true,
-            "hhad": true,
-            "hadPoints": 4,
-            "hhadPoints": 3,
-            "oddsUpdatedAt": "2026-05-23T13:07:21.000Z"
-          },
-          "fixture": {
-            "id": "jc-2026-05-23-周六009-塞伊奈-ac奥卢",
-            "date": "2026-05-23",
-            "sequence": "周六009",
-            "kickoff": "2026-05-23 22:00",
-            "competition": "芬超",
-            "homeTeam": "塞伊奈",
-            "awayTeam": "AC奥卢",
-            "marketType": "jingcai",
-            "tags": [
-              "竞彩足球",
-              "中国竞彩网官方"
-            ],
-            "source": "lottery.gov.cn/jc/jsq/zqspf",
-            "officialStatus": "official-web",
-            "officialFixtureId": 2039903,
-            "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六009"
-          },
-          "marketSnapshot": {
-            "date": "2026-05-23",
-            "fixtureId": "jc-2026-05-23-周六009-塞伊奈-ac奥卢",
-            "sequence": "周六009",
-            "competition": "芬超",
-            "homeTeam": "塞伊奈",
-            "awayTeam": "AC奥卢",
-            "collectedAt": "2026-05-23T14:00:20.622Z",
-            "europeanOdds": {
-              "initial": {
-                "home": 2.45,
-                "draw": 3.2,
-                "away": 2.45
-              },
-              "current": {
-                "home": 2.32,
-                "draw": 3.2,
-                "away": 2.6
-              }
-            },
-            "handicapOdds": {
-              "initial": {
-                "home": 5.5,
-                "draw": 4.1,
-                "away": 1.42
-              },
-              "current": {
-                "home": 5.3,
-                "draw": 4,
-                "away": 1.45
-              }
-            },
-            "scoreOdds": {
-              "top": [
-                {
-                  "score": "1-1",
-                  "odds": 6.5
-                },
-                {
-                  "score": "2-1",
-                  "odds": 7.75
-                },
-                {
-                  "score": "1-2",
-                  "odds": 8
-                },
-                {
-                  "score": "1-0",
-                  "odds": 9.5
-                },
-                {
-                  "score": "0-1",
-                  "odds": 10
-                }
-              ]
-            },
-            "halfFullOdds": {
-              "top": [
-                {
-                  "halfFull": "胜胜",
-                  "odds": 3.7
-                },
-                {
-                  "halfFull": "负负",
-                  "odds": 4
-                },
-                {
-                  "halfFull": "平胜",
-                  "odds": 5.75
-                },
-                {
-                  "halfFull": "平平",
-                  "odds": 5.85
-                },
-                {
-                  "halfFull": "平负",
-                  "odds": 6.25
-                }
-              ]
-            },
-            "source": "中国体彩网竞彩足球计算器"
-          }
-        },
-        {
-          "matchId": 2039904,
-          "sequence": "周六010",
-          "businessDate": "2026-05-23",
-          "matchDate": "2026-05-23",
-          "matchTime": "22:00",
-          "competition": "芬超",
-          "homeTeam": "库奥皮奥",
-          "awayTeam": "拉赫蒂",
-          "officialOdds": {
-            "had": {
-              "home": 1.39,
-              "draw": 4.05,
-              "away": 6.15,
-              "goalLine": "",
-              "updateTime": "2026-05-23T13:46:48.000Z"
-            },
-            "hhad": {
-              "home": 2.4,
-              "draw": 3.2,
-              "away": 2.5,
-              "goalLine": "-1",
-              "updateTime": "2026-05-23T13:46:50.000Z"
-            },
-            "scoreTop": [
-              {
-                "score": "1-0",
-                "odds": 6
-              },
-              {
-                "score": "2-1",
-                "odds": 6.5
-              },
-              {
-                "score": "2-0",
-                "odds": 6.7
-              },
-              {
-                "score": "1-1",
-                "odds": 7
-              },
-              {
-                "score": "3-0",
-                "odds": 11
-              }
-            ],
-            "halfFullTop": [
-              {
-                "halfFull": "胜胜",
-                "odds": 2.1
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 3.9
-              },
-              {
-                "halfFull": "平平",
-                "odds": 6.25
-              },
-              {
-                "halfFull": "负负",
-                "odds": 10
-              },
-              {
-                "halfFull": "平负",
-                "odds": 13.5
-              }
-            ]
-          },
-          "historyStatus": {
-            "had": true,
-            "hhad": true,
-            "hadPoints": 6,
-            "hhadPoints": 6,
-            "oddsUpdatedAt": "2026-05-23T13:46:50.000Z"
-          },
-          "fixture": {
-            "id": "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂",
-            "date": "2026-05-23",
-            "sequence": "周六010",
-            "kickoff": "2026-05-23 22:00",
-            "competition": "芬超",
-            "homeTeam": "库奥皮奥",
-            "awayTeam": "拉赫蒂",
-            "marketType": "jingcai",
-            "tags": [
-              "竞彩足球",
-              "中国竞彩网官方"
-            ],
-            "source": "lottery.gov.cn/jc/jsq/zqspf",
-            "officialStatus": "official-web",
-            "officialFixtureId": 2039904,
-            "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六010"
-          },
-          "marketSnapshot": {
-            "date": "2026-05-23",
-            "fixtureId": "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂",
-            "sequence": "周六010",
-            "competition": "芬超",
-            "homeTeam": "库奥皮奥",
-            "awayTeam": "拉赫蒂",
-            "collectedAt": "2026-05-23T14:00:20.622Z",
-            "europeanOdds": {
-              "initial": {
-                "home": 1.54,
-                "draw": 3.6,
-                "away": 4.95
-              },
-              "current": {
-                "home": 1.39,
-                "draw": 4.05,
-                "away": 6.15
-              }
-            },
-            "handicapOdds": {
-              "initial": {
-                "home": 2.81,
-                "draw": 3.25,
-                "away": 2.15
-              },
-              "current": {
-                "home": 2.4,
-                "draw": 3.2,
-                "away": 2.5
-              }
-            },
-            "scoreOdds": {
-              "top": [
-                {
-                  "score": "1-0",
-                  "odds": 6
-                },
-                {
-                  "score": "2-1",
-                  "odds": 6.5
-                },
-                {
-                  "score": "2-0",
-                  "odds": 6.7
-                },
-                {
-                  "score": "1-1",
-                  "odds": 7
-                },
-                {
-                  "score": "3-0",
-                  "odds": 11
-                }
-              ]
-            },
-            "halfFullOdds": {
-              "top": [
-                {
-                  "halfFull": "胜胜",
-                  "odds": 2.1
-                },
-                {
-                  "halfFull": "平胜",
-                  "odds": 3.9
-                },
-                {
-                  "halfFull": "平平",
-                  "odds": 6.25
-                },
-                {
-                  "halfFull": "负负",
-                  "odds": 10
-                },
-                {
-                  "halfFull": "平负",
-                  "odds": 13.5
-                }
-              ]
-            },
-            "source": "中国体彩网竞彩足球计算器"
-          }
-        },
-        {
-          "matchId": 2039905,
-          "sequence": "周六011",
-          "businessDate": "2026-05-23",
-          "matchDate": "2026-05-23",
-          "matchTime": "22:00",
-          "competition": "芬超",
-          "homeTeam": "雅罗",
-          "awayTeam": "玛丽港",
-          "officialOdds": {
-            "had": {
-              "home": 1.8,
-              "draw": 3.28,
-              "away": 3.72,
-              "goalLine": "",
-              "updateTime": "2026-05-23T13:09:32.000Z"
-            },
-            "hhad": {
-              "home": 3.6,
-              "draw": 3.45,
-              "away": 1.78,
-              "goalLine": "-1",
-              "updateTime": "2026-05-23T13:09:39.000Z"
-            },
-            "scoreTop": [
-              {
-                "score": "1-0",
-                "odds": 6.5
-              },
-              {
-                "score": "1-1",
-                "odds": 6.5
-              },
-              {
-                "score": "2-1",
-                "odds": 6.7
-              },
-              {
-                "score": "2-0",
-                "odds": 7.75
-              },
-              {
-                "score": "0-1",
-                "odds": 11.5
-              }
-            ],
-            "halfFullTop": [
-              {
-                "halfFull": "胜胜",
-                "odds": 2.75
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 4.4
-              },
-              {
-                "halfFull": "平平",
-                "odds": 5.45
-              },
-              {
-                "halfFull": "负负",
-                "odds": 6.3
-              },
-              {
-                "halfFull": "平负",
-                "odds": 8.6
-              }
-            ]
-          },
-          "historyStatus": {
-            "had": true,
-            "hhad": true,
-            "hadPoints": 5,
-            "hhadPoints": 5,
-            "oddsUpdatedAt": "2026-05-23T13:09:39.000Z"
-          },
-          "fixture": {
-            "id": "jc-2026-05-23-周六011-雅罗-玛丽港",
-            "date": "2026-05-23",
-            "sequence": "周六011",
-            "kickoff": "2026-05-23 22:00",
-            "competition": "芬超",
-            "homeTeam": "雅罗",
-            "awayTeam": "玛丽港",
-            "marketType": "jingcai",
-            "tags": [
-              "竞彩足球",
-              "中国竞彩网官方"
-            ],
-            "source": "lottery.gov.cn/jc/jsq/zqspf",
-            "officialStatus": "official-web",
-            "officialFixtureId": 2039905,
-            "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六011"
-          },
-          "marketSnapshot": {
-            "date": "2026-05-23",
-            "fixtureId": "jc-2026-05-23-周六011-雅罗-玛丽港",
-            "sequence": "周六011",
-            "competition": "芬超",
-            "homeTeam": "雅罗",
-            "awayTeam": "玛丽港",
-            "collectedAt": "2026-05-23T14:00:20.622Z",
-            "europeanOdds": {
-              "initial": {
-                "home": 1.63,
-                "draw": 3.45,
-                "away": 4.42
-              },
-              "current": {
-                "home": 1.8,
-                "draw": 3.28,
-                "away": 3.72
-              }
-            },
-            "handicapOdds": {
-              "initial": {
-                "home": 3.1,
-                "draw": 3.27,
-                "away": 2
-              },
-              "current": {
-                "home": 3.6,
-                "draw": 3.45,
-                "away": 1.78
-              }
-            },
-            "scoreOdds": {
-              "top": [
-                {
-                  "score": "1-0",
-                  "odds": 6.5
-                },
-                {
-                  "score": "1-1",
-                  "odds": 6.5
-                },
-                {
-                  "score": "2-1",
-                  "odds": 6.7
-                },
-                {
-                  "score": "2-0",
-                  "odds": 7.75
-                },
-                {
-                  "score": "0-1",
-                  "odds": 11.5
-                }
-              ]
-            },
-            "halfFullOdds": {
-              "top": [
-                {
-                  "halfFull": "胜胜",
-                  "odds": 2.75
-                },
-                {
-                  "halfFull": "平胜",
-                  "odds": 4.4
-                },
-                {
-                  "halfFull": "平平",
-                  "odds": 5.45
-                },
-                {
-                  "halfFull": "负负",
-                  "odds": 6.3
-                },
-                {
-                  "halfFull": "平负",
-                  "odds": 8.6
-                }
-              ]
-            },
-            "source": "中国体彩网竞彩足球计算器"
-          }
-        },
         {
           "matchId": 2039906,
           "sequence": "周六012",
@@ -929,7 +221,7 @@
             "competition": "英冠",
             "homeTeam": "赫尔城",
             "awayTeam": "米堡",
-            "collectedAt": "2026-05-23T14:00:20.622Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 4.65,
@@ -1106,7 +398,7 @@
             "competition": "意甲",
             "homeTeam": "博洛尼亚",
             "awayTeam": "国际米兰",
-            "collectedAt": "2026-05-23T14:00:20.622Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 2.88,
@@ -1283,7 +575,7 @@
             "competition": "德国杯",
             "homeTeam": "拜仁",
             "awayTeam": "斯图加特",
-            "collectedAt": "2026-05-23T14:00:20.622Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.29,
@@ -1460,7 +752,7 @@
             "competition": "荷乙",
             "homeTeam": "福伦丹",
             "awayTeam": "威廉二世",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 2,
@@ -1637,7 +929,7 @@
             "competition": "意甲",
             "homeTeam": "拉齐奥",
             "awayTeam": "比萨",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.5,
@@ -1814,7 +1106,7 @@
             "competition": "西甲",
             "homeTeam": "赫罗纳",
             "awayTeam": "埃尔切",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.68,
@@ -1991,7 +1283,7 @@
             "competition": "西甲",
             "homeTeam": "马洛卡",
             "awayTeam": "奥维耶多",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.34,
@@ -2168,7 +1460,7 @@
             "competition": "西甲",
             "homeTeam": "西班牙人",
             "awayTeam": "皇家社会",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.661Z",
             "europeanOdds": {
               "initial": {
                 "home": 2.3,
@@ -2345,7 +1637,7 @@
             "competition": "西甲",
             "homeTeam": "皇马",
             "awayTeam": "毕尔巴鄂",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.33,
@@ -2522,7 +1814,7 @@
             "competition": "西甲",
             "homeTeam": "赫塔费",
             "awayTeam": "奥萨苏纳",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 2.3,
@@ -2699,7 +1991,7 @@
             "competition": "西甲",
             "homeTeam": "塞尔塔",
             "awayTeam": "塞维利亚",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.6,
@@ -2876,7 +2168,7 @@
             "competition": "西甲",
             "homeTeam": "阿拉维斯",
             "awayTeam": "巴列卡诺",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 2.32,
@@ -3053,7 +2345,7 @@
             "competition": "西甲",
             "homeTeam": "巴伦西亚",
             "awayTeam": "巴萨",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 3.25,
@@ -3230,7 +2522,7 @@
             "competition": "西甲",
             "homeTeam": "贝蒂斯",
             "awayTeam": "莱万特",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 2.15,
@@ -3407,7 +2699,7 @@
             "competition": "美职",
             "homeTeam": "明尼苏达",
             "awayTeam": "盐湖城",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.98,
@@ -3584,7 +2876,7 @@
             "competition": "美职",
             "homeTeam": "夏洛特FC",
             "awayTeam": "新英格兰",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.83,
@@ -3761,7 +3053,7 @@
             "competition": "美职",
             "homeTeam": "华盛顿",
             "awayTeam": "蒙特利尔",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.79,
@@ -3938,7 +3230,7 @@
             "competition": "美职",
             "homeTeam": "纳什维尔",
             "awayTeam": "纽约城",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 1.61,
@@ -4115,7 +3407,7 @@
             "competition": "美职",
             "homeTeam": "波特兰",
             "awayTeam": "圣何塞",
-            "collectedAt": "2026-05-23T14:00:20.623Z",
+            "collectedAt": "2026-05-23T14:08:05.662Z",
             "europeanOdds": {
               "initial": {
                 "home": 2.16,
@@ -4193,78 +3485,6 @@
         }
       ],
       "fixtures": [
-        {
-          "id": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
-          "date": "2026-05-23",
-          "sequence": "周六008",
-          "kickoff": "2026-05-23 22:00",
-          "competition": "芬超",
-          "homeTeam": "坦山猫",
-          "awayTeam": "赫尔火花",
-          "marketType": "jingcai",
-          "tags": [
-            "竞彩足球",
-            "中国竞彩网官方"
-          ],
-          "source": "lottery.gov.cn/jc/jsq/zqspf",
-          "officialStatus": "official-web",
-          "officialFixtureId": 2039902,
-          "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六008"
-        },
-        {
-          "id": "jc-2026-05-23-周六009-塞伊奈-ac奥卢",
-          "date": "2026-05-23",
-          "sequence": "周六009",
-          "kickoff": "2026-05-23 22:00",
-          "competition": "芬超",
-          "homeTeam": "塞伊奈",
-          "awayTeam": "AC奥卢",
-          "marketType": "jingcai",
-          "tags": [
-            "竞彩足球",
-            "中国竞彩网官方"
-          ],
-          "source": "lottery.gov.cn/jc/jsq/zqspf",
-          "officialStatus": "official-web",
-          "officialFixtureId": 2039903,
-          "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六009"
-        },
-        {
-          "id": "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂",
-          "date": "2026-05-23",
-          "sequence": "周六010",
-          "kickoff": "2026-05-23 22:00",
-          "competition": "芬超",
-          "homeTeam": "库奥皮奥",
-          "awayTeam": "拉赫蒂",
-          "marketType": "jingcai",
-          "tags": [
-            "竞彩足球",
-            "中国竞彩网官方"
-          ],
-          "source": "lottery.gov.cn/jc/jsq/zqspf",
-          "officialStatus": "official-web",
-          "officialFixtureId": 2039904,
-          "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六010"
-        },
-        {
-          "id": "jc-2026-05-23-周六011-雅罗-玛丽港",
-          "date": "2026-05-23",
-          "sequence": "周六011",
-          "kickoff": "2026-05-23 22:00",
-          "competition": "芬超",
-          "homeTeam": "雅罗",
-          "awayTeam": "玛丽港",
-          "marketType": "jingcai",
-          "tags": [
-            "竞彩足球",
-            "中国竞彩网官方"
-          ],
-          "source": "lottery.gov.cn/jc/jsq/zqspf",
-          "officialStatus": "official-web",
-          "officialFixtureId": 2039905,
-          "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六011"
-        },
         {
           "id": "jc-2026-05-23-周六012-赫尔城-米堡",
           "date": "2026-05-23",
@@ -4611,340 +3831,12 @@
       "marketSnapshots": [
         {
           "date": "2026-05-23",
-          "fixtureId": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
-          "sequence": "周六008",
-          "competition": "芬超",
-          "homeTeam": "坦山猫",
-          "awayTeam": "赫尔火花",
-          "collectedAt": "2026-05-23T14:00:20.622Z",
-          "europeanOdds": {
-            "initial": {
-              "home": 1.78,
-              "draw": 3.55,
-              "away": 3.5
-            },
-            "current": {
-              "home": 1.93,
-              "draw": 3.4,
-              "away": 3.15
-            }
-          },
-          "handicapOdds": {
-            "initial": {
-              "home": 3.35,
-              "draw": 3.55,
-              "away": 1.82
-            },
-            "current": {
-              "home": 3.9,
-              "draw": 3.75,
-              "away": 1.65
-            }
-          },
-          "scoreOdds": {
-            "top": [
-              {
-                "score": "1-1",
-                "odds": 7.5
-              },
-              {
-                "score": "2-1",
-                "odds": 7.5
-              },
-              {
-                "score": "1-0",
-                "odds": 9
-              },
-              {
-                "score": "1-2",
-                "odds": 10
-              },
-              {
-                "score": "2-2",
-                "odds": 10.5
-              }
-            ]
-          },
-          "halfFullOdds": {
-            "top": [
-              {
-                "halfFull": "胜胜",
-                "odds": 2.85
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 4.9
-              },
-              {
-                "halfFull": "负负",
-                "odds": 5.3
-              },
-              {
-                "halfFull": "平平",
-                "odds": 6.25
-              },
-              {
-                "halfFull": "平负",
-                "odds": 7.75
-              }
-            ]
-          },
-          "source": "中国体彩网竞彩足球计算器"
-        },
-        {
-          "date": "2026-05-23",
-          "fixtureId": "jc-2026-05-23-周六009-塞伊奈-ac奥卢",
-          "sequence": "周六009",
-          "competition": "芬超",
-          "homeTeam": "塞伊奈",
-          "awayTeam": "AC奥卢",
-          "collectedAt": "2026-05-23T14:00:20.622Z",
-          "europeanOdds": {
-            "initial": {
-              "home": 2.45,
-              "draw": 3.2,
-              "away": 2.45
-            },
-            "current": {
-              "home": 2.32,
-              "draw": 3.2,
-              "away": 2.6
-            }
-          },
-          "handicapOdds": {
-            "initial": {
-              "home": 5.5,
-              "draw": 4.1,
-              "away": 1.42
-            },
-            "current": {
-              "home": 5.3,
-              "draw": 4,
-              "away": 1.45
-            }
-          },
-          "scoreOdds": {
-            "top": [
-              {
-                "score": "1-1",
-                "odds": 6.5
-              },
-              {
-                "score": "2-1",
-                "odds": 7.75
-              },
-              {
-                "score": "1-2",
-                "odds": 8
-              },
-              {
-                "score": "1-0",
-                "odds": 9.5
-              },
-              {
-                "score": "0-1",
-                "odds": 10
-              }
-            ]
-          },
-          "halfFullOdds": {
-            "top": [
-              {
-                "halfFull": "胜胜",
-                "odds": 3.7
-              },
-              {
-                "halfFull": "负负",
-                "odds": 4
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 5.75
-              },
-              {
-                "halfFull": "平平",
-                "odds": 5.85
-              },
-              {
-                "halfFull": "平负",
-                "odds": 6.25
-              }
-            ]
-          },
-          "source": "中国体彩网竞彩足球计算器"
-        },
-        {
-          "date": "2026-05-23",
-          "fixtureId": "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂",
-          "sequence": "周六010",
-          "competition": "芬超",
-          "homeTeam": "库奥皮奥",
-          "awayTeam": "拉赫蒂",
-          "collectedAt": "2026-05-23T14:00:20.622Z",
-          "europeanOdds": {
-            "initial": {
-              "home": 1.54,
-              "draw": 3.6,
-              "away": 4.95
-            },
-            "current": {
-              "home": 1.39,
-              "draw": 4.05,
-              "away": 6.15
-            }
-          },
-          "handicapOdds": {
-            "initial": {
-              "home": 2.81,
-              "draw": 3.25,
-              "away": 2.15
-            },
-            "current": {
-              "home": 2.4,
-              "draw": 3.2,
-              "away": 2.5
-            }
-          },
-          "scoreOdds": {
-            "top": [
-              {
-                "score": "1-0",
-                "odds": 6
-              },
-              {
-                "score": "2-1",
-                "odds": 6.5
-              },
-              {
-                "score": "2-0",
-                "odds": 6.7
-              },
-              {
-                "score": "1-1",
-                "odds": 7
-              },
-              {
-                "score": "3-0",
-                "odds": 11
-              }
-            ]
-          },
-          "halfFullOdds": {
-            "top": [
-              {
-                "halfFull": "胜胜",
-                "odds": 2.1
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 3.9
-              },
-              {
-                "halfFull": "平平",
-                "odds": 6.25
-              },
-              {
-                "halfFull": "负负",
-                "odds": 10
-              },
-              {
-                "halfFull": "平负",
-                "odds": 13.5
-              }
-            ]
-          },
-          "source": "中国体彩网竞彩足球计算器"
-        },
-        {
-          "date": "2026-05-23",
-          "fixtureId": "jc-2026-05-23-周六011-雅罗-玛丽港",
-          "sequence": "周六011",
-          "competition": "芬超",
-          "homeTeam": "雅罗",
-          "awayTeam": "玛丽港",
-          "collectedAt": "2026-05-23T14:00:20.622Z",
-          "europeanOdds": {
-            "initial": {
-              "home": 1.63,
-              "draw": 3.45,
-              "away": 4.42
-            },
-            "current": {
-              "home": 1.8,
-              "draw": 3.28,
-              "away": 3.72
-            }
-          },
-          "handicapOdds": {
-            "initial": {
-              "home": 3.1,
-              "draw": 3.27,
-              "away": 2
-            },
-            "current": {
-              "home": 3.6,
-              "draw": 3.45,
-              "away": 1.78
-            }
-          },
-          "scoreOdds": {
-            "top": [
-              {
-                "score": "1-0",
-                "odds": 6.5
-              },
-              {
-                "score": "1-1",
-                "odds": 6.5
-              },
-              {
-                "score": "2-1",
-                "odds": 6.7
-              },
-              {
-                "score": "2-0",
-                "odds": 7.75
-              },
-              {
-                "score": "0-1",
-                "odds": 11.5
-              }
-            ]
-          },
-          "halfFullOdds": {
-            "top": [
-              {
-                "halfFull": "胜胜",
-                "odds": 2.75
-              },
-              {
-                "halfFull": "平胜",
-                "odds": 4.4
-              },
-              {
-                "halfFull": "平平",
-                "odds": 5.45
-              },
-              {
-                "halfFull": "负负",
-                "odds": 6.3
-              },
-              {
-                "halfFull": "平负",
-                "odds": 8.6
-              }
-            ]
-          },
-          "source": "中国体彩网竞彩足球计算器"
-        },
-        {
-          "date": "2026-05-23",
           "fixtureId": "jc-2026-05-23-周六012-赫尔城-米堡",
           "sequence": "周六012",
           "competition": "英冠",
           "homeTeam": "赫尔城",
           "awayTeam": "米堡",
-          "collectedAt": "2026-05-23T14:00:20.622Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 4.65,
@@ -5026,7 +3918,7 @@
           "competition": "意甲",
           "homeTeam": "博洛尼亚",
           "awayTeam": "国际米兰",
-          "collectedAt": "2026-05-23T14:00:20.622Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 2.88,
@@ -5108,7 +4000,7 @@
           "competition": "德国杯",
           "homeTeam": "拜仁",
           "awayTeam": "斯图加特",
-          "collectedAt": "2026-05-23T14:00:20.622Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 1.29,
@@ -5190,7 +4082,7 @@
           "competition": "荷乙",
           "homeTeam": "福伦丹",
           "awayTeam": "威廉二世",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 2,
@@ -5272,7 +4164,7 @@
           "competition": "意甲",
           "homeTeam": "拉齐奥",
           "awayTeam": "比萨",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 1.5,
@@ -5354,7 +4246,7 @@
           "competition": "西甲",
           "homeTeam": "赫罗纳",
           "awayTeam": "埃尔切",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 1.68,
@@ -5436,7 +4328,7 @@
           "competition": "西甲",
           "homeTeam": "马洛卡",
           "awayTeam": "奥维耶多",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 1.34,
@@ -5518,7 +4410,7 @@
           "competition": "西甲",
           "homeTeam": "西班牙人",
           "awayTeam": "皇家社会",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.661Z",
           "europeanOdds": {
             "initial": {
               "home": 2.3,
@@ -5600,7 +4492,7 @@
           "competition": "西甲",
           "homeTeam": "皇马",
           "awayTeam": "毕尔巴鄂",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 1.33,
@@ -5682,7 +4574,7 @@
           "competition": "西甲",
           "homeTeam": "赫塔费",
           "awayTeam": "奥萨苏纳",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 2.3,
@@ -5764,7 +4656,7 @@
           "competition": "西甲",
           "homeTeam": "塞尔塔",
           "awayTeam": "塞维利亚",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 1.6,
@@ -5846,7 +4738,7 @@
           "competition": "西甲",
           "homeTeam": "阿拉维斯",
           "awayTeam": "巴列卡诺",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 2.32,
@@ -5928,7 +4820,7 @@
           "competition": "西甲",
           "homeTeam": "巴伦西亚",
           "awayTeam": "巴萨",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 3.25,
@@ -6010,7 +4902,7 @@
           "competition": "西甲",
           "homeTeam": "贝蒂斯",
           "awayTeam": "莱万特",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 2.15,
@@ -6092,7 +4984,7 @@
           "competition": "美职",
           "homeTeam": "明尼苏达",
           "awayTeam": "盐湖城",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 1.98,
@@ -6174,7 +5066,7 @@
           "competition": "美职",
           "homeTeam": "夏洛特FC",
           "awayTeam": "新英格兰",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 1.83,
@@ -6256,7 +5148,7 @@
           "competition": "美职",
           "homeTeam": "华盛顿",
           "awayTeam": "蒙特利尔",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 1.79,
@@ -6338,7 +5230,7 @@
           "competition": "美职",
           "homeTeam": "纳什维尔",
           "awayTeam": "纽约城",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 1.61,
@@ -6420,7 +5312,7 @@
           "competition": "美职",
           "homeTeam": "波特兰",
           "awayTeam": "圣何塞",
-          "collectedAt": "2026-05-23T14:00:20.623Z",
+          "collectedAt": "2026-05-23T14:08:05.662Z",
           "europeanOdds": {
             "initial": {
               "home": 2.16,
@@ -8919,13 +7811,13 @@
     },
     "fixtureSync": {
       "saved": true,
-      "fixtures": 37,
+      "fixtures": 33,
       "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\fixtures\\2026-05-23.json"
     },
     "marketSync": {
       "saved": true,
       "previous": 43,
-      "imported": 23,
+      "imported": 19,
       "snapshots": 43,
       "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\market\\2026-05-23.json"
     },
@@ -8936,7 +7828,7 @@
   },
   "externalOdds": {
     "date": "2026-05-23",
-    "fixtures": 37,
+    "fixtures": 33,
     "sources": [
       {
         "name": "The Odds API",
@@ -8979,7 +7871,7 @@
       },
       {
         "name": "Sina euro-asian contrast",
-        "fetched": 24,
+        "fetched": 22,
         "ok": true
       },
       {
@@ -9000,7 +7892,7 @@
       },
       {
         "name": "捷报比分公开赔率",
-        "fetched": 9,
+        "fetched": 7,
         "ok": true
       },
       {
@@ -9009,8 +7901,8 @@
         "ok": true
       }
     ],
-    "fetched": 103,
-    "matched": 103,
+    "fetched": 99,
+    "matched": 99,
     "saved": true,
     "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\market\\2026-05-23.json",
     "snapshots": [
@@ -9553,7 +8445,7 @@
         "competition": "英冠",
         "homeTeam": "赫尔城",
         "awayTeam": "米堡",
-        "collectedAt": "2026-05-23T14:00:52.590Z",
+        "collectedAt": "2026-05-23T14:08:36.820Z",
         "europeanOdds": {
           "initial": {
             "home": 4.65,
@@ -9606,7 +8498,7 @@
         "competition": "意甲",
         "homeTeam": "博洛尼亚",
         "awayTeam": "国际米兰",
-        "collectedAt": "2026-05-23T14:00:53.678Z",
+        "collectedAt": "2026-05-23T14:08:39.508Z",
         "europeanOdds": {
           "initial": {
             "home": 2.88,
@@ -9659,7 +8551,7 @@
         "competition": "德国杯",
         "homeTeam": "拜仁",
         "awayTeam": "斯图加特",
-        "collectedAt": "2026-05-23T14:00:20.622Z",
+        "collectedAt": "2026-05-23T14:08:05.661Z",
         "europeanOdds": {
           "initial": {
             "home": 1.33,
@@ -9712,7 +8604,7 @@
         "competition": "荷乙",
         "homeTeam": "福伦丹",
         "awayTeam": "威廉二世",
-        "collectedAt": "2026-05-23T14:00:53.678Z",
+        "collectedAt": "2026-05-23T14:08:39.508Z",
         "europeanOdds": {
           "initial": {
             "home": 2.12,
@@ -9765,7 +8657,7 @@
         "competition": "意甲",
         "homeTeam": "拉齐奥",
         "awayTeam": "比萨",
-        "collectedAt": "2026-05-23T14:00:53.680Z",
+        "collectedAt": "2026-05-23T14:08:39.510Z",
         "europeanOdds": {
           "initial": {
             "home": 1.57,
@@ -9818,7 +8710,7 @@
         "competition": "西甲",
         "homeTeam": "赫罗纳",
         "awayTeam": "埃尔切",
-        "collectedAt": "2026-05-23T14:00:53.688Z",
+        "collectedAt": "2026-05-23T14:08:39.517Z",
         "europeanOdds": {
           "initial": {
             "home": 1.77,
@@ -9871,12 +8763,12 @@
         "competition": "西甲",
         "homeTeam": "马洛卡",
         "awayTeam": "奥维耶多",
-        "collectedAt": "2026-05-23T14:00:44.708Z",
+        "collectedAt": "2026-05-23T14:08:26.881Z",
         "europeanOdds": {
           "initial": {
             "home": 1.465,
-            "draw": 4.371,
-            "away": 6.835
+            "draw": 4.373,
+            "away": 6.837
           },
           "current": {
             "home": 1.466,
@@ -9887,9 +8779,9 @@
         },
         "asianHandicap": {
           "initial": {
-            "line": -1.792,
-            "homeWater": 0.964,
-            "awayWater": 2.26
+            "line": -1.812,
+            "homeWater": 0.987,
+            "awayWater": 2.236
           },
           "current": {
             "line": -1.769,
@@ -9924,7 +8816,7 @@
         "competition": "西甲",
         "homeTeam": "西班牙人",
         "awayTeam": "皇家社会",
-        "collectedAt": "2026-05-23T14:00:53.683Z",
+        "collectedAt": "2026-05-23T14:08:39.513Z",
         "europeanOdds": {
           "initial": {
             "home": 2.3,
@@ -9977,12 +8869,12 @@
         "competition": "西甲",
         "homeTeam": "皇马",
         "awayTeam": "毕尔巴鄂",
-        "collectedAt": "2026-05-23T14:00:45.772Z",
+        "collectedAt": "2026-05-23T14:08:27.948Z",
         "europeanOdds": {
           "initial": {
-            "home": 1.487,
-            "draw": 4.655,
-            "away": 5.638
+            "home": 1.49,
+            "draw": 4.646,
+            "away": 5.615
           },
           "current": {
             "home": 1.435,
@@ -9994,8 +8886,8 @@
         "asianHandicap": {
           "initial": {
             "line": -1.638,
-            "homeWater": 0.985,
-            "awayWater": 1.664
+            "homeWater": 0.986,
+            "awayWater": 1.663
           },
           "current": {
             "line": -1.815,
@@ -10030,7 +8922,7 @@
         "competition": "西甲",
         "homeTeam": "赫塔费",
         "awayTeam": "奥萨苏纳",
-        "collectedAt": "2026-05-23T14:00:53.687Z",
+        "collectedAt": "2026-05-23T14:08:39.517Z",
         "europeanOdds": {
           "initial": {
             "home": 2.3,
@@ -10083,7 +8975,7 @@
         "competition": "西甲",
         "homeTeam": "塞尔塔",
         "awayTeam": "塞维利亚",
-        "collectedAt": "2026-05-23T14:00:20.623Z",
+        "collectedAt": "2026-05-23T14:08:05.662Z",
         "europeanOdds": {
           "initial": {
             "home": 1.74,
@@ -10136,7 +9028,7 @@
         "competition": "西甲",
         "homeTeam": "阿拉维斯",
         "awayTeam": "巴列卡诺",
-        "collectedAt": "2026-05-23T14:00:53.686Z",
+        "collectedAt": "2026-05-23T14:08:39.515Z",
         "europeanOdds": {
           "initial": {
             "home": 2.32,
@@ -10189,12 +9081,12 @@
         "competition": "西甲",
         "homeTeam": "巴伦西亚",
         "awayTeam": "巴萨",
-        "collectedAt": "2026-05-23T14:00:46.841Z",
+        "collectedAt": "2026-05-23T14:08:29.020Z",
         "europeanOdds": {
           "initial": {
-            "home": 3.236,
-            "draw": 3.918,
-            "away": 2.001
+            "home": 3.235,
+            "draw": 3.92,
+            "away": 2.002
           },
           "current": {
             "home": 3.512,
@@ -10206,8 +9098,8 @@
         "asianHandicap": {
           "initial": {
             "line": -0.158,
-            "homeWater": 1.203,
-            "awayWater": 1.191
+            "homeWater": 1.202,
+            "awayWater": 1.192
           },
           "current": {
             "line": -0.181,
@@ -10242,7 +9134,7 @@
         "competition": "西甲",
         "homeTeam": "贝蒂斯",
         "awayTeam": "莱万特",
-        "collectedAt": "2026-05-23T14:00:20.623Z",
+        "collectedAt": "2026-05-23T14:08:05.662Z",
         "europeanOdds": {
           "initial": {
             "home": 2.27,
@@ -10295,7 +9187,7 @@
         "competition": "美职",
         "homeTeam": "明尼苏达",
         "awayTeam": "盐湖城",
-        "collectedAt": "2026-05-23T14:00:47.901Z",
+        "collectedAt": "2026-05-23T14:08:30.095Z",
         "europeanOdds": {
           "initial": {
             "home": 2.113,
@@ -10312,8 +9204,8 @@
         "asianHandicap": {
           "initial": {
             "line": -0.762,
-            "homeWater": 1.064,
-            "awayWater": 1.287
+            "homeWater": 1.065,
+            "awayWater": 1.286
           },
           "current": {
             "line": -0.754,
@@ -10348,12 +9240,12 @@
         "competition": "美职",
         "homeTeam": "夏洛特FC",
         "awayTeam": "新英格兰",
-        "collectedAt": "2026-05-23T14:00:48.959Z",
+        "collectedAt": "2026-05-23T14:08:31.156Z",
         "europeanOdds": {
           "initial": {
-            "home": 1.854,
-            "draw": 3.713,
-            "away": 3.746
+            "home": 1.852,
+            "draw": 3.714,
+            "away": 3.753
           },
           "current": {
             "home": 1.865,
@@ -10365,8 +9257,8 @@
         "asianHandicap": {
           "initial": {
             "line": -0.973,
-            "homeWater": 0.977,
-            "awayWater": 1.436
+            "homeWater": 0.975,
+            "awayWater": 1.438
           },
           "current": {
             "line": -0.95,
@@ -10401,10 +9293,10 @@
         "competition": "美职",
         "homeTeam": "华盛顿",
         "awayTeam": "蒙特利尔",
-        "collectedAt": "2026-05-23T14:00:50.023Z",
+        "collectedAt": "2026-05-23T14:08:32.218Z",
         "europeanOdds": {
           "initial": {
-            "home": 2.005,
+            "home": 2.012,
             "draw": 3.598,
             "away": 3.313
           },
@@ -10418,7 +9310,7 @@
         "asianHandicap": {
           "initial": {
             "line": -0.923,
-            "homeWater": 1.123,
+            "homeWater": 1.124,
             "awayWater": 1.245
           },
           "current": {
@@ -10454,7 +9346,7 @@
         "competition": "美职",
         "homeTeam": "纳什维尔",
         "awayTeam": "纽约城",
-        "collectedAt": "2026-05-23T14:00:54.112Z",
+        "collectedAt": "2026-05-23T14:08:40.806Z",
         "europeanOdds": {
           "initial": {
             "home": 1.61,
@@ -10507,12 +9399,12 @@
         "competition": "美职",
         "homeTeam": "波特兰",
         "awayTeam": "圣何塞",
-        "collectedAt": "2026-05-23T14:00:51.078Z",
+        "collectedAt": "2026-05-23T14:08:33.291Z",
         "europeanOdds": {
           "initial": {
             "home": 2.395,
             "draw": 3.897,
-            "away": 2.495
+            "away": 2.497
           },
           "current": {
             "home": 2.31,
@@ -10524,8 +9416,8 @@
         "asianHandicap": {
           "initial": {
             "line": -0.585,
-            "homeWater": 1.124,
-            "awayWater": 1.17
+            "homeWater": 1.121,
+            "awayWater": 1.173
           },
           "current": {
             "line": -0.662,
@@ -10560,12 +9452,12 @@
         "competition": "荷乙",
         "homeTeam": "福伦丹",
         "awayTeam": "威廉二世",
-        "collectedAt": "2026-05-23T13:58:43.000Z",
+        "collectedAt": "2026-05-23T14:05:29.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 2.192,
-            "draw": 3.537,
-            "away": 2.969
+            "home": 2.196,
+            "draw": 3.533,
+            "away": 2.963
           },
           "current": {
             "home": 2.303,
@@ -10582,8 +9474,8 @@
           },
           "current": {
             "line": -0.281,
-            "homeWater": 1.952,
-            "awayWater": 1.892
+            "homeWater": 1.971,
+            "awayWater": 1.853
           },
           "final": null
         },
@@ -10601,12 +9493,12 @@
         "competition": "英冠",
         "homeTeam": "赫尔城",
         "awayTeam": "南安普敦",
-        "collectedAt": "2026-05-23T14:00:52.592Z",
+        "collectedAt": "2026-05-23T14:08:36.821Z",
         "europeanOdds": {
           "initial": {
             "home": 1.368,
-            "draw": 5.611,
-            "away": 6.415
+            "draw": 5.603,
+            "away": 6.424
           },
           "current": {
             "home": 1.356,
@@ -10642,12 +9534,12 @@
         "competition": "德国杯",
         "homeTeam": "拜仁慕尼黑",
         "awayTeam": "斯图加特",
-        "collectedAt": "2026-05-23T13:58:54.000Z",
+        "collectedAt": "2026-05-23T14:05:42.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 3.272,
-            "draw": 3.534,
-            "away": 2.138
+            "home": 3.262,
+            "draw": 3.522,
+            "away": 2.145
           },
           "current": {
             "home": 3.709,
@@ -10664,8 +9556,8 @@
           },
           "current": {
             "line": 0.281,
-            "homeWater": 1.958,
-            "awayWater": 1.833
+            "homeWater": 1.955,
+            "awayWater": 1.838
           },
           "final": null
         },
@@ -10683,12 +9575,12 @@
         "competition": "意甲",
         "homeTeam": "博洛尼亚",
         "awayTeam": "国际米兰",
-        "collectedAt": "2026-05-23T13:59:03.000Z",
+        "collectedAt": "2026-05-23T14:05:50.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 1.718,
-            "draw": 3.803,
-            "away": 4.727
+            "home": 1.721,
+            "draw": 3.781,
+            "away": 4.734
           },
           "current": {
             "home": 1.491,
@@ -10705,8 +9597,8 @@
           },
           "current": {
             "line": -0.719,
-            "homeWater": 1.918,
-            "awayWater": 1.929
+            "homeWater": 1.917,
+            "awayWater": 1.93
           },
           "final": null
         },
@@ -10724,12 +9616,12 @@
         "competition": "意甲",
         "homeTeam": "拉齐奥",
         "awayTeam": "比萨",
-        "collectedAt": "2026-05-23T13:59:04.000Z",
+        "collectedAt": "2026-05-23T14:05:51.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 1.94,
-            "draw": 3.457,
-            "away": 3.997
+            "home": 1.947,
+            "draw": 3.448,
+            "away": 3.977
           },
           "current": {
             "home": 1.89,
@@ -10745,9 +9637,9 @@
             "awayWater": 1.876
           },
           "current": {
-            "line": -0.531,
-            "homeWater": 1.927,
-            "awayWater": 1.869
+            "line": -0.5,
+            "homeWater": 1.912,
+            "awayWater": 1.831
           },
           "final": null
         },
@@ -10765,12 +9657,12 @@
         "competition": "西甲",
         "homeTeam": "维戈塞尔塔",
         "awayTeam": "塞维利亚",
-        "collectedAt": "2026-05-23T14:00:53.683Z",
+        "collectedAt": "2026-05-23T14:08:39.513Z",
         "europeanOdds": {
           "initial": {
-            "home": 2.74,
-            "draw": 2.713,
-            "away": 3.096
+            "home": 2.75,
+            "draw": 2.707,
+            "away": 3.095
           },
           "current": {
             "home": 2.369,
@@ -10806,11 +9698,11 @@
         "competition": "西甲",
         "homeTeam": "赫塔费",
         "awayTeam": "奥萨苏纳",
-        "collectedAt": "2026-05-23T13:59:04.000Z",
+        "collectedAt": "2026-05-23T14:05:51.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 1.813,
-            "draw": 3.86,
+            "home": 1.811,
+            "draw": 3.868,
             "away": 4.06
           },
           "current": {
@@ -10827,9 +9719,9 @@
             "awayWater": 1.936
           },
           "current": {
-            "line": -0.578,
-            "homeWater": 1.887,
-            "awayWater": 1.958
+            "line": -0.562,
+            "homeWater": 1.876,
+            "awayWater": 1.968
           },
           "final": null
         },
@@ -10847,12 +9739,12 @@
         "competition": "西甲",
         "homeTeam": "赫罗纳",
         "awayTeam": "埃尔切",
-        "collectedAt": "2026-05-23T13:59:04.000Z",
+        "collectedAt": "2026-05-23T14:05:51.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 2.31,
-            "draw": 3.421,
-            "away": 3.036
+            "home": 2.312,
+            "draw": 3.423,
+            "away": 3.034
           },
           "current": {
             "home": 2.04,
@@ -10869,8 +9761,8 @@
           },
           "current": {
             "line": -0.25,
-            "homeWater": 2.02,
-            "awayWater": 1.846
+            "homeWater": 2.024,
+            "awayWater": 1.844
           },
           "final": null
         },
@@ -10888,7 +9780,7 @@
         "competition": "瑞超",
         "homeTeam": "哈尔姆斯塔德",
         "awayTeam": "厄尔格里特",
-        "collectedAt": "2026-05-23T14:00:52.588Z",
+        "collectedAt": "2026-05-23T14:08:36.819Z",
         "europeanOdds": {
           "initial": {
             "home": 2.017,
@@ -10929,7 +9821,7 @@
         "competition": "瑞超",
         "homeTeam": "卡尔马",
         "awayTeam": "代格福什",
-        "collectedAt": "2026-05-23T14:00:52.587Z",
+        "collectedAt": "2026-05-23T14:08:36.818Z",
         "europeanOdds": {
           "initial": {
             "home": 1.897,
@@ -10970,12 +9862,12 @@
         "competition": "芬超",
         "homeTeam": "坦佩雷山猫",
         "awayTeam": "赫尔辛基火花",
-        "collectedAt": "2026-05-23T13:58:37.000Z",
+        "collectedAt": "2026-05-23T14:05:22.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 2.076,
-            "draw": 3.538,
-            "away": 3.159
+            "home": 2.086,
+            "draw": 3.534,
+            "away": 3.144
           },
           "current": {
             "home": 1.778,
@@ -10991,9 +9883,9 @@
             "awayWater": 1.923
           },
           "current": {
-            "line": -0.283,
-            "homeWater": 1.875,
-            "awayWater": 1.948
+            "line": -0.3,
+            "homeWater": 1.903,
+            "awayWater": 1.921
           },
           "final": null
         },
@@ -11011,7 +9903,7 @@
         "competition": "芬超",
         "homeTeam": "雅罗",
         "awayTeam": "玛丽港",
-        "collectedAt": "2026-05-23T13:58:37.000Z",
+        "collectedAt": "2026-05-23T14:05:22.000Z",
         "europeanOdds": {
           "initial": {
             "home": 1.852,
@@ -11052,7 +9944,7 @@
         "competition": "芬超",
         "homeTeam": "库奥皮奥",
         "awayTeam": "拉赫蒂",
-        "collectedAt": "2026-05-23T13:58:38.000Z",
+        "collectedAt": "2026-05-23T14:05:23.000Z",
         "europeanOdds": {
           "initial": {
             "home": 1.507,
@@ -11093,12 +9985,12 @@
         "competition": "芬超",
         "homeTeam": "塞伊奈约基",
         "awayTeam": "AC 奥卢",
-        "collectedAt": "2026-05-23T13:58:38.000Z",
+        "collectedAt": "2026-05-23T14:05:23.000Z",
         "europeanOdds": {
           "initial": {
-            "home": 2.391,
-            "draw": 3.468,
-            "away": 2.688
+            "home": 2.393,
+            "draw": 3.494,
+            "away": 2.667
           },
           "current": {
             "home": 2.484,
@@ -11114,9 +10006,9 @@
             "awayWater": 1.847
           },
           "current": {
-            "line": 0.016,
-            "homeWater": 1.804,
-            "awayWater": 1.964
+            "line": 0,
+            "homeWater": 1.818,
+            "awayWater": 1.949
           },
           "final": null
         },
@@ -11129,62 +10021,14 @@
   },
   "market": {
     "date": "2026-05-23",
-    "fixtures": 37,
+    "fixtures": 33,
     "snapshots": 43,
-    "usable": 37,
-    "complete": 37,
+    "usable": 33,
+    "complete": 33,
     "missing": 0,
     "coverage": 1,
     "completeCoverage": 1,
     "rows": [
-      {
-        "fixtureId": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
-        "sequence": "周六008",
-        "match": "坦山猫 对 赫尔火花",
-        "hasSnapshot": true,
-        "realTime": true,
-        "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:42.575Z",
-        "usable": true,
-        "complete": true,
-        "missing": []
-      },
-      {
-        "fixtureId": "jc-2026-05-23-周六009-塞伊奈-ac奥卢",
-        "sequence": "周六009",
-        "match": "塞伊奈 对 AC奥卢",
-        "hasSnapshot": true,
-        "realTime": true,
-        "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:43.640Z",
-        "usable": true,
-        "complete": true,
-        "missing": []
-      },
-      {
-        "fixtureId": "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂",
-        "sequence": "周六010",
-        "match": "库奥皮奥 对 拉赫蒂",
-        "hasSnapshot": true,
-        "realTime": true,
-        "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T14:00:20.622Z",
-        "usable": true,
-        "complete": true,
-        "missing": []
-      },
-      {
-        "fixtureId": "jc-2026-05-23-周六011-雅罗-玛丽港",
-        "sequence": "周六011",
-        "match": "雅罗 对 玛丽港",
-        "hasSnapshot": true,
-        "realTime": true,
-        "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T14:00:20.622Z",
-        "usable": true,
-        "complete": true,
-        "missing": []
-      },
       {
         "fixtureId": "jc-2026-05-23-周六012-赫尔城-米堡",
         "sequence": "周六012",
@@ -11192,7 +10036,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:52.590Z",
+        "collectedAt": "2026-05-23T14:08:36.820Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11204,7 +10048,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.678Z",
+        "collectedAt": "2026-05-23T14:08:39.508Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11216,7 +10060,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T14:00:20.622Z",
+        "collectedAt": "2026-05-23T14:08:05.661Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11228,7 +10072,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.678Z",
+        "collectedAt": "2026-05-23T14:08:39.508Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11240,7 +10084,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.680Z",
+        "collectedAt": "2026-05-23T14:08:39.510Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11252,7 +10096,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.688Z",
+        "collectedAt": "2026-05-23T14:08:39.517Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11264,7 +10108,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:44.708Z",
+        "collectedAt": "2026-05-23T14:08:26.881Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11276,7 +10120,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.683Z",
+        "collectedAt": "2026-05-23T14:08:39.513Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11288,7 +10132,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:45.772Z",
+        "collectedAt": "2026-05-23T14:08:27.948Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11300,7 +10144,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.687Z",
+        "collectedAt": "2026-05-23T14:08:39.517Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11312,7 +10156,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T14:00:20.623Z",
+        "collectedAt": "2026-05-23T14:08:05.662Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11324,7 +10168,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.686Z",
+        "collectedAt": "2026-05-23T14:08:39.515Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11336,7 +10180,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:46.841Z",
+        "collectedAt": "2026-05-23T14:08:29.020Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11348,7 +10192,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T14:00:20.623Z",
+        "collectedAt": "2026-05-23T14:08:05.662Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11360,7 +10204,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:47.901Z",
+        "collectedAt": "2026-05-23T14:08:30.095Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11372,7 +10216,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:48.959Z",
+        "collectedAt": "2026-05-23T14:08:31.156Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11384,7 +10228,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:50.023Z",
+        "collectedAt": "2026-05-23T14:08:32.218Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11396,7 +10240,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:54.112Z",
+        "collectedAt": "2026-05-23T14:08:40.806Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11408,7 +10252,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:51.078Z",
+        "collectedAt": "2026-05-23T14:08:33.291Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11420,7 +10264,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:52.592Z",
+        "collectedAt": "2026-05-23T14:08:36.821Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11431,8 +10275,8 @@
         "match": "拜仁慕尼黑 对 斯图加特",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:58:54.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:42.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11443,8 +10287,8 @@
         "match": "博洛尼亚 对 国际米兰",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:59:03.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:50.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11455,8 +10299,8 @@
         "match": "拉齐奥 对 比萨",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:59:04.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:51.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11468,7 +10312,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:53.683Z",
+        "collectedAt": "2026-05-23T14:08:39.513Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11479,8 +10323,8 @@
         "match": "赫塔费 对 奥萨苏纳",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:59:04.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:51.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11491,8 +10335,8 @@
         "match": "赫罗纳 对 埃尔切",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:59:04.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:51.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11503,8 +10347,8 @@
         "match": "福伦丹 对 威廉二世",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:58:43.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:29.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11516,7 +10360,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:52.588Z",
+        "collectedAt": "2026-05-23T14:08:36.819Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11528,7 +10372,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T14:00:52.587Z",
+        "collectedAt": "2026-05-23T14:08:36.818Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11539,8 +10383,8 @@
         "match": "坦佩雷山猫 对 赫尔辛基火花",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:58:37.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:22.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11551,8 +10395,8 @@
         "match": "雅罗 对 玛丽港",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:58:37.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:22.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11563,8 +10407,8 @@
         "match": "库奥皮奥 对 拉赫蒂",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:58:38.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:23.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11575,8 +10419,8 @@
         "match": "塞伊奈约基 对 AC 奥卢",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T13:58:38.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T14:05:23.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -11586,7 +10430,7 @@
   "gate": {
     "ok": true,
     "date": "2026-05-23",
-    "generatedAt": "2026-05-23T14:00:54.824Z",
+    "generatedAt": "2026-05-23T14:08:42.549Z",
     "policy": {
       "requireOfficialChinaSources": true,
       "requireJingcaiRealtimeOdds": true,
@@ -11595,23 +10439,23 @@
       "maxGateAgeMinutes": 30
     },
     "summary": {
-      "fixtures": 37,
-      "jingcaiMatches": 23,
+      "fixtures": 33,
+      "jingcaiMatches": 19,
       "shengfucaiMatches": 14,
       "marketSnapshots": 43,
-      "marketUsable": 37,
-      "marketRealtime": 37
+      "marketUsable": 33,
+      "marketRealtime": 33
     },
     "checks": [
       {
         "name": "中国官方源实时抓取",
         "ok": true,
-        "detail": "抓取时间：2026-05-23T14:00:21.022Z"
+        "detail": "抓取时间：2026-05-23T14:08:05.974Z"
       },
       {
         "name": "竞彩足球官方源",
         "ok": true,
-        "detail": "场次：23"
+        "detail": "场次：19"
       },
       {
         "name": "竞彩公告官方源",
@@ -11626,17 +10470,17 @@
       {
         "name": "竞彩赔率实时快照",
         "ok": true,
-        "detail": "快照：23/23"
+        "detail": "快照：19/19"
       },
       {
         "name": "Fixture 文件来自本次官方同步",
         "ok": true,
-        "detail": "source=china-official-web:sporttery+lottery-gov-cn，fixtures=37"
+        "detail": "source=china-official-web:sporttery+lottery-gov-cn，fixtures=33"
       },
       {
         "name": "市场快照实时性",
         "ok": true,
-        "detail": "实时快照：37/37"
+        "detail": "实时快照：33/33"
       },
       {
         "name": "全量赔率硬门槛",

@@ -1,88 +1,8 @@
 {
   "date": "2026-05-23",
   "source": "china-official-web:sporttery+lottery-gov-cn",
-  "importedAt": "2026-05-23T14:00:21.019Z",
+  "importedAt": "2026-05-23T14:08:05.971Z",
   "fixtures": [
-    {
-      "id": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 22:00",
-      "competition": "芬超",
-      "homeTeam": "坦山猫",
-      "awayTeam": "赫尔火花",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六008",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六008",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039902,
-      "result": null
-    },
-    {
-      "id": "jc-2026-05-23-周六009-塞伊奈-ac奥卢",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 22:00",
-      "competition": "芬超",
-      "homeTeam": "塞伊奈",
-      "awayTeam": "AC奥卢",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六009",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六009",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039903,
-      "result": null
-    },
-    {
-      "id": "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 22:00",
-      "competition": "芬超",
-      "homeTeam": "库奥皮奥",
-      "awayTeam": "拉赫蒂",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六010",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六010",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039904,
-      "result": null
-    },
-    {
-      "id": "jc-2026-05-23-周六011-雅罗-玛丽港",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 22:00",
-      "competition": "芬超",
-      "homeTeam": "雅罗",
-      "awayTeam": "玛丽港",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六011",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六011",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039905,
-      "result": null
-    },
     {
       "id": "jc-2026-05-23-周六012-赫尔城-米堡",
       "date": "2026-05-23",
