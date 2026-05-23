@@ -52,6 +52,8 @@ function harmonizeDuplicatePredictions(predictions) {
     if (prediction.fixture.marketType !== "shengfucai") return prediction;
     const source = authoritative.get(fixtureIdentityKey(prediction.fixture));
     if (!source) return prediction;
+    const scorePicks = buildScorePicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index);
+    const halfFullPicks = buildHalfFullPicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scorePicks);
     const next = {
       ...prediction,
       probabilities: { ...source.probabilities },
@@ -63,8 +65,8 @@ function harmonizeDuplicatePredictions(predictions) {
       secondaryPick: { ...source.secondaryPick },
       risk: source.risk,
       confidence: source.confidence,
-      scorePicks: buildScorePicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index),
-      halfFullPicks: buildHalfFullPicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index),
+      scorePicks,
+      halfFullPicks,
       rationale: `${prediction.rationale}；同场次已与竞彩足球 ${source.fixture.sequence} 胜平负方向强制一致`
     };
     const consistencyErrors = validatePredictionConsistency(next);
@@ -109,6 +111,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
+  const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index);
+  const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks);
   const prediction = {
     fixture,
     baseProbabilities,
@@ -122,8 +126,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     secondaryPick: ranked[1],
     risk,
     confidence,
-    scorePicks: buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index),
-    halfFullPicks: buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index),
+    scorePicks,
+    halfFullPicks,
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
   };
   prediction.bankroll = buildBankrollRisk(prediction, options.env ?? process.env);
@@ -155,6 +159,19 @@ export function halfFullFinalOutcomeCode(value) {
   return chineseOutcomeToCode(finalLabel);
 }
 
+export function halfFullFirstOutcomeCode(value) {
+  const firstLabel = normalizeHalfFull(value).split("-").at(0)?.trim();
+  return chineseOutcomeToCode(firstLabel);
+}
+
+export function scoreHalfFullConsistent(score, halfFull) {
+  const scoreCode = scoreOutcomeCode(score);
+  const finalCode = halfFullFinalOutcomeCode(halfFull);
+  const firstCode = halfFullFirstOutcomeCode(halfFull);
+  if (!scoreCode || !finalCode || !firstCode || scoreCode !== finalCode) return false;
+  return possibleHalfOutcomeCodes(score).has(firstCode);
+}
+
 export function validatePredictionConsistency(prediction) {
   const checks = [
     ["比分首选", prediction.scorePicks?.primary, prediction.pick?.code, scoreOutcomeCode],
@@ -162,11 +179,19 @@ export function validatePredictionConsistency(prediction) {
     ["半全场首选", prediction.halfFullPicks?.primary, prediction.pick?.code, halfFullFinalOutcomeCode],
     ["半全场次选", prediction.halfFullPicks?.secondary, prediction.secondaryPick?.code, halfFullFinalOutcomeCode]
   ];
-  return checks.flatMap(([label, value, expectedCode, parser]) => {
+  const errors = checks.flatMap(([label, value, expectedCode, parser]) => {
     const actualCode = parser(value);
     if (!expectedCode || actualCode === expectedCode) return [];
     return `${label} ${value || "缺失"} 与 ${outcomeCodeToChinese(expectedCode)} 不一致`;
   });
+  const pathChecks = [
+    ["比分/半全场首选", prediction.scorePicks?.primary, prediction.halfFullPicks?.primary],
+    ["比分/半全场次选", prediction.scorePicks?.secondary, prediction.halfFullPicks?.secondary]
+  ];
+  for (const [label, score, halfFull] of pathChecks) {
+    if (score && halfFull && !scoreHalfFullConsistent(score, halfFull)) errors.push(`${label} ${score} 与 ${halfFull} 路径冲突`);
+  }
+  return errors;
 }
 
 function probabilitiesFromOdds(odds) {
@@ -293,12 +318,14 @@ function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {
   };
 }
 
-function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0) {
-  const primary = halfFullFromMarket(snapshot, code);
-  const secondary = halfFullFromMarket(snapshot, secondaryCode, new Set(primary ? [primary] : []));
+function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, scorePicks = {}) {
+  const primaryScore = scorePicks.primary ?? scoreForOutcome(code, 0, probabilities, index);
+  const secondaryScore = scorePicks.secondary ?? scoreForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1);
+  const primary = halfFullFromMarket(snapshot, code, new Set(), primaryScore);
+  const secondary = halfFullFromMarket(snapshot, secondaryCode, new Set(primary ? [primary] : []), secondaryScore);
   return {
-    primary: primary ?? halfFullForOutcome(code, 0, probabilities, index),
-    secondary: secondary ?? halfFullForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
+    primary: primary ?? halfFullForScore(primaryScore, code, 0, probabilities, index),
+    secondary: secondary ?? halfFullForScore(secondaryScore, secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
   };
 }
 
@@ -310,12 +337,52 @@ function scoreFromMarket(snapshot, code, excluded = new Set()) {
     .at(0);
 }
 
-function halfFullFromMarket(snapshot, code, excluded = new Set()) {
+function halfFullFromMarket(snapshot, code, excluded = new Set(), score = "") {
   const rows = snapshot?.halfFullOdds?.top ?? [];
   return rows
     .map((row) => normalizeHalfFull(row.halfFull))
     .filter((halfFull) => halfFullFinalOutcomeCode(halfFull) === code && !excluded.has(halfFull))
+    .filter((halfFull) => !score || scoreHalfFullConsistent(score, halfFull))
     .at(0);
+}
+
+function possibleHalfOutcomeCodes(score) {
+  const match = String(score ?? "").trim().match(/^(\d+)\s*[-:]\s*(\d+)$/);
+  if (!match) return new Set();
+  const homeGoals = Number(match[1]);
+  const awayGoals = Number(match[2]);
+  const codes = new Set();
+  for (let homeHalf = 0; homeHalf <= homeGoals; homeHalf += 1) {
+    for (let awayHalf = 0; awayHalf <= awayGoals; awayHalf += 1) {
+      if (homeHalf > awayHalf) codes.add("3");
+      else if (homeHalf === awayHalf) codes.add("1");
+      else codes.add("0");
+    }
+  }
+  return codes;
+}
+
+function halfFullForScore(score, code, variant = 0, probabilities = {}, index = 0) {
+  const possible = [...possibleHalfOutcomeCodes(score)];
+  const finalCode = scoreOutcomeCode(score) || code;
+  const preferred = preferredHalfOutcomeCodes(finalCode, variant, probabilities, index);
+  const firstCode = preferred.find((candidate) => possible.includes(candidate)) ?? possible.at(0) ?? finalCode;
+  return `${outcomeCodeToChinese(firstCode)}-${outcomeCodeToChinese(finalCode)}`;
+}
+
+function preferredHalfOutcomeCodes(finalCode, variant = 0, probabilities = {}, index = 0) {
+  const variantIndex = Math.abs(index + variant) % 3;
+  if (finalCode === "3") {
+    if ((probabilities.home ?? 0) >= 0.58) return ["3", "1", "0"];
+    return variantIndex === 0 ? ["1", "3", "0"] : ["3", "1", "0"];
+  }
+  if (finalCode === "0") {
+    if ((probabilities.away ?? 0) >= 0.58) return ["0", "1", "3"];
+    return variantIndex === 0 ? ["1", "0", "3"] : ["0", "1", "3"];
+  }
+  if (variantIndex === 1 && (probabilities.home ?? 0) > (probabilities.away ?? 0)) return ["3", "1", "0"];
+  if (variantIndex === 2 && (probabilities.away ?? 0) > (probabilities.home ?? 0)) return ["0", "1", "3"];
+  return ["1", "3", "0"];
 }
 
 function scoreForOutcome(code, variant = 0, probabilities = {}, index = 0) {

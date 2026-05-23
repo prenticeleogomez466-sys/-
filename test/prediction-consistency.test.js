@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { auditRecommendations } from "../src/recommendation-audit.js";
-import { halfFullFinalOutcomeCode, predictFixture, scoreOutcomeCode } from "../src/prediction-engine.js";
+import { halfFullFinalOutcomeCode, predictFixture, scoreHalfFullConsistent, scoreOutcomeCode } from "../src/prediction-engine.js";
 
 const baseFixture = {
   id: "fixture-1",
@@ -39,8 +39,21 @@ describe("prediction derived market consistency", () => {
     const audit = auditRecommendations({ predictions: [prediction], fourteen: { count: 0 } });
 
     assert.equal(audit.ok, false);
-    assert.equal(audit.summary.errors, 1);
+    assert.ok(audit.summary.errors >= 1);
     assert.match(audit.errors[0].message, /比分首选/);
+  });
+
+  it("keeps score and half-full picks on a possible match path", () => {
+    const prediction = predictFixture(baseFixture, [{
+      fixtureId: baseFixture.id,
+      date: baseFixture.date,
+      europeanOdds: { current: { home: 1.5, draw: 4.2, away: 6.5 } },
+      scoreOdds: { top: [{ score: "2-0", odds: 7.5 }] },
+      halfFullOdds: { top: [{ halfFull: "负胜", odds: 18 }, { halfFull: "平胜", odds: 4.5 }] }
+    }]);
+
+    assert.equal(prediction.scorePicks.primary, "2-0");
+    assert.equal(scoreHalfFullConsistent(prediction.scorePicks.primary, prediction.halfFullPicks.primary), true);
   });
 
   it("bounds confidence and rejects high-risk bankers", () => {
