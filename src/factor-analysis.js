@@ -90,6 +90,7 @@ function totalsFactor(prediction) {
   return {
     name: "大小球",
     level: bias,
+    bias,
     direction: bias,
     point: Number.isFinite(expectedGoals) ? `${marketPoint}，模型总进球${expectedGoals.toFixed(2)}` : marketPoint,
     riskScore: bias === "中性" ? 1 : 0,
