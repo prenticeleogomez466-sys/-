@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
@@ -36,8 +36,20 @@ export async function runDailyRecap(date, options = {}) {
     { name: "复盘明细", rows: [recapDetailHeaders(), ...detailRows] },
     { name: "历史总表", rows: [recapDetailHeaders(), ...nextLedger.map(toRecapDetailRow)] }
   ]);
+  const dDrivePaths = mirrorRecapExports(targetDate, summaryPath, masterPath);
   const sync = options.syncArtifacts === false ? null : syncFootballArtifacts(targetDate);
-  return { ok: true, date: targetDate, summary, paths: { summaryPath, masterPath, ledgerPath }, syncResults, sync };
+  return { ok: true, date: targetDate, summary, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+}
+
+function mirrorRecapExports(date, summaryPath, masterPath) {
+  if (process.env.FOOTBALL_D_EXPORT === "0") return {};
+  const dExportDir = join("D:", "football-model-exports");
+  mkdirSync(dExportDir, { recursive: true });
+  const dSummaryPath = join(dExportDir, `daily-recap-${date}.json`);
+  const dMasterPath = join(dExportDir, "football-recap-master.xlsx");
+  copyFileSync(summaryPath, dSummaryPath);
+  copyFileSync(masterPath, dMasterPath);
+  return { dSummaryPath, dMasterPath };
 }
 
 function updateLedgerRow(row, fixtures) {

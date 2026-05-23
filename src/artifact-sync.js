@@ -143,6 +143,9 @@ function resolveObsidianVault(explicitPath) {
   const candidates = [
     explicitPath,
     process.env.OBSIDIAN_VAULT_DIR,
+    join("D:", "足球数据分析库", "111"),
+    join("D:", "codex", "codex足球大模型"),
+    join("D:", "Users", os.userInfo().username, "Documents", "Obsidian Vault"),
     join(os.homedir(), "Desktop"),
     join("D:", "Users", os.userInfo().username, "Desktop"),
     join("D:", "Desktop")

@@ -11,6 +11,13 @@ $LogDir = Join-Path $Root "data\logs"
 $ExportDir = Join-Path $Root "data\exports"
 New-Item -ItemType Directory -Force -Path $LogDir, $ExportDir | Out-Null
 
+if ([string]::IsNullOrWhiteSpace($env:OBSIDIAN_VAULT_DIR)) {
+  $DefaultObsidianVault = "D:\足球数据分析库\111"
+  if (Test-Path (Join-Path $DefaultObsidianVault ".obsidian")) {
+    $env:OBSIDIAN_VAULT_DIR = $DefaultObsidianVault
+  }
+}
+
 if ([string]::IsNullOrWhiteSpace($Date)) {
   if ($Mode -eq "recap") {
     $Date = (Get-Date).AddDays(-1).ToString("yyyy-MM-dd")
