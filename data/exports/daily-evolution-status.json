@@ -12745,7 +12745,23 @@
     "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\exports\\wechat-outbox-latest.json",
     "archivedPath": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\wechat\\wechat-outbox-20260523T115516Z.json"
   },
-  "sync": null,
+  "sync": {
+    "date": "2026-05-23",
+    "generatedAt": "2026-05-23T11:55:16.834Z",
+    "obsidian": {
+      "ok": false,
+      "skipped": true,
+      "error": "未找到 Obsidian vault；请设置 OBSIDIAN_VAULT_DIR"
+    },
+    "git": {
+      "ok": true,
+      "remote": "git@github.com:prenticeleogomez466-sys/-.git",
+      "committed": true,
+      "pushed": true,
+      "message": "Sync football model artifacts 2026-05-23"
+    },
+    "ok": false
+  },
   "ok": true,
   "error": null,
   "finishedAt": "2026-05-23T11:55:16.827Z"
