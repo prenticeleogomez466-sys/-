@@ -1,7 +1,7 @@
 param(
   [string]$DailyTime = "03:00",
   [string]$HealthTime = "03:00",
-  [string]$RecapTime = "03:00",
+  [string]$RecapTime = "11:00",
   [string]$WeeklyTime = "03:00",
   [switch]$AllowMissingOdds
 )

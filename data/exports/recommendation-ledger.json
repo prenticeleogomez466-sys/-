@@ -1198,7 +1198,8 @@
     "reason": "经模型综合分析：瑞超，主胜概率领先客胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1229,7 +1230,8 @@
     "reason": "经模型综合分析：沙职，客胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1260,7 +1262,8 @@
     "reason": "经模型综合分析：沙职，客胜概率领先主胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1291,7 +1294,8 @@
     "reason": "经模型综合分析：沙职，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1322,7 +1326,8 @@
     "reason": "经模型综合分析：解放者杯，主胜概率领先客胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1353,7 +1358,8 @@
     "reason": "经模型综合分析：荷甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1384,7 +1390,8 @@
     "reason": "经模型综合分析：德甲，主胜概率领先平局；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1415,7 +1422,8 @@
     "reason": "经模型综合分析：荷甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1446,7 +1454,8 @@
     "reason": "经模型综合分析：英冠，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1477,7 +1486,8 @@
     "reason": "经模型综合分析：德国杯，客胜概率领先主胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1508,7 +1518,8 @@
     "reason": "经模型综合分析：意甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1539,7 +1550,8 @@
     "reason": "经模型综合分析：意甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1570,7 +1582,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1601,7 +1614,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1632,7 +1646,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先客胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1663,7 +1678,8 @@
     "reason": "经模型综合分析：荷乙，主胜概率领先客胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1694,7 +1710,8 @@
     "reason": "经模型综合分析：瑞超，主胜概率领先客胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1725,7 +1742,8 @@
     "reason": "经模型综合分析：瑞超，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1756,7 +1774,8 @@
     "reason": "经模型综合分析：芬超，主胜概率领先平局；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1787,7 +1806,8 @@
     "reason": "经模型综合分析：芬超，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1818,7 +1838,8 @@
     "reason": "经模型综合分析：芬超，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-21",
@@ -1849,6 +1870,7 @@
     "reason": "经模型综合分析：芬超，主胜概率领先客胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   }
 ]

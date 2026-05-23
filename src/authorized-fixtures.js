@@ -11,6 +11,7 @@ const SETTLED_FOOTBALL_DATA = new Set(["FINISHED", "AWARDED"]);
 
 export async function syncAuthorizedFixturesAndResults(date, options = {}) {
   const env = options.env ?? process.env;
+  const queryDate = options.resultDate ?? date;
   const providers = buildAuthorizedProviders(env, options);
   if (!providers.length) {
     if (options.strict) throw new Error("缺少赛程/赛果授权源：请配置 API_FOOTBALL_KEY、FOOTBALL_DATA_ORG_TOKEN 或 SPORTMONKS_API_TOKEN");
@@ -24,7 +25,7 @@ export async function syncAuthorizedFixturesAndResults(date, options = {}) {
   const sources = [];
   for (const provider of providers) {
     try {
-      const fixtures = await provider.fetch(date, fetchImpl);
+      const fixtures = await provider.fetch(queryDate, fetchImpl);
       fetched.push(...fixtures);
       sources.push({ name: provider.name, ok: true, fetched: fixtures.length, error: null });
     } catch (error) {
@@ -38,7 +39,7 @@ export async function syncAuthorizedFixturesAndResults(date, options = {}) {
   if (options.save !== false && (merged.updated > 0 || merged.added > 0)) {
     saved = saveFixtures(date, merged.fixtures, { source: mergeSource(fixtureSet.source, sources.filter((source) => source.ok).map((source) => source.name).join("+")) });
   }
-  const result = { date, sources, existing: fixtureSet.fixtures.length, fetched: fetched.length, matched: merged.matched, updated: merged.updated, added: merged.added, saved: Boolean(saved), path: saved ? join(rootDir, "data", "fixtures", `${date}.json`) : null, skipped: null };
+  const result = { date, queryDate, sources, existing: fixtureSet.fixtures.length, fetched: fetched.length, matched: merged.matched, updated: merged.updated, added: merged.added, saved: Boolean(saved), path: saved ? join(rootDir, "data", "fixtures", `${date}.json`) : null, skipped: null };
   if (options.writeLog !== false) writeSyncLog(result);
   return result;
 }

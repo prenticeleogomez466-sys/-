@@ -12,7 +12,11 @@ $ExportDir = Join-Path $Root "data\exports"
 New-Item -ItemType Directory -Force -Path $LogDir, $ExportDir | Out-Null
 
 if ([string]::IsNullOrWhiteSpace($Date)) {
-  $Date = Get-Date -Format "yyyy-MM-dd"
+  if ($Mode -eq "recap") {
+    $Date = (Get-Date).AddDays(-1).ToString("yyyy-MM-dd")
+  } else {
+    $Date = Get-Date -Format "yyyy-MM-dd"
+  }
 }
 
 $RunId = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -87,9 +91,9 @@ function Run-Daily {
 }
 
 function Run-Recap {
-  Invoke-Step "sync post-match results" "npm run fixtures:sync:soft -- --date=$Date"
+  Invoke-Step "sync previous-day results" "npm run fixtures:sync:soft -- --date=$Date"
+  Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
-  Invoke-Step "refresh recap workbook" "npm run daily:no-web -- --date $Date"
 }
 
 function Run-Weekly {

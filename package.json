@@ -32,6 +32,7 @@
     "auto:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-football-automation-tasks.ps1",
     "wechat:reconnect": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/reconnect-wechat-server.ps1",
     "recommend:audit": "node src/recommendation-audit.js",
+    "recap:daily": "node src/daily-recap.js",
     "backtest:evolution": "node src/evolution-backtest.js",
     "sources:audit": "node src/data-source-registry.js",
     "freeodds:audit": "node src/free-odds-source-registry.js",
