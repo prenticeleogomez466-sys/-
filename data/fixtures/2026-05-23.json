@@ -1,28 +1,8 @@
 {
   "date": "2026-05-23",
   "source": "china-official-web:sporttery+lottery-gov-cn",
-  "importedAt": "2026-05-23T14:08:05.971Z",
+  "importedAt": "2026-05-23T15:06:08.762Z",
   "fixtures": [
-    {
-      "id": "jc-2026-05-23-周六012-赫尔城-米堡",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 22:30",
-      "competition": "英冠",
-      "homeTeam": "赫尔城",
-      "awayTeam": "米堡",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六012",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六012",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039906,
-      "result": null
-    },
     {
       "id": "jc-2026-05-23-周六013-博洛尼亚-国际米兰",
       "date": "2026-05-23",
@@ -61,26 +41,6 @@
       "source": "lottery.gov.cn/jc/jsq/zqspf",
       "officialStatus": "official-web",
       "officialFixtureId": 2039908,
-      "result": null
-    },
-    {
-      "id": "jc-2026-05-23-周六015-福伦丹-威廉二世",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 22:30",
-      "competition": "荷乙",
-      "homeTeam": "福伦丹",
-      "awayTeam": "威廉二世",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六015",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六015",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039909,
       "result": null
     },
     {

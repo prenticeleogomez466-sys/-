@@ -1,7 +1,7 @@
 # 足球大模型结构审计 2026-05-23
 
 状态：通过
-生成时间：2026-05-23T14:08:03.899Z
+生成时间：2026-05-23T15:06:51.461Z
 
 | 层级 | 检查项 | 状态 | 说明 |
 |---|---|---:|---|
@@ -36,16 +36,16 @@
 | 脚本层 | npm 脚本 auto:install | 通过 | powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-football-automation-tasks.ps1 |
 | 脚本层 | npm 脚本 wechat:check | 通过 | node src/wechat-smoke.js |
 | 脚本层 | npm 脚本 test | 通过 | node --test |
-| 数据层 | 赛程总量 | 通过 | 33 场 |
-| 数据层 | 竞彩足球场次 | 通过 | 19 场 |
+| 数据层 | 赛程总量 | 通过 | 31 场 |
+| 数据层 | 竞彩足球场次 | 通过 | 17 场 |
 | 数据层 | 14场完整性 | 通过 | 14/14 |
 | 数据层 | 官方数据来源 | 通过 | china-official-web:sporttery+lottery-gov-cn |
 | 赔率层 | 市场快照 | 通过 | 43 个快照 |
-| 赔率层 | 实时赔率覆盖 | 通过 | 33/33 |
+| 赔率层 | 实时赔率覆盖 | 通过 | 31/31 |
 | 闸门层 | 实时数据源闸门 | 通过 | 通过 |
 | 闸门层 | 闸门新鲜度 | 通过 | 0 分钟 |
-| 输出层 | 每日推荐 XLSX | 通过 | 356504 bytes |
-| 输出层 | 复盘总表 XLSX | 通过 | 151503 bytes |
+| 输出层 | 每日推荐 XLSX | 通过 | 317784 bytes |
+| 输出层 | 复盘总表 XLSX | 通过 | 145460 bytes |
 | 输出层 | 微信 outbox | 通过 | 626 bytes |
 | 中文层 | 用户可见中文 src/prediction-engine.js | 通过 | 正常中文 |
 | 中文层 | 用户可见中文 src/daily-report.js | 通过 | 正常中文 |

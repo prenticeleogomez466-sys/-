@@ -1,7 +1,7 @@
 {
   "ok": true,
   "date": "2026-05-23",
-  "generatedAt": "2026-05-23T14:10:45.915Z",
+  "generatedAt": "2026-05-23T15:07:51.914Z",
   "summary": {
     "ok": true,
     "defects": 1,
@@ -10,10 +10,10 @@
       "P1": 0,
       "P2": 1
     },
-    "fixtures": 33,
-    "marketUsable": 33,
-    "marketComplete": 33,
-    "predictions": 33,
+    "fixtures": 31,
+    "marketUsable": 31,
+    "marketComplete": 31,
+    "predictions": 31,
     "advancedRequiredReady": 5,
     "advancedRequiredTotal": 5
   },
@@ -21,32 +21,20 @@
     {
       "severity": "P2",
       "layer": "高级数据层",
-      "title": "高级层使用模型派生代理：伤停与阵容(33)、预计首发(33)、xG/射门质量(33)",
+      "title": "高级层使用模型派生代理：伤停与阵容(31)、预计首发(31)、xG/射门质量(31)",
       "remediation": "代理特征可用于增强分析，但不等同于真实外部伤停/首发/xG；有授权免费源后应优先替换。"
     }
   ],
   "marketStatus": {
     "date": "2026-05-23",
-    "fixtures": 33,
+    "fixtures": 31,
     "snapshots": 43,
-    "usable": 33,
-    "complete": 33,
+    "usable": 31,
+    "complete": 31,
     "missing": 0,
     "coverage": 1,
     "completeCoverage": 1,
     "rows": [
-      {
-        "fixtureId": "jc-2026-05-23-周六012-赫尔城-米堡",
-        "sequence": "周六012",
-        "match": "赫尔城 对 米堡",
-        "hasSnapshot": true,
-        "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:36.820Z",
-        "usable": true,
-        "complete": true,
-        "missing": []
-      },
       {
         "fixtureId": "jc-2026-05-23-周六013-博洛尼亚-国际米兰",
         "sequence": "周六013",
@@ -54,7 +42,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.508Z",
+        "collectedAt": "2026-05-23T15:06:08.498Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -65,20 +53,8 @@
         "match": "拜仁 对 斯图加特",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（3分钟前）",
-        "collectedAt": "2026-05-23T14:08:05.661Z",
-        "usable": true,
-        "complete": true,
-        "missing": []
-      },
-      {
-        "fixtureId": "jc-2026-05-23-周六015-福伦丹-威廉二世",
-        "sequence": "周六015",
-        "match": "福伦丹 对 威廉二世",
-        "hasSnapshot": true,
-        "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.508Z",
+        "collectedAt": "2026-05-23T15:06:08.498Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -90,7 +66,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.510Z",
+        "collectedAt": "2026-05-23T15:06:08.498Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -102,7 +78,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.517Z",
+        "collectedAt": "2026-05-23T15:06:08.498Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -113,8 +89,8 @@
         "match": "马洛卡 对 奥维耶多",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:26.881Z",
+        "freshness": "实时赔率有效（1分钟前）",
+        "collectedAt": "2026-05-23T15:06:31.032Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -126,7 +102,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.513Z",
+        "collectedAt": "2026-05-23T15:06:08.498Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -137,8 +113,8 @@
         "match": "皇马 对 毕尔巴鄂",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:27.948Z",
+        "freshness": "实时赔率有效（1分钟前）",
+        "collectedAt": "2026-05-23T15:06:32.103Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -150,7 +126,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.517Z",
+        "collectedAt": "2026-05-23T15:06:08.498Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -161,8 +137,8 @@
         "match": "塞尔塔 对 塞维利亚",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（3分钟前）",
-        "collectedAt": "2026-05-23T14:08:05.662Z",
+        "freshness": "实时赔率有效（2分钟前）",
+        "collectedAt": "2026-05-23T15:06:08.498Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -174,7 +150,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.515Z",
+        "collectedAt": "2026-05-23T15:06:08.499Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -185,8 +161,8 @@
         "match": "巴伦西亚 对 巴萨",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:29.020Z",
+        "freshness": "实时赔率有效（1分钟前）",
+        "collectedAt": "2026-05-23T15:06:33.170Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -197,8 +173,8 @@
         "match": "贝蒂斯 对 莱万特",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（3分钟前）",
-        "collectedAt": "2026-05-23T14:08:05.662Z",
+        "freshness": "实时赔率有效（2分钟前）",
+        "collectedAt": "2026-05-23T15:06:08.499Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -209,8 +185,8 @@
         "match": "明尼苏达 对 盐湖城",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:30.095Z",
+        "freshness": "实时赔率有效（1分钟前）",
+        "collectedAt": "2026-05-23T15:06:34.256Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -221,8 +197,8 @@
         "match": "夏洛特FC 对 新英格兰",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:31.156Z",
+        "freshness": "实时赔率有效（1分钟前）",
+        "collectedAt": "2026-05-23T15:06:35.330Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -233,8 +209,8 @@
         "match": "华盛顿 对 蒙特利尔",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:32.218Z",
+        "freshness": "实时赔率有效（1分钟前）",
+        "collectedAt": "2026-05-23T15:06:36.399Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -246,7 +222,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:40.806Z",
+        "collectedAt": "2026-05-23T15:06:08.499Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -257,8 +233,8 @@
         "match": "波特兰 对 圣何塞",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:33.291Z",
+        "freshness": "实时赔率有效（1分钟前）",
+        "collectedAt": "2026-05-23T15:06:37.463Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -270,7 +246,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:36.821Z",
+        "collectedAt": "2026-05-23T15:05:30.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -281,8 +257,8 @@
         "match": "拜仁慕尼黑 对 斯图加特",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:42.000Z",
+        "freshness": "实时赔率有效（2分钟前）",
+        "collectedAt": "2026-05-23T15:05:24.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -293,8 +269,8 @@
         "match": "博洛尼亚 对 国际米兰",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:50.000Z",
+        "freshness": "实时赔率有效（2分钟前）",
+        "collectedAt": "2026-05-23T15:05:31.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -305,8 +281,8 @@
         "match": "拉齐奥 对 比萨",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:51.000Z",
+        "freshness": "实时赔率有效（6分钟前）",
+        "collectedAt": "2026-05-23T15:02:19.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -317,8 +293,8 @@
         "match": "维戈塞尔塔 对 塞维利亚",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:39.513Z",
+        "freshness": "实时赔率有效（6分钟前）",
+        "collectedAt": "2026-05-23T15:02:18.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -329,8 +305,8 @@
         "match": "赫塔费 对 奥萨苏纳",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:51.000Z",
+        "freshness": "实时赔率有效（2分钟前）",
+        "collectedAt": "2026-05-23T15:05:32.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -341,8 +317,8 @@
         "match": "赫罗纳 对 埃尔切",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:51.000Z",
+        "freshness": "实时赔率有效（2分钟前）",
+        "collectedAt": "2026-05-23T15:05:32.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -353,8 +329,8 @@
         "match": "福伦丹 对 威廉二世",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:29.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T15:05:15.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -365,8 +341,8 @@
         "match": "哈尔姆斯塔德 对 厄尔格里特",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:36.819Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T15:04:59.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -377,8 +353,8 @@
         "match": "卡尔马 对 代格福什",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（2分钟前）",
-        "collectedAt": "2026-05-23T14:08:36.818Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T15:04:59.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -389,8 +365,8 @@
         "match": "坦佩雷山猫 对 赫尔辛基火花",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:22.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T15:05:08.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -401,8 +377,8 @@
         "match": "雅罗 对 玛丽港",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:22.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T15:05:08.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -413,8 +389,8 @@
         "match": "库奥皮奥 对 拉赫蒂",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:23.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T15:05:08.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -425,8 +401,8 @@
         "match": "塞伊奈约基 对 AC 奥卢",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T14:05:23.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T15:05:08.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -440,11 +416,11 @@
       "env": "TEAM_ELO_SOURCE_URL",
       "requiredForTopTier": true,
       "configured": true,
-      "source": "model-derived fallback",
+      "source": "ClubElo public API; model-derived fallback",
       "derived": false,
-      "realCount": 0,
+      "realCount": 3,
       "derivedCount": 0,
-      "count": 33,
+      "count": 31,
       "status": "configured"
     },
     {
@@ -455,9 +431,9 @@
       "configured": true,
       "source": "football-data.co.uk CSV; model-derived fallback",
       "derived": false,
-      "realCount": 2,
+      "realCount": 1,
       "derivedCount": 0,
-      "count": 33,
+      "count": 31,
       "status": "configured"
     },
     {
@@ -469,8 +445,8 @@
       "source": "model-derived fallback",
       "derived": true,
       "realCount": 0,
-      "derivedCount": 33,
-      "count": 33,
+      "derivedCount": 31,
+      "count": 31,
       "status": "configured"
     },
     {
@@ -482,8 +458,8 @@
       "source": "model-derived fallback",
       "derived": true,
       "realCount": 0,
-      "derivedCount": 33,
-      "count": 33,
+      "derivedCount": 31,
+      "count": 31,
       "status": "configured"
     },
     {
@@ -495,8 +471,8 @@
       "source": "model-derived fallback",
       "derived": true,
       "realCount": 0,
-      "derivedCount": 33,
-      "count": 33,
+      "derivedCount": 31,
+      "count": 31,
       "status": "configured"
     },
     {
@@ -507,9 +483,9 @@
       "configured": true,
       "source": "Open-Meteo geocoding+forecast",
       "derived": false,
-      "realCount": 5,
+      "realCount": 4,
       "derivedCount": 0,
-      "count": 5,
+      "count": 4,
       "status": "configured"
     },
     {
@@ -522,7 +498,7 @@
       "derived": false,
       "realCount": 0,
       "derivedCount": 0,
-      "count": 33,
+      "count": 31,
       "status": "configured"
     }
   ]
