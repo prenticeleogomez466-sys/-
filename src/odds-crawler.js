@@ -77,6 +77,15 @@ export async function crawlMarketData(date, options = {}) {
       sources.push({ name: "BetExplorer public odds", fetched: 0, ok: false, error: error.message });
     }
   }
+  if (process.env.LIAOGOU_ODDS_ENABLED !== "0") {
+    try {
+      const rows = await crawlLiaogouMappedOdds(date, fixtureSet.fixtures, fetchImpl);
+      candidates.push(...rows);
+      sources.push({ name: "料狗公开赛前盘口", fetched: rows.length, ok: rows.length > 0, error: rows.length ? undefined : "no mapped Liaogou pages" });
+    } catch (error) {
+      sources.push({ name: "料狗公开赛前盘口", fetched: 0, ok: false, error: error.message });
+    }
+  }
   if (process.env.SINA_SFC_ODDS_ENABLED !== "0" && fixtureSet.fixtures.some((fixture) => fixture.marketType === "shengfucai")) {
     try {
       const rows = await crawlSinaShengfucaiOdds(date, fixtureSet.fixtures, fetchImpl);
@@ -382,13 +391,19 @@ async function crawlNowscoreOdds(date, fixtures, fetchImpl) {
   for (const fixture of fixtures) {
     const nowscoreId = idMap[fixture.id] ?? idMap[`${fixture.homeTeam}-${fixture.awayTeam}`];
     if (!nowscoreId) continue;
-    const url = `https://live.nowscore.com/analysis/odds/${nowscoreId}.htm`;
-    const html = await fetchText(fetchImpl, url);
-    const snapshot = parseNowscoreOddsHtml(html, fixture, date, url);
+    const matchOddsUrl = `https://live.nowscore.com/odds/match/${nowscoreId}.htm`;
+    const matchOddsHtml = await fetchText(fetchImpl, matchOddsUrl, { Referer: `https://live.nowscore.com/analysis/${nowscoreId}cn.html` });
+    const snapshot = parseNowscoreMatchOddsHtml(matchOddsHtml, fixture, date, matchOddsUrl) ?? await crawlLegacyNowscoreOdds(fetchImpl, fixture, date, nowscoreId);
     if (snapshot) rows.push(snapshot);
     await new Promise((resolve) => setTimeout(resolve, Number(process.env.NOWSCORE_CRAWL_DELAY_MS ?? 1000)));
   }
   return rows;
+}
+
+async function crawlLegacyNowscoreOdds(fetchImpl, fixture, date, nowscoreId) {
+  const url = `https://live.nowscore.com/analysis/odds/${nowscoreId}.htm`;
+  const html = await fetchText(fetchImpl, url);
+  return parseNowscoreOddsHtml(html, fixture, date, url);
 }
 
 async function crawlCubegoalOdds(date, fixtures, fetchImpl) {
@@ -499,7 +514,15 @@ function cubegoalTeamKey(value) {
     [normalizeName("\u57c3\u592b\u65af\u5821")]: normalizeName("\u57c3\u5c14\u592b\u65af\u5821"),
     [normalizeName("\u57c3\u5c14\u592b\u65af\u5821")]: normalizeName("\u57c3\u5c14\u592b\u65af\u5821"),
     [normalizeName("\u6c83\u592b\u65af\u5821")]: normalizeName("\u6c83\u5c14\u592b\u65af\u5821"),
-    [normalizeName("\u6c83\u5c14\u592b\u65af\u5821")]: normalizeName("\u6c83\u5c14\u592b\u65af\u5821")
+    [normalizeName("\u6c83\u5c14\u592b\u65af\u5821")]: normalizeName("\u6c83\u5c14\u592b\u65af\u5821"),
+    [normalizeName("京都")]: normalizeName("京都不死鸟"),
+    [normalizeName("京都不死鸟")]: normalizeName("京都不死鸟"),
+    [normalizeName("哈尔姆斯")]: normalizeName("哈尔姆斯塔德"),
+    [normalizeName("哈尔姆斯塔德")]: normalizeName("哈尔姆斯塔德"),
+    [normalizeName("厄格里特")]: normalizeName("厄尔格里特"),
+    [normalizeName("厄尔格里特")]: normalizeName("厄尔格里特"),
+    [normalizeName("米堡")]: normalizeName("米德尔斯堡"),
+    [normalizeName("米德尔斯堡")]: normalizeName("米德尔斯堡")
   };
   return aliases[key] ?? key;
 }
@@ -1038,6 +1061,58 @@ function betExplorerCollectedAt(value) {
   return match ? shanghaiDateTimeToIso(match[3], match[2], match[1], match[4], match[5], "00") : null;
 }
 
+async function crawlLiaogouMappedOdds(date, fixtures, fetchImpl) {
+  const mapping = {
+    "jc-2026-05-23-周六002-奥克兰fc-悉尼fc": "https://vip.liaogou168.com/match_detail/20260523/2518580.html?type=2",
+    ...parseJsonEnv("LIAOGOU_FIXTURE_URLS")
+  };
+  const rows = [];
+  for (const fixture of fixtures) {
+    const url = mapping[fixture.id] ?? mapping[`${fixture.homeTeam}-${fixture.awayTeam}`];
+    if (!url) continue;
+    const html = await fetchText(fetchImpl, url);
+    const snapshot = parseLiaogouMatchSummaryOdds(html, fixture, date, url);
+    if (snapshot) rows.push(snapshot);
+    await new Promise((resolve) => setTimeout(resolve, Number(process.env.LIAOGOU_CRAWL_DELAY_MS ?? 600)));
+  }
+  return rows;
+}
+
+function parseLiaogouMatchSummaryOdds(html, fixture, date, sourceUrl = "") {
+  const text = cleanHtmlText(html);
+  const asianMatch = text.match(/亚[:：]\s*([\d.]+)\s+([^欧大]+?)\s+([\d.]+)/);
+  if (!asianMatch) return null;
+  const euroMatch = text.match(/欧[:：]\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
+  const homeWater = Number(asianMatch[1]);
+  const rawLine = liaogouAsianLine(asianMatch[2]);
+  const awayWater = Number(asianMatch[3]);
+  const euro = euroMatch ? parseNowscoreMatchEuropean(euroMatch[1], euroMatch[2], euroMatch[3]) : null;
+  const homeFavored = euro ? euro.home <= euro.away : true;
+  const line = rawLine === 0 ? 0 : homeFavored ? -Math.abs(rawLine) : Math.abs(rawLine);
+  if (![homeWater, line, awayWater].every(Number.isFinite)) return null;
+  const asianHandicap = { line, homeWater, awayWater };
+  return normalizeMarketSnapshot({
+    date,
+    fixtureId: fixture.id,
+    sequence: fixture.sequence,
+    marketType: fixture.marketType,
+    competition: fixture.competition,
+    homeTeam: fixture.homeTeam,
+    awayTeam: fixture.awayTeam,
+    collectedAt: new Date().toISOString(),
+    asianHandicap: { initial: asianHandicap, current: asianHandicap },
+    europeanOdds: euro ? { initial: euro, current: euro } : null,
+    source: sourceUrl ? `料狗公开赛前盘口 ${sourceUrl}` : "料狗公开赛前盘口"
+  }, date);
+}
+
+function liaogouAsianLine(value) {
+  const text = String(value ?? "").replace(/&nbsp;/g, " ").trim();
+  const numeric = Number(text);
+  if (Number.isFinite(numeric)) return Math.abs(numeric);
+  return Math.abs(nowscoreChineseAsianLine(text.replace(/^让|^受让|^受/, "")));
+}
+
 async function fetchJson(fetchImpl, url, headers = {}) {
   const response = await fetchWithRetry(fetchImpl, url, { headers: { "User-Agent": "football-ai-copilot/odds-crawler", ...headers } });
   const text = await response.text();
@@ -1202,6 +1277,16 @@ function extractAnchors(html) {
 
 function readNowscoreFixtureIdMap() {
   return {
+    "jc-2026-05-23-周六005-国际图尔-tps图尔": "2913617",
+    "jc-2026-05-23-周六008-坦山猫-赫尔火花": "2913618",
+    "jc-2026-05-23-周六009-塞伊奈-ac奥卢": "2913621",
+    "jc-2026-05-23-周六018-马洛卡-奥维耶多": "2804670",
+    "jc-2026-05-23-周六020-皇马-毕尔巴鄂": "2804671",
+    "jc-2026-05-23-周六024-巴伦西亚-巴萨": "2804672",
+    "jc-2026-05-23-周六026-明尼苏达-盐湖城": "2908622",
+    "jc-2026-05-23-周六027-夏洛特fc-新英格兰": "2908618",
+    "jc-2026-05-23-周六028-华盛顿-蒙特利尔": "2908619",
+    "jc-2026-05-23-周六030-波特兰-圣何塞": "2908626",
     "jc-2026-05-15-周五001-阿德莱德-奥克兰fc": "2983484",
     "jc-2026-05-15-周五002-达马克-迈季宽广": "2852351",
     "jc-2026-05-15-周五003-布赖合作-利雅得": "2852350",
@@ -1238,6 +1323,95 @@ export function parseNowscoreOddsHtml(html, fixture, date, sourceUrl = "") {
     },
     source: sourceUrl ? `捷报比分公开赔率 ${sourceUrl}` : "捷报比分公开赔率"
   };
+}
+
+export function parseNowscoreMatchOddsHtml(html, fixture, date, sourceUrl = "") {
+  const rows = extractTableRows(html)
+    .map((cells) => cells.map((cell) => decodeHtmlText(cell)).filter(Boolean))
+    .filter((cells) => cells.length >= 13 && /^\D+\*$/.test(cells[0]) && cells.slice(1, 13).some((cell) => /\d/.test(cell)));
+  const points = rows.map(parseNowscoreMatchOddsRow).filter(Boolean);
+  const asianCurrent = points.map((point) => point.asianHandicap?.current).filter(Boolean);
+  const asianInitial = points.map((point) => point.asianHandicap?.initial).filter(Boolean);
+  const euroCurrent = points.map((point) => point.europeanOdds?.current).filter(Boolean);
+  const euroInitial = points.map((point) => point.europeanOdds?.initial).filter(Boolean);
+  if (!asianCurrent.length && !asianInitial.length && !euroCurrent.length && !euroInitial.length) return null;
+  return normalizeMarketSnapshot({
+    date,
+    fixtureId: fixture.id,
+    sequence: fixture.sequence,
+    marketType: fixture.marketType,
+    competition: fixture.competition,
+    homeTeam: fixture.homeTeam,
+    awayTeam: fixture.awayTeam,
+    collectedAt: new Date().toISOString(),
+    asianHandicap: asianCurrent.length || asianInitial.length ? {
+      initial: averageAsian(asianInitial.length ? asianInitial : asianCurrent),
+      current: averageAsian(asianCurrent.length ? asianCurrent : asianInitial)
+    } : null,
+    europeanOdds: euroCurrent.length || euroInitial.length ? {
+      initial: averageOutcome(euroInitial.length ? euroInitial : euroCurrent),
+      current: averageOutcome(euroCurrent.length ? euroCurrent : euroInitial)
+    } : null,
+    source: sourceUrl ? `捷报比分公开指数 ${sourceUrl}` : "捷报比分公开指数"
+  }, date);
+}
+
+function parseNowscoreMatchOddsRow(cells) {
+  const currentAsian = parseNowscoreMatchAsian(cells[1], cells[2], cells[3]);
+  const initialAsian = parseNowscoreMatchAsian(cells[4], cells[5], cells[6]);
+  const currentEuro = parseNowscoreMatchEuropean(cells[7], cells[8], cells[9]);
+  const initialEuro = parseNowscoreMatchEuropean(cells[10], cells[11], cells[12]);
+  if (!currentAsian && !initialAsian && !currentEuro && !initialEuro) return null;
+  return {
+    asianHandicap: { current: currentAsian, initial: initialAsian },
+    europeanOdds: { current: currentEuro, initial: initialEuro }
+  };
+}
+
+function parseNowscoreMatchAsian(homeWaterText, lineText, awayWaterText) {
+  const homeWater = Number(homeWaterText);
+  const awayWater = Number(awayWaterText);
+  const line = nowscoreChineseAsianLine(lineText);
+  return [homeWater, line, awayWater].every(Number.isFinite) ? { line, homeWater, awayWater } : null;
+}
+
+function parseNowscoreMatchEuropean(homeText, drawText, awayText) {
+  const home = Number(homeText);
+  const draw = Number(drawText);
+  const away = Number(awayText);
+  return [home, draw, away].every((value) => Number.isFinite(value) && value > 1) ? { home, draw, away } : null;
+}
+
+function nowscoreChineseAsianLine(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return Number.NaN;
+  const receives = raw.startsWith("受") || raw.startsWith("+");
+  const clean = raw.replace(/^受/, "").replace(/^[+-]/, "");
+  const mapped = clean.split("/").map(nowscoreChineseAsianLinePart).reduce((sum, item, _, list) => sum + item / list.length, 0);
+  if (!Number.isFinite(mapped)) return Number.NaN;
+  return receives ? mapped : -mapped;
+}
+
+function nowscoreChineseAsianLinePart(value) {
+  const text = String(value ?? "").trim();
+  const map = {
+    "平手": 0,
+    "平": 0,
+    "半球": 0.5,
+    "半": 0.5,
+    "一球": 1,
+    "一": 1,
+    "球半": 1.5,
+    "两球": 2,
+    "二球": 2,
+    "两球半": 2.5,
+    "二球半": 2.5,
+    "三球": 3,
+    "三球半": 3.5
+  };
+  if (text in map) return map[text];
+  const numeric = Number(text);
+  return Number.isFinite(numeric) ? Math.abs(numeric) : Number.NaN;
 }
 
 export function parseCubegoalOddsHtml(html, fixture, date, sourceUrl = "") {
