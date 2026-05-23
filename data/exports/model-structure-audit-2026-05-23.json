@@ -1,7 +1,7 @@
 {
   "ok": true,
   "date": "2026-05-23",
-  "generatedAt": "2026-05-23T07:20:19.324Z",
+  "generatedAt": "2026-05-23T11:54:23.423Z",
   "summary": {
     "total": 49,
     "errors": 0,
@@ -231,14 +231,14 @@
       "name": "赛程总量",
       "ok": true,
       "level": "ok",
-      "detail": "43 场"
+      "detail": "39 场"
     },
     {
       "layer": "数据层",
       "name": "竞彩足球场次",
       "ok": true,
       "level": "ok",
-      "detail": "29 场"
+      "detail": "25 场"
     },
     {
       "layer": "数据层",
@@ -266,7 +266,7 @@
       "name": "实时赔率覆盖",
       "ok": true,
       "level": "ok",
-      "detail": "43/43"
+      "detail": "39/39"
     },
     {
       "layer": "闸门层",
@@ -280,21 +280,21 @@
       "name": "闸门新鲜度",
       "ok": true,
       "level": "ok",
-      "detail": "4 分钟"
+      "detail": "0 分钟"
     },
     {
       "layer": "输出层",
       "name": "每日推荐 XLSX",
       "ok": true,
       "level": "ok",
-      "detail": "329368 bytes"
+      "detail": "332616 bytes"
     },
     {
       "layer": "输出层",
       "name": "复盘总表 XLSX",
       "ok": true,
       "level": "ok",
-      "detail": "159414 bytes"
+      "detail": "160234 bytes"
     },
     {
       "layer": "输出层",
