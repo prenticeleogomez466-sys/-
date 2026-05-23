@@ -132,6 +132,8 @@ function artifactPaths(date) {
     join(exportDir, `model-stage-audit-${date}.md`),
     join(exportDir, `model-defect-audit-${date}.json`),
     join(exportDir, `model-defect-audit-${date}.md`),
+    join(exportDir, `model-capability-audit-${date}.json`),
+    join(exportDir, `model-capability-audit-${date}.md`),
     join(dataDir, "fixtures", `${date}.json`),
     join(dataDir, "market", `${date}.json`),
     join(dataDir, "advanced", `${date}.json`),

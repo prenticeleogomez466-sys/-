@@ -43,6 +43,7 @@
     "model:top-tier-audit": "node src/top-tier-model-audit.js",
     "model:defect-audit": "node src/model-defect-audit.js",
     "model:stage-audit": "node src/model-stage-audit.js",
+    "model:capability-audit": "node src/model-capability-registry.js",
     "advanced:sync": "node src/advanced-data-runner.js",
     "standard:check": "node src/data-completeness-standard-runner.js"
   },
