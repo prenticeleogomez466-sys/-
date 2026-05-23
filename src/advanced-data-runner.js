@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import "./env.js";
 import { loadFixtures } from "./fixture-store.js";
 import { saveAdvancedData } from "./advanced-data-store.js";
+import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = join(rootDir, "data", "exports");
@@ -30,6 +31,7 @@ export async function syncAdvancedFootballData(date, options = {}) {
   result.layers.weather = await syncOpenMeteoWeather(date, fixtureSet.fixtures, fetchImpl, env);
   result.layers.news = await syncGdeltNews(date, fixtureSet.fixtures, fetchImpl, env);
 
+  applyDerivedAdvancedFallbacks(result, fixtureSet.fixtures);
   applyLayerData(result.fixtures, result.layers);
   const saved = saveAdvancedData(date, result);
   writeAdvancedSyncExport(date, result, saved.path);
@@ -293,6 +295,136 @@ function applyLayerData(fixtures, layers) {
       if (fixtureData[fixture.fixtureId]) fixture.data[layerKey] = fixtureData[fixture.fixtureId];
     }
   }
+}
+
+function applyDerivedAdvancedFallbacks(result, fixtures) {
+  const marketSnapshots = loadMarketSnapshots(result.date).snapshots ?? [];
+  const fallbackBuilders = {
+    elo: derivedEloLayer,
+    form: derivedFormLayer,
+    injuries: derivedInjuryAwarenessLayer,
+    lineups: derivedLineupAwarenessLayer,
+    xg: derivedXgLayer,
+    news: derivedMotivationLayer
+  };
+  for (const [layerKey, builder] of Object.entries(fallbackBuilders)) {
+    const layer = result.layers[layerKey] ?? skipped(layerKey, "missing-layer");
+    const fixtureData = { ...(layer.fixtureData ?? {}) };
+    let derivedCount = 0;
+    for (const fixture of fixtures) {
+      if (fixtureData[fixture.id] && Object.keys(fixtureData[fixture.id]).length) continue;
+      const snapshot = findMarketSnapshot(fixture, marketSnapshots);
+      const derived = builder(fixture, snapshot);
+      if (!derived) continue;
+      fixtureData[fixture.id] = derived;
+      derivedCount += 1;
+    }
+    const realCount = Number(layer.count ?? 0);
+    const count = Object.keys(fixtureData).length;
+    result.layers[layerKey] = {
+      ...layer,
+      ok: count > 0,
+      count,
+      realCount,
+      derivedCount,
+      derived: derivedCount > 0,
+      source: realCount > 0 ? `${layer.source}; model-derived fallback` : "model-derived fallback",
+      fixtureData,
+      warning: derivedCount > 0 ? `包含 ${derivedCount} 场模型派生代理特征，不等同于真实外部情报` : layer.warning ?? null
+    };
+  }
+}
+
+function derivedEloLayer(fixture, snapshot) {
+  const probabilities = impliedProbabilitiesFromSnapshot(snapshot);
+  if (!probabilities) return null;
+  const edge = (probabilities.home - probabilities.away) * 420;
+  return {
+    modelDerived: true,
+    confidence: "proxy",
+    home: { team: fixture.homeTeam, Elo: Math.round(1500 + edge / 2), source: "market-implied-strength" },
+    away: { team: fixture.awayTeam, Elo: Math.round(1500 - edge / 2), source: "market-implied-strength" }
+  };
+}
+
+function derivedFormLayer(fixture, snapshot) {
+  const probabilities = impliedProbabilitiesFromSnapshot(snapshot);
+  if (!probabilities) return null;
+  const homeEdge = probabilities.home - probabilities.away;
+  return {
+    modelDerived: true,
+    confidence: "proxy",
+    home: {
+      matches: 8,
+      pointsPerMatch: round(1.35 + homeEdge * 1.8),
+      goalDiff: Math.round(homeEdge * 12),
+      source: "market-implied-form-proxy"
+    },
+    away: {
+      matches: 8,
+      pointsPerMatch: round(1.35 - homeEdge * 1.8),
+      goalDiff: Math.round(-homeEdge * 12),
+      source: "market-implied-form-proxy"
+    }
+  };
+}
+
+function derivedInjuryAwarenessLayer() {
+  return {
+    modelDerived: true,
+    confidence: "unknown",
+    injuries: [],
+    status: "no-free-confirmed-injury-source; treated as neutral with manual review required"
+  };
+}
+
+function derivedLineupAwarenessLayer() {
+  return {
+    modelDerived: true,
+    confidence: "unknown",
+    status: "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
+  };
+}
+
+function derivedXgLayer(fixture, snapshot) {
+  const probabilities = impliedProbabilitiesFromSnapshot(snapshot);
+  if (!probabilities) return null;
+  const drawPressure = probabilities.draw;
+  const homeEdge = probabilities.home - probabilities.away;
+  const totalGoals = Math.max(1.7, Math.min(3.6, 2.65 - Math.max(0, drawPressure - 0.25) * 1.2 + Math.abs(homeEdge) * 0.55));
+  const homeShare = Math.max(0.28, Math.min(0.72, 0.5 + homeEdge * 0.55));
+  return {
+    modelDerived: true,
+    confidence: "proxy",
+    home: { team: fixture.homeTeam, xg: round(totalGoals * homeShare), source: "market-implied-xg-proxy" },
+    away: { team: fixture.awayTeam, xg: round(totalGoals * (1 - homeShare)), source: "market-implied-xg-proxy" }
+  };
+}
+
+function derivedMotivationLayer(fixture) {
+  return {
+    modelDerived: true,
+    confidence: "heuristic",
+    motivation: {
+      summary: motivationHeuristic(fixture),
+      note: "由赛事类型/赛季阶段推断，非官方积分榜确认"
+    }
+  };
+}
+
+function motivationHeuristic(fixture) {
+  const competition = String(fixture.competition ?? "");
+  if (/英冠|荷乙|瑞超|芬超|西甲|意甲|德甲/.test(competition)) return "联赛阶段：默认纳入争冠、升级、保级与欧战席位战意风险";
+  if (/杯|欧冠|欧罗巴|解放者/.test(competition)) return "杯赛阶段：默认纳入轮换、赛程密度与晋级优先级风险";
+  return "常规赛事：战意未获外部源确认，按中性处理";
+}
+
+function impliedProbabilitiesFromSnapshot(snapshot) {
+  const odds = snapshot?.europeanOdds?.current ?? snapshot?.europeanOdds?.final;
+  if (!odds || !Number.isFinite(Number(odds.home)) || !Number.isFinite(Number(odds.draw)) || !Number.isFinite(Number(odds.away))) return null;
+  const raw = { home: 1 / Number(odds.home), draw: 1 / Number(odds.draw), away: 1 / Number(odds.away) };
+  const total = raw.home + raw.draw + raw.away;
+  return { home: raw.home / total, draw: raw.draw / total, away: raw.away / total };
 }
 
 async function fetchClubElo(fetchImpl, team) {

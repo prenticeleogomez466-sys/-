@@ -4,64 +4,8 @@
     "form": {
       "ok": true,
       "source": "football-data.co.uk CSV; model-derived fallback",
-      "count": 37,
+      "count": 33,
       "fixtureData": {
-        "jc-2026-05-23-周六008-坦山猫-赫尔火花": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
-        "jc-2026-05-23-周六009-塞伊奈-ac奥卢": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
-        "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
-        "jc-2026-05-23-周六011-雅罗-玛丽港": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
         "jc-2026-05-23-周六012-赫尔城-米堡": {
           "home": {
             "matches": 0,
@@ -533,24 +477,8 @@
     "elo": {
       "ok": true,
       "source": "model-derived fallback",
-      "count": 37,
+      "count": 33,
       "fixtureData": {
-        "jc-2026-05-23-周六008-坦山猫-赫尔火花": {
-          "home": null,
-          "away": null
-        },
-        "jc-2026-05-23-周六009-塞伊奈-ac奥卢": {
-          "home": null,
-          "away": null
-        },
-        "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂": {
-          "home": null,
-          "away": null
-        },
-        "jc-2026-05-23-周六011-雅罗-玛丽港": {
-          "home": null,
-          "away": null
-        },
         "jc-2026-05-23-周六012-赫尔城-米堡": {
           "home": null,
           "away": null
@@ -692,32 +620,8 @@
     "injuries": {
       "ok": true,
       "source": "model-derived fallback",
-      "count": 37,
+      "count": 33,
       "fixtureData": {
-        "jc-2026-05-23-周六008-坦山猫-赫尔火花": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
-        "jc-2026-05-23-周六009-塞伊奈-ac奥卢": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
-        "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
-        "jc-2026-05-23-周六011-雅罗-玛丽港": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
         "jc-2026-05-23-周六012-赫尔城-米堡": {
           "modelDerived": true,
           "confidence": "unknown",
@@ -918,36 +822,16 @@
         }
       },
       "skipped": true,
-      "warning": "包含 37 场模型派生代理特征，不等同于真实外部情报",
+      "warning": "包含 33 场模型派生代理特征，不等同于真实外部情报",
       "realCount": 0,
-      "derivedCount": 37,
+      "derivedCount": 33,
       "derived": true
     },
     "lineups": {
       "ok": true,
       "source": "model-derived fallback",
-      "count": 37,
+      "count": 33,
       "fixtureData": {
-        "jc-2026-05-23-周六008-坦山猫-赫尔火花": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
-        "jc-2026-05-23-周六009-塞伊奈-ac奥卢": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
-        "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
-        "jc-2026-05-23-周六011-雅罗-玛丽港": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
         "jc-2026-05-23-周六012-赫尔城-米堡": {
           "modelDerived": true,
           "confidence": "unknown",
@@ -1115,72 +999,16 @@
         }
       },
       "skipped": true,
-      "warning": "包含 37 场模型派生代理特征，不等同于真实外部情报",
+      "warning": "包含 33 场模型派生代理特征，不等同于真实外部情报",
       "realCount": 0,
-      "derivedCount": 37,
+      "derivedCount": 33,
       "derived": true
     },
     "xg": {
       "ok": true,
       "source": "model-derived fallback",
-      "count": 37,
+      "count": 33,
       "fixtureData": {
-        "jc-2026-05-23-周六008-坦山猫-赫尔火花": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "坦山猫",
-            "xg": 1.774,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "赫尔火花",
-            "xg": 1.013,
-            "source": "market-implied-xg-proxy"
-          }
-        },
-        "jc-2026-05-23-周六009-塞伊奈-ac奥卢": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "塞伊奈",
-            "xg": 1.338,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "AC奥卢",
-            "xg": 1.298,
-            "source": "market-implied-xg-proxy"
-          }
-        },
-        "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "库奥皮奥",
-            "xg": 2.075,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "拉赫蒂",
-            "xg": 0.807,
-            "source": "market-implied-xg-proxy"
-          }
-        },
-        "jc-2026-05-23-周六011-雅罗-玛丽港": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "雅罗",
-            "xg": 1.737,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "玛丽港",
-            "xg": 1.017,
-            "source": "market-implied-xg-proxy"
-          }
-        },
         "jc-2026-05-23-周六012-赫尔城-米堡": {
           "modelDerived": true,
           "confidence": "proxy",
@@ -1645,92 +1473,16 @@
         }
       },
       "skipped": true,
-      "warning": "包含 37 场模型派生代理特征，不等同于真实外部情报",
+      "warning": "包含 33 场模型派生代理特征，不等同于真实外部情报",
       "realCount": 0,
-      "derivedCount": 37,
+      "derivedCount": 33,
       "derived": true
     },
     "weather": {
       "ok": true,
       "source": "Open-Meteo geocoding+forecast",
-      "count": 8,
+      "count": 5,
       "fixtureData": {
-        "sf-26079-10-卡尔马-代格福什": {
-          "place": "卡尔马",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六026-明尼苏达-盐湖城": {
-          "place": "明尼苏达",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六029-纳什维尔-纽约城": {
-          "place": "纳什维尔",
-          "warning": "geocode-not-found"
-        },
-        "sf-26079-05-维戈塞尔塔-塞维利亚": {
-          "place": "维戈塞尔塔",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六022-塞尔塔-塞维利亚": {
-          "place": "塞尔塔",
-          "warning": "geocode-not-found"
-        },
-        "sf-26079-01-赫尔城-南安普敦": {
-          "place": "赫尔城",
-          "warning": "geocode-not-found"
-        },
-        "sf-26079-07-赫罗纳-埃尔切": {
-          "place": "赫罗纳",
-          "warning": "geocode-not-found"
-        },
-        "sf-26079-09-哈尔姆斯塔德-厄尔格里特": {
-          "place": "哈尔姆斯塔德",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六020-皇马-毕尔巴鄂": {
-          "place": "皇马",
-          "warning": "geocode-not-found"
-        },
-        "sf-26079-14-塞伊奈约基-ac-奥卢": {
-          "place": "塞伊奈约基",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六028-华盛顿-蒙特利尔": {
-          "place": "华盛顿",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六030-波特兰-圣何塞": {
-          "place": "波特兰",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六014-拜仁-斯图加特": {
-          "place": "拜仁",
-          "warning": "geocode-not-found"
-        },
-        "sf-26079-02-拜仁慕尼黑-斯图加特": {
-          "place": "拜仁慕尼黑",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六009-塞伊奈-ac奥卢": {
-          "place": "塞伊奈",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六012-赫尔城-米堡": {
-          "place": "赫尔城",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六018-马洛卡-奥维耶多": {
-          "place": "马洛卡",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六017-赫罗纳-埃尔切": {
-          "place": "赫罗纳",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六019-西班牙人-皇家社会": {
-          "place": "西班牙人",
-          "warning": "geocode-not-found"
-        },
         "jc-2026-05-23-周六021-赫塔费-奥萨苏纳": {
           "place": "赫塔费",
           "warning": "geocode-not-found"
@@ -1739,29 +1491,118 @@
           "place": "拉齐奥",
           "warning": "geocode-not-found"
         },
-        "jc-2026-05-23-周六013-博洛尼亚-国际米兰": {
-          "place": "博洛尼亚",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六016-拉齐奥-比萨": {
-          "place": "拉齐奥",
+        "jc-2026-05-23-周六027-夏洛特fc-新英格兰": {
+          "place": "夏洛特FC",
           "warning": "geocode-not-found"
         },
         "sf-26079-03-博洛尼亚-国际米兰": {
           "place": "博洛尼亚",
           "warning": "geocode-not-found"
         },
-        "jc-2026-05-23-周六024-巴伦西亚-巴萨": {
-          "place": "巴伦西亚",
+        "jc-2026-05-23-周六025-贝蒂斯-莱万特": {
+          "place": "贝蒂斯",
           "warning": "geocode-not-found"
         },
-        "sf-26079-06-赫塔费-奥萨苏纳": {
-          "place": "赫塔费",
+        "jc-2026-05-23-周六028-华盛顿-蒙特利尔": {
+          "place": "华盛顿",
           "warning": "geocode-not-found"
         },
         "jc-2026-05-23-周六023-阿拉维斯-巴列卡诺": {
           "place": "阿拉维斯",
           "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六020-皇马-毕尔巴鄂": {
+          "place": "皇马",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-07-赫罗纳-埃尔切": {
+          "place": "赫罗纳",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六016-拉齐奥-比萨": {
+          "place": "拉齐奥",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六014-拜仁-斯图加特": {
+          "place": "拜仁",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六012-赫尔城-米堡": {
+          "place": "赫尔城",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-10-卡尔马-代格福什": {
+          "place": "卡尔马",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六017-赫罗纳-埃尔切": {
+          "place": "赫罗纳",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-14-塞伊奈约基-ac-奥卢": {
+          "place": "塞伊奈约基",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六026-明尼苏达-盐湖城": {
+          "place": "明尼苏达",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-02-拜仁慕尼黑-斯图加特": {
+          "place": "拜仁慕尼黑",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-09-哈尔姆斯塔德-厄尔格里特": {
+          "place": "哈尔姆斯塔德",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六024-巴伦西亚-巴萨": {
+          "place": "巴伦西亚",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六013-博洛尼亚-国际米兰": {
+          "place": "博洛尼亚",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-05-维戈塞尔塔-塞维利亚": {
+          "place": "维戈塞尔塔",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-01-赫尔城-南安普敦": {
+          "place": "赫尔城",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六022-塞尔塔-塞维利亚": {
+          "place": "塞尔塔",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六030-波特兰-圣何塞": {
+          "place": "波特兰",
+          "warning": "geocode-not-found"
+        },
+        "sf-26079-11-坦佩雷山猫-赫尔辛基火花": {
+          "place": "Tampere",
+          "latitude": 61.49911,
+          "longitude": 23.78712,
+          "country": "Finland",
+          "timezone": "Europe/Helsinki",
+          "hourly": {
+            "date": "2026-05-23",
+            "temperature2m": {
+              "min": 10,
+              "max": 23.5,
+              "avg": 17.071
+            },
+            "precipitation": {
+              "min": 0,
+              "max": 0,
+              "avg": 0
+            },
+            "windSpeed10m": {
+              "min": 9,
+              "max": 20.5,
+              "avg": 14.779
+            }
+          }
         },
         "sf-26079-08-福伦丹-威廉二世": {
           "place": "Volendam",
@@ -1788,36 +1629,7 @@
             }
           }
         },
-        "jc-2026-05-23-周六027-夏洛特fc-新英格兰": {
-          "place": "夏洛特FC",
-          "warning": "geocode-not-found"
-        },
-        "jc-2026-05-23-周六008-坦山猫-赫尔火花": {
-          "place": "Tampere",
-          "latitude": 61.49911,
-          "longitude": 23.78712,
-          "country": "Finland",
-          "timezone": "Europe/Helsinki",
-          "hourly": {
-            "date": "2026-05-23",
-            "temperature2m": {
-              "min": 10,
-              "max": 23.5,
-              "avg": 17.071
-            },
-            "precipitation": {
-              "min": 0,
-              "max": 0,
-              "avg": 0
-            },
-            "windSpeed10m": {
-              "min": 9,
-              "max": 20.5,
-              "avg": 14.779
-            }
-          }
-        },
-        "jc-2026-05-23-周六011-雅罗-玛丽港": {
+        "sf-26079-12-雅罗-玛丽港": {
           "place": "Jakobstad",
           "latitude": 63.67486,
           "longitude": 22.70256,
@@ -1842,59 +1654,17 @@
             }
           }
         },
-        "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂": {
-          "place": "Kuopio",
-          "latitude": 62.89238,
-          "longitude": 27.67703,
-          "country": "Finland",
-          "timezone": "Europe/Helsinki",
-          "hourly": {
-            "date": "2026-05-23",
-            "temperature2m": {
-              "min": 11.7,
-              "max": 21,
-              "avg": 16.208
-            },
-            "precipitation": {
-              "min": 0,
-              "max": 2.2,
-              "avg": 0.229
-            },
-            "windSpeed10m": {
-              "min": 7.9,
-              "max": 29.9,
-              "avg": 19.058
-            }
-          }
-        },
-        "jc-2026-05-23-周六025-贝蒂斯-莱万特": {
-          "place": "贝蒂斯",
+        "jc-2026-05-23-周六018-马洛卡-奥维耶多": {
+          "place": "马洛卡",
           "warning": "geocode-not-found"
         },
-        "sf-26079-11-坦佩雷山猫-赫尔辛基火花": {
-          "place": "Tampere",
-          "latitude": 61.49911,
-          "longitude": 23.78712,
-          "country": "Finland",
-          "timezone": "Europe/Helsinki",
-          "hourly": {
-            "date": "2026-05-23",
-            "temperature2m": {
-              "min": 10,
-              "max": 23.5,
-              "avg": 17.071
-            },
-            "precipitation": {
-              "min": 0,
-              "max": 0,
-              "avg": 0
-            },
-            "windSpeed10m": {
-              "min": 9,
-              "max": 20.5,
-              "avg": 14.779
-            }
-          }
+        "sf-26079-06-赫塔费-奥萨苏纳": {
+          "place": "赫塔费",
+          "warning": "geocode-not-found"
+        },
+        "jc-2026-05-23-周六029-纳什维尔-纽约城": {
+          "place": "纳什维尔",
+          "warning": "geocode-not-found"
         },
         "jc-2026-05-23-周六015-福伦丹-威廉二世": {
           "place": "Volendam",
@@ -1921,6 +1691,10 @@
             }
           }
         },
+        "jc-2026-05-23-周六019-西班牙人-皇家社会": {
+          "place": "西班牙人",
+          "warning": "geocode-not-found"
+        },
         "sf-26079-13-库奥皮奥-拉赫蒂": {
           "place": "Kuopio",
           "latitude": 62.89238,
@@ -1945,31 +1719,6 @@
               "avg": 19.058
             }
           }
-        },
-        "sf-26079-12-雅罗-玛丽港": {
-          "place": "Jakobstad",
-          "latitude": 63.67486,
-          "longitude": 22.70256,
-          "country": "Finland",
-          "timezone": "Europe/Helsinki",
-          "hourly": {
-            "date": "2026-05-23",
-            "temperature2m": {
-              "min": 8.1,
-              "max": 21.3,
-              "avg": 15.067
-            },
-            "precipitation": {
-              "min": 0,
-              "max": 0,
-              "avg": 0
-            },
-            "windSpeed10m": {
-              "min": 5.8,
-              "max": 17.3,
-              "avg": 10.517
-            }
-          }
         }
       },
       "warning": null
@@ -1977,78 +1726,78 @@
     "news": {
       "ok": true,
       "source": "model-derived fallback",
-      "count": 37,
+      "count": 33,
       "fixtureData": {
-        "jc-2026-05-23-周六009-塞伊奈-ac奥卢": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六015-福伦丹-威廉二世": {
-          "articles": []
-        },
-        "sf-26079-12-雅罗-玛丽港": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六008-坦山猫-赫尔火花": {
-          "articles": []
-        },
-        "sf-26079-13-库奥皮奥-拉赫蒂": {
-          "articles": []
-        },
-        "sf-26079-06-赫塔费-奥萨苏纳": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六014-拜仁-斯图加特": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六027-夏洛特fc-新英格兰": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六021-赫塔费-奥萨苏纳": {
+        "sf-26079-14-塞伊奈约基-ac-奥卢": {
           "articles": []
         },
         "jc-2026-05-23-周六012-赫尔城-米堡": {
           "articles": []
         },
-        "sf-26079-03-博洛尼亚-国际米兰": {
+        "sf-26079-13-库奥皮奥-拉赫蒂": {
           "articles": []
         },
-        "jc-2026-05-23-周六025-贝蒂斯-莱万特": {
+        "sf-26079-12-雅罗-玛丽港": {
+          "articles": []
+        },
+        "sf-26079-11-坦佩雷山猫-赫尔辛基火花": {
+          "articles": []
+        },
+        "sf-26079-10-卡尔马-代格福什": {
           "articles": []
         },
         "sf-26079-09-哈尔姆斯塔德-厄尔格里特": {
           "articles": []
         },
-        "jc-2026-05-23-周六023-阿拉维斯-巴列卡诺": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六013-博洛尼亚-国际米兰": {
-          "articles": []
-        },
-        "sf-26079-14-塞伊奈约基-ac-奥卢": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六028-华盛顿-蒙特利尔": {
+        "sf-26079-08-福伦丹-威廉二世": {
           "articles": []
         },
         "sf-26079-07-赫罗纳-埃尔切": {
           "articles": []
         },
-        "jc-2026-05-23-周六026-明尼苏达-盐湖城": {
+        "sf-26079-06-赫塔费-奥萨苏纳": {
           "articles": []
         },
-        "jc-2026-05-23-周六029-纳什维尔-纽约城": {
+        "sf-26079-05-维戈塞尔塔-塞维利亚": {
           "articles": []
         },
-        "jc-2026-05-23-周六024-巴伦西亚-巴萨": {
+        "sf-26079-04-拉齐奥-比萨": {
+          "articles": []
+        },
+        "sf-26079-03-博洛尼亚-国际米兰": {
           "articles": []
         },
         "sf-26079-02-拜仁慕尼黑-斯图加特": {
           "articles": []
         },
-        "jc-2026-05-23-周六022-塞尔塔-塞维利亚": {
+        "sf-26079-01-赫尔城-南安普敦": {
           "articles": []
         },
         "jc-2026-05-23-周六030-波特兰-圣何塞": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六029-纳什维尔-纽约城": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六028-华盛顿-蒙特利尔": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六027-夏洛特fc-新英格兰": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六025-贝蒂斯-莱万特": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六024-巴伦西亚-巴萨": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六023-阿拉维斯-巴列卡诺": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六022-塞尔塔-塞维利亚": {
+          "articles": []
+        },
+        "jc-2026-05-23-周六021-赫塔费-奥萨苏纳": {
           "articles": []
         },
         "jc-2026-05-23-周六020-皇马-毕尔巴鄂": {
@@ -2066,28 +1815,16 @@
         "jc-2026-05-23-周六016-拉齐奥-比萨": {
           "articles": []
         },
-        "sf-26079-10-卡尔马-代格福什": {
+        "jc-2026-05-23-周六015-福伦丹-威廉二世": {
           "articles": []
         },
-        "sf-26079-08-福伦丹-威廉二世": {
+        "jc-2026-05-23-周六014-拜仁-斯图加特": {
           "articles": []
         },
-        "sf-26079-04-拉齐奥-比萨": {
+        "jc-2026-05-23-周六013-博洛尼亚-国际米兰": {
           "articles": []
         },
-        "jc-2026-05-23-周六011-雅罗-玛丽港": {
-          "articles": []
-        },
-        "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂": {
-          "articles": []
-        },
-        "sf-26079-11-坦佩雷山猫-赫尔辛基火花": {
-          "articles": []
-        },
-        "sf-26079-05-维戈塞尔塔-塞维利亚": {
-          "articles": []
-        },
-        "sf-26079-01-赫尔城-南安普敦": {
+        "jc-2026-05-23-周六026-明尼苏达-盐湖城": {
           "articles": []
         }
       },
@@ -2098,301 +1835,6 @@
     }
   },
   "fixtures": [
-    {
-      "fixtureId": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
-      "sequence": "周六008",
-      "homeTeam": "坦山猫",
-      "awayTeam": "赫尔火花",
-      "data": {
-        "form": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
-        "elo": {
-          "home": null,
-          "away": null
-        },
-        "injuries": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
-        "lineups": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
-        "xg": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "坦山猫",
-            "xg": 1.774,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "赫尔火花",
-            "xg": 1.013,
-            "source": "market-implied-xg-proxy"
-          }
-        },
-        "weather": {
-          "place": "Tampere",
-          "latitude": 61.49911,
-          "longitude": 23.78712,
-          "country": "Finland",
-          "timezone": "Europe/Helsinki",
-          "hourly": {
-            "date": "2026-05-23",
-            "temperature2m": {
-              "min": 10,
-              "max": 23.5,
-              "avg": 17.071
-            },
-            "precipitation": {
-              "min": 0,
-              "max": 0,
-              "avg": 0
-            },
-            "windSpeed10m": {
-              "min": 9,
-              "max": 20.5,
-              "avg": 14.779
-            }
-          }
-        },
-        "news": {
-          "articles": []
-        }
-      }
-    },
-    {
-      "fixtureId": "jc-2026-05-23-周六009-塞伊奈-ac奥卢",
-      "sequence": "周六009",
-      "homeTeam": "塞伊奈",
-      "awayTeam": "AC奥卢",
-      "data": {
-        "form": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
-        "elo": {
-          "home": null,
-          "away": null
-        },
-        "injuries": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
-        "lineups": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
-        "xg": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "塞伊奈",
-            "xg": 1.338,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "AC奥卢",
-            "xg": 1.298,
-            "source": "market-implied-xg-proxy"
-          }
-        },
-        "weather": {
-          "place": "塞伊奈",
-          "warning": "geocode-not-found"
-        },
-        "news": {
-          "articles": []
-        }
-      }
-    },
-    {
-      "fixtureId": "jc-2026-05-23-周六010-库奥皮奥-拉赫蒂",
-      "sequence": "周六010",
-      "homeTeam": "库奥皮奥",
-      "awayTeam": "拉赫蒂",
-      "data": {
-        "form": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
-        "elo": {
-          "home": null,
-          "away": null
-        },
-        "injuries": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
-        "lineups": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
-        "xg": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "库奥皮奥",
-            "xg": 2.075,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "拉赫蒂",
-            "xg": 0.807,
-            "source": "market-implied-xg-proxy"
-          }
-        },
-        "weather": {
-          "place": "Kuopio",
-          "latitude": 62.89238,
-          "longitude": 27.67703,
-          "country": "Finland",
-          "timezone": "Europe/Helsinki",
-          "hourly": {
-            "date": "2026-05-23",
-            "temperature2m": {
-              "min": 11.7,
-              "max": 21,
-              "avg": 16.208
-            },
-            "precipitation": {
-              "min": 0,
-              "max": 2.2,
-              "avg": 0.229
-            },
-            "windSpeed10m": {
-              "min": 7.9,
-              "max": 29.9,
-              "avg": 19.058
-            }
-          }
-        },
-        "news": {
-          "articles": []
-        }
-      }
-    },
-    {
-      "fixtureId": "jc-2026-05-23-周六011-雅罗-玛丽港",
-      "sequence": "周六011",
-      "homeTeam": "雅罗",
-      "awayTeam": "玛丽港",
-      "data": {
-        "form": {
-          "home": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          },
-          "away": {
-            "matches": 0,
-            "points": 0,
-            "pointsPerMatch": null,
-            "goalDiff": 0
-          }
-        },
-        "elo": {
-          "home": null,
-          "away": null
-        },
-        "injuries": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "injuries": [],
-          "status": "no-free-confirmed-injury-source; treated as neutral with manual review required"
-        },
-        "lineups": {
-          "modelDerived": true,
-          "confidence": "unknown",
-          "status": "no-confirmed-lineup-source; model uses neutral lineup assumption and requires pre-match review"
-        },
-        "xg": {
-          "modelDerived": true,
-          "confidence": "proxy",
-          "home": {
-            "team": "雅罗",
-            "xg": 1.737,
-            "source": "market-implied-xg-proxy"
-          },
-          "away": {
-            "team": "玛丽港",
-            "xg": 1.017,
-            "source": "market-implied-xg-proxy"
-          }
-        },
-        "weather": {
-          "place": "Jakobstad",
-          "latitude": 63.67486,
-          "longitude": 22.70256,
-          "country": "Finland",
-          "timezone": "Europe/Helsinki",
-          "hourly": {
-            "date": "2026-05-23",
-            "temperature2m": {
-              "min": 8.1,
-              "max": 21.3,
-              "avg": 15.067
-            },
-            "precipitation": {
-              "min": 0,
-              "max": 0,
-              "avg": 0
-            },
-            "windSpeed10m": {
-              "min": 5.8,
-              "max": 17.3,
-              "avg": 10.517
-            }
-          }
-        },
-        "news": {
-          "articles": []
-        }
-      }
-    },
     {
       "fixtureId": "jc-2026-05-23-周六012-赫尔城-米堡",
       "sequence": "周六012",

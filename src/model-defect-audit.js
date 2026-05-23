@@ -97,6 +97,16 @@ function inspectRealtimeGate(date, defects, env) {
 function inspectAdvancedLayers(layers, defects) {
   const missingRequired = layers.filter((layer) => layer.requiredForTopTier && !layer.configured);
   for (const layer of missingRequired) add(defects, "P1", "高级数据层", `缺少${layer.label}`, `配置 ${layer.env} 或补入合法公开/授权数据源。`);
+  const derivedRequired = layers.filter((layer) => layer.requiredForTopTier && layer.configured && layer.derived);
+  if (derivedRequired.length) {
+    add(
+      defects,
+      "P2",
+      "高级数据层",
+      `高级层使用模型派生代理：${derivedRequired.map((layer) => `${layer.label}(${layer.derivedCount ?? 0})`).join("、")}`,
+      "代理特征可用于增强分析，但不等同于真实外部伤停/首发/xG；有授权免费源后应优先替换。"
+    );
+  }
   const missingOptional = layers.filter((layer) => !layer.requiredForTopTier && !layer.configured);
   if (missingOptional.length) add(defects, "P2", "高级数据层", `可选层未完全覆盖：${missingOptional.map((layer) => layer.label).join("、")}`, "可继续补天气/新闻等免费公开源，提高冷门解释能力。");
 }

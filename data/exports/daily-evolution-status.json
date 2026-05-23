@@ -10939,7 +10939,24 @@
     "path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\exports\\wechat-outbox-latest.json",
     "archivedPath": "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\wechat\\wechat-outbox-20260523T140842Z.json"
   },
-  "sync": null,
+  "sync": {
+    "date": "2026-05-23",
+    "generatedAt": "2026-05-23T14:08:42.745Z",
+    "obsidian": {
+      "ok": true,
+      "vaultDir": "D:\\足球数据分析库\\111",
+      "notePath": "D:\\足球数据分析库\\111\\Football Model\\日报\\2026-05-23 足球大模型日报.md",
+      "copied": 13
+    },
+    "git": {
+      "ok": true,
+      "remote": "git@github.com:prenticeleogomez466-sys/-.git",
+      "committed": true,
+      "pushed": true,
+      "message": "Sync football model artifacts 2026-05-23"
+    },
+    "ok": true
+  },
   "ok": true,
   "error": null,
   "finishedAt": "2026-05-23T14:08:42.738Z"

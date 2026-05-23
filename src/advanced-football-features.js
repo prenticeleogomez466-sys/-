@@ -26,7 +26,10 @@ export function advancedDataLayerStatus(env = process.env, advancedData = null) 
   return ADVANCED_DATA_LAYERS.map((layer) => ({
     ...layer,
     configured: Boolean(env[layer.env]) || layerAvailableFromSync(advancedData, layer.key),
-    source: env[layer.env] ? "env" : layerAvailableFromSync(advancedData, layer.key) ? "synced" : "",
+    source: env[layer.env] ? "env" : layerAvailableFromSync(advancedData, layer.key) ? advancedData?.layers?.[layer.key]?.source ?? "synced" : "",
+    derived: Boolean(advancedData?.layers?.[layer.key]?.derived),
+    realCount: advancedData?.layers?.[layer.key]?.realCount ?? advancedData?.layers?.[layer.key]?.count ?? 0,
+    derivedCount: advancedData?.layers?.[layer.key]?.derivedCount ?? 0,
     count: advancedData?.layers?.[layer.key]?.count ?? 0,
     status: Boolean(env[layer.env]) || layerAvailableFromSync(advancedData, layer.key) ? "configured" : layer.requiredForTopTier ? "missing-required" : "missing-optional"
   }));
@@ -80,8 +83,11 @@ function buildExternalDataAvailability(env, fixture, advancedData) {
     return {
       ...layer,
       configured: hasEnvironmentSource || hasFixtureData,
-      source: hasEnvironmentSource ? "env" : hasFixtureData ? "synced-fixture" : "",
+      source: hasEnvironmentSource ? "env" : hasFixtureData ? advancedData?.layers?.[layer.key]?.source ?? "synced-fixture" : "",
       fixtureCovered: hasFixtureData,
+      derived: Boolean(advancedData?.layers?.[layer.key]?.derived),
+      realCount: advancedData?.layers?.[layer.key]?.realCount ?? advancedData?.layers?.[layer.key]?.count ?? 0,
+      derivedCount: advancedData?.layers?.[layer.key]?.derivedCount ?? 0,
       status: hasEnvironmentSource || hasFixtureData ? "configured" : layer.requiredForTopTier ? "missing-required" : "missing-optional"
     };
   });

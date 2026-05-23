@@ -201,6 +201,9 @@ function probabilityGap(prediction) {
 }
 
 function totalExpectedGoals(prediction) {
+  const xg = fixtureDataOf(prediction).xg;
+  const xgTotal = Number(xg?.home?.xg ?? xg?.homeXg ?? 0) + Number(xg?.away?.xg ?? xg?.awayXg ?? 0);
+  if (Number.isFinite(xgTotal) && xgTotal > 0) return xgTotal;
   const lambdas = prediction.simulation?.lambdas;
   const total = Number(lambdas?.home ?? 0) + Number(lambdas?.away ?? 0);
   return Number.isFinite(total) && total > 0 ? total : Number.NaN;
