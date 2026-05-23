@@ -32,7 +32,7 @@ export function recommendFixtures(date) {
   const fixtureSet = loadFixtures(date);
   const marketSnapshots = loadMarketSnapshots(fixtureSet.date).snapshots;
   const advancedData = loadAdvancedData(fixtureSet.date);
-  const predictions = fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData }));
+  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData })));
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
@@ -40,6 +40,61 @@ export function recommendFixtures(date) {
     predictions,
     fourteen: buildFourteenPlan(predictions)
   };
+}
+
+function harmonizeDuplicatePredictions(predictions) {
+  const authoritative = new Map(
+    predictions
+      .filter((prediction) => prediction.fixture.marketType === "jingcai")
+      .map((prediction) => [fixtureIdentityKey(prediction.fixture), prediction])
+  );
+  return predictions.map((prediction, index) => {
+    if (prediction.fixture.marketType !== "shengfucai") return prediction;
+    const source = authoritative.get(fixtureIdentityKey(prediction.fixture));
+    if (!source) return prediction;
+    const next = {
+      ...prediction,
+      probabilities: { ...source.probabilities },
+      probabilityAdjustment: {
+        ...prediction.probabilityAdjustment,
+        harmonizedWith: source.fixture.id
+      },
+      pick: { ...source.pick },
+      secondaryPick: { ...source.secondaryPick },
+      risk: source.risk,
+      confidence: source.confidence,
+      scorePicks: buildScorePicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index),
+      halfFullPicks: buildHalfFullPicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index),
+      rationale: `${prediction.rationale}；同场次已与竞彩足球 ${source.fixture.sequence} 胜平负方向强制一致`
+    };
+    const consistencyErrors = validatePredictionConsistency(next);
+    if (consistencyErrors.length) throw new Error(`同场次一致性修复失败：${prediction.fixture.homeTeam} 对 ${prediction.fixture.awayTeam}：${consistencyErrors.join("；")}`);
+    return next;
+  });
+}
+
+function fixtureIdentityKey(fixture) {
+  return `${canonicalTeamName(fixture.homeTeam)}__${canonicalTeamName(fixture.awayTeam)}`;
+}
+
+function canonicalTeamName(value) {
+  const key = String(value ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
+  const aliases = {
+    "拜仁慕尼黑": "拜仁",
+    "拜仁": "拜仁",
+    "斯图加特": "斯图加特",
+    "维戈塞尔塔": "塞尔塔",
+    "塞尔塔": "塞尔塔",
+    "坦佩雷山猫": "坦山猫",
+    "坦山猫": "坦山猫",
+    "赫尔辛基火花": "赫尔火花",
+    "赫尔火花": "赫尔火花",
+    "塞伊奈约基": "塞伊奈",
+    "塞伊奈": "塞伊奈",
+    "ac奥卢": "ac奥卢",
+    "acoulu": "ac奥卢"
+  };
+  return aliases[key] ?? key;
 }
 
 export function predictFixture(fixture, marketSnapshots = [], index = 0, options = {}) {
