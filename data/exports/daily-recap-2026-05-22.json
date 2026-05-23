@@ -1,0 +1,59 @@
+{
+  "date": "2026-05-22",
+  "generatedAt": "2026-05-23T12:00:21.781Z",
+  "summary": {
+    "date": "2026-05-22",
+    "predictions": 0,
+    "settled": 0,
+    "pending": 0,
+    "winDrawLossPrimary": {
+      "hit": 0,
+      "total": 0,
+      "accuracy": null
+    },
+    "winDrawLossCover": {
+      "hit": 0,
+      "total": 0,
+      "accuracy": null
+    },
+    "scorePrimary": {
+      "hit": 0,
+      "total": 0,
+      "accuracy": null
+    },
+    "scoreCover": {
+      "hit": 0,
+      "total": 0,
+      "accuracy": null
+    },
+    "halfFullPrimary": {
+      "hit": 0,
+      "total": 0,
+      "accuracy": null
+    },
+    "halfFullCover": {
+      "hit": 0,
+      "total": 0,
+      "accuracy": null
+    },
+    "sync": [
+      {
+        "date": "2026-05-22",
+        "fetched": 0,
+        "matched": 0,
+        "updated": 0,
+        "skipped": "未配置授权赛程/赛果源，已跳过",
+        "sources": ""
+      },
+      {
+        "date": "2026-05-22",
+        "fetched": 0,
+        "matched": 0,
+        "updated": 0,
+        "skipped": "未配置授权赛程/赛果源，已跳过",
+        "sources": ""
+      }
+    ]
+  },
+  "rows": []
+}
