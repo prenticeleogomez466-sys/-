@@ -1,7 +1,7 @@
 {
   "ok": true,
   "date": "2026-05-23",
-  "generatedAt": "2026-05-23T11:54:23.423Z",
+  "generatedAt": "2026-05-23T12:37:42.146Z",
   "summary": {
     "total": 49,
     "errors": 0,
@@ -287,14 +287,14 @@
       "name": "每日推荐 XLSX",
       "ok": true,
       "level": "ok",
-      "detail": "332616 bytes"
+      "detail": "303779 bytes"
     },
     {
       "layer": "输出层",
       "name": "复盘总表 XLSX",
       "ok": true,
       "level": "ok",
-      "detail": "160234 bytes"
+      "detail": "175821 bytes"
     },
     {
       "layer": "输出层",
