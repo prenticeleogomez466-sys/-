@@ -1,48 +1,8 @@
 {
   "date": "2026-05-23",
   "source": "china-official-web:sporttery+lottery-gov-cn",
-  "importedAt": "2026-05-23T12:46:00.558Z",
+  "importedAt": "2026-05-23T13:23:53.216Z",
   "fixtures": [
-    {
-      "id": "jc-2026-05-23-周六006-哈尔姆斯-厄格里特",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 21:00",
-      "competition": "瑞超",
-      "homeTeam": "哈尔姆斯",
-      "awayTeam": "厄格里特",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六006",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六006",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039900,
-      "result": null
-    },
-    {
-      "id": "jc-2026-05-23-周六007-卡尔马-代格福什",
-      "date": "2026-05-23",
-      "kickoff": "2026-05-23 21:00",
-      "competition": "瑞超",
-      "homeTeam": "卡尔马",
-      "awayTeam": "代格福什",
-      "round": "",
-      "marketType": "jingcai",
-      "sequence": "周六007",
-      "tags": [
-        "竞彩足球",
-        "中国竞彩网官方"
-      ],
-      "notes": "官方业务日期=2026-05-23; 比赛日期=2026-05-23; 赛事编号=周六007",
-      "source": "lottery.gov.cn/jc/jsq/zqspf",
-      "officialStatus": "official-web",
-      "officialFixtureId": 2039901,
-      "result": null
-    },
     {
       "id": "jc-2026-05-23-周六008-坦山猫-赫尔火花",
       "date": "2026-05-23",
