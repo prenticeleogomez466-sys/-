@@ -1,12 +1,12 @@
 {
   "ok": true,
   "date": "2026-05-23",
-  "generatedAt": "2026-05-23T07:15:33.245Z",
+  "generatedAt": "2026-05-23T07:20:19.324Z",
   "summary": {
     "total": 49,
     "errors": 0,
-    "warnings": 1,
-    "passed": 48
+    "warnings": 0,
+    "passed": 49
   },
   "checks": [
     {
@@ -280,21 +280,21 @@
       "name": "闸门新鲜度",
       "ok": true,
       "level": "ok",
-      "detail": "0 分钟"
+      "detail": "4 分钟"
     },
     {
       "layer": "输出层",
       "name": "每日推荐 XLSX",
-      "ok": false,
-      "level": "warning",
-      "detail": "缺失"
+      "ok": true,
+      "level": "ok",
+      "detail": "329368 bytes"
     },
     {
       "layer": "输出层",
       "name": "复盘总表 XLSX",
       "ok": true,
       "level": "ok",
-      "detail": "150681 bytes"
+      "detail": "159414 bytes"
     },
     {
       "layer": "输出层",

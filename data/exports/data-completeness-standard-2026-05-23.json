@@ -1,7 +1,7 @@
 {
   "ok": true,
   "date": "2026-05-23",
-  "generatedAt": "2026-05-23T07:15:33.245Z",
+  "generatedAt": "2026-05-23T07:20:19.325Z",
   "standard": {
     "baselineDate": "2026-05-15",
     "baselineTimezone": "Asia/Shanghai",
@@ -36,7 +36,7 @@
     {
       "name": "fresh-realtime-gate",
       "ok": true,
-      "detail": "ageMinutes=0"
+      "detail": "ageMinutes=4"
     },
     {
       "name": "market-usable-coverage",
