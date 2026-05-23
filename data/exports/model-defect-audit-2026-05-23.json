@@ -1,7 +1,7 @@
 {
   "ok": true,
   "date": "2026-05-23",
-  "generatedAt": "2026-05-23T12:37:42.139Z",
+  "generatedAt": "2026-05-23T12:45:58.790Z",
   "summary": {
     "ok": true,
     "defects": 6,
@@ -72,7 +72,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:28.038Z",
+        "collectedAt": "2026-05-23T12:45:55.566Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -84,7 +84,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:28.038Z",
+        "collectedAt": "2026-05-23T12:45:55.566Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -96,7 +96,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:18.057Z",
+        "collectedAt": "2026-05-23T12:45:45.437Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -108,7 +108,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:19.113Z",
+        "collectedAt": "2026-05-23T12:45:46.488Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -120,7 +120,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:55.452Z",
+        "collectedAt": "2026-05-23T12:45:24.667Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -132,7 +132,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:55.452Z",
+        "collectedAt": "2026-05-23T12:45:24.667Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -144,7 +144,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:28.039Z",
+        "collectedAt": "2026-05-23T12:45:55.568Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -156,7 +156,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.264Z",
+        "collectedAt": "2026-05-23T12:45:56.866Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -168,7 +168,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:55.452Z",
+        "collectedAt": "2026-05-23T12:45:24.667Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -180,7 +180,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.265Z",
+        "collectedAt": "2026-05-23T12:45:56.866Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -192,7 +192,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.266Z",
+        "collectedAt": "2026-05-23T12:45:56.867Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -204,7 +204,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.271Z",
+        "collectedAt": "2026-05-23T12:45:56.872Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -216,7 +216,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:20.171Z",
+        "collectedAt": "2026-05-23T12:45:47.551Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -228,7 +228,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.268Z",
+        "collectedAt": "2026-05-23T12:45:56.869Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -240,7 +240,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:21.231Z",
+        "collectedAt": "2026-05-23T12:45:48.608Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -252,7 +252,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.270Z",
+        "collectedAt": "2026-05-23T12:45:56.872Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -264,7 +264,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:55.453Z",
+        "collectedAt": "2026-05-23T12:45:24.667Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -276,7 +276,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.269Z",
+        "collectedAt": "2026-05-23T12:45:56.871Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -288,7 +288,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:22.286Z",
+        "collectedAt": "2026-05-23T12:45:49.729Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -300,7 +300,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:55.453Z",
+        "collectedAt": "2026-05-23T12:45:24.667Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -312,7 +312,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:23.346Z",
+        "collectedAt": "2026-05-23T12:45:50.785Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -324,7 +324,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:24.392Z",
+        "collectedAt": "2026-05-23T12:45:51.850Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -336,7 +336,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:25.442Z",
+        "collectedAt": "2026-05-23T12:45:52.910Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -348,7 +348,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.679Z",
+        "collectedAt": "2026-05-23T12:45:57.368Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -360,7 +360,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:26.492Z",
+        "collectedAt": "2026-05-23T12:45:53.975Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -372,7 +372,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:28.040Z",
+        "collectedAt": "2026-05-23T12:45:55.568Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -383,8 +383,8 @@
         "match": "拜仁慕尼黑 对 斯图加特",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（4分钟前）",
-        "collectedAt": "2026-05-23T12:33:26.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:43:02.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -395,8 +395,8 @@
         "match": "博洛尼亚 对 国际米兰",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（4分钟前）",
-        "collectedAt": "2026-05-23T12:33:34.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:43:10.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -407,8 +407,8 @@
         "match": "拉齐奥 对 比萨",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（4分钟前）",
-        "collectedAt": "2026-05-23T12:33:35.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:43:11.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -420,7 +420,7 @@
         "hasSnapshot": true,
         "realTime": true,
         "freshness": "实时赔率有效（0分钟前）",
-        "collectedAt": "2026-05-23T12:37:29.268Z",
+        "collectedAt": "2026-05-23T12:45:56.868Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -431,8 +431,8 @@
         "match": "赫塔费 对 奥萨苏纳",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（4分钟前）",
-        "collectedAt": "2026-05-23T12:33:35.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:43:11.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -443,8 +443,8 @@
         "match": "赫罗纳 对 埃尔切",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:50.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:43:11.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -455,8 +455,8 @@
         "match": "福伦丹 对 威廉二世",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（4分钟前）",
-        "collectedAt": "2026-05-23T12:33:17.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:42:52.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -467,8 +467,8 @@
         "match": "哈尔姆斯塔德 对 厄尔格里特",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:18.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:42:38.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -479,8 +479,8 @@
         "match": "卡尔马 对 代格福什",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:18.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:42:38.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -491,8 +491,8 @@
         "match": "坦佩雷山猫 对 赫尔辛基火花",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:26.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:42:45.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -503,8 +503,8 @@
         "match": "雅罗 对 玛丽港",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T12:33:11.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:42:46.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -515,8 +515,8 @@
         "match": "库奥皮奥 对 拉赫蒂",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（1分钟前）",
-        "collectedAt": "2026-05-23T12:36:27.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:42:46.000Z",
         "usable": true,
         "complete": true,
         "missing": []
@@ -527,8 +527,8 @@
         "match": "塞伊奈约基 对 AC 奥卢",
         "hasSnapshot": true,
         "realTime": true,
-        "freshness": "实时赔率有效（5分钟前）",
-        "collectedAt": "2026-05-23T12:33:11.000Z",
+        "freshness": "实时赔率有效（3分钟前）",
+        "collectedAt": "2026-05-23T12:42:46.000Z",
         "usable": true,
         "complete": true,
         "missing": []
