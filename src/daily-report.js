@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { judgmentFactorColumns, judgmentFactorRow } from "./factor-analysis.js";
 import { recommendFixtures, outcomeCodeToChinese } from "./prediction-engine.js";
 import { auditRecommendations, writeRecommendationAudit } from "./recommendation-audit.js";
 import { assertLatestRealtimeSourceGate } from "./realtime-source-gate.js";
@@ -27,6 +28,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "竞彩足球", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
     { name: "14场胜负彩", rows: [fourteenHeaders(), ...fourteen.map(toFourteenRow)] },
     { name: "赔率变化对比", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
+    { name: "融合判断要点", rows: [judgmentHeaders(), ...recommendations.predictions.map(toJudgmentRow)] },
     { name: "大小球阵容特色", rows: [totalGoalsLineupHeaders(), ...recommendations.predictions.map(toTotalGoalsLineupRow)] },
     { name: "复盘对比", rows: [recapHeaders(), ...recapRows.map(Object.values)] },
     { name: "模型健康", rows: modelHealthRows(sourceGate, audit) }
@@ -177,6 +179,26 @@ function toTotalGoalsLineupRow(prediction) {
   ];
 }
 
+function toJudgmentRow(prediction) {
+  const fixture = prediction.fixture;
+  return [
+    fixture.date,
+    fixture.sequence,
+    fixture.marketType,
+    fixture.competition,
+    fixture.homeTeam,
+    fixture.awayTeam,
+    fixture.kickoff,
+    outcomeCodeToChinese(prediction.pick.code),
+    outcomeCodeToChinese(prediction.secondaryPick.code),
+    prediction.scorePicks.primary,
+    prediction.halfFullPicks.primary,
+    prediction.confidence,
+    prediction.risk,
+    ...judgmentFactorRow(prediction)
+  ];
+}
+
 function toLedgerRow(prediction) {
   const fixture = prediction.fixture;
   const actual = fixture.result ? resultCode(fixture.result) : "";
@@ -226,6 +248,10 @@ function jingcaiHeaders() {
 
 function fourteenHeaders() {
   return ["场次", "比赛", "单式推荐", "覆盖选择", "类型", "风险", "信心", "选择理由"];
+}
+
+function judgmentHeaders() {
+  return ["日期", "场次", "市场", "赛事", "主队", "客队", "开赛", "首选", "备选", "比分首选", "半全场首选", "信心", "风险", ...judgmentFactorColumns()];
 }
 
 function oddsComparisonHeaders() {

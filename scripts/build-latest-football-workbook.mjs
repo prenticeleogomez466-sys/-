@@ -1,6 +1,7 @@
 import { mkdirSync, copyFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildJudgmentFactors, judgmentFactorColumns, judgmentFactorRow } from "../src/factor-analysis.js";
 import { recommendFixtures, outcomeCodeToChinese } from "../src/prediction-engine.js";
 import { writeXlsxWorkbook } from "../src/xlsx-writer.js";
 
@@ -31,6 +32,7 @@ writeXlsxWorkbook(localPath, [
   { name: "总览审计", rows: summaryRows() },
   { name: "竞彩正式版", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
   { name: "14场精选", rows: [fourteenHeaders(), ...fourteen.map(toFourteenRow)] },
+  { name: "融合判断要点", rows: [factorHeaders(), ...predictions.map(toFactorRow)] },
   { name: "赔率变化快照", rows: [oddsHeaders(), ...predictions.map(toOddsRow)] },
   { name: "爆冷观察", rows: [upsetHeaders(), ...predictions.map(toUpsetRow)] }
 ]);
@@ -72,7 +74,8 @@ function jingcaiHeaders() {
   return [
     "日期", "场次", "赛事", "开赛", "主队", "客队", "首选", "备选", "主胜概率", "平局概率", "客胜概率",
     "比分首选", "比分备选", "半全场首选", "半全场备选", "信心", "风险", "爆冷等级", "爆冷方向",
-    "欧赔初始", "欧赔即时", "欧赔变化", "让球初始", "让球即时", "让球变化", "大小球倾向", "模型理由"
+    "欧赔初始", "欧赔即时", "欧赔变化", "让球初始", "让球即时", "让球变化", "大小球倾向",
+    ...judgmentFactorColumns(), "模型理由"
   ];
 }
 
@@ -87,6 +90,10 @@ function oddsHeaders() {
     "亚盘初盘", "亚盘初主水", "亚盘初客水", "亚盘即盘", "亚盘即主水", "亚盘即客水",
     "让球初主", "让球初平", "让球初客", "让球即主", "让球即平", "让球即客"
   ];
+}
+
+function factorHeaders() {
+  return ["市场", "场次", "赛事", "主队", "客队", "首选", "备选", "比分", "半全场", "信心", "风险", ...judgmentFactorColumns()];
 }
 
 function upsetHeaders() {
@@ -123,6 +130,7 @@ function toJingcaiRow(prediction) {
     oddsText(snapshot?.handicapOdds?.current ?? snapshot?.handicapOdds?.final),
     oddsDeltaText(snapshot?.handicapOdds),
     totalGoalsBias(prediction),
+    ...judgmentFactorRow(prediction),
     prediction.rationale
   ];
 }
@@ -185,8 +193,27 @@ function toOddsRow(prediction) {
   ];
 }
 
+function toFactorRow(prediction) {
+  const fixture = prediction.fixture;
+  return [
+    fixture.marketType,
+    fixture.sequence,
+    fixture.competition,
+    fixture.homeTeam,
+    fixture.awayTeam,
+    outcomeCodeToChinese(prediction.pick.code),
+    outcomeCodeToChinese(prediction.secondaryPick.code),
+    prediction.scorePicks.primary,
+    prediction.halfFullPicks.primary,
+    prediction.confidence,
+    prediction.risk,
+    ...judgmentFactorRow(prediction)
+  ];
+}
+
 function toUpsetRow(prediction) {
   const fixture = prediction.fixture;
+  const analysis = buildJudgmentFactors(prediction);
   return [
     fixture.marketType,
     fixture.sequence,
@@ -195,8 +222,8 @@ function toUpsetRow(prediction) {
     outcomeCodeToChinese(prediction.secondaryPick.code),
     prediction.risk,
     prediction.confidence,
-    upsetLevel(prediction),
-    upsetReason(prediction),
+    analysis.factors.upset.level,
+    analysis.factors.upset.point,
     defensiveCover(prediction)
   ];
 }
