@@ -117,11 +117,13 @@ function inspectRecommendations(recommendations, defects, env) {
     add(defects, "P0", "推荐层", "推荐引擎运行失败", "修复预测引擎异常后再生成表格。");
     return;
   }
+  let missingBankrollCount = 0;
   for (const prediction of recommendations.predictions ?? []) {
     const errors = validatePredictionConsistency(prediction);
     for (const error of errors) add(defects, "P0", "推荐一致性", `${prediction.fixture.homeTeam} vs ${prediction.fixture.awayTeam}：${error}`, "胜平负必须先定，比分和半全场必须从该结果派生。");
-    if (!prediction.bankroll?.enabled && env.BANKROLL_RISK_POLICY !== "1") add(defects, "P1", "资金风控", "资金风控未启用", "配置 BANKROLL_RISK_POLICY=1。");
+    if (!prediction.bankroll?.enabled && env.BANKROLL_RISK_POLICY !== "1") missingBankrollCount += 1;
   }
+  if (missingBankrollCount) add(defects, "P1", "资金风控", `资金风控未覆盖：${missingBankrollCount} 场`, "配置 BANKROLL_RISK_POLICY=1，并输出 EV/凯利/仓位约束。");
   const rules = fourteenSelectionRules(env);
   const bankers = (recommendations.fourteen?.selections ?? []).filter((selection) => String(selection.type).includes("胆"));
   if (bankers.length > rules.maxBankers) add(defects, "P0", "14场规则", `胆数量过多：${bankers.length}/${rules.maxBankers}`, "降低胆数量，只保留高置信/低风险场次。");

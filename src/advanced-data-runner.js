@@ -28,7 +28,7 @@ export async function syncAdvancedFootballData(date, options = {}) {
   const apiFootballFixtures = await syncApiFootballFixtureIndex(date, fixtureSet.fixtures, fetchImpl, env);
   result.layers.injuries = await syncInjuries(date, fixtureSet.fixtures, fetchImpl, env, apiFootballFixtures);
   result.layers.lineups = await syncLineups(date, fixtureSet.fixtures, fetchImpl, env, apiFootballFixtures);
-  result.layers.xg = await syncXg(date, fixtureSet.fixtures, fetchImpl, env, apiFootballFixtures);
+  result.layers.xg = await syncXg(date, fixtureSet.fixtures, fetchImpl, env, apiFootballFixtures, result.layers.form);
   result.layers.weather = await syncOpenMeteoWeather(date, fixtureSet.fixtures, fetchImpl, env);
   result.layers.news = await syncGdeltNews(date, fixtureSet.fixtures, fetchImpl, env);
 
@@ -161,9 +161,10 @@ async function syncLineups(date, fixtures, fetchImpl, env, apiFootballFixtures) 
   return { ok: count > 0, source: "API-Football lineups", count, fixtureData, warning: count ? null : generic.warning ?? "API-Football 未返回预计/确认首发" };
 }
 
-async function syncXg(date, fixtures, fetchImpl, env, apiFootballFixtures) {
+async function syncXg(date, fixtures, fetchImpl, env, apiFootballFixtures, formLayer = null) {
   const generic = await syncGenericFixtureLayer("xg", "XG_SOURCE_URL", date, fixtures, fetchImpl, env);
-  if (generic.ok || !env.API_FOOTBALL_KEY) return generic;
+  if (generic.ok) return generic;
+  if (!env.API_FOOTBALL_KEY) return buildShotQualityXgLayer(fixtures, formLayer, generic);
   const fixtureData = {};
   let count = 0;
   await Promise.all(fixtures.map(async (fixture) => {
@@ -180,6 +181,7 @@ async function syncXg(date, fixtures, fetchImpl, env, apiFootballFixtures) {
       fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, error: error.message };
     }
   }));
+  if (count === 0) return buildShotQualityXgLayer(fixtures, formLayer, generic);
   return { ok: count > 0, source: "API-Football fixture statistics xG", count, fixtureData, warning: count ? null : generic.warning ?? "API-Football 统计未包含 xG；请配置 XG_SOURCE_URL" };
 }
 
@@ -187,6 +189,44 @@ async function fetchApiFootballPath(fetchImpl, path, apiKey, params = {}) {
   const url = new URL(`https://v3.football.api-sports.io/${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return await fetchJson(fetchImpl, url, { "x-apisports-key": apiKey });
+}
+
+function buildShotQualityXgLayer(fixtures, formLayer, fallback = {}) {
+  const fixtureData = {};
+  for (const fixture of fixtures) {
+    const form = formLayer?.fixtureData?.[fixture.id];
+    const home = shotQualityExpectedGoals(form?.home);
+    const away = shotQualityExpectedGoals(form?.away);
+    if (home === null || away === null) continue;
+    fixtureData[fixture.id] = {
+      proxy: true,
+      confidence: "historical-shot-quality",
+      home: { team: fixture.homeTeam, xg: home, source: "football-data.co.uk shots/SOT proxy" },
+      away: { team: fixture.awayTeam, xg: away, source: "football-data.co.uk shots/SOT proxy" }
+    };
+  }
+  const count = Object.keys(fixtureData).length;
+  return {
+    ok: count > 0,
+    source: "football-data.co.uk shots/SOT proxy",
+    count,
+    fixtureData,
+    warning: count ? "xG 为免费历史射门质量代理，不等同于官方实时 xG" : fallback.warning ?? "football-data.co.uk 射门质量代理未覆盖今日球队"
+  };
+}
+
+function shotQualityExpectedGoals(teamForm) {
+  if (!teamForm || (teamForm.matches ?? 0) < 4) return null;
+  const shots = Number(teamForm.shotsForPerMatch);
+  const shotsOnTarget = Number(teamForm.shotsOnTargetForPerMatch);
+  const goals = Number(teamForm.goalDiff) / Number(teamForm.matches) + 1.25;
+  const components = [
+    Number.isFinite(shots) ? shots * 0.055 : null,
+    Number.isFinite(shotsOnTarget) ? shotsOnTarget * 0.18 : null,
+    Number.isFinite(goals) ? goals : null
+  ].filter(Number.isFinite);
+  if (!components.length) return null;
+  return round(Math.max(0.25, Math.min(3.6, components.reduce((sum, value) => sum + value, 0) / components.length)));
 }
 
 function parseApiFootballXg(rows, fixture) {

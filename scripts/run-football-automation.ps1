@@ -71,7 +71,11 @@ function Invoke-Step([string]$Name, [string]$Command, [bool]$AllowFailure = $fal
 }
 
 function Run-Health {
-  Invoke-Step "realtime football crawler gate" "npm run crawler:realtime -- --date=$Date --allow-missing-odds --no-external-odds --no-history"
+  if ($AllowMissingOdds) {
+    Invoke-Step "realtime football crawler gate" "npm run crawler:realtime -- --date=$Date --allow-missing-odds --no-external-odds --no-history"
+  } else {
+    Invoke-Step "strict realtime football crawler gate" "npm run crawler:realtime:strict -- --date=$Date"
+  }
   Invoke-Step "china official web source analysis" "npm run china:sources -- --date=$Date --no-history"
   Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free odds source audit" "npm run freeodds:audit"
@@ -88,6 +92,9 @@ function Run-Daily {
   Invoke-Step "sync china official jingcai and 14 fixtures" "npm run china:sources:sync -- --date=$Date"
   Invoke-Step "sync free fixtures and results" "npm run fixtures:sync:soft -- --date=$Date"
   Invoke-Step "crawl free odds" "npm run market:crawl:soft -- --date=$Date"
+  if (-not $AllowMissingOdds) {
+    Invoke-Step "refresh strict realtime gate before generation" "npm run crawler:realtime:strict -- --date=$Date"
+  }
   if ($AllowMissingOdds) {
     Invoke-Step "market status without strict odds gate" "npm run market:status -- --date=$Date"
   } else {

@@ -130,8 +130,8 @@ function auditDerivativeStage(recommendations) {
   if (!recommendations) return stage("derivatives", "比分/半全场/14场派生", 0, {}, [finding("P0", "无推荐结果可审计", "先修复预测层。")]);
   const conflicts = recommendations.predictions.flatMap((prediction) => validatePredictionConsistency(prediction).map((message) => ({ match: `${prediction.fixture.homeTeam} vs ${prediction.fixture.awayTeam}`, message })));
   if (conflicts.length) add(findings, "P0", `比分/半全场冲突：${conflicts.length}`, "必须先定胜平负，再派生比分和半全场。");
-  const shengfucaiWithDerivativeRisk = recommendations.predictions.filter((prediction) => prediction.fixture.marketType === "shengfucai" && (prediction.scorePicks?.primary || prediction.halfFullPicks?.primary)).length;
-  if (shengfucaiWithDerivativeRisk) add(findings, "P2", `14场内部仍有派生字段：${shengfucaiWithDerivativeRisk}`, "表格输出层必须继续只输出胜平负/胆双全，不输出比分半全场。");
+  const fourteenOutputDerivativeRisk = (recommendations.fourteen?.selections ?? []).filter((selection) => selection.scorePicks || selection.halfFullPicks || selection.scorePrimary || selection.halfFullPrimary).length;
+  if (fourteenOutputDerivativeRisk) add(findings, "P2", `14场输出仍有派生字段：${fourteenOutputDerivativeRisk}`, "14场表格只能输出胜平负、胆/双选/全选，不输出比分半全场。");
   const rules = recommendations.fourteen?.selections ?? [];
   const bankers = rules.filter((selection) => selection.type === "胆");
   if (bankers.some((selection) => selection.risk === "高")) add(findings, "P0", "14场存在高风险定胆", "高风险胆必须降为双选或全选。");
@@ -168,7 +168,7 @@ function auditOutputStage(date) {
   if (gatePayload && !gatePayload.ok) add(findings, "P0", "实时闸门未通过", gatePayload.failures?.join("；") || "修复闸门失败原因。");
   if (standard && !standard.ok) add(findings, "P0", "完整度标准未通过", "standard:check 必须通过后才能正式推荐。");
   if (dailyStatus && dailyStatus.ok === false) add(findings, "P1", "日报生成被阻断", "这是正确保护；过闸后再生成 XLSX/微信输出。");
-  return stage("output", "输出与自动化", scoreFrom(findings, gatePayload?.ok ? 1 : 0), {
+  return stage("output", "输出与自动化", gatePayload?.ok && standard?.ok ? 100 : 0, {
     gateOk: gatePayload?.ok ?? false,
     standardOk: standard?.ok ?? false,
     dailyOk: dailyStatus?.ok ?? false

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import "./env.js";
 import { getExportDir } from "./paths.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMarketCoverageStatus } from "./market-data-store.js";
