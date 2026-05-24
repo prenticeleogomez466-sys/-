@@ -259,14 +259,30 @@ function formSignal(form) {
   if ((home?.matches ?? 0) < 4 || (away?.matches ?? 0) < 4) return null;
   const ppgDiff = clamp((home.pointsPerMatch ?? 0) - (away.pointsPerMatch ?? 0), -2, 2);
   const goalDiffPerMatch = clamp((home.goalDiff / home.matches) - (away.goalDiff / away.matches), -3, 3);
+  const shotQualityDiff = shotQualitySignal(home, away);
   return {
     key: "form",
     homePointsPerMatch: round(home.pointsPerMatch),
     awayPointsPerMatch: round(away.pointsPerMatch),
     ppgDiff: round(ppgDiff),
     goalDiffPerMatch: round(goalDiffPerMatch),
-    score: round(ppgDiff * 0.08 + goalDiffPerMatch * 0.025)
+    shotQualityDiff: shotQualityDiff === null ? null : round(shotQualityDiff),
+    score: round(ppgDiff * 0.08 + goalDiffPerMatch * 0.025 + (shotQualityDiff ?? 0) * 0.015)
   };
+}
+
+function shotQualitySignal(home, away) {
+  const homeShotEdge = shotEdge(home);
+  const awayShotEdge = shotEdge(away);
+  if (!Number.isFinite(homeShotEdge) || !Number.isFinite(awayShotEdge)) return null;
+  return clamp(homeShotEdge - awayShotEdge, -2, 2);
+}
+
+function shotEdge(row) {
+  const attack = Number(row.shotsOnTargetForPerMatch ?? row.shotsForPerMatch);
+  const defense = Number(row.shotsOnTargetAgainstPerMatch ?? row.shotsAgainstPerMatch);
+  if (!Number.isFinite(attack) || !Number.isFinite(defense)) return Number.NaN;
+  return attack - defense;
 }
 
 function weatherSignal(weather) {

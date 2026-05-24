@@ -40,7 +40,7 @@ export async function syncAdvancedFootballData(date, options = {}) {
 }
 
 async function syncFootballDataCoUkForm(date, fixtures, fetchImpl, env) {
-  const enabled = env.FOOTBALL_DATA_CO_UK_ENABLED === "1";
+  const enabled = env.FOOTBALL_DATA_CO_UK_ENABLED !== "0";
   if (!enabled) return skipped("football-data.co.uk form", "FOOTBALL_DATA_CO_UK_ENABLED 未启用");
   const leagues = String(env.FOOTBALL_DATA_CO_UK_LEAGUES || FOOTBALL_DATA_LEAGUES).split(",").map((item) => item.trim()).filter(Boolean);
   const season = env.FOOTBALL_DATA_CO_UK_SEASON || footballDataSeason(date);
@@ -464,8 +464,22 @@ function buildTeamForm(rows, team, date) {
     goalDiff: played.reduce((sum, row) => {
       const isHome = aliases.includes(normalizeName(row.HomeTeam));
       return sum + Number(isHome ? row.FTHG : row.FTAG) - Number(isHome ? row.FTAG : row.FTHG);
-    }, 0)
+    }, 0),
+    shotsForPerMatch: averageTeamColumn(played, aliases, "HS", "AS"),
+    shotsAgainstPerMatch: averageTeamColumn(played, aliases, "AS", "HS"),
+    shotsOnTargetForPerMatch: averageTeamColumn(played, aliases, "HST", "AST"),
+    shotsOnTargetAgainstPerMatch: averageTeamColumn(played, aliases, "AST", "HST")
   };
+}
+
+function averageTeamColumn(rows, aliases, homeColumn, awayColumn) {
+  const values = rows
+    .map((row) => {
+      const isHome = aliases.includes(normalizeName(row.HomeTeam));
+      return Number(isHome ? row[homeColumn] : row[awayColumn]);
+    })
+    .filter(Number.isFinite);
+  return values.length ? round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 }
 
 function parseFootballDataCsv(text, league) {

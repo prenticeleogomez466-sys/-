@@ -73,6 +73,7 @@ function Invoke-Step([string]$Name, [string]$Command, [bool]$AllowFailure = $fal
 function Run-Health {
   Invoke-Step "realtime football crawler gate" "npm run crawler:realtime -- --date=$Date --allow-missing-odds --no-external-odds --no-history"
   Invoke-Step "china official web source analysis" "npm run china:sources -- --date=$Date --no-history"
+  Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free odds source audit" "npm run freeodds:audit"
   Invoke-Step "data source audit" "npm run sources:audit"
   Invoke-Step "credential check" "npm run credentials:check" $AllowMissingOdds.IsPresent
@@ -80,6 +81,7 @@ function Run-Health {
   Invoke-Step "market coverage status" "npm run market:status -- --date=$Date"
   Invoke-Step "recommendation audit" "npm run recommend:audit -- --date $Date"
   Invoke-Step "model structure audit" "npm run model:audit -- --date=$Date"
+  Invoke-Step "recap automation health" "npm run recap:health -- --date=$Date" $AllowMissingOdds.IsPresent
 }
 
 function Run-Daily {
@@ -91,6 +93,8 @@ function Run-Daily {
   } else {
     Invoke-Step "verify odds gate" "npm run market:verify -- --date=$Date"
   }
+  Invoke-Step "sync advanced free data layers" "npm run advanced:sync -- --date=$Date"
+  Invoke-Step "strict data completeness check" "npm run standard:check -- --date=$Date"
   if ($AllowMissingOdds) {
     Invoke-Step "build offline daily xlsx" "npm run daily:no-web -- --date $Date"
   } else {
@@ -102,10 +106,12 @@ function Run-Recap {
   Invoke-Step "sync previous-day results" "npm run fixtures:sync:soft -- --date=$Date"
   Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
+  Invoke-Step "recap automation health" "npm run recap:health -- --date=$Date"
 }
 
 function Run-Weekly {
   Invoke-Step "full test suite" "npm test"
+  Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free source matrix review" "npm run freeodds:audit"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
 }
