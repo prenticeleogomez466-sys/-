@@ -4,9 +4,10 @@ import { fileURLToPath } from "node:url";
 import "./env.js";
 import { loadFixtures } from "./fixture-store.js";
 import { findMarketSnapshot, loadMarketSnapshots, normalizeMarketSnapshot, saveMarketSnapshots } from "./market-data-store.js";
+import { getDataSubdir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 export async function crawlMarketData(date, options = {}) {
   if (options.requireApiKey && !hasAnyFreeOddsSource()) throw new Error("缺少免费赔率源：请配置 ODDS_API_KEY、ODDS_API_IO_KEY、API_FOOTBALL_KEY 或 ODDS_JSON_URL/ODDS_CSV_URL");
@@ -911,7 +912,7 @@ function mergeSnapshots(previous, next) {
 }
 
 async function crawlSgOddsMapped(date, fixtures, fetchImpl) {
-  const mapPath = join(rootDir, "data", "sgodds-urls.json");
+  const mapPath = join(getDataSubdir("sgodds-urls.json"));
   if (!existsSync(mapPath)) return [];
   const mapping = JSON.parse(readFileSync(mapPath, "utf8"));
   const rows = [];
@@ -989,7 +990,7 @@ function sgOddsLineFromLabel(label) {
 }
 
 async function crawlBetExplorerMapped(date, fixtures, fetchImpl) {
-  const mapPath = join(rootDir, "data", "betexplorer-urls.json");
+  const mapPath = join(getDataSubdir("betexplorer-urls.json"));
   if (!existsSync(mapPath)) return [];
   const mapping = JSON.parse(readFileSync(mapPath, "utf8"));
   const rows = [];

@@ -2,11 +2,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getExportDir } from "./paths.js";
 import { assertMarketRequirements, buildMarketCoverageStatus } from "./market-data-store.js";
 import { crawlMarketData } from "./odds-crawler.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 const args = process.argv.slice(2);
 const date = readArg("--date") ?? todayInShanghai();
 const strict = args.includes("--strict");

@@ -2,10 +2,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getDataSubdir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const registryPath = join(rootDir, "data", "free-odds-sources.json");
-const exportDir = join(rootDir, "data", "exports");
+const registryPath = getDataSubdir("free-odds-sources.json");
+const exportDir = getExportDir();
 
 export function loadFreeOddsSources(path = registryPath) {
   if (!existsSync(path)) throw new Error(`免费赔率源注册表不存在：${path}`);

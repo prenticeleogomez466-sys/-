@@ -4,10 +4,11 @@ import { fileURLToPath } from "node:url";
 import { buildJudgmentFactors, judgmentFactorColumns, judgmentFactorRow } from "../src/factor-analysis.js";
 import { recommendFixtures, outcomeCodeToChinese } from "../src/prediction-engine.js";
 import { writeXlsxWorkbook } from "../src/xlsx-writer.js";
+import { getExportDir } from "../src/paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const date = readArg("--date") ?? new Date().toISOString().slice(0, 10);
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 const dExportDir = "D:\\football-model-exports";
 mkdirSync(exportDir, { recursive: true });
 mkdirSync(dExportDir, { recursive: true });

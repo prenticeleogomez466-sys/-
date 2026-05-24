@@ -1,11 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getExportDir } from "./paths.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMarketCoverageStatus } from "./market-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 const CAPABILITIES = [
   {

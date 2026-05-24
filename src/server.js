@@ -3,13 +3,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getDataSubdir, getExportDir } from "./paths.js";
 import { buildCredentialStatus } from "./source-credentials.js";
 import { recommendFixtures } from "./prediction-engine.js";
 import { getWechatConfig, handleWechatQuery } from "./wechat-channel.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
-const advancedDir = join(rootDir, "data", "advanced");
+const exportDir = getExportDir();
+const advancedDir = getDataSubdir("advanced");
 const port = Number(process.env.PORT ?? 3000);
 
 export function createFootballServer() {

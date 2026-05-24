@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getExportDir } from "./paths.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { advancedDataLayerStatus } from "./advanced-football-features.js";
 import { loadFixtures } from "./fixture-store.js";
@@ -8,7 +9,7 @@ import { buildMarketCoverageStatus, loadMarketSnapshots } from "./market-data-st
 import { fourteenSelectionRules, recommendFixtures, validatePredictionConsistency } from "./prediction-engine.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 export function auditModelDefects(date = todayInShanghai(), env = process.env) {
   mkdirSync(exportDir, { recursive: true });

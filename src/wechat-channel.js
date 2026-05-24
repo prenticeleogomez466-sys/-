@@ -3,10 +3,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getDataSubdir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
-const wechatDir = join(rootDir, "data", "wechat");
+const exportDir = getExportDir();
+const wechatDir = getDataSubdir("wechat");
 
 export function getWechatConfig(env = process.env) {
   return {

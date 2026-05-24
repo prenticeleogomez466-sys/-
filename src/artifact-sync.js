@@ -3,10 +3,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
+import { getDataDir, getExportDir, rootDir } from "./paths.js";
 
-const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const dataDir = join(rootDir, "data");
-const exportDir = join(dataDir, "exports");
+const dataDir = getDataDir();
+const exportDir = getExportDir();
 
 export function syncFootballArtifacts(date, options = {}) {
   const result = {
@@ -43,6 +43,9 @@ export function syncToObsidian(date, options = {}) {
 export function syncToGit(date, options = {}) {
   try {
     const remote = git(["remote", "get-url", "origin"]).trim();
+    if (!isInsideWorkspace(dataDir) || !isInsideWorkspace(exportDir)) {
+      return { ok: true, remote, committed: false, pushed: false, skipped: true, message: "生成内容已按策略落到 D 盘，跳过 C 盘仓库内数据提交" };
+    }
     const artifactSpecs = [
       "data/advanced",
       "data/china-web",
@@ -68,6 +71,11 @@ export function syncToGit(date, options = {}) {
   } catch (error) {
     return { ok: false, error: error.message };
   }
+}
+
+function isInsideWorkspace(path) {
+  const relativePath = relative(rootDir, resolve(path));
+  return relativePath && !relativePath.startsWith("..") && !relativePath.includes(":");
 }
 
 function buildObsidianNote(date, vaultDir, copied) {

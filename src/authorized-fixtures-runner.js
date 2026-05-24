@@ -4,7 +4,7 @@ const args = process.argv.slice(2);
 const date = readArg("--date") ?? todayInShanghai();
 
 try {
-  const result = await syncAuthorizedFixturesAndResults(date, { strict: args.includes("--strict"), addNew: args.includes("--add-new"), save: !args.includes("--no-save") });
+  const result = await syncAuthorizedFixturesAndResults(date, { strict: args.includes("--strict"), addNew: args.includes("--add-new"), save: !args.includes("--no-save"), resultDate: readArg("--result-date") });
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {
   console.error(error.stack || error.message);

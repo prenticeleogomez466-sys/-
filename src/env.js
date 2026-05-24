@@ -1,10 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getDataDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
-export function loadLocalEnv(paths = [join(rootDir, ".env"), join(rootDir, "data", "local.env")]) {
+export function loadLocalEnv(paths = [join(rootDir, ".env"), join(getDataDir(), "local.env")]) {
   for (const path of paths) {
     if (!existsSync(path)) continue;
     for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {

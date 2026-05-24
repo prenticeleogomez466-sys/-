@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getExportDir } from "./paths.js";
 import { loadFixtures } from "./fixture-store.js";
 import { buildMarketCoverageStatus } from "./market-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 const REQUIRED_FILES = [
   "package.json",

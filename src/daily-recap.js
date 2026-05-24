@@ -2,13 +2,14 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getExportDir } from "./paths.js";
 import { loadFixtures } from "./fixture-store.js";
 import { syncAuthorizedFixturesAndResults } from "./authorized-fixtures.js";
 import { syncFootballArtifacts } from "./artifact-sync.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 const ledgerPath = join(exportDir, "recommendation-ledger.json");
 
 export async function runDailyRecap(date, options = {}) {

@@ -2,10 +2,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getDataSubdir, getExportDir } from "./paths.js";
 import { loadFixtures, saveFixtures } from "./fixture-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 const SETTLED_API_FOOTBALL = new Set(["FT", "AET", "PEN"]);
 const SETTLED_FOOTBALL_DATA = new Set(["FINISHED", "AWARDED"]);
 
@@ -39,16 +40,30 @@ export async function syncAuthorizedFixturesAndResults(date, options = {}) {
   if (options.save !== false && (merged.updated > 0 || merged.added > 0)) {
     saved = saveFixtures(date, merged.fixtures, { source: mergeSource(fixtureSet.source, sources.filter((source) => source.ok).map((source) => source.name).join("+")) });
   }
-  const result = { date, queryDate, sources, existing: fixtureSet.fixtures.length, fetched: fetched.length, matched: merged.matched, updated: merged.updated, added: merged.added, saved: Boolean(saved), path: saved ? join(rootDir, "data", "fixtures", `${date}.json`) : null, skipped: null };
+  const result = { date, queryDate, sources, existing: fixtureSet.fixtures.length, fetched: fetched.length, matched: merged.matched, updated: merged.updated, added: merged.added, saved: Boolean(saved), path: saved ? join(getDataSubdir("fixtures"), `${date}.json`) : null, skipped: null };
   if (options.writeLog !== false) writeSyncLog(result);
   return result;
 }
 
 export function buildAuthorizedProviders(env = process.env, options = {}) {
   const providers = [];
+  if (env.OPENLIGADB_ENABLED !== "0") providers.push({ name: "OpenLigaDB", fetch: (date, fetchImpl) => fetchOpenLigaDbMatches(date, fetchImpl, options) });
   if (env.API_FOOTBALL_KEY) providers.push({ name: "API-Football", fetch: (date, fetchImpl) => fetchApiFootballFixtures(date, fetchImpl, env.API_FOOTBALL_KEY, options) });
   if (env.FOOTBALL_DATA_ORG_TOKEN) providers.push({ name: "football-data.org", fetch: (date, fetchImpl) => fetchFootballDataOrgMatches(date, fetchImpl, env.FOOTBALL_DATA_ORG_TOKEN) });
   return providers;
+}
+
+export async function fetchOpenLigaDbMatches(date, fetchImpl, options = {}) {
+  const season = options.openLigaSeason ?? openLigaSeason(date);
+  const shortcuts = String(options.openLigaShortcuts ?? process.env.OPENLIGADB_SHORTCUTS ?? "dfb,bl1,bl2").split(",").map((item) => item.trim()).filter(Boolean);
+  const rows = [];
+  for (const shortcut of shortcuts) {
+    const url = `https://api.openligadb.de/getmatchdata/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`;
+    const payload = await fetchJson(fetchImpl, url);
+    const matches = Array.isArray(payload) ? payload : [];
+    rows.push(...matches.filter((row) => localDate(row.matchDateTimeUTC ?? row.matchDateTime) === date).map((row, index) => mapOpenLigaDbMatch(row, date, index)).filter(Boolean));
+  }
+  return rows;
 }
 
 export async function fetchApiFootballFixtures(date, fetchImpl, apiKey, options = {}) {
@@ -105,6 +120,28 @@ function mapFootballDataOrgMatch(row, date, index) {
   return { id: `football-data-org-${row.id ?? index + 1}`, date, kickoff: kickoffTime(row.utcDate), competition: row.competition?.name ?? "Unknown", homeTeam, awayTeam, round: row.matchday ? `第${row.matchday}轮` : "", sequence: index + 1, source: `football-data-org:${row.id ?? ""}`, officialStatus: row.status ?? "", officialFixtureId: row.id ?? null, result: SETTLED_FOOTBALL_DATA.has(row.status) ? normalizeResult(row.score?.fullTime, row.score?.halfTime) : null };
 }
 
+function mapOpenLigaDbMatch(row, date, index) {
+  const homeTeam = row.team1?.teamName;
+  const awayTeam = row.team2?.teamName;
+  if (!homeTeam || !awayTeam) return null;
+  const fullTime = pickOpenLigaResult(row.matchResults, 2) ?? pickOpenLigaResult(row.matchResults);
+  const halfTime = pickOpenLigaResult(row.matchResults, 1);
+  return {
+    id: `openligadb-${row.matchID ?? index + 1}`,
+    date,
+    kickoff: kickoffTime(row.matchDateTimeUTC ?? row.matchDateTime),
+    competition: row.leagueName ?? "OpenLigaDB",
+    homeTeam,
+    awayTeam,
+    round: row.group?.groupName ?? "",
+    sequence: index + 1,
+    source: `openligadb:${row.matchID ?? ""}`,
+    officialStatus: row.matchIsFinished ? "FINISHED" : "SCHEDULED",
+    officialFixtureId: row.matchID ?? null,
+    result: row.matchIsFinished && fullTime ? normalizeResult({ home: fullTime.pointsTeam1, away: fullTime.pointsTeam2 }, { home: halfTime?.pointsTeam1, away: halfTime?.pointsTeam2 }) : null
+  };
+}
+
 async function fetchJson(fetchImpl, url, headers = {}) {
   const response = await fetchImpl(String(url), { headers: { "User-Agent": "football-ai-copilot/authorized-fixtures", ...headers } });
   const text = await response.text();
@@ -134,7 +171,31 @@ function kickoffTime(value) {
 }
 
 function normalizeName(value) {
-  return String(value ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
+  const normalized = String(value ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
+  const aliases = [
+    [/^(fc)?bayern|bayernmunchen|拜仁|拜仁慕尼黑|鎷滀粊|鎷滀粊鎱曞凹榛?/, "bayernmunich"],
+    [/vfbstuttgart|stuttgart|斯图加特|鏂浘鍔犵壒/, "stuttgart"]
+  ];
+  return aliases.find(([pattern]) => pattern.test(normalized))?.[1] ?? normalized;
+}
+
+function pickOpenLigaResult(results = [], resultTypeId = null) {
+  const rows = Array.isArray(results) ? results : [];
+  if (resultTypeId !== null) return rows.find((row) => Number(row.resultTypeID) === resultTypeId) ?? null;
+  return rows.slice().sort((left, right) => Number(right.resultOrderID ?? 0) - Number(left.resultOrderID ?? 0))[0] ?? null;
+}
+
+function openLigaSeason(date) {
+  const [year, month] = String(date).split("-").map(Number);
+  return month >= 7 ? year : year - 1;
+}
+
+function localDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? "";
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const mapped = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${mapped.year}-${mapped.month}-${mapped.day}`;
 }
 
 function mergeSource(left, right) {

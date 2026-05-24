@@ -7,8 +7,9 @@ param(
 
 $ErrorActionPreference = "Continue"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$LogDir = Join-Path $Root "data\logs"
-$ExportDir = Join-Path $Root "data\exports"
+$DataDir = if ([string]::IsNullOrWhiteSpace($env:FOOTBALL_DATA_DIR)) { "D:\football-model-data" } else { $env:FOOTBALL_DATA_DIR }
+$ExportDir = if ([string]::IsNullOrWhiteSpace($env:FOOTBALL_EXPORT_DIR)) { "D:\football-model-exports" } else { $env:FOOTBALL_EXPORT_DIR }
+$LogDir = Join-Path $DataDir "logs"
 New-Item -ItemType Directory -Force -Path $LogDir, $ExportDir | Out-Null
 
 if ([string]::IsNullOrWhiteSpace($env:OBSIDIAN_VAULT_DIR)) {

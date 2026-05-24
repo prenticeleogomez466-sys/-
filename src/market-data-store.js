@@ -3,9 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
 import { loadFixtures } from "./fixture-store.js";
+import { getDataSubdir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const marketDir = join(rootDir, "data", "market");
+const marketDir = getDataSubdir("market");
 
 export function loadMarketSnapshots(date) {
   mkdirSync(marketDir, { recursive: true });

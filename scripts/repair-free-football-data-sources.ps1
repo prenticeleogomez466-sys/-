@@ -1,7 +1,9 @@
 $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-$EnvPath = Join-Path $Root "data\local.env"
+$DataDir = if ([string]::IsNullOrWhiteSpace($env:FOOTBALL_DATA_DIR)) { "D:\football-model-data" } else { $env:FOOTBALL_DATA_DIR }
+$EnvPath = Join-Path $DataDir "local.env"
+New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
 
 Push-Location $Root
 try {

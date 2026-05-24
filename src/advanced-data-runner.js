@@ -2,12 +2,13 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getExportDir } from "./paths.js";
 import { loadFixtures } from "./fixture-store.js";
 import { saveAdvancedData } from "./advanced-data-store.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 const FOOTBALL_DATA_LEAGUES = "E0,E1,E2,E3,EC,SC0,SC1,N1,D1,D2,I1,I2,SP1,SP2,F1,F2,P1,B1,T1,G1";
 

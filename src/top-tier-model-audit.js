@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getExportDir } from "./paths.js";
 import { buildMarketCoverageStatus } from "./market-data-store.js";
 import { advancedDataLayerStatus, topTierReadiness } from "./advanced-football-features.js";
 import { advancedDataPath, layerAvailable, loadAdvancedData } from "./advanced-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 export function auditTopTierModelReadiness(date, env = process.env) {
   mkdirSync(exportDir, { recursive: true });

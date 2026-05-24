@@ -2,10 +2,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getDataDir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const dataDir = join(rootDir, "data");
-const exportDir = join(dataDir, "exports");
+const dataDir = getDataDir();
+const exportDir = getExportDir();
 const localEnvPath = join(dataDir, "local.env");
 
 export const SOURCE_CREDENTIALS = [

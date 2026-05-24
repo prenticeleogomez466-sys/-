@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getDataSubdir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-export const fixtureDir = join(rootDir, "data", "fixtures");
+export const fixtureDir = getDataSubdir("fixtures");
 
 export function loadFixtures(date = todayIso()) {
   ensureFixtureDir();

@@ -1,4 +1,6 @@
-data/local.env
+data/
+D:/football-model-data/
+D:/football-model-exports/
 .env
 .env.*
 !.env.example

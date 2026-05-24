@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getDataSubdir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const advancedDir = join(rootDir, "data", "advanced");
+const advancedDir = getDataSubdir("advanced");
 
 export function loadAdvancedData(date) {
   const path = advancedDataPath(date);

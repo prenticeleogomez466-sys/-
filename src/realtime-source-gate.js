@@ -6,10 +6,11 @@ import { readChinaWebSources } from "./china-web-sources.js";
 import { loadFixtures } from "./fixture-store.js";
 import { buildMarketCoverageStatus, checkMarketRequirements } from "./market-data-store.js";
 import { crawlMarketData } from "./odds-crawler.js";
+import { getDataSubdir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const crawlerDir = join(rootDir, "data", "crawler");
-const exportDir = join(rootDir, "data", "exports");
+const crawlerDir = getDataSubdir("crawler");
+const exportDir = getExportDir();
 
 export async function runRealtimeFootballCrawler(date, options = {}) {
   const normalizedDate = safeDate(date);

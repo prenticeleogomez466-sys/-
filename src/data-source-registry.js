@@ -3,9 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
 import { validateProductionCredentials } from "./source-credentials.js";
+import { getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 const SOURCES = [
   { name: "中国体彩网竞彩足球计算器（公开官方源）", priority: "P0", layers: ["fixtures-jingcai", "odds-win-draw-loss", "odds-handicap-win-draw-loss", "score-odds", "half-full-odds"], env: [], adapterStatus: "connected", freeDefault: true },

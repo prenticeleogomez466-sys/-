@@ -5,8 +5,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..")
-$LogDir = Join-Path $Root "data\logs"
-$EnvPath = Join-Path $Root "data\local.env"
+$DataDir = if ([string]::IsNullOrWhiteSpace($env:FOOTBALL_DATA_DIR)) { "D:\football-model-data" } else { $env:FOOTBALL_DATA_DIR }
+$LogDir = Join-Path $DataDir "logs"
+$EnvPath = Join-Path $DataDir "local.env"
 $HealthUrl = "http://127.0.0.1:$Port/api/health"
 $QueryUrl = "http://127.0.0.1:$Port/api/wechat/query"
 $OutLog = Join-Path $LogDir "wechat-server.out.log"

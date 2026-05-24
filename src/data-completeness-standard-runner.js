@@ -6,9 +6,10 @@ import { auditRecommendations } from "./recommendation-audit.js";
 import { assertLatestRealtimeSourceGate } from "./realtime-source-gate.js";
 import { auditModelStructure } from "./model-structure-audit.js";
 import { buildMarketCoverageStatus, checkMarketRequirements } from "./market-data-store.js";
+import { getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 
 const STANDARD = {
   baselineDate: "2026-05-15",

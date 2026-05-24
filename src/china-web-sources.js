@@ -1,13 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getDataSubdir, getExportDir } from "./paths.js";
 import { loadFixtures, saveFixtures } from "./fixture-store.js";
 import { loadMarketSnapshots, saveMarketSnapshots } from "./market-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const registryPath = join(rootDir, "data", "china-web-sources.json");
-const chinaWebDir = join(rootDir, "data", "china-web");
-const exportDir = join(rootDir, "data", "exports");
+const registryPath = getDataSubdir("china-web-sources.json");
+const chinaWebDir = getDataSubdir("china-web");
+const exportDir = getExportDir();
 
 const REQUEST_HEADERS = {
   "User-Agent": "football-ai-copilot/china-web-source-reader",
@@ -71,14 +72,14 @@ export function loadChinaWebSourceRegistry() {
 function syncOfficialFixtures(date, jingcaiFixtures, shengfucaiFixtures) {
   const fixtures = [...jingcaiFixtures, ...shengfucaiFixtures];
   const saved = saveFixtures(date, fixtures, { source: "china-official-web:sporttery+lottery-gov-cn" });
-  return { saved: true, fixtures: fixtures.length, path: join(rootDir, "data", "fixtures", `${date}.json`) };
+  return { saved: true, fixtures: fixtures.length, path: join(getDataSubdir("fixtures"), `${date}.json`) };
 }
 
 function syncOfficialMarket(date, marketSnapshots) {
   const previous = loadMarketSnapshots(date).snapshots;
   const merged = mergeMarketSnapshots(previous, marketSnapshots);
   const saved = saveMarketSnapshots(date, merged, { source: "china-official-web:jczq-calculator" });
-  return { saved: true, previous: previous.length, imported: marketSnapshots.length, snapshots: merged.length, path: join(rootDir, "data", "market", `${date}.json`) };
+  return { saved: true, previous: previous.length, imported: marketSnapshots.length, snapshots: merged.length, path: join(getDataSubdir("market"), `${date}.json`) };
 }
 
 async function readJingcaiSource(date, fetchImpl, options) {

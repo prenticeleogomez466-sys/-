@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
+import { getExportDir } from "./paths.js";
 import { buildDailyRecommendationPackage } from "./daily-report.js";
 import { runEvolutionBacktest } from "./evolution-backtest.js";
 import { assertMarketRequirements, buildMarketCoverageStatus } from "./market-data-store.js";
@@ -10,7 +11,7 @@ import { deliverDailyReportToWechat } from "./wechat-delivery.js";
 import { syncFootballArtifacts } from "./artifact-sync.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const exportDir = join(rootDir, "data", "exports");
+const exportDir = getExportDir();
 const args = process.argv.slice(2);
 const date = readArg("--date") ?? todayInShanghai();
 const withWeb = !args.includes("--no-web");
