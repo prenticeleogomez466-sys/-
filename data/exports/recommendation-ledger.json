@@ -1902,7 +1902,8 @@
     "reason": "经模型综合分析：英冠，客胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -1933,7 +1934,8 @@
     "reason": "经模型综合分析：意甲，客胜概率领先主胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -1964,7 +1966,8 @@
     "reason": "经模型综合分析：德国杯，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -1995,7 +1998,8 @@
     "reason": "经模型综合分析：荷乙，主胜概率领先客胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2026,7 +2030,8 @@
     "reason": "经模型综合分析：意甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2057,7 +2062,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2088,7 +2094,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2119,7 +2126,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2150,7 +2158,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2181,7 +2190,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2212,7 +2222,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2243,7 +2254,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2274,7 +2286,8 @@
     "reason": "经模型综合分析：西甲，客胜概率领先主胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2305,7 +2318,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先客胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2336,7 +2350,8 @@
     "reason": "经模型综合分析：美职，主胜概率领先客胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2367,7 +2382,8 @@
     "reason": "经模型综合分析：美职，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2398,7 +2414,8 @@
     "reason": "经模型综合分析：美职，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2429,7 +2446,8 @@
     "reason": "经模型综合分析：美职，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2460,7 +2478,8 @@
     "reason": "经模型综合分析：美职，主胜概率领先客胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2491,7 +2510,8 @@
     "reason": "经模型综合分析：英冠，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2522,7 +2542,8 @@
     "reason": "经模型综合分析：德国杯，客胜概率领先主胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正；同场次已与竞彩足球 周六014 胜平负方向强制一致",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2553,7 +2574,8 @@
     "reason": "经模型综合分析：意甲，主胜概率领先平局；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正；同场次已与竞彩足球 周六013 胜平负方向强制一致",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2584,7 +2606,8 @@
     "reason": "经模型综合分析：意甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正；同场次已与竞彩足球 周六016 胜平负方向强制一致",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2615,7 +2638,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正；同场次已与竞彩足球 周六022 胜平负方向强制一致",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2646,7 +2670,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正；同场次已与竞彩足球 周六021 胜平负方向强制一致",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2677,7 +2702,8 @@
     "reason": "经模型综合分析：西甲，主胜概率领先客胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正；同场次已与竞彩足球 周六017 胜平负方向强制一致",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2708,7 +2734,8 @@
     "reason": "经模型综合分析：荷乙，主胜概率领先客胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正；同场次已与竞彩足球 周六015 胜平负方向强制一致",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2739,7 +2766,8 @@
     "reason": "经模型综合分析：瑞超，主胜概率领先客胜；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2770,7 +2798,8 @@
     "reason": "经模型综合分析：瑞超，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2801,7 +2830,8 @@
     "reason": "经模型综合分析：芬超，主胜概率领先平局；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2832,7 +2862,8 @@
     "reason": "经模型综合分析：芬超，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2863,7 +2894,8 @@
     "reason": "经模型综合分析：芬超，主胜概率领先平局；风险中；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   },
   {
     "date": "2026-05-23",
@@ -2894,6 +2926,7 @@
     "reason": "经模型综合分析：芬超，主胜概率领先客胜；风险高；已接入本次实时赔率快照，并完成隐含概率换算与高级数据修正",
     "actual": "",
     "actualScore": "",
-    "hit": null
+    "hit": null,
+    "actualStatus": "pending-result"
   }
 ]
