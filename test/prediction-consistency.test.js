@@ -98,4 +98,29 @@ describe("prediction derived market consistency", () => {
     assert.equal(prediction.simulation.iterations, 20000);
     assert.ok(prediction.simulation.topScores.length > 0);
   });
+
+  it("applies historical calibration without changing probability normalization", () => {
+    const calibrationProfile = {
+      usable: true,
+      source: "test-profile",
+      minSamples: 10,
+      minBucketSamples: 5,
+      maxShift: 0.05,
+      global: { samples: 30, predictedHitRate: 0.62, actualHitRate: 0.54, adjustment: -0.04 },
+      buckets: {
+        "55-65": { samples: 12, predictedHitRate: 0.61, actualHitRate: 0.52, adjustment: -0.045 }
+      }
+    };
+    const prediction = predictFixture(
+      baseFixture,
+      [{ fixtureId: baseFixture.id, date: baseFixture.date, europeanOdds: { current: { home: 1.7, draw: 3.6, away: 5.2 } } }],
+      0,
+      { calibrationProfile }
+    );
+    const total = prediction.probabilities.home + prediction.probabilities.draw + prediction.probabilities.away;
+
+    assert.equal(prediction.probabilityAdjustment.calibration.applied, true);
+    assert.ok(prediction.probabilities.home < prediction.baseProbabilities.home);
+    assert.ok(Math.abs(total - 1) < 0.0001);
+  });
 });

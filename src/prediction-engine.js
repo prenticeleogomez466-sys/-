@@ -4,6 +4,7 @@ import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
+import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -32,7 +33,8 @@ export function recommendFixtures(date) {
   const fixtureSet = loadFixtures(date);
   const marketSnapshots = loadMarketSnapshots(fixtureSet.date).snapshots;
   const advancedData = loadAdvancedData(fixtureSet.date);
-  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData })));
+  const calibrationProfile = loadCalibrationProfile();
+  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile })));
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
@@ -103,7 +105,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const snapshot = findMarketSnapshot(fixture, marketSnapshots);
   const baseProbabilities = snapshot?.europeanOdds?.current ? probabilitiesFromOdds(snapshot.europeanOdds.current) : seededProbabilities(fixture, index);
   const probabilityAdjustment = adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
-  const probabilities = probabilityAdjustment.probabilities;
+  const calibrated = calibrateProbabilities(probabilityAdjustment.probabilities, options.calibrationProfile, { fixture, snapshot });
+  const probabilities = calibrated.probabilities;
+  probabilityAdjustment.calibration = calibrated.calibration;
   const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);
   const ranked = OUTCOMES.map((outcome) => ({ ...outcome, probability: probabilities[outcome.key] })).sort((a, b) => b.probability - a.probability);
   const gap = ranked[0].probability - ranked[1].probability;
