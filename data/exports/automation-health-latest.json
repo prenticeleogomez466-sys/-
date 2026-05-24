@@ -1,31 +1,31 @@
 ﻿{
     "mode":  "health",
-    "date":  "2026-05-15",
-    "ok":  true,
-    "failed":  0,
+    "date":  "2026-05-24",
+    "ok":  false,
+    "failed":  3,
     "total":  9,
-    "logPath":  "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\logs\\football-health-2026-05-15-20260515-030000.log",
-    "generatedAt":  "2026-05-15T03:00:07.2026602+08:00",
+    "logPath":  "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\logs\\football-health-2026-05-24-20260524-110851.log",
+    "generatedAt":  "2026-05-24T11:08:58.3700190+08:00",
     "steps":  [
                   {
                       "name":  "realtime football crawler gate",
-                      "command":  "npm run crawler:realtime -- --date=2026-05-15 --allow-missing-odds --no-external-odds --no-history",
-                      "ok":  true,
+                      "command":  "npm run crawler:realtime -- --date=2026-05-24 --allow-missing-odds --no-external-odds --no-history",
+                      "ok":  false,
                       "allowedFailure":  false,
-                      "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:00.6897784+08:00",
-                      "finishedAt":  "2026-05-15T03:00:02.5470486+08:00",
-                      "seconds":  1.86
+                      "exitCode":  1,
+                      "startedAt":  "2026-05-24T11:08:51.6322252+08:00",
+                      "finishedAt":  "2026-05-24T11:08:53.6712738+08:00",
+                      "seconds":  2.04
                   },
                   {
                       "name":  "china official web source analysis",
-                      "command":  "npm run china:sources -- --date=2026-05-15 --no-history",
+                      "command":  "npm run china:sources -- --date=2026-05-24 --no-history",
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:02.5583297+08:00",
-                      "finishedAt":  "2026-05-15T03:00:03.4712455+08:00",
-                      "seconds":  0.91
+                      "startedAt":  "2026-05-24T11:08:53.6824561+08:00",
+                      "finishedAt":  "2026-05-24T11:08:54.4820135+08:00",
+                      "seconds":  0.8
                   },
                   {
                       "name":  "free odds source audit",
@@ -33,8 +33,8 @@
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:03.4732450+08:00",
-                      "finishedAt":  "2026-05-15T03:00:03.9573149+08:00",
+                      "startedAt":  "2026-05-24T11:08:54.4840062+08:00",
+                      "finishedAt":  "2026-05-24T11:08:54.9612257+08:00",
                       "seconds":  0.48
                   },
                   {
@@ -43,19 +43,19 @@
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:03.9593150+08:00",
-                      "finishedAt":  "2026-05-15T03:00:04.4443373+08:00",
-                      "seconds":  0.49
+                      "startedAt":  "2026-05-24T11:08:54.9727842+08:00",
+                      "finishedAt":  "2026-05-24T11:08:55.4147847+08:00",
+                      "seconds":  0.44
                   },
                   {
                       "name":  "credential check",
                       "command":  "npm run credentials:check",
                       "ok":  true,
-                      "allowedFailure":  true,
-                      "exitCode":  1,
-                      "startedAt":  "2026-05-15T03:00:04.4473377+08:00",
-                      "finishedAt":  "2026-05-15T03:00:04.9389268+08:00",
-                      "seconds":  0.49
+                      "allowedFailure":  false,
+                      "exitCode":  0,
+                      "startedAt":  "2026-05-24T11:08:55.4178620+08:00",
+                      "finishedAt":  "2026-05-24T11:08:55.9903525+08:00",
+                      "seconds":  0.57
                   },
                   {
                       "name":  "wechat channel check",
@@ -63,39 +63,39 @@
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:04.9429244+08:00",
-                      "finishedAt":  "2026-05-15T03:00:05.5024504+08:00",
-                      "seconds":  0.56
+                      "startedAt":  "2026-05-24T11:08:55.9913600+08:00",
+                      "finishedAt":  "2026-05-24T11:08:56.5328405+08:00",
+                      "seconds":  0.54
                   },
                   {
                       "name":  "market coverage status",
-                      "command":  "npm run market:status -- --date=2026-05-15",
+                      "command":  "npm run market:status -- --date=2026-05-24",
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:05.5054500+08:00",
-                      "finishedAt":  "2026-05-15T03:00:06.1816589+08:00",
-                      "seconds":  0.68
+                      "startedAt":  "2026-05-24T11:08:56.5348490+08:00",
+                      "finishedAt":  "2026-05-24T11:08:57.3222799+08:00",
+                      "seconds":  0.79
                   },
                   {
                       "name":  "recommendation audit",
-                      "command":  "npm run recommend:audit -- --date 2026-05-15",
-                      "ok":  true,
+                      "command":  "npm run recommend:audit -- --date 2026-05-24",
+                      "ok":  false,
                       "allowedFailure":  false,
-                      "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:06.1846585+08:00",
-                      "finishedAt":  "2026-05-15T03:00:06.6929976+08:00",
-                      "seconds":  0.51
+                      "exitCode":  1,
+                      "startedAt":  "2026-05-24T11:08:57.3242798+08:00",
+                      "finishedAt":  "2026-05-24T11:08:57.9281310+08:00",
+                      "seconds":  0.6
                   },
                   {
                       "name":  "model structure audit",
-                      "command":  "npm run model:audit -- --date=2026-05-15",
-                      "ok":  true,
+                      "command":  "npm run model:audit -- --date=2026-05-24",
+                      "ok":  false,
                       "allowedFailure":  false,
-                      "exitCode":  0,
-                      "startedAt":  "2026-05-15T03:00:06.6949977+08:00",
-                      "finishedAt":  "2026-05-15T03:00:07.1966613+08:00",
-                      "seconds":  0.5
+                      "exitCode":  1,
+                      "startedAt":  "2026-05-24T11:08:57.9291296+08:00",
+                      "finishedAt":  "2026-05-24T11:08:58.3650189+08:00",
+                      "seconds":  0.44
                   }
               ]
 }

@@ -1,0 +1,44 @@
+{
+  "source": "daily-recap-ledger",
+  "generatedAt": "2026-05-24T03:12:49.084Z",
+  "usable": false,
+  "reason": "insufficient-settled-samples",
+  "samples": 0,
+  "minSamples": 20,
+  "minBucketSamples": 8,
+  "maxShift": 0.055,
+  "global": {
+    "samples": 0,
+    "predictedHitRate": null,
+    "actualHitRate": null,
+    "adjustment": 0
+  },
+  "buckets": {
+    "33-45": {
+      "samples": 0,
+      "predictedHitRate": null,
+      "actualHitRate": null,
+      "adjustment": 0
+    },
+    "45-55": {
+      "samples": 0,
+      "predictedHitRate": null,
+      "actualHitRate": null,
+      "adjustment": 0
+    },
+    "55-65": {
+      "samples": 0,
+      "predictedHitRate": null,
+      "actualHitRate": null,
+      "adjustment": 0
+    },
+    "65-100": {
+      "samples": 0,
+      "predictedHitRate": null,
+      "actualHitRate": null,
+      "adjustment": 0
+    }
+  },
+  "byRisk": {},
+  "byMarketType": {}
+}

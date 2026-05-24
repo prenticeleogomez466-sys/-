@@ -1,31 +1,31 @@
 ﻿{
     "mode":  "recap",
-    "date":  "2026-05-22",
+    "date":  "2026-05-23",
     "ok":  true,
     "failed":  0,
     "total":  3,
-    "logPath":  "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\logs\\football-recap-2026-05-22-20260523-200045.log",
-    "generatedAt":  "2026-05-23T20:00:55.2928149+08:00",
+    "logPath":  "C:\\Users\\Administrator\\Documents\\Codex\\2026-05-04\\files-mentioned-by-the-user-v3\\data\\logs\\football-recap-2026-05-23-20260524-110851.log",
+    "generatedAt":  "2026-05-24T11:09:02.5744392+08:00",
     "steps":  [
                   {
                       "name":  "sync previous-day results",
-                      "command":  "npm run fixtures:sync:soft -- --date=2026-05-22",
+                      "command":  "npm run fixtures:sync:soft -- --date=2026-05-23",
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-23T20:00:45.5314966+08:00",
-                      "finishedAt":  "2026-05-23T20:00:45.9818693+08:00",
-                      "seconds":  0.45
+                      "startedAt":  "2026-05-24T11:08:51.6182259+08:00",
+                      "finishedAt":  "2026-05-24T11:08:52.3265321+08:00",
+                      "seconds":  0.71
                   },
                   {
                       "name":  "compare predictions with actual results",
-                      "command":  "npm run recap:daily -- --date=2026-05-22",
+                      "command":  "npm run recap:daily -- --date=2026-05-23",
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-23T20:00:45.9958378+08:00",
-                      "finishedAt":  "2026-05-23T20:00:54.8544509+08:00",
-                      "seconds":  8.86
+                      "startedAt":  "2026-05-24T11:08:52.3401546+08:00",
+                      "finishedAt":  "2026-05-24T11:09:02.0742258+08:00",
+                      "seconds":  9.73
                   },
                   {
                       "name":  "run evolution backtest",
@@ -33,9 +33,9 @@
                       "ok":  true,
                       "allowedFailure":  false,
                       "exitCode":  0,
-                      "startedAt":  "2026-05-23T20:00:54.8583444+08:00",
-                      "finishedAt":  "2026-05-23T20:00:55.2787944+08:00",
-                      "seconds":  0.42
+                      "startedAt":  "2026-05-24T11:09:02.0762259+08:00",
+                      "finishedAt":  "2026-05-24T11:09:02.5677587+08:00",
+                      "seconds":  0.49
                   }
               ]
 }

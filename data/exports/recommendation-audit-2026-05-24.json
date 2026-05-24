@@ -1,0 +1,56 @@
+{
+  "ok": false,
+  "summary": {
+    "totalChecks": 42,
+    "errors": 5,
+    "warnings": 0,
+    "predictions": 42,
+    "fourteen": 14,
+    "fourteenBankers": 0,
+    "fourteenMaxBankers": 4
+  },
+  "checks": [
+    {
+      "level": "error",
+      "message": "富勒姆 对 纽卡斯尔联 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "利物浦 对 布伦特福德 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "曼彻斯特城 对 阿斯顿维拉 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "诺丁汉森林 对 伯恩茅斯 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "托特纳姆热刺 对 埃弗顿 缺少实时赔率快照"
+    }
+  ],
+  "errors": [
+    {
+      "level": "error",
+      "message": "富勒姆 对 纽卡斯尔联 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "利物浦 对 布伦特福德 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "曼彻斯特城 对 阿斯顿维拉 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "诺丁汉森林 对 伯恩茅斯 缺少实时赔率快照"
+    },
+    {
+      "level": "error",
+      "message": "托特纳姆热刺 对 埃弗顿 缺少实时赔率快照"
+    }
+  ]
+}
