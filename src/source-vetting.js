@@ -24,6 +24,15 @@ const SOURCES = [
     caveat: "仅使用公开页面；失败时不得绕过反爬、登录或付费限制。"
   },
   {
+    name: "新浪胜负彩公开赔率文章",
+    url: "https://sports.sina.com.cn/l/football/",
+    decision: "accepted-fast-fallback",
+    tier: "P0",
+    layers: ["14场欧赔", "14场澳盘", "欧亚对照"],
+    modelValue: "作为 14 场胜负彩赔率快源兜底，当前比逐站抓 500/捷报/聚合站更快更稳定。",
+    caveat: "仅用于公开文章解析；若官方 14 场未来提供结构化赔率 API，应优先替换。"
+  },
+  {
     name: "football-data.co.uk",
     url: "https://www.football-data.co.uk/data.php",
     decision: "accepted",
