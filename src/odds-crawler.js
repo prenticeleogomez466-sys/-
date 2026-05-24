@@ -87,6 +87,15 @@ export async function crawlMarketData(date, options = {}) {
       sources.push({ name: "料狗公开赛前盘口", fetched: 0, ok: false, error: error.message });
     }
   }
+  if (process.env.FIVEHUNDRED_JC_ASIAN_ENABLED !== "0" && fixtureSet.fixtures.some((fixture) => fixture.marketType === "jingcai")) {
+    try {
+      const rows = await crawlFiveHundredJingcaiAsianOdds(date, fixtureSet.fixtures, fetchImpl);
+      candidates.push(...rows);
+      sources.push({ name: "500.com jingcai asian odds", fetched: rows.length, ok: rows.length > 0, error: rows.length ? undefined : "no matching 500.com jingcai asian odds" });
+    } catch (error) {
+      sources.push({ name: "500.com jingcai asian odds", fetched: 0, ok: false, error: error.message });
+    }
+  }
   if (process.env.SINA_SFC_ODDS_ENABLED !== "0" && fixtureSet.fixtures.some((fixture) => fixture.marketType === "shengfucai")) {
     try {
       const rows = await crawlSinaShengfucaiOdds(date, fixtureSet.fixtures, fetchImpl);
@@ -619,6 +628,55 @@ async function crawlFiveHundredShengfucaiAsianOdds(date, fixtures, fetchImpl) {
     await new Promise((resolve) => setTimeout(resolve, Number(process.env.FIVEHUNDRED_CRAWL_DELAY_MS ?? 250)));
   }
   return rows;
+}
+
+async function crawlFiveHundredJingcaiAsianOdds(date, fixtures, fetchImpl) {
+  if (typeof fetchImpl !== "function") throw new Error("褰撳墠 Node 鐜涓嶆敮鎸?fetch");
+  const jingcaiFixtures = fixtures
+    .filter((fixture) => fixture.marketType === "jingcai")
+    .sort((left, right) => jingcaiSequenceNumber(left.sequence) - jingcaiSequenceNumber(right.sequence));
+  if (!jingcaiFixtures.length) return [];
+  const indexUrl = process.env.FIVEHUNDRED_JC_INDEX_URL || `https://trade.500.com/jczq/?date=${date}`;
+  const indexHtml = await fetchTextWithEncoding(fetchImpl, indexUrl, "gb18030");
+  const fixtureIds = parseFiveHundredJingcaiFixtureIds(indexHtml);
+  const rows = [];
+  for (const fixture of jingcaiFixtures) {
+    const fid = fixtureIds.get(String(fixture.sequence)) ?? fixtureIds.get(String(jingcaiSequenceNumber(fixture.sequence)));
+    if (!fid) continue;
+    const sourceUrl = `https://odds.500.com/fenxi/yazhi-${fid}.shtml`;
+    try {
+      const html = await fetchTextWithEncoding(fetchImpl, sourceUrl, "gb18030");
+      const snapshot = parseFiveHundredAsianOddsHtml(html, fixture, date, sourceUrl);
+      if (snapshot) rows.push(snapshot);
+    } catch {
+      // Some public pages throttle individual requests; keep the rest of the source usable.
+    }
+    await new Promise((resolve) => setTimeout(resolve, Number(process.env.FIVEHUNDRED_CRAWL_DELAY_MS ?? 250)));
+  }
+  return rows;
+}
+
+function parseFiveHundredJingcaiFixtureIds(html) {
+  const rows = [...String(html).matchAll(/<tr\b([^>]*\bclass=["'][^"']*bet-tb-tr[^"']*["'][^>]*)>/gi)];
+  const map = new Map();
+  for (const row of rows) {
+    const attrs = htmlAttributes(row[1]);
+    const fixtureId = attrs["data-fixtureid"];
+    const matchNum = attrs["data-matchnum"];
+    if (!fixtureId || !matchNum) continue;
+    map.set(matchNum, fixtureId);
+    map.set(String(jingcaiSequenceNumber(matchNum)), fixtureId);
+  }
+  return map;
+}
+
+function htmlAttributes(value) {
+  return Object.fromEntries([...String(value ?? "").matchAll(/\b([\w:-]+)\s*=\s*"([^"]*)"/g)].map((match) => [match[1].toLowerCase(), decodeHtmlText(match[2])]));
+}
+
+function jingcaiSequenceNumber(value) {
+  const number = String(value ?? "").match(/(\d{1,3})/)?.[1];
+  return number ? Number(number) : Number.POSITIVE_INFINITY;
 }
 
 async function discoverSinaShengfucaiOddsArticle(issue, fetchImpl) {
@@ -1555,8 +1613,12 @@ function parseFiveHundredAsianOddsHtml(html, fixture, date, sourceUrl = "") {
       initial: averageAsian(initialPoints.length ? initialPoints : currentPoints),
       current: averageAsian(currentPoints.length ? currentPoints : initialPoints)
     },
-    source: sourceUrl ? `500.com shengfucai asian odds ${sourceUrl}` : "500.com shengfucai asian odds"
+    source: sourceUrl ? `${fiveHundredAsianSourceName(fixture)} ${sourceUrl}` : fiveHundredAsianSourceName(fixture)
   }, date);
+}
+
+function fiveHundredAsianSourceName(fixture) {
+  return fixture?.marketType === "jingcai" ? "500.com jingcai asian odds" : "500.com shengfucai asian odds";
 }
 
 function parseFiveHundredAsianRows(html) {
