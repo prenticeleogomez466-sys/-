@@ -6,6 +6,7 @@ import { getExportDir } from "./paths.js";
 import { loadFixtures } from "./fixture-store.js";
 import { saveAdvancedData } from "./advanced-data-store.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
+import { fetchAuthorizedFixtureLayer } from "./authorized-source-fetcher.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -85,21 +86,13 @@ async function syncEloRatings(fixtures, fetchImpl, env) {
 }
 
 async function syncGenericFixtureLayer(layerKey, envKey, date, fixtures, fetchImpl, env) {
-  const url = env[envKey];
-  if (!url) return skipped(layerKey, `缺 ${envKey}`);
-  try {
-    const payload = await fetchJson(fetchImpl, expandDateUrl(url, date));
-    const rows = Array.isArray(payload) ? payload : payload.fixtures ?? payload.data ?? [];
-    const fixtureData = {};
-    for (const fixture of fixtures) {
-      const matched = rows.find((row) => sameFixture(row, fixture));
-      if (matched) fixtureData[fixture.id] = matched;
-    }
-    const count = Object.keys(fixtureData).length;
-    return { ok: count > 0, source: url, count, fixtureData, warning: count ? null : "源已配置但未匹配今日赛程" };
-  } catch (error) {
-    return { ok: false, source: url, count: 0, fixtureData: {}, error: error.message };
-  }
+  // 委托给 authorized-source-fetcher,获得:
+  //   - URL 模板支持({date}/{fixtureId}/{homeTeam}/{awayTeam}/{homeTeamAlias}/{awayTeamAlias})
+  //   - 共享 team-aliases 做 bulk URL 匹配,提高 hit rate
+  //   - 本地缓存(TTL 由 AUTHORIZED_SOURCE_TTL_MINUTES 控制,默认 6 小时)
+  //   - <ENVKEY>_AUTH_HEADER 可注入 Authorization: Bearer xxx 之类的 header
+  // 旧调用方仍然只看到 { ok, source, count, fixtureData, warning, error } 的形状。
+  return fetchAuthorizedFixtureLayer({ layerKey, envKey, date, fixtures, fetchImpl, env });
 }
 
 async function syncApiFootballFixtureIndex(date, fixtures, fetchImpl, env) {
