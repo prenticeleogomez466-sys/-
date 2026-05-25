@@ -47,9 +47,16 @@
     "model:stage-audit": "node src/model-stage-audit.js",
     "model:capability-audit": "node src/model-capability-registry.js",
     "advanced:sync": "node src/advanced-data-runner.js",
-    "standard:check": "node src/data-completeness-standard-runner.js"
+    "standard:check": "node src/data-completeness-standard-runner.js",
+    "dc:fit": "node -e \"import('./src/dixon-coles-engine.js').then(m => { const f = m.fitFromFixtureStore(); console.log(JSON.stringify({ usable: f.usable, matches: f.matches, teams: Object.keys(f.teams).length, baseRate: f.baseRate }, null, 2)); })\"",
+    "dc:predict": "node -e \"import('./src/dixon-coles-engine.js').then(m => { const f = m.fitFromFixtureStore(); const args = process.argv.slice(2); if (args.length < 2) { console.log('用法: npm run dc:predict -- 主队 客队'); return; } console.log(JSON.stringify(m.predictFromFitted(f, { homeTeam: args[0], awayTeam: args[1] }), null, 2)); })\"",
+    "metrics:trend": "node -e \"import('./src/daily-metrics-trend.js').then(m => console.log(JSON.stringify({ rolling7: m.rollingMetrics(7), rolling14: m.rollingMetrics(14), rolling30: m.rollingMetrics(30), drift: m.detectDrift() }, null, 2)))\"",
+    "signal:weights": "node -e \"import('./src/signal-weight-tuner.js').then(m => console.log(JSON.stringify(m.buildSignalWeightsProfile(), null, 2)))\""
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "undici": "^8.3.0"
   }
 }
