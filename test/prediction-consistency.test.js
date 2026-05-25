@@ -94,7 +94,7 @@ describe("prediction derived market consistency", () => {
     assert.equal(prediction.probabilityAdjustment.applied, true);
     assert.ok(prediction.probabilityAdjustment.signals.some((signal) => signal.key === "elo"));
     assert.ok(prediction.probabilities.home > prediction.baseProbabilities.home);
-    assert.ok(prediction.probabilityAdjustment.maxShift <= 0.08);
+    assert.ok(prediction.probabilityAdjustment.maxShift <= 0.1);
     assert.equal(prediction.simulation.iterations, 20000);
     assert.ok(prediction.simulation.topScores.length > 0);
   });

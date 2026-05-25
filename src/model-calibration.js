@@ -21,15 +21,32 @@ export function loadCalibrationProfile(path = profilePath) {
 
 export function calibrateProbabilities(probabilities, profile = emptyProfile(), context = {}) {
   const normalized = normalizeProbabilities(probabilities);
-  if (!profile.usable) {
-    return { probabilities: normalized, calibration: { applied: false, reason: profile.reason ?? "not-usable" } };
-  }
   const favorite = favoriteOutcome(normalized);
   const bucket = probabilityBucket(favorite.probability);
+  if (!profile.usable) {
+    // 冷启动:profile 不可用时,套一层"favorite-longshot bias"先验。
+    // 学术与博彩历史一致表明:赔率市场对高概率主队普遍高估 2~5 个点,
+    // 对长程冷门低估同等程度。这里只对 ≥0.65 的强主队收缩 15% 多余部分,
+    // 是已知行为的最小修正,不引入未经验证的趋势。一旦 calibration profile
+    // 通过 backtest 训练出来,这条先验会被覆盖。
+    return applyColdStartCalibration(normalized, favorite, bucket, profile.reason);
+  }
+  const competition = context.fixture?.competition ?? "";
+  const competitionRule = profile.byCompetition?.[competition];
   const bucketRule = profile.buckets?.[bucket];
-  const rule = bucketRule?.samples >= profile.minBucketSamples ? bucketRule : profile.global;
+  // 优先级：联赛专属规则（样本足够）> 概率分桶规则 > 全局规则
+  let rule = profile.global;
+  let ruleScope = "global";
+  if (bucketRule?.samples >= profile.minBucketSamples) {
+    rule = bucketRule;
+    ruleScope = `bucket:${bucket}`;
+  }
+  if (competitionRule?.samples >= profile.minBucketSamples) {
+    rule = competitionRule;
+    ruleScope = `competition:${competition}`;
+  }
   if (!rule || rule.samples < profile.minSamples) {
-    return { probabilities: normalized, calibration: { applied: false, reason: "insufficient-calibration-samples", bucket } };
+    return applyColdStartCalibration(normalized, favorite, bucket, "insufficient-calibration-samples");
   }
   const targetFavorite = clamp(
     favorite.probability + rule.adjustment,
@@ -43,6 +60,7 @@ export function calibrateProbabilities(probabilities, profile = emptyProfile(), 
       applied: true,
       source: profile.source,
       bucket,
+      scope: ruleScope,
       samples: rule.samples,
       predictedHitRate: round(rule.predictedHitRate),
       actualHitRate: round(rule.actualHitRate),
@@ -74,7 +92,8 @@ export function buildCalibrationProfileFromRows(rows, options = {}) {
     global,
     buckets,
     byRisk: groupRules(settled, (row) => row.risk || "unknown", maxShift),
-    byMarketType: groupRules(settled, (row) => row.marketType || "unknown", maxShift)
+    byMarketType: groupRules(settled, (row) => row.marketType || "unknown", maxShift),
+    byCompetition: groupRules(settled, (row) => row.competition || "unknown", maxShift)
   });
 }
 
@@ -90,7 +109,8 @@ function toCalibrationRow(row) {
     hit: favorite.code === actual,
     bucket: probabilityBucket(favorite.probability),
     risk: row.risk,
-    marketType: row.marketType
+    marketType: row.marketType,
+    competition: row.competition
   };
 }
 
@@ -128,12 +148,37 @@ function normalizeProfile(profile) {
     global: profile.global ?? { samples: 0, adjustment: 0 },
     buckets: profile.buckets ?? {},
     byRisk: profile.byRisk ?? {},
-    byMarketType: profile.byMarketType ?? {}
+    byMarketType: profile.byMarketType ?? {},
+    byCompetition: profile.byCompetition ?? {}
   };
 }
 
 function emptyProfile(reason = "not-configured") {
   return normalizeProfile({ usable: false, reason, samples: 0 });
+}
+
+const COLD_START_FAVORITE_THRESHOLD = 0.65;
+const COLD_START_SHRINK_TOWARD = 0.6;
+const COLD_START_SHRINK_FRACTION = 0.15;
+
+function applyColdStartCalibration(normalized, favorite, bucket, reason) {
+  if (favorite.probability < COLD_START_FAVORITE_THRESHOLD) {
+    return { probabilities: normalized, calibration: { applied: false, reason, bucket, scope: "cold-start-no-op" } };
+  }
+  const targetFavorite = favorite.probability - (favorite.probability - COLD_START_SHRINK_TOWARD) * COLD_START_SHRINK_FRACTION;
+  const calibrated = moveFavoriteProbability(normalized, favorite.key, targetFavorite);
+  return {
+    probabilities: calibrated,
+    calibration: {
+      applied: true,
+      source: "cold-start-favorite-longshot-prior",
+      bucket,
+      scope: "cold-start",
+      samples: 0,
+      reason,
+      adjustment: round(targetFavorite - favorite.probability)
+    }
+  };
 }
 
 function probabilitySet(row) {

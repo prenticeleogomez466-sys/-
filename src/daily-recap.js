@@ -7,6 +7,7 @@ import { loadFixtures } from "./fixture-store.js";
 import { syncAuthorizedFixturesAndResults } from "./authorized-fixtures.js";
 import { syncFootballArtifacts } from "./artifact-sync.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
+import { appendDailyMetrics, recapTrendRows } from "./daily-metrics-trend.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -32,14 +33,15 @@ export async function runDailyRecap(date, options = {}) {
   const summaryPath = join(exportDir, `daily-recap-${targetDate}.json`);
   const masterPath = join(exportDir, "football-recap-master.xlsx");
   writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, rows: targetRows }, null, 2)}\n`, "utf8");
+  const dailyMetrics = appendDailyMetrics(targetDate, targetRows);
   writeXlsxWorkbook(masterPath, [
-    { name: "复盘汇总", rows: recapSummaryRows(summary) },
+    { name: "复盘汇总", rows: [...recapSummaryRows(summary), ...recapTrendRows()] },
     { name: "复盘明细", rows: [recapDetailHeaders(), ...detailRows] },
     { name: "历史总表", rows: [recapDetailHeaders(), ...nextLedger.map(toRecapDetailRow)] }
   ]);
   const dDrivePaths = mirrorRecapExports(targetDate, summaryPath, masterPath);
   const sync = options.syncArtifacts === false ? null : syncFootballArtifacts(targetDate);
-  return { ok: true, date: targetDate, summary, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+  return { ok: true, date: targetDate, summary, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
 }
 
 function mirrorRecapExports(date, summaryPath, masterPath) {

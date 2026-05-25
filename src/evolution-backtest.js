@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildCalibrationProfileFromRows } from "./model-calibration.js";
+import { buildSignalWeightsProfile, signalWeightsSummary } from "./signal-weight-tuner.js";
 import { getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -31,6 +32,8 @@ export function runEvolutionBacktest() {
     }
   };
   mkdirSync(exportDir, { recursive: true });
+  const signalProfile = buildSignalWeightsProfile();
+  summary.signalWeights = signalWeightsSummary();
   writeFileSync(join(exportDir, "backtest-summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
   writeFileSync(join(exportDir, "backtest-calibration-profile.json"), `${JSON.stringify(calibrationProfile, null, 2)}\n`, "utf8");
   return summary;

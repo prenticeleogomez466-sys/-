@@ -5,6 +5,10 @@ import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
+import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
+import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
+import { applyLayer2Signals } from "./feature-enhancers.js";
+import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -34,7 +38,8 @@ export function recommendFixtures(date) {
   const marketSnapshots = loadMarketSnapshots(fixtureSet.date).snapshots;
   const advancedData = loadAdvancedData(fixtureSet.date);
   const calibrationProfile = loadCalibrationProfile();
-  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile })));
+  const dixonColesFitted = fitFromFixtureStore();
+  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted })));
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
@@ -82,28 +87,19 @@ function fixtureIdentityKey(fixture) {
 }
 
 function canonicalTeamName(value) {
-  const key = String(value ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9\u4e00-\u9fff]+/g, "");
-  const aliases = {
-    "拜仁慕尼黑": "拜仁",
-    "拜仁": "拜仁",
-    "斯图加特": "斯图加特",
-    "维戈塞尔塔": "塞尔塔",
-    "塞尔塔": "塞尔塔",
-    "坦佩雷山猫": "坦山猫",
-    "坦山猫": "坦山猫",
-    "赫尔辛基火花": "赫尔火花",
-    "赫尔火花": "赫尔火花",
-    "塞伊奈约基": "塞伊奈",
-    "塞伊奈": "塞伊奈",
-    "ac奥卢": "ac奥卢",
-    "acoulu": "ac奥卢"
-  };
-  return aliases[key] ?? key;
+  return canonicalTeamNameFromTable(value);
 }
 
 export function predictFixture(fixture, marketSnapshots = [], index = 0, options = {}) {
   const snapshot = findMarketSnapshot(fixture, marketSnapshots);
-  const baseProbabilities = snapshot?.europeanOdds?.current ? probabilitiesFromOdds(snapshot.europeanOdds.current) : seededProbabilities(fixture, index);
+  const oddsProbabilities = snapshot?.europeanOdds?.current ? probabilitiesFromOdds(snapshot.europeanOdds.current) : null;
+  const dcResult = options.dixonColesFitted ? predictFromFitted(options.dixonColesFitted, fixture) : null;
+  const blendResult = oddsProbabilities
+    ? blendWithOdds(oddsProbabilities, dcResult, { competition: fixture.competition, weightProfile: loadSignalWeights() })
+    : dcResult
+      ? { probabilities: dcResult.probabilities, blendSource: "dixon-coles-only", dcWeight: 1, dcResult }
+      : { probabilities: seededProbabilities(fixture, index), blendSource: "seeded-fallback", dcWeight: 0, dcResult: null };
+  const baseProbabilities = blendResult.probabilities;
   const probabilityAdjustment = adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
   const calibrated = calibrateProbabilities(probabilityAdjustment.probabilities, options.calibrationProfile, { fixture, snapshot });
   const probabilities = calibrated.probabilities;
@@ -122,6 +118,12 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     baseProbabilities,
     probabilities,
     probabilityAdjustment,
+    dixonColes: blendResult.dcResult ? {
+      source: blendResult.blendSource,
+      independentProbs: blendResult.dcResult?.probabilities,
+      expectedGoals: blendResult.dcResult?.expectedGoals,
+      teamStrength: blendResult.dcResult?.teamStrength,
+    } : null,
     simulation,
     marketSnapshot: snapshot,
     advancedFeatures,
@@ -229,8 +231,11 @@ function adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, advance
     weights.away *= weather.awayMultiplier;
     signals.push(weather);
   }
+  const layer2 = applyLayer2Signals(weights, fixtureData, getSignalScale);
+  weights = layer2.weights;
+  signals.push(...layer2.signals);
   if (!signals.length) return { applied: false, probabilities: baseProbabilities, signals: [] };
-  const adjusted = capProbabilityShift(baseProbabilities, normalizeProbabilities(weights), 0.08);
+  const adjusted = capProbabilityShift(baseProbabilities, normalizeProbabilities(weights), 0.1);
   return {
     applied: true,
     probabilities: adjusted,
@@ -249,7 +254,7 @@ function eloSignal(elo) {
     home,
     away,
     diff: round(diff),
-    score: round((diff / 400) * 0.18)
+    score: round((diff / 400) * 0.18 * getSignalScale("elo"))
   };
 }
 
@@ -267,7 +272,7 @@ function formSignal(form) {
     ppgDiff: round(ppgDiff),
     goalDiffPerMatch: round(goalDiffPerMatch),
     shotQualityDiff: shotQualityDiff === null ? null : round(shotQualityDiff),
-    score: round(ppgDiff * 0.08 + goalDiffPerMatch * 0.025 + (shotQualityDiff ?? 0) * 0.015)
+    score: round((ppgDiff * 0.08 + goalDiffPerMatch * 0.025 + (shotQualityDiff ?? 0) * 0.015) * getSignalScale("form"))
   };
 }
 
@@ -295,9 +300,9 @@ function weatherSignal(weather) {
     key: "weather",
     precipitation: Number.isFinite(precipitation) ? round(precipitation) : null,
     windSpeed10m: Number.isFinite(wind) ? round(wind) : null,
-    homeMultiplier: 0.98,
-    drawMultiplier: 1.04,
-    awayMultiplier: 0.98
+    homeMultiplier: 1 - 0.02 * getSignalScale("weather"),
+    drawMultiplier: 1 + 0.04 * getSignalScale("weather"),
+    awayMultiplier: 1 - 0.02 * getSignalScale("weather")
   };
 }
 
