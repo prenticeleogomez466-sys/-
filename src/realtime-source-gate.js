@@ -81,21 +81,39 @@ export function buildRealtimeSourceGate(date, context = {}) {
     requireRealTime: true
   });
 
+  // SOURCE_GATE_PARTIAL_MODE=1 时,把"竞彩源相关"三项(竞彩官方源/公告/赔率快照)从硬阻断
+  // 改为"软警告":只要至少 14 场源通过,就允许 daily 生成 14 场推荐(不出竞彩 9 场)。
+  // 这种部分降级模式用于:webapi.sporttery.cn 反爬 567 时让 14 场 + 大乐透流程继续。
+  // 默认关闭,需要时主动 `SOURCE_GATE_PARTIAL_MODE=1` 跑一次。
+  const partialMode = process.env.SOURCE_GATE_PARTIAL_MODE === "1";
+  const jingcaiSourceOk = sourceOk(sourceStatus, "lottery-gov-cn-jc-calculator") && (china.summary?.jingcaiMatches ?? 0) > 0;
+  const jingcaiBulletinOk = sourceOk(sourceStatus, "sporttery-cn-jc-bulletin");
+  const jingcaiSnapshotOk = (china.summary?.jingcaiMarketSnapshots ?? 0) >= (china.summary?.jingcaiMatches ?? 1);
+
   const checks = [
     check("中国官方源实时抓取", Boolean(china.generatedAt), `抓取时间：${china.generatedAt ?? "缺失"}`),
-    check("竞彩足球官方源", sourceOk(sourceStatus, "lottery-gov-cn-jc-calculator") && (china.summary?.jingcaiMatches ?? 0) > 0, `场次：${china.summary?.jingcaiMatches ?? 0}`),
-    check("竞彩公告官方源", sourceOk(sourceStatus, "sporttery-cn-jc-bulletin"), `公告：${china.summary?.bulletins ?? 0}`),
+    check("竞彩足球官方源", jingcaiSourceOk, `场次：${china.summary?.jingcaiMatches ?? 0}${partialMode && !jingcaiSourceOk ? "（partial-mode 软警告）" : ""}`),
+    check("竞彩公告官方源", jingcaiBulletinOk, `公告：${china.summary?.bulletins ?? 0}${partialMode && !jingcaiBulletinOk ? "（partial-mode 软警告）" : ""}`),
     check("14场官方源", sourceOk(sourceStatus, "sporttery-cn-ctzc-announcement") && (china.summary?.shengfucaiMatches ?? 0) === 14, `期号：${china.summary?.shengfucaiIssue ?? "缺失"}，场次：${china.summary?.shengfucaiMatches ?? 0}`),
-    check("竞彩赔率实时快照", (china.summary?.jingcaiMarketSnapshots ?? 0) >= (china.summary?.jingcaiMatches ?? 1), `快照：${china.summary?.jingcaiMarketSnapshots ?? 0}/${china.summary?.jingcaiMatches ?? 0}`),
+    check("竞彩赔率实时快照", jingcaiSnapshotOk, `快照：${china.summary?.jingcaiMarketSnapshots ?? 0}/${china.summary?.jingcaiMatches ?? 0}${partialMode && !jingcaiSnapshotOk ? "（partial-mode 软警告）" : ""}`),
     check("Fixture 文件来自本次官方同步", fixtures.source?.includes("china-official-web"), `source=${fixtures.source ?? "缺失"}，fixtures=${fixtures.fixtures.length}`),
     check("市场快照实时性", market.rows.filter((row) => row.hasSnapshot).every((row) => row.realTime), `实时快照：${market.rows.filter((row) => row.realTime).length}/${market.rows.filter((row) => row.hasSnapshot).length}`),
     check("全量赔率硬门槛", !context.requireFullOdds || marketCheck.ok, context.requireFullOdds ? marketCheck.failures.join("；") : "未启用全量赔率硬门槛")
   ];
 
-  const failures = checks.filter((item) => !item.ok).map((item) => `${item.name}失败：${item.detail}`);
+  // partial-mode:竞彩 jingcai 相关三项 + 市场快照实时性 + 全量赔率硬门槛
+  // 当竞彩源 567 时,既没有竞彩 9 场也没有竞彩实时赔率快照,
+  // "市场快照实时性"和"全量赔率硬门槛"自然全失败,
+  // 但 14 场只要识别就可以单独生成胜负彩推荐。
+  const jingcaiSoftNames = new Set(partialMode
+    ? ["竞彩足球官方源", "竞彩公告官方源", "竞彩赔率实时快照", "市场快照实时性", "全量赔率硬门槛"]
+    : []);
+  const failures = checks.filter((item) => !item.ok && !jingcaiSoftNames.has(item.name)).map((item) => `${item.name}失败：${item.detail}`);
+  const softWarnings = checks.filter((item) => !item.ok && jingcaiSoftNames.has(item.name)).map((item) => `partial-mode 软警告:${item.name}失败,本次不生成竞彩 9 场推荐 — ${item.detail}`);
   const warnings = [];
   if (!context.requireFullOdds && market.usable < market.fixtures) warnings.push(`未启用全量赔率硬门槛，当前赔率覆盖 ${market.usable}/${market.fixtures}；14场仍以官方赛程为准。`);
   if (context.externalOdds && context.externalOdds.ok === false) warnings.push(`外部赔率源抓取失败：${context.externalOdds.error}`);
+  warnings.push(...softWarnings);
   warnings.push("正式推荐只允许在本闸门生成后短时间内调用；过期闸门会阻断生成。");
 
   return {
