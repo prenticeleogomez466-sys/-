@@ -21,6 +21,8 @@
     "crawler:realtime": "node src/realtime-crawler-runner.js",
     "crawler:realtime:strict": "node src/realtime-crawler-runner.js --require-external-odds --require-full-odds",
     "model:scorecard": "node scripts/run-model-scorecard.mjs",
+    "backfill:history": "node scripts/run-backfill-history.mjs",
+    "analyze:deep": "node scripts/run-analyze-deep.mjs",
     "daily": "node src/daily-evolution.js",
     "daily:allow-missing": "node src/daily-evolution.js --allow-missing-odds",
     "daily:no-web": "node src/daily-evolution.js --allow-missing-odds",
