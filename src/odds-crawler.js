@@ -162,8 +162,34 @@ export async function crawlMarketData(date, options = {}) {
       sources.push({ name: "CubeGoal公开赔率", fetched: 0, ok: false, error: error.message });
     }
   }
-  const matched = alignSnapshots(candidates, fixtureSet.fixtures);
-  const merged = mergeSnapshots(previous, matched);
+  let matched = alignSnapshots(candidates, fixtureSet.fixtures);
+  let merged = mergeSnapshots(previous, matched);
+
+  // 2026-05-28: 缺亚盘场次主动二轮救援。
+  // 经过常规源后,如果还存在 fixture 拿不到 asianHandicap,临时启用 cubegoal API
+  // (基于 date+team-name 自动查找,不需要预置 mapping) 针对这些 fixture 做最后一轮。
+  // 控制开关:ODDS_INCOMPLETE_RESCUE_ENABLED="0" 可关闭(默认开)。
+  if (process.env.ODDS_INCOMPLETE_RESCUE_ENABLED !== "0") {
+    const stillMissingAsian = fixtureSet.fixtures.filter((fixture) => {
+      const snapshot = merged.find((item) => item.fixtureId === fixture.id);
+      return !snapshot || !snapshot.asianHandicap;
+    });
+    if (stillMissingAsian.length && process.env.CUBEGOAL_ODDS_ENABLED === "0") {
+      // 仅在 cubegoal 本来禁用的情况下,临时为缺亚盘场次单独触发一次。
+      try {
+        const rows = await crawlCubegoalOdds(date, stillMissingAsian, fetchImpl);
+        candidates.push(...rows);
+        sources.push({ name: "CubeGoal二轮救援(缺亚盘)", fetched: rows.length, ok: rows.length > 0, error: rows.length ? undefined : `针对 ${stillMissingAsian.length} 场缺亚盘 fixture 未获补救` });
+        if (rows.length) {
+          matched = alignSnapshots(candidates, fixtureSet.fixtures);
+          merged = mergeSnapshots(previous, matched);
+        }
+      } catch (error) {
+        sources.push({ name: "CubeGoal二轮救援(缺亚盘)", fetched: 0, ok: false, error: error.message });
+      }
+    }
+  }
+
   const saved = matched.length ? saveMarketSnapshots(date, merged, { source: sources.filter((source) => source.ok).map((source) => source.name).join("+") }) : null;
   const result = { date, fixtures: fixtureSet.fixtures.length, sources, fetched: candidates.length, matched: matched.length, saved: Boolean(saved), path: saved?.path ?? null, snapshots: merged };
   mkdirSync(exportDir, { recursive: true });

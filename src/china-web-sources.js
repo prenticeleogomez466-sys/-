@@ -22,10 +22,27 @@ const REQUEST_HEADERS = {
 // 抓取时就会带上,直到 cookie 过期或 WAF 策略变化。
 // 同样支持 LOTTERY_GOV_CN_COOKIE(站点同源,有时会用不同 cookie)。
 // 同时把 UA / Origin 配成最近版 Chrome,降低被直接 reset 的概率。
+// WEBAPI_SPORTTERY_USER_AGENT 支持用 "|" 分隔多个 UA,每次请求随机选一个,
+// 降低同一 schtasks 时刻同样指纹被 WAF 命中的概率。
+const DEFAULT_JINGCAI_USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36 Edg/147.0.0.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0"
+];
+
+function pickJingcaiUserAgent() {
+  const configured = process.env.WEBAPI_SPORTTERY_USER_AGENT;
+  const pool = configured
+    ? configured.split("|").map((item) => item.trim()).filter(Boolean)
+    : DEFAULT_JINGCAI_USER_AGENTS;
+  if (!pool.length) return DEFAULT_JINGCAI_USER_AGENTS[0];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function jingcaiRequestHeaders() {
   const headers = {
-    "User-Agent": process.env.WEBAPI_SPORTTERY_USER_AGENT
-      ?? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    "User-Agent": pickJingcaiUserAgent(),
     Accept: "application/json, text/plain, */*",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
     Origin: "https://www.lottery.gov.cn",
@@ -550,24 +567,41 @@ async function fetchText(fetchImpl, url, headers = {}) {
   return text;
 }
 
+// 默认重试列表里加入 567 (sporttery / 百度云加速 WAF 的非标 challenge code)
+// 以及 403/521/522/523/525/526 等 Cloudflare/Akamai 风格反爬码,
+// 这些情况下短暂退避后换 UA 重试有概率拿到正常响应。
+const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 521, 522, 523, 525, 526, 567]);
+const HARD_CHALLENGE_STATUSES = new Set([403, 567]);
+
 async function fetchWithRetry(fetchImpl, url, options = {}) {
-  const attempts = Number(process.env.CHINA_SOURCE_RETRY_ATTEMPTS ?? 3);
+  const attempts = Number(process.env.CHINA_SOURCE_RETRY_ATTEMPTS ?? 5);
   const timeoutMs = Number(process.env.CHINA_SOURCE_TIMEOUT_MS ?? 12000);
   let lastError = null;
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    // 每次都重新生成 jingcai headers,这样 UA 池在每次 attempt 都重新随机一次。
+    // 调用方传进来的 headers 是引用,所以这里只在 challenge 类状态码下才替换。
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetchImpl(String(url), { ...options, signal: controller.signal });
       clearTimeout(timeout);
-      if (response.ok || attempt === attempts || ![408, 425, 429, 500, 502, 503, 504].includes(response.status)) return response;
+      if (response.ok) return response;
+      const isTransient = TRANSIENT_HTTP_STATUSES.has(response.status);
+      if (!isTransient || attempt === attempts) return response;
       lastError = new Error(`HTTP ${response.status}`);
+      if (HARD_CHALLENGE_STATUSES.has(response.status) && options.headers?.["User-Agent"]) {
+        // sporttery WAF 命中:在下一次重试前切换 UA,提升通过概率。
+        options.headers["User-Agent"] = pickJingcaiUserAgent();
+      }
     } catch (error) {
       clearTimeout(timeout);
       lastError = error;
       if (attempt === attempts) break;
     }
-    await sleep(300 * attempt);
+    // 指数退避 + 随机抖动 (300ms~700ms 起步,每次翻倍 + 0~500ms 抖动)。
+    const base = 300 * Math.pow(2, attempt - 1);
+    const jitter = Math.floor(Math.random() * 500);
+    await sleep(base + jitter);
   }
   throw lastError ?? new Error(`请求失败：${url}`);
 }
