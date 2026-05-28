@@ -113,6 +113,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, blendResult.dcResult);
   const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, blendResult.dcResult);
+  const expectedValue = computeExpectedValueLabels(ranked, snapshot);
   const prediction = {
     fixture,
     baseProbabilities,
@@ -134,6 +135,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     confidence,
     scorePicks,
     halfFullPicks,
+    expectedValue,
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
   };
   prediction.bankroll = buildBankrollRisk(prediction, options.env ?? process.env);
@@ -204,6 +206,47 @@ function probabilitiesFromOdds(odds) {
   const raw = { home: 1 / odds.home, draw: 1 / odds.draw, away: 1 / odds.away };
   const total = raw.home + raw.draw + raw.away;
   return { home: round(raw.home / total), draw: round(raw.draw / total), away: round(raw.away / total) };
+}
+
+// Expected Value 计算:
+//   EV = p × (odds - 1) - (1 - p) × 1
+//      = p × odds - 1
+// p 是模型给的真实概率,odds 是 sporttery 当前赔率(SP)。
+// EV > 0:value bet,长期正期望
+// EV > 0.05:强 value bet(给 5% 安全垫,避免估计误差)
+// EV < 0:不该投,即便概率最高(赔率太低 = 价值不足)
+//
+// 这条算法是 EV 思维的核心 ── 持续正 EV 是长期盈利的唯一数学路径,
+// 而不是追求"看上去概率高"的票。配合 1/4 凯利仓位(已在 bankroll-risk.js),
+// 形成完整的 valuation + sizing 闭环。
+export function computeExpectedValueLabels(rankedOutcomes, snapshot) {
+  const oddsCurrent = snapshot?.europeanOdds?.current;
+  if (!oddsCurrent || !rankedOutcomes?.length) return null;
+  const oddsByCode = {
+    "3": Number(oddsCurrent.home),
+    "1": Number(oddsCurrent.draw),
+    "0": Number(oddsCurrent.away)
+  };
+  const labels = rankedOutcomes.map((outcome) => {
+    const odds = oddsByCode[outcome.code];
+    if (!Number.isFinite(odds) || odds <= 1) {
+      return { code: outcome.code, label: outcome.label, ev: null, odds: null, valueBet: false };
+    }
+    const ev = outcome.probability * odds - 1;
+    return {
+      code: outcome.code,
+      label: outcome.label,
+      odds: round(odds),
+      ev: round(ev),
+      valueBet: ev > 0.05,
+      verdict: ev > 0.15 ? "strong-value" : ev > 0.05 ? "value" : ev > -0.05 ? "fair" : "negative-ev"
+    };
+  });
+  return {
+    primary: labels[0] ?? null,
+    secondary: labels[1] ?? null,
+    all: labels
+  };
 }
 
 function adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, advancedData) {
