@@ -20,6 +20,7 @@
     "china:sources:sync": "node src/china-web-source-runner.js --sync-fixtures",
     "crawler:realtime": "node src/realtime-crawler-runner.js",
     "crawler:realtime:strict": "node src/realtime-crawler-runner.js --require-external-odds --require-full-odds",
+    "model:scorecard": "node scripts/run-model-scorecard.mjs",
     "daily": "node src/daily-evolution.js",
     "daily:allow-missing": "node src/daily-evolution.js --allow-missing-odds",
     "daily:no-web": "node src/daily-evolution.js --allow-missing-odds",

@@ -42,6 +42,11 @@ import { markovScoreMatrix, outcomesFromMatrix } from "./markov-match-simulator.
 import { findSimilarMatches } from "./similar-match-knn.js";
 import { performanceReport } from "./betting-performance.js";
 import { detectDistributionShift } from "./adversarial-validation.js";
+// I 档接入(2026-05-29)
+import { sharpenOdds } from "./multi-source-odds-sharpener.js";
+import { analyzeLineMovement } from "./line-movement-tracker.js";
+import { buildFormFeatures, buildMatchupFeatures } from "./form-momentum-features.js";
+import { attentionWeightedForm } from "./sequence-attention.js";
 
 export function createDeepPipeline(opts = {}) {
   const {
@@ -51,7 +56,11 @@ export function createDeepPipeline(opts = {}) {
     temperature = 1.0,
     kellyFraction: kFrac = 0.25,
     bankrollSize = 1000,
-    weights = null
+    weights = null,
+    // I 档:可选的球队图 embedding(避免每场都重建)
+    teamGraphEmbedding = null,
+    // 可选的历史比赛(给 KNN + form-momentum 用)
+    historicalMatches = []
   } = opts;
 
   // 预计算 calibrator(若没传)
@@ -73,9 +82,61 @@ export function createDeepPipeline(opts = {}) {
         steps: {}
       };
 
-      // STEP 1: 基础概率(已经过 DC + odds blend)
-      const baseProbabilities = options.baseProbabilities ?? oddsToProbs(marketSnapshot?.europeanOdds?.current);
+      // STEP 1: 基础概率(I 档升级:优先用多源 sharpened 共识,否则 fallback 单源 odds)
+      let baseProbabilities;
+      if (options.multiSourceOdds?.length >= 2) {
+        const sharpened = sharpenOdds(options.multiSourceOdds);
+        if (sharpened.ok) {
+          baseProbabilities = sharpened.fairProbabilities;
+          result.steps.sharpener = {
+            sources: sharpened.sourceCount,
+            consensus: sharpened.marketConsensus,
+            avgVig: sharpened.averageVig
+          };
+        }
+      }
+      if (!baseProbabilities) {
+        baseProbabilities = options.baseProbabilities ?? oddsToProbs(marketSnapshot?.europeanOdds?.current);
+      }
       result.steps.base = baseProbabilities;
+
+      // STEP 1.5(I 档新增): Line Movement 信号
+      if (options.oddsSnapshots?.length >= 2) {
+        const lm = analyzeLineMovement({ fixtureId: fixture.id, snapshots: options.oddsSnapshots });
+        if (lm.ok) {
+          result.steps.lineMovement = {
+            isSteam: lm.isSteam,
+            reverseLineMove: lm.reverseLineMove,
+            sharpOnOutcomes: lm.sharpOnOutcomes,
+            interpretation: lm.interpretation
+          };
+        }
+      }
+
+      // STEP 1.6(I 档新增): Form Momentum + Attention Weighted Form
+      if (options.homeRecentMatches?.length || options.awayRecentMatches?.length) {
+        const homeFeat = options.homeRecentMatches?.length ? buildFormFeatures(options.homeRecentMatches) : null;
+        const awayFeat = options.awayRecentMatches?.length ? buildFormFeatures(options.awayRecentMatches) : null;
+        result.steps.formFeatures = { home: homeFeat, away: awayFeat };
+        if (homeFeat && awayFeat) {
+          result.steps.matchupFeatures = buildMatchupFeatures(homeFeat, awayFeat);
+        }
+        // Attention-weighted form against the specific opponent type
+        const opponentRating = Number(options.opponentRating ?? 1500);
+        if (options.homeRecentMatches?.length) {
+          result.steps.homeAttentionForm = attentionWeightedForm(options.homeRecentMatches, { opponentRating, isHome: true });
+        }
+        if (options.awayRecentMatches?.length) {
+          result.steps.awayAttentionForm = attentionWeightedForm(options.awayRecentMatches, { opponentRating, isHome: false });
+        }
+      }
+
+      // STEP 1.7(I 档新增): GNN 球队相似检索
+      if (teamGraphEmbedding?.ok) {
+        const homeSim = teamGraphEmbedding.nearestTo(fixture.homeTeam, 5);
+        const awaySim = teamGraphEmbedding.nearestTo(fixture.awayTeam, 5);
+        result.steps.graphSimilarity = { home: homeSim, away: awaySim };
+      }
 
       // STEP 2: 调用所有模型
       const modelPredictions = collectAllModelPredictions(fixture, ratingsBootstrap, baseProbabilities, advancedData);
