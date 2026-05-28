@@ -10,6 +10,21 @@ export function buildBankrollRisk(prediction, env = process.env) {
   if (!Number.isFinite(odds) || odds <= 1 || !Number.isFinite(probability) || probability <= 0) {
     return { enabled: true, decision: "跳过", reason: "缺少可计算 EV/凯利的欧赔或概率" };
   }
+  // 冷启动 / 高级数据未就绪时,模型概率不可靠,
+  // 拿真实市场赔率去算 EV 会给出严重误导性的"全负 EV"或"巨正 EV"。
+  // 在此状态下只输出 odds + probability 让人参考,不输出 EV/凯利结论。
+  const dcColdStart = Boolean(prediction?.dixonColes?.source?.includes("cold-start"));
+  const externalReady = Boolean(prediction?.advancedFeatures?.external?.readiness?.ready);
+  if (dcColdStart && !externalReady) {
+    return {
+      enabled: true,
+      decision: "观察(冷启动)",
+      reason: "Dixon-Coles 冷启动且高级数据未就绪;EV/凯利在此状态下不可信,只列出赔率和概率",
+      coldStart: true,
+      decimalOdds: round(odds, 4),
+      probability: round(probability, 4),
+    };
+  }
   const ev = round(probability * odds - 1, 4);
   const rawKelly = round((probability * odds - 1) / (odds - 1), 4);
   const maxKellyFraction = finiteNumber(env.BANKROLL_MAX_KELLY_FRACTION, 0.25);

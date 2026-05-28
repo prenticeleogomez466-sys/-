@@ -467,11 +467,22 @@ function buildFourteenPlan(predictions) {
   const selected = predictions.filter((prediction) => prediction.fixture.marketType === "shengfucai" || prediction.fixture.tags.includes("14场胜负彩")).slice(0, 14);
   const source = selected.length ? selected : predictions.slice(0, 14);
   const rules = fourteenSelectionRules();
+  // 冷启动模式:当所有 prediction 都没有真实高级数据(quality.score 一律 D 级 ≤ 62),
+  // 严格 quality 门槛会过滤所有场次到 0 胆。这时改用更严格的概率/置信筛选,
+  // 让模型仍能基于赔率给出胆材,同时维持"不容易给胆"的保守特性。
+  const coldStartAll = source.every((p) => (p.advancedFeatures?.quality?.score ?? 0) < 62);
   const bankerIndexes = new Set(
     source
       .map((prediction, index) => ({ index, prediction, gap: prediction.pick.probability - prediction.secondaryPick.probability }))
       .filter((item) => item.gap >= rules.bankerMinGap && item.prediction.confidence >= rules.bankerMinConfidence)
-      .filter((item) => item.prediction.risk !== "高" && (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62)
+      .filter((item) => {
+        if (item.prediction.risk === "高") return false;
+        const qualityOk = (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62;
+        if (qualityOk) return true;
+        // 冷启动放宽:gap ≥ 0.35 且置信 ≥ 65 也允许进强胆池,但单独打 cold-start 标签
+        if (coldStartAll && item.gap >= 0.35 && item.prediction.confidence >= 65) return true;
+        return false;
+      })
       .sort((a, b) => b.gap - a.gap || b.prediction.confidence - a.prediction.confidence)
       .slice(0, rules.maxBankers)
       .map((item) => item.index)

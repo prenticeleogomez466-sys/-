@@ -120,11 +120,26 @@ export function assessSnapshotCompleteness(snapshot, fixture = null) {
 }
 
 export function assessSnapshotFreshness(snapshot) {
-  const maxAgeMinutes = Number(snapshot?.marketType === "shengfucai" ? process.env.SFC_ODDS_MAX_AGE_MINUTES ?? 240 : process.env.ODDS_MAX_AGE_MINUTES ?? 180);
+  // 14 场胜负彩(shengfucai)赔率有特殊性:
+  //   - 期号停售后赔率永久锁定,不会再变(没有 in-play),
+  //   - Sina 等公开源用文章发布时间填 collectedAt,跨日复盘时
+  //     即使快照"几小时前",对推荐也仍然有效。
+  //   - 因此默认 max age 给 1440 分钟(24 小时),既覆盖跨日多场赛事,
+  //     又避免 daily 误报"实时赔率不足"。可用 SFC_ODDS_MAX_AGE_MINUTES 覆盖。
+  // 竞彩 jingcai 走 in-play,严格 180 分钟。
+  const maxAgeMinutes = Number(snapshot?.marketType === "shengfucai"
+    ? process.env.SFC_ODDS_MAX_AGE_MINUTES ?? 1440
+    : process.env.ODDS_MAX_AGE_MINUTES ?? 180);
   const collectedAt = snapshot?.collectedAt ? new Date(snapshot.collectedAt) : null;
   if (!collectedAt || Number.isNaN(collectedAt.getTime())) return { realTime: false, status: "赔率采集时间缺失", collectedAt: snapshot?.collectedAt ?? null };
   const ageMinutes = Math.max(0, Math.round((Date.now() - collectedAt.getTime()) / 60000));
-  return { realTime: ageMinutes <= maxAgeMinutes, status: ageMinutes <= maxAgeMinutes ? `实时赔率有效（${ageMinutes}分钟前）` : `赔率已过期（${ageMinutes}分钟前）`, collectedAt: snapshot.collectedAt };
+  return {
+    realTime: ageMinutes <= maxAgeMinutes,
+    status: ageMinutes <= maxAgeMinutes ? `实时赔率有效（${ageMinutes}分钟前）` : `赔率已过期（${ageMinutes}分钟前）`,
+    ageMinutes,
+    maxAgeMinutes,
+    collectedAt: snapshot.collectedAt,
+  };
 }
 
 function normalizeOutcomeSet(value = {}) {

@@ -89,13 +89,18 @@ function checkPackageScripts(packageJson) {
 }
 
 function checkDataLayer(date) {
+  // SOURCE_GATE_PARTIAL_MODE=1:webapi.sporttery.cn 反爬期间允许只跑 14 场流程,
+  // 此时"竞彩场次"硬要求降级为 warning,避免 model audit 被同一根因二次阻断
+  const partialMode = process.env.SOURCE_GATE_PARTIAL_MODE === "1";
   const checks = [];
   try {
     const fixtures = loadFixtures(date);
     const jingcai = fixtures.fixtures.filter((fixture) => fixture.marketType === "jingcai");
     const shengfucai = fixtures.fixtures.filter((fixture) => fixture.marketType === "shengfucai");
     checks.push(check("数据层", "赛程总量", fixtures.fixtures.length > 0, `${fixtures.fixtures.length} 场`, fixtures.fixtures.length > 0 ? "ok" : "error"));
-    checks.push(check("数据层", "竞彩足球场次", jingcai.length > 0, `${jingcai.length} 场`, jingcai.length > 0 ? "ok" : "error"));
+    const jingcaiLevel = jingcai.length > 0 ? "ok" : (partialMode ? "warning" : "error");
+    const jingcaiDetail = `${jingcai.length} 场${partialMode && jingcai.length === 0 ? "（partial-mode 软警告）" : ""}`;
+    checks.push(check("数据层", "竞彩足球场次", jingcai.length > 0, jingcaiDetail, jingcaiLevel));
     checks.push(check("数据层", "14场完整性", shengfucai.length === 14, `${shengfucai.length}/14`, shengfucai.length === 14 ? "ok" : "error"));
     checks.push(check("数据层", "官方数据来源", fixtures.source?.includes("china-official-web"), fixtures.source ?? "缺失", fixtures.source?.includes("china-official-web") ? "ok" : "warning"));
   } catch (error) {

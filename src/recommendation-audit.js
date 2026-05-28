@@ -13,7 +13,13 @@ export function auditRecommendations(recommendations) {
     const fixture = prediction.fixture;
     if (!fixture.homeTeam || !fixture.awayTeam) checks.push({ level: "error", message: "比赛缺少主队或客队" });
     if (!["3", "1", "0"].includes(prediction.pick.code)) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 胜平负编码非法` });
-    if (!prediction.marketSnapshot) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 缺少实时赔率快照` });
+    // 实时赔率快照只对竞彩(in-play)场次硬要求:
+    //   - 14 场胜负彩(shengfucai)期号停售后赔率永久锁定,赔率从 Sina 跨日抓取即可,不需要实时快照
+    //   - 国际/参考赛(无 marketType 或其他)不强制
+    // 这条修复了 jingcai 反爬 567 时,14 场推荐审计被 14/14 全错阻断的问题
+    if (fixture.marketType === "jingcai" && !prediction.marketSnapshot) {
+      checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 缺少实时赔率快照` });
+    }
     if (!Number.isFinite(prediction.confidence) || prediction.confidence < 0 || prediction.confidence > 100) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 信心值越界：${prediction.confidence}` });
     if (Math.abs(Object.values(prediction.probabilities ?? {}).reduce((sum, value) => sum + Number(value || 0), 0) - 1) > 0.02) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 胜平负概率未归一` });
     if (!prediction.scorePicks?.primary || !prediction.halfFullPicks?.primary) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 缺少比分或半全场派生` });

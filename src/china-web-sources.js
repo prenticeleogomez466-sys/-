@@ -15,6 +15,27 @@ const REQUEST_HEADERS = {
   Accept: "application/json,text/html,application/xhtml+xml"
 };
 
+// webapi.sporttery.cn 的 WAF 偶尔会对裸 Node 流量返回 HTTP 567 反爬挑战页。
+// 用户可以从浏览器开发者工具复制一段已通过挑战的 Cookie 串
+// 并放到 D:\football-model-data\local.env 里:
+//   WEBAPI_SPORTTERY_COOKIE=cookie1=value1; cookie2=value2
+// 抓取时就会带上,直到 cookie 过期或 WAF 策略变化。
+// 同样支持 LOTTERY_GOV_CN_COOKIE(站点同源,有时会用不同 cookie)。
+// 同时把 UA / Origin 配成最近版 Chrome,降低被直接 reset 的概率。
+function jingcaiRequestHeaders() {
+  const headers = {
+    "User-Agent": process.env.WEBAPI_SPORTTERY_USER_AGENT
+      ?? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36",
+    Accept: "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    Origin: "https://www.lottery.gov.cn",
+    Referer: "https://www.lottery.gov.cn/jc/jsq/zqspf/",
+  };
+  const cookie = [process.env.WEBAPI_SPORTTERY_COOKIE, process.env.LOTTERY_GOV_CN_COOKIE].filter(Boolean).join("; ");
+  if (cookie) headers.Cookie = cookie;
+  return headers;
+}
+
 export async function readChinaWebSources(date, options = {}) {
   const normalizedDate = safeDate(date);
   const fetchImpl = options.fetch ?? globalThis.fetch;
@@ -90,11 +111,9 @@ async function readJingcaiSource(date, fetchImpl, options) {
     apiUrl: "https://webapi.sporttery.cn/gateway/uniform/football/getMatchCalculatorV1.qry?channel=c"
   };
   const fetchedAt = new Date().toISOString();
+  const jingcaiHeaders = jingcaiRequestHeaders();
   try {
-    const payload = await fetchJson(fetchImpl, source.apiUrl, {
-      Referer: source.pageUrl,
-      ...REQUEST_HEADERS
-    });
+    const payload = await fetchJson(fetchImpl, source.apiUrl, jingcaiHeaders);
     const matchInfoList = Array.isArray(payload.value?.matchInfoList) ? payload.value.matchInfoList : [];
     const rawMatches = matchInfoList.flatMap((day) => Array.isArray(day.subMatchList) ? day.subMatchList : []);
     const matchesForDate = rawMatches.filter((match) => safeDateOrNull(match.businessDate) === date);
@@ -102,7 +121,7 @@ async function readJingcaiSource(date, fetchImpl, options) {
 
     if (options.withHistories) {
       for (const match of matchesForDate) {
-        historyByMatchId.set(String(match.matchId), await readJingcaiHistories(fetchImpl, source.pageUrl, match.matchId));
+        historyByMatchId.set(String(match.matchId), await readJingcaiHistories(fetchImpl, source.pageUrl, match.matchId, jingcaiHeaders));
       }
     }
 
