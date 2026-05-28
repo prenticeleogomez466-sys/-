@@ -43,7 +43,10 @@ function Invoke-Step([string]$Name, [string]$Command, [bool]$AllowFailure = $fal
   $Started = Get-Date
   Push-Location $Root
   try {
-    $Output = & powershell -NoProfile -ExecutionPolicy Bypass -Command $Command 2>&1
+    # Use cmd.exe instead of nested powershell:
+    # avoids child-PS SetConsoleWindowTitle host corruption (seen 2026-05-28),
+    # and avoids PS 5.1 NativeCommandError wrapping that flags OK exits as failure.
+    $Output = & cmd.exe /d /c "$Command 2>&1"
     $ExitCode = $LASTEXITCODE
     if ($null -eq $ExitCode) { $ExitCode = 0 }
     foreach ($Line in $Output) { Write-Log ([string]$Line) }
