@@ -7,6 +7,26 @@ import { loadFixtures } from "./fixture-store.js";
 import { saveAdvancedData } from "./advanced-data-store.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 import { fetchAuthorizedFixtureLayer } from "./authorized-source-fetcher.js";
+import { syncFotmobAllLayers } from "./public-football-data.js";
+
+// 三个 sync* 内共享同一份 fotmob 兜底结果 — 避免每层都各自发 day-index + matchDetails。
+// syncFotmobAllLayers 内部已经有文件+内存级缓存,这里再加一层是为了避免重复的 extract 工作。
+let memoizedFotmobLayers = null;
+let memoizedFotmobKey = null;
+
+async function getFotmobLayersMemoized(date, fixtures, fetchImpl, env) {
+  const key = `${date}:${fixtures.length}`;
+  if (memoizedFotmobKey === key && memoizedFotmobLayers) return memoizedFotmobLayers;
+  memoizedFotmobLayers = await syncFotmobAllLayers(date, fixtures, fetchImpl, env);
+  memoizedFotmobKey = key;
+  return memoizedFotmobLayers;
+}
+
+// 测试 hook:在单测中清除 memoize,确保各测试独立
+export function __resetAdvancedRunnerMemoForTests() {
+  memoizedFotmobLayers = null;
+  memoizedFotmobKey = null;
+}
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -116,66 +136,88 @@ async function syncApiFootballFixtureIndex(date, fixtures, fetchImpl, env) {
 
 async function syncInjuries(date, fixtures, fetchImpl, env, apiFootballFixtures) {
   const generic = await syncGenericFixtureLayer("injuries", "INJURY_SOURCE_URL", date, fixtures, fetchImpl, env);
-  if (generic.ok || !env.API_FOOTBALL_KEY) return generic;
-  const fixtureData = {};
-  let count = 0;
-  await Promise.all(fixtures.map(async (fixture) => {
-    const apiFixtureId = apiFootballFixtures.fixtureData?.[fixture.id]?.fixture?.id;
-    if (!apiFixtureId) return;
-    try {
-      const payload = await fetchApiFootballPath(fetchImpl, "injuries", env.API_FOOTBALL_KEY, { fixture: apiFixtureId });
-      const rows = Array.isArray(payload.response) ? payload.response : [];
-      fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, injuries: rows };
-      count += 1;
-    } catch (error) {
-      fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, error: error.message };
-    }
-  }));
-  return { ok: count > 0, source: "API-Football injuries", count, fixtureData, warning: count ? null : generic.warning ?? "API-Football 未匹配伤停" };
+  if (generic.ok) return generic;
+  if (env.API_FOOTBALL_KEY) {
+    const fixtureData = {};
+    let count = 0;
+    await Promise.all(fixtures.map(async (fixture) => {
+      const apiFixtureId = apiFootballFixtures.fixtureData?.[fixture.id]?.fixture?.id;
+      if (!apiFixtureId) return;
+      try {
+        const payload = await fetchApiFootballPath(fetchImpl, "injuries", env.API_FOOTBALL_KEY, { fixture: apiFixtureId });
+        const rows = Array.isArray(payload.response) ? payload.response : [];
+        fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, injuries: rows };
+        count += 1;
+      } catch (error) {
+        fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, error: error.message };
+      }
+    }));
+    if (count > 0) return { ok: true, source: "API-Football injuries", count, fixtureData };
+  }
+  // Public fallback: fotmob 匹配赛程,拿伤停清单
+  if (env.FOTMOB_PUBLIC_ENABLED !== "0") {
+    const fotmob = await getFotmobLayersMemoized(date, fixtures, fetchImpl, env);
+    if (fotmob.injuries.ok) return fotmob.injuries;
+  }
+  return { ok: false, source: generic.source ?? "INJURY_SOURCE_URL", count: 0, fixtureData: {}, warning: generic.warning ?? "未配置 INJURY_SOURCE_URL/API_FOOTBALL_KEY 且 fotmob 无匹配" };
 }
 
 async function syncLineups(date, fixtures, fetchImpl, env, apiFootballFixtures) {
   const generic = await syncGenericFixtureLayer("lineups", "LINEUP_SOURCE_URL", date, fixtures, fetchImpl, env);
-  if (generic.ok || !env.API_FOOTBALL_KEY) return generic;
-  const fixtureData = {};
-  let count = 0;
-  await Promise.all(fixtures.map(async (fixture) => {
-    const apiFixtureId = apiFootballFixtures.fixtureData?.[fixture.id]?.fixture?.id;
-    if (!apiFixtureId) return;
-    try {
-      const payload = await fetchApiFootballPath(fetchImpl, "fixtures/lineups", env.API_FOOTBALL_KEY, { fixture: apiFixtureId });
-      const rows = Array.isArray(payload.response) ? payload.response : [];
-      fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, lineups: rows };
-      if (rows.length) count += 1;
-    } catch (error) {
-      fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, error: error.message };
-    }
-  }));
-  return { ok: count > 0, source: "API-Football lineups", count, fixtureData, warning: count ? null : generic.warning ?? "API-Football 未返回预计/确认首发" };
+  if (generic.ok) return generic;
+  if (env.API_FOOTBALL_KEY) {
+    const fixtureData = {};
+    let count = 0;
+    await Promise.all(fixtures.map(async (fixture) => {
+      const apiFixtureId = apiFootballFixtures.fixtureData?.[fixture.id]?.fixture?.id;
+      if (!apiFixtureId) return;
+      try {
+        const payload = await fetchApiFootballPath(fetchImpl, "fixtures/lineups", env.API_FOOTBALL_KEY, { fixture: apiFixtureId });
+        const rows = Array.isArray(payload.response) ? payload.response : [];
+        fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, lineups: rows };
+        if (rows.length) count += 1;
+      } catch (error) {
+        fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, error: error.message };
+      }
+    }));
+    if (count > 0) return { ok: true, source: "API-Football lineups", count, fixtureData };
+  }
+  if (env.FOTMOB_PUBLIC_ENABLED !== "0") {
+    const fotmob = await getFotmobLayersMemoized(date, fixtures, fetchImpl, env);
+    if (fotmob.lineups.ok) return fotmob.lineups;
+  }
+  return { ok: false, source: generic.source ?? "LINEUP_SOURCE_URL", count: 0, fixtureData: {}, warning: generic.warning ?? "未配置 LINEUP_SOURCE_URL/API_FOOTBALL_KEY 且 fotmob 无匹配" };
 }
 
 async function syncXg(date, fixtures, fetchImpl, env, apiFootballFixtures, formLayer = null) {
   const generic = await syncGenericFixtureLayer("xg", "XG_SOURCE_URL", date, fixtures, fetchImpl, env);
   if (generic.ok) return generic;
-  if (!env.API_FOOTBALL_KEY) return buildShotQualityXgLayer(fixtures, formLayer, generic);
-  const fixtureData = {};
-  let count = 0;
-  await Promise.all(fixtures.map(async (fixture) => {
-    const apiFixtureId = apiFootballFixtures.fixtureData?.[fixture.id]?.fixture?.id;
-    if (!apiFixtureId) return;
-    try {
-      const payload = await fetchApiFootballPath(fetchImpl, "fixtures/statistics", env.API_FOOTBALL_KEY, { fixture: apiFixtureId });
-      const parsed = parseApiFootballXg(payload.response, fixture);
-      if (parsed) {
-        fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, ...parsed };
-        count += 1;
+  if (env.API_FOOTBALL_KEY) {
+    const fixtureData = {};
+    let count = 0;
+    await Promise.all(fixtures.map(async (fixture) => {
+      const apiFixtureId = apiFootballFixtures.fixtureData?.[fixture.id]?.fixture?.id;
+      if (!apiFixtureId) return;
+      try {
+        const payload = await fetchApiFootballPath(fetchImpl, "fixtures/statistics", env.API_FOOTBALL_KEY, { fixture: apiFixtureId });
+        const parsed = parseApiFootballXg(payload.response, fixture);
+        if (parsed) {
+          fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, ...parsed };
+          count += 1;
+        }
+      } catch (error) {
+        fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, error: error.message };
       }
-    } catch (error) {
-      fixtureData[fixture.id] = { providerFixtureId: apiFixtureId, error: error.message };
-    }
-  }));
-  if (count === 0) return buildShotQualityXgLayer(fixtures, formLayer, generic);
-  return { ok: count > 0, source: "API-Football fixture statistics xG", count, fixtureData, warning: count ? null : generic.warning ?? "API-Football 统计未包含 xG；请配置 XG_SOURCE_URL" };
+    }));
+    if (count > 0) return { ok: true, source: "API-Football fixture statistics xG", count, fixtureData };
+  }
+  // 顺序:fotmob 公开 xG > football-data.co.uk 射门质量代理
+  // fotmob 通常是赛后真实统计或赛前 averageXg,精度高于纯射门代理。
+  if (env.FOTMOB_PUBLIC_ENABLED !== "0") {
+    const fotmob = await getFotmobLayersMemoized(date, fixtures, fetchImpl, env);
+    if (fotmob.xg.ok) return fotmob.xg;
+  }
+  return buildShotQualityXgLayer(fixtures, formLayer, generic);
 }
 
 async function fetchApiFootballPath(fetchImpl, path, apiKey, params = {}) {
