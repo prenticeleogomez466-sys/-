@@ -31,6 +31,35 @@ export function calibrateProbabilities(probabilities, profile = emptyProfile(), 
     // 通过 backtest 训练出来,这条先验会被覆盖。
     return applyColdStartCalibration(normalized, favorite, bucket, profile.reason);
   }
+  // 优先级 0(新增 2026-05-28):isotonic regression 映射
+  // 学术界对 calibration 的标准做法。从 (predicted, actual) 对学单调非递减映射,
+  // 比 "bucket shift" 精度高。仅在样本 ≥30(buildIsotonicMap 时已经检查)时启用。
+  if (profile.isotonicMap?.knots?.length) {
+    const isotonicTarget = applyIsotonicMap(profile.isotonicMap, favorite.probability);
+    if (Number.isFinite(isotonicTarget)) {
+      const clamped = clamp(
+        isotonicTarget,
+        Math.max(1 / 3, favorite.probability - profile.maxShift * 1.5),
+        Math.min(0.85, favorite.probability + profile.maxShift * 1.5)
+      );
+      const calibrated = moveFavoriteProbability(normalized, favorite.key, clamped);
+      return {
+        probabilities: calibrated,
+        calibration: {
+          applied: true,
+          source: "isotonic-regression",
+          scope: "isotonic",
+          bucket,
+          samples: profile.isotonicMap.samples,
+          adjustment: round(clamped - favorite.probability),
+          context: {
+            marketType: context.fixture?.marketType ?? "",
+            competition: context.fixture?.competition ?? ""
+          }
+        }
+      };
+    }
+  }
   const competition = context.fixture?.competition ?? "";
   const competitionRule = profile.byCompetition?.[competition];
   const bucketRule = profile.buckets?.[bucket];
@@ -80,6 +109,13 @@ export function buildCalibrationProfileFromRows(rows, options = {}) {
   const maxShift = Number(options.maxShift ?? 0.055);
   const global = buildRule(settled, maxShift);
   const buckets = Object.fromEntries(["33-45", "45-55", "55-65", "65-100"].map((bucket) => [bucket, buildRule(settled.filter((row) => row.bucket === bucket), maxShift)]));
+  // 新增:Isotonic regression 映射(2026-05-28 B 档 #1)
+  // 在样本足够时(≥30)从 (predicted_probability, hit:0/1) 学一个单调非递减映射,
+  // 比 "bucket shift adjustment" 更精细。calibrateProbabilities 会优先用 isotonic,
+  // 失败时回退到 bucket/global rules,再回退到 cold-start prior。
+  const isotonicMap = settled.length >= Number(options.minIsotonicSamples ?? 30)
+    ? buildIsotonicMap(settled.map((row) => ({ predicted: row.favorite.probability, actual: row.hit ? 1 : 0 })))
+    : null;
   return normalizeProfile({
     source: "daily-recap-ledger",
     generatedAt: new Date().toISOString(),
@@ -91,10 +127,76 @@ export function buildCalibrationProfileFromRows(rows, options = {}) {
     maxShift,
     global,
     buckets,
+    isotonicMap,
     byRisk: groupRules(settled, (row) => row.risk || "unknown", maxShift),
     byMarketType: groupRules(settled, (row) => row.marketType || "unknown", maxShift),
     byCompetition: groupRules(settled, (row) => row.competition || "unknown", maxShift)
   });
+}
+
+// Isotonic regression via Pool Adjacent Violators (PAV).
+// 输入:[{ predicted: 0.x, actual: 0|1 }, ...]  (任意顺序)
+// 输出:{ knots: [{ predicted, calibrated }, ...] } — 单调非递减的分段常数映射
+// 复杂度 O(n log n) 排序 + O(n) PAV 合并。
+export function buildIsotonicMap(observations) {
+  if (!Array.isArray(observations) || observations.length === 0) return null;
+  const sorted = observations
+    .filter((row) => Number.isFinite(row.predicted) && Number.isFinite(row.actual))
+    .map((row) => ({ predicted: row.predicted, actual: row.actual }))
+    .sort((a, b) => a.predicted - b.predicted);
+  if (sorted.length < 2) return null;
+  // 初始化每个点为单独 block (weight=1, mean=actual)
+  const blocks = sorted.map((row) => ({
+    minPredicted: row.predicted,
+    maxPredicted: row.predicted,
+    weight: 1,
+    mean: row.actual
+  }));
+  // PAV: 从左到右合并违反单调性的相邻 block
+  let i = 0;
+  while (i < blocks.length - 1) {
+    if (blocks[i].mean > blocks[i + 1].mean) {
+      const merged = {
+        minPredicted: blocks[i].minPredicted,
+        maxPredicted: blocks[i + 1].maxPredicted,
+        weight: blocks[i].weight + blocks[i + 1].weight,
+        mean: (blocks[i].mean * blocks[i].weight + blocks[i + 1].mean * blocks[i + 1].weight) / (blocks[i].weight + blocks[i + 1].weight)
+      };
+      blocks.splice(i, 2, merged);
+      if (i > 0) i--;
+    } else {
+      i++;
+    }
+  }
+  return {
+    knots: blocks.map((b) => ({
+      predictedMin: round(b.minPredicted),
+      predictedMax: round(b.maxPredicted),
+      calibrated: round(b.mean),
+      weight: b.weight
+    })),
+    samples: sorted.length
+  };
+}
+
+// 给一个预测概率,从 isotonic map 取校准后的概率。线性插值用 block 边界。
+export function applyIsotonicMap(map, predicted) {
+  if (!map?.knots?.length || !Number.isFinite(predicted)) return null;
+  const knots = map.knots;
+  // 边界处理
+  if (predicted <= knots[0].predictedMin) return knots[0].calibrated;
+  if (predicted >= knots[knots.length - 1].predictedMax) return knots[knots.length - 1].calibrated;
+  // 找命中 block,直接返回(分段常数)。如果在 block 之间的"空隙",做线性插值。
+  for (let i = 0; i < knots.length; i++) {
+    if (predicted >= knots[i].predictedMin && predicted <= knots[i].predictedMax) {
+      return knots[i].calibrated;
+    }
+    if (i < knots.length - 1 && predicted > knots[i].predictedMax && predicted < knots[i + 1].predictedMin) {
+      const t = (predicted - knots[i].predictedMax) / (knots[i + 1].predictedMin - knots[i].predictedMax);
+      return knots[i].calibrated + t * (knots[i + 1].calibrated - knots[i].calibrated);
+    }
+  }
+  return null;
 }
 
 function toCalibrationRow(row) {
@@ -147,6 +249,7 @@ function normalizeProfile(profile) {
     maxShift: Number(profile.maxShift ?? 0.055),
     global: profile.global ?? { samples: 0, adjustment: 0 },
     buckets: profile.buckets ?? {},
+    isotonicMap: profile.isotonicMap ?? null,
     byRisk: profile.byRisk ?? {},
     byMarketType: profile.byMarketType ?? {},
     byCompetition: profile.byCompetition ?? {}

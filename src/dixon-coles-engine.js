@@ -135,6 +135,7 @@ export function predictFromFitted(fitted, fixture) {
     homeAdv: fitted.homeAdvantage,
     baseRate: fitted.baseRate,
     rho: fitted.rho ?? -0.08,
+    tauModel: fitted.tauModel ?? (process.env.DC_TAU_MODEL ?? "dixon-coles"),
   });
 
   const probs = outcomeProbs(matrix);
@@ -227,16 +228,17 @@ export function resolveDcWeight(competition, weightProfile) {
 
 // ───── Dixon-Coles 核心 ─────
 
-function scoreMatrix(p) {
+export function scoreMatrix(p) {
   const lambda = p.baseRate * p.attackHome * p.defenseAway * p.homeAdv;
   const mu = p.baseRate * p.attackAway * p.defenseHome;
   const rho = p.rho ?? -0.08;
+  const tauFn = p.tauModel === "extended" ? extendedTau : tau;
   const matrix = [];
   let total = 0;
   for (let h = 0; h <= MAX_GOALS; h++) {
     matrix[h] = [];
     for (let a = 0; a <= MAX_GOALS; a++) {
-      const prob = poissonPmf(h, lambda) * poissonPmf(a, mu) * tau(h, a, lambda, mu, rho);
+      const prob = poissonPmf(h, lambda) * poissonPmf(a, mu) * tauFn(h, a, lambda, mu, rho);
       matrix[h][a] = Math.max(prob, 0);
       total += matrix[h][a];
     }
@@ -245,11 +247,35 @@ function scoreMatrix(p) {
   return { matrix, lambda, mu };
 }
 
+// 原始 Dixon-Coles tau:仅对 (0,0), (0,1), (1,0), (1,1) 做修正,
+// 把双低比分概率往 0-0/1-1 推。其他比分 tau = 1。
 function tau(hg, ag, lambda, mu, rho) {
   if (hg === 0 && ag === 0) return 1 - lambda * mu * rho;
   if (hg === 0 && ag === 1) return 1 + lambda * rho;
   if (hg === 1 && ag === 0) return 1 + mu * rho;
   if (hg === 1 && ag === 1) return 1 - rho;
+  return 1;
+}
+
+// 扩展 tau (Mar-Co / Sarmanov / Michels 2025 风格):
+// 把 rho 影响延伸到 (0..2) × (0..2) 范围 9 个点,同时对高比分 (3+ vs 3+) 做反向微调。
+// 数学动机:Michels 2025 证明 tau 不只能往低比分推,也能反向。这条对 Over/Under 玩法尤其有用 ─
+// 当 rho < 0,模型本身偏向防守平局型;扩展 tau 让 (2,1)/(1,2) 也享受概率提升,
+// 减弱"所有进球场都往 1-1 跑"的偏差。
+function extendedTau(hg, ag, lambda, mu, rho) {
+  // 原 4 点保持兼容
+  if (hg === 0 && ag === 0) return 1 - lambda * mu * rho;
+  if (hg === 0 && ag === 1) return 1 + lambda * rho;
+  if (hg === 1 && ag === 0) return 1 + mu * rho;
+  if (hg === 1 && ag === 1) return 1 - rho;
+  // 新增 5 点(对称 + 折扣 0.5):(2,0)/(0,2)/(2,1)/(1,2)/(2,2)
+  if (hg === 2 && ag === 0) return 1 + 0.5 * mu * rho;
+  if (hg === 0 && ag === 2) return 1 + 0.5 * lambda * rho;
+  if (hg === 2 && ag === 1) return 1 + 0.3 * rho;
+  if (hg === 1 && ag === 2) return 1 + 0.3 * rho;
+  if (hg === 2 && ag === 2) return 1 - 0.3 * rho;
+  // 高比分 (3+, 3+):反向微调,补偿低比分增强后总和上偏
+  if (hg >= 3 && ag >= 3) return 1 + 0.1 * rho;
   return 1;
 }
 
