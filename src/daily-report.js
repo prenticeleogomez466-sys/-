@@ -229,6 +229,11 @@ function toLedgerRow(prediction) {
     bankrollDecision: prediction.bankroll?.decision ?? "",
     ev: prediction.bankroll?.ev ?? null,
     stakeUnitsPer100: prediction.bankroll?.stakeUnitsPer100 ?? null,
+    // D 档接入(2026-05-28):ensembleView 概率落盘,backtest 算其 RPS 跟主路径对比
+    ensembleHome: prediction.ensembleView?.probabilities?.home ?? "",
+    ensembleDraw: prediction.ensembleView?.probabilities?.draw ?? "",
+    ensembleAway: prediction.ensembleView?.probabilities?.away ?? "",
+    ensembleMethods: prediction.ensembleView?.methodCount ?? 0,
     reason: prediction.rationale,
     actual: outcomeCodeToChinese(actual),
     actualScore: fixture.result ? `${fixture.result.home}-${fixture.result.away}` : "",

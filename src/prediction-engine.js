@@ -6,6 +6,8 @@ import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
+import { buildEnsemblePrediction } from "./ratings-ensemble.js";
+import { bootstrapRatings } from "./ratings-bootstrap.js";
 import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
 import { applyLayer2Signals } from "./feature-enhancers.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
@@ -39,12 +41,30 @@ export function recommendFixtures(date) {
   const advancedData = loadAdvancedData(fixtureSet.date);
   const calibrationProfile = loadCalibrationProfile();
   const dixonColesFitted = fitFromFixtureStore();
-  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted })));
+  // D 档接入(2026-05-28):一次性加载所有评级,传给 predictFixture 算 ensembleView.
+  // 失败时(样本不足等)bootstrap.* 字段为 null,不影响主路径.
+  let ratingsBootstrap = null;
+  try {
+    ratingsBootstrap = bootstrapRatings();
+  } catch {
+    // bootstrap 失败 → 跳过,主路径仍工作
+  }
+  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap })));
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
     fixtures: predictions.length,
     predictions,
+    ratingsBootstrap: ratingsBootstrap ? {
+      samples: ratingsBootstrap.samples,
+      methods: {
+        pi: ratingsBootstrap.pi?.ok ?? false,
+        massey: ratingsBootstrap.massey?.ok ?? false,
+        colley: ratingsBootstrap.colley?.ok ?? false,
+        bivariate: ratingsBootstrap.bivariate?.ok ?? false,
+        hierarchical: ratingsBootstrap.hierarchical?.ok ?? false
+      }
+    } : null,
     fourteen: buildFourteenPlan(predictions)
   };
 }
@@ -114,6 +134,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, blendResult.dcResult);
   const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, blendResult.dcResult);
   const expectedValue = computeExpectedValueLabels(ranked, snapshot);
+  // D 档接入(2026-05-28):用 bootstrap 传入的多评级算 ensembleView 作为 supplementary.
+  // 不替换 main 路径 — 主推荐仍走 calibrated probabilities;ensembleView 用于 backtest 对比和未来切主.
+  const ensembleView = options.ratingsBootstrap
+    ? buildEnsembleViewFromBootstrap(fixture, options.ratingsBootstrap, oddsProbabilities, blendResult.dcResult)
+    : null;
   const prediction = {
     fixture,
     baseProbabilities,
@@ -125,6 +150,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       expectedGoals: blendResult.dcResult?.expectedGoals,
       teamStrength: blendResult.dcResult?.teamStrength,
     } : null,
+    ensembleView,
     simulation,
     marketSnapshot: snapshot,
     advancedFeatures,
@@ -206,6 +232,53 @@ function probabilitiesFromOdds(odds) {
   const raw = { home: 1 / odds.home, draw: 1 / odds.draw, away: 1 / odds.away };
   const total = raw.home + raw.draw + raw.away;
   return { home: round(raw.home / total), draw: round(raw.draw / total), away: round(raw.away / total) };
+}
+
+// D 档接入:把每个评级模型的预测打包成 ensembleView,backtest 时算其 RPS 跟主路径对比.
+// 任何评级缺数据/失败 → 该方法 null,buildEnsemblePrediction 自动跳过.
+export function buildEnsembleViewFromBootstrap(fixture, bootstrap, oddsProbabilities, dcResult) {
+  if (!bootstrap) return null;
+  const preds = {};
+  // odds 隐含(无 stacker 时仍可作一票)
+  if (oddsProbabilities) preds.odds = oddsProbabilities;
+  // Dixon-Coles
+  if (dcResult?.probabilities) preds.dixonColes = dcResult.probabilities;
+  // Pi-ratings
+  if (bootstrap.pi?.ok && typeof bootstrap.pi.predictWinProb === "function") {
+    try {
+      const p = bootstrap.pi.predictWinProb(fixture.homeTeam, fixture.awayTeam);
+      if (p) preds.pi = { home: p.home, draw: p.draw, away: p.away };
+    } catch { /* graceful skip */ }
+  }
+  // Massey
+  if (bootstrap.massey?.ok && typeof bootstrap.massey.predictWinProb === "function") {
+    try {
+      const p = bootstrap.massey.predictWinProb(fixture.homeTeam, fixture.awayTeam);
+      if (p) preds.massey = { home: p.home, draw: p.draw, away: p.away };
+    } catch { /* */ }
+  }
+  // Colley
+  if (bootstrap.colley?.ok && typeof bootstrap.colley.predictWinProb === "function") {
+    try {
+      const p = bootstrap.colley.predictWinProb(fixture.homeTeam, fixture.awayTeam);
+      if (p) preds.colley = { home: p.home, draw: p.draw, away: p.away };
+    } catch { /* */ }
+  }
+  // Bivariate Poisson
+  if (bootstrap.bivariate?.ok && typeof bootstrap.bivariate.predict === "function") {
+    try {
+      const p = bootstrap.bivariate.predict(fixture.homeTeam, fixture.awayTeam);
+      if (p?.probabilities) preds.bivariatePoisson = p.probabilities;
+    } catch { /* */ }
+  }
+  const result = buildEnsemblePrediction(preds);
+  if (!result.ok) return null;
+  return {
+    probabilities: result.probabilities,
+    source: result.source,
+    methodCount: Object.keys(result.contributions).length,
+    contributions: result.contributions
+  };
 }
 
 // Expected Value 计算:

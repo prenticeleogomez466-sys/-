@@ -43,7 +43,23 @@ function buildProbabilityMetrics(rows) {
   const brier = rows.reduce((sum, row) => sum + brierScore(probabilitySet(row), actualCode(row)), 0) / rows.length;
   const logLoss = rows.reduce((sum, row) => sum + logLossScore(probabilitySet(row), actualCode(row)), 0) / rows.length;
   const rps = rows.reduce((sum, row) => sum + rankedProbabilityScore(probabilitySet(row), actualCode(row)), 0) / rows.length;
-  return { brier: round(brier), logLoss: round(logLoss), rps: round(rps) };
+  // D 档接入:同时算 ensemble probability 的 RPS,跟主路径对比
+  const ensRows = rows.filter((row) => ensembleSet(row));
+  let ensembleMetrics = null;
+  if (ensRows.length >= 5) {
+    const ensBrier = ensRows.reduce((sum, row) => sum + brierScore(ensembleSet(row), actualCode(row)), 0) / ensRows.length;
+    const ensRps = ensRows.reduce((sum, row) => sum + rankedProbabilityScore(ensembleSet(row), actualCode(row)), 0) / ensRows.length;
+    ensembleMetrics = {
+      samples: ensRows.length,
+      brier: round(ensBrier),
+      rps: round(ensRps),
+      versusMain: {
+        rpsDelta: round(ensRps - rps),
+        recommendation: ensRps < rps - 0.005 ? "切换主路径为 ensemble" : "保持主路径"
+      }
+    };
+  }
+  return { brier: round(brier), logLoss: round(logLoss), rps: round(rps), ensemble: ensembleMetrics };
 }
 
 function buildReliabilitySummary(rows) {
@@ -74,6 +90,17 @@ function probabilitySet(row) {
     "3": Number(row.probabilityHome),
     "1": Number(row.probabilityDraw),
     "0": Number(row.probabilityAway)
+  };
+  const total = probabilities["3"] + probabilities["1"] + probabilities["0"];
+  if (![probabilities["3"], probabilities["1"], probabilities["0"], total].every(Number.isFinite) || total <= 0) return null;
+  return { "3": probabilities["3"] / total, "1": probabilities["1"] / total, "0": probabilities["0"] / total };
+}
+
+function ensembleSet(row) {
+  const probabilities = {
+    "3": Number(row.ensembleHome),
+    "1": Number(row.ensembleDraw),
+    "0": Number(row.ensembleAway)
   };
   const total = probabilities["3"] + probabilities["1"] + probabilities["0"];
   if (![probabilities["3"], probabilities["1"], probabilities["0"], total].every(Number.isFinite) || total <= 0) return null;

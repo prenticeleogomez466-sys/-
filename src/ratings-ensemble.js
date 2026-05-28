@@ -29,11 +29,12 @@
  */
 
 const DEFAULT_WEIGHTS = {
-  elo: 0.15,
-  pi: 0.20,
-  massey: 0.15,
-  colley: 0.10,
-  dixonColes: 0.30,         // DC 权重最高,因为它的输出最完整(比分矩阵)
+  odds: 0.20,               // 赔率隐含(市场共识)是 ensemble 一票
+  elo: 0.12,
+  pi: 0.15,
+  massey: 0.10,
+  colley: 0.08,
+  dixonColes: 0.25,         // DC 权重最高,因为它的输出最完整(比分矩阵)
   bivariatePoisson: 0.10
 };
 
