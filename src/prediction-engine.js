@@ -111,8 +111,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
-  const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index);
-  const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks);
+  const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, blendResult.dcResult);
+  const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, blendResult.dcResult);
   const prediction = {
     fixture,
     baseProbabilities,
@@ -334,24 +334,125 @@ function seededProbabilities(fixture, index) {
   return { home: round(home / total), draw: round(draw / total), away: round(away / total) };
 }
 
-function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0) {
-  const primary = scoreFromMarket(snapshot, code);
-  const secondary = scoreFromMarket(snapshot, secondaryCode, new Set(primary ? [primary] : []));
+// 比分预测优先级:
+//   1. snapshot.scoreOdds.top  ── sporttery 官方比分赔率(市场共识,准确度最高)
+//   2. dcResult.topScores      ── Dixon-Coles 泊松矩阵 (用历史进球独立估计的概率)
+//   3. scoreForOutcome         ── if-else 硬编码 fallback(coldStart 或 DC 不可用时)
+//
+// 之前(2026-05-28 之前)只走 1 和 3,DC 拿到的 topScores 完全闲置 — 这就是"敷衍"的根本原因。
+function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, dcResult = null) {
+  const fromMarket = scoreFromMarket(snapshot, code);
+  const fromMarketSecondary = scoreFromMarket(snapshot, secondaryCode, new Set(fromMarket ? [fromMarket] : []));
+  const fromDc = fromMarket ? null : scoreFromDcResult(dcResult, code);
+  const exclusionForSecondary = new Set([fromMarket, fromDc].filter(Boolean));
+  const fromDcSecondary = fromMarketSecondary ? null : scoreFromDcResult(dcResult, secondaryCode, exclusionForSecondary);
   return {
-    primary: primary ?? scoreForOutcome(code, 0, probabilities, index),
-    secondary: secondary ?? scoreForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
+    primary: fromMarket ?? fromDc ?? scoreForOutcome(code, 0, probabilities, index),
+    secondary: fromMarketSecondary ?? fromDcSecondary ?? scoreForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
   };
 }
 
-function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, scorePicks = {}) {
+// 半全场预测优先级同上:市场 → DC 泊松半场分布 → 硬编码 fallback
+function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, scorePicks = {}, dcResult = null) {
   const primaryScore = scorePicks.primary ?? scoreForOutcome(code, 0, probabilities, index);
   const secondaryScore = scorePicks.secondary ?? scoreForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1);
-  const primary = halfFullFromMarket(snapshot, code, new Set(), primaryScore);
-  const secondary = halfFullFromMarket(snapshot, secondaryCode, new Set(primary ? [primary] : []), secondaryScore);
+  const primaryFromMarket = halfFullFromMarket(snapshot, code, new Set(), primaryScore);
+  const primaryFromDc = primaryFromMarket ? null : halfFullFromDcResult(dcResult, code, new Set(), primaryScore);
+  const exclusion = new Set([primaryFromMarket, primaryFromDc].filter(Boolean));
+  const secondaryFromMarket = halfFullFromMarket(snapshot, secondaryCode, exclusion, secondaryScore);
+  const secondaryFromDc = secondaryFromMarket ? null : halfFullFromDcResult(dcResult, secondaryCode, exclusion, secondaryScore);
   return {
-    primary: primary ?? halfFullForScore(primaryScore, code, 0, probabilities, index),
-    secondary: secondary ?? halfFullForScore(secondaryScore, secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
+    primary: primaryFromMarket ?? primaryFromDc ?? halfFullForScore(primaryScore, code, 0, probabilities, index),
+    secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullForScore(secondaryScore, secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
   };
+}
+
+// 从 Dixon-Coles 的 topScores(已经按概率从高到低排好)挑符合指定 outcome 的最高概率比分。
+// dcResult.topScores 形如 [{ score: "2-1", probability: 0.087 }, ...]
+export function scoreFromDcResult(dcResult, code, excluded = new Set()) {
+  if (!dcResult?.topScores?.length) return null;
+  for (const entry of dcResult.topScores) {
+    const score = String(entry.score ?? "").trim();
+    if (!score) continue;
+    if (scoreOutcomeCode(score) !== code) continue;
+    if (excluded.has(score)) continue;
+    return score;
+  }
+  return null;
+}
+
+// 半全场分布:DC 引擎给了全场 expectedGoals { home: λ, away: μ }。
+// 我们假设上半场进球率 ≈ 全场的 halfRatio(默认 0.46,这是英超/五大联赛大量历史数据
+// 上半场进球占比的稳定经验值)。下半场进球率 = 全场 - 上半场。
+// 半场和下半场进球独立(简化假设,实际有微弱负相关但量级小可忽略)。
+// 联合分布 -> 6 outcome 概率聚合,挑符合 final outcome 的最高 outcome,
+// 并保证跟 score 路径一致(scoreHalfFullConsistent)。
+export function halfFullFromDcResult(dcResult, code, excluded = new Set(), score = "") {
+  if (!dcResult?.expectedGoals) return null;
+  const halfRatio = Number(process.env.DC_HALF_RATIO ?? 0.46);
+  const probs = halfFullProbsFromLambdas(dcResult.expectedGoals.home, dcResult.expectedGoals.away, halfRatio);
+  const candidates = Object.entries(probs)
+    .filter(([halfFull]) => halfFullFinalOutcomeCode(halfFull) === code)
+    .filter(([halfFull]) => !excluded.has(halfFull))
+    .filter(([halfFull]) => !score || scoreHalfFullConsistent(score, halfFull))
+    .sort((a, b) => b[1] - a[1]);
+  return candidates[0]?.[0] ?? null;
+}
+
+// 输入全场 λ_home / μ_away,输出 9 个 outcome("主胜-主胜" 等)的概率字典。
+// 注意:有 3 个 outcome 在半全场玩法里不参与("主胜-客胜" 等),仍计算以方便测试。
+export function halfFullProbsFromLambdas(lambdaHome, muAway, halfRatio = 0.46, maxGoals = 5) {
+  const lambdaH1 = lambdaHome * halfRatio;
+  const muA1 = muAway * halfRatio;
+  const lambdaH2 = lambdaHome - lambdaH1;
+  const muA2 = muAway - muA1;
+  const distH1 = poissonDist(lambdaH1, maxGoals);
+  const distA1 = poissonDist(muA1, maxGoals);
+  const distH2 = poissonDist(lambdaH2, maxGoals);
+  const distA2 = poissonDist(muA2, maxGoals);
+  const probs = {
+    "主胜-主胜": 0, "主胜-平局": 0, "主胜-客胜": 0,
+    "平局-主胜": 0, "平局-平局": 0, "平局-客胜": 0,
+    "客胜-主胜": 0, "客胜-平局": 0, "客胜-客胜": 0
+  };
+  for (let h1 = 0; h1 <= maxGoals; h1++) {
+    for (let a1 = 0; a1 <= maxGoals; a1++) {
+      const p1 = distH1[h1] * distA1[a1];
+      const halfLabel = h1 > a1 ? "主胜" : h1 === a1 ? "平局" : "客胜";
+      for (let h2 = 0; h2 <= maxGoals; h2++) {
+        for (let a2 = 0; a2 <= maxGoals; a2++) {
+          const p2 = distH2[h2] * distA2[a2];
+          const fullH = h1 + h2;
+          const fullA = a1 + a2;
+          const fullLabel = fullH > fullA ? "主胜" : fullH === fullA ? "平局" : "客胜";
+          probs[`${halfLabel}-${fullLabel}`] += p1 * p2;
+        }
+      }
+    }
+  }
+  return probs;
+}
+
+function poissonDist(lambda, maxGoals) {
+  const out = new Array(maxGoals + 1).fill(0);
+  if (!Number.isFinite(lambda) || lambda <= 0) {
+    out[0] = 1;
+    return out;
+  }
+  let sum = 0;
+  for (let k = 0; k <= maxGoals; k++) {
+    out[k] = Math.exp(k * Math.log(lambda) - lambda - logFact(k));
+    sum += out[k];
+  }
+  // 归一化:截尾(maxGoals 以上)概率重新分到 0..maxGoals,保证总和=1
+  if (sum > 0) for (let k = 0; k <= maxGoals; k++) out[k] /= sum;
+  return out;
+}
+
+function logFact(n) {
+  let v = 0;
+  for (let i = 2; i <= n; i++) v += Math.log(i);
+  return v;
 }
 
 function scoreFromMarket(snapshot, code, excluded = new Set()) {
