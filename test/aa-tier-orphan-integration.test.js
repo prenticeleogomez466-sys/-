@@ -376,3 +376,23 @@ test("summarizeLeagueAccuracy 按命中率降序 + 样本充足标注", () => {
   const nor = out.find((x) => x.league === "挪超");
   assert.equal(nor.reliable, false, "样本<20标注不可靠");
 });
+
+// ---- 联赛可信度接进下注分级(弱联赛降级)----
+import { bettingTier as bettingTierLg, loadLeagueReliability, _resetLeagueReliabilityCache } from "../src/daily-report.js";
+
+test("bettingTier 联赛可信度:弱联赛降级+⚠️,强/未知联赛不变,无league参数向后兼容", () => {
+  // 无 profile 或无 league → 与旧行为一致
+  _resetLeagueReliabilityCache();
+  const probsStrong = { home: 0.70, draw: 0.18, away: 0.12 };
+  assert.match(bettingTierLg(probsStrong), /建议下注/, "单参数向后兼容");
+  // profile 存在时:弱联赛(reliable且<阈值)应降级
+  const prof = loadLeagueReliability();
+  if (prof?.leagues) {
+    const weak = Object.entries(prof.leagues).find(([, v]) => v.reliable && v.accuracy < (prof.weakThreshold ?? 0.42));
+    if (weak) {
+      const t = bettingTierLg(probsStrong, weak[0]);
+      assert.match(t, /⚠️弱联赛/, "弱联赛应加⚠️降级");
+      assert.ok(!t.startsWith("🟢"), "🟢应被降级");
+    }
+  }
+});

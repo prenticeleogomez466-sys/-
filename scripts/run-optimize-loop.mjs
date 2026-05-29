@@ -33,6 +33,7 @@ results.push(step("② 逐信号消融诊断", "run-signal-ablation.mjs"));
 results.push(step("③ 权重搜索(变好则写 profile)", "run-weight-search.mjs", ["--apply"]));
 results.push(step("④ 温度校准(Brier改善且命中不掉则写 T)", "run-temperature-fit.mjs", ["--apply"]));
 results.push(step("⑤ 复测确认(应用新 profile 后)", "run-walkforward-backtest.mjs"));
+results.push(step("⑥ 刷新联赛可信度 profile", "build-league-reliability.mjs"));
 
 console.log(`\n${"=".repeat(60)}\n自调优闭环完成。步骤结果:`);
 for (const r of results) console.log(`  ${r.ok ? "✅" : "⚠️"} ${r.title}${r.ok ? "" : " — " + r.error}`);

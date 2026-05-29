@@ -12,6 +12,18 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
 const ledgerPath = join(exportDir, "recommendation-ledger.json");
 
+// 联赛可信度 profile(由 build-league-reliability.mjs 写);进程内缓存。
+let _leagueReliabilityCache;
+export function loadLeagueReliability() {
+  if (_leagueReliabilityCache !== undefined) return _leagueReliabilityCache;
+  try {
+    const p = join(exportDir, "league-reliability.json");
+    _leagueReliabilityCache = existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null;
+  } catch { _leagueReliabilityCache = null; }
+  return _leagueReliabilityCache;
+}
+export function _resetLeagueReliabilityCache() { _leagueReliabilityCache = undefined; }
+
 export function buildDailyRecommendationPackage(date, options = {}) {
   mkdirSync(exportDir, { recursive: true });
   const sourceGate = assertLatestRealtimeSourceGate(date, { skip: options.skipRealtimeGate === true });
@@ -64,7 +76,7 @@ function toJingcaiRow(prediction) {
     prediction.halfFullPicks.secondary,
     prediction.risk,
     prediction.confidence,
-    bettingTier(prediction.probabilities),
+    bettingTier(prediction.probabilities, prediction.fixture?.competition),
     prediction.bankroll?.decision ?? "",
     prediction.bankroll?.ev ?? "",
     prediction.bankroll?.stakeUnitsPer100 ?? "",
@@ -75,11 +87,20 @@ function toJingcaiRow(prediction) {
 // 下注分级:按首选(top-prob)分桶,阈值依据 recommend:coverage 曲线
 // (≥65%→历史命中~73%,50-65%→~64-67%,<50%→低于全推基线 54%)。
 // 仅是「帮你挑高把握场」的过滤,不改变模型预测本身。
-export function bettingTier(probabilities) {
+// 联赛可信度修正:若该联赛回测可靠且命中明显偏弱(如阿甲/墨超~37%),自动降一档并加⚠️,
+// 避免🟢在弱联赛误导重注。联赛不在 profile / 样本不足 → 不降级(无数据不臆断)。
+export function bettingTier(probabilities, league = null) {
   const top = Math.max(probabilities?.home ?? 0, probabilities?.draw ?? 0, probabilities?.away ?? 0);
-  if (top >= 0.65) return "🟢 建议下注";
-  if (top >= 0.50) return "🟡 可选";
-  return "⚪ 慎选/观望";
+  let level = top >= 0.65 ? 2 : top >= 0.50 ? 1 : 0;
+  const labels = ["⚪ 慎选/观望", "🟡 可选", "🟢 建议下注"];
+  if (league) {
+    const prof = loadLeagueReliability();
+    const lg = prof?.leagues?.[league];
+    if (lg?.reliable && Number.isFinite(lg.accuracy) && lg.accuracy < (prof.weakThreshold ?? 0.42) && level > 0) {
+      return `${labels[level - 1]} ⚠️弱联赛(${league}回测命中${Math.round(lg.accuracy * 100)}%)`;
+    }
+  }
+  return labels[level];
 }
 
 function toFourteenRow(selection) {
@@ -251,7 +272,7 @@ function toLedgerRow(prediction) {
     monteCarloTopScores: prediction.simulation?.topScores?.slice(0, 3).map((item) => `${item.score}:${pct(item.probability)}`).join(" / ") ?? "",
     risk: prediction.risk,
     confidence: prediction.confidence,
-    tier: bettingTier(prediction.probabilities),
+    tier: bettingTier(prediction.probabilities, prediction.fixture?.competition),
     bankrollDecision: prediction.bankroll?.decision ?? "",
     ev: prediction.bankroll?.ev ?? null,
     stakeUnitsPer100: prediction.bankroll?.stakeUnitsPer100 ?? null,
