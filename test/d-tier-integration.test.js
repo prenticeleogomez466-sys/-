@@ -9,7 +9,6 @@ import {
 } from "../src/consistency-derivation.js";
 import { kellyFraction, dutchingStakes, kellyCombo, detectArbitrage } from "../src/dutching-optimizer.js";
 import { generateExplanation } from "../src/explanation-generator.js";
-import { parseClubsCSV } from "../src/transfermarkt-loader.js";
 
 describe("ratings-bootstrap", () => {
   it("returns no-op result when no fixtures", () => {
@@ -216,17 +215,3 @@ describe("explanation-generator", () => {
   });
 });
 
-describe("transfermarkt-loader CSV parser", () => {
-  it("parseClubsCSV handles header + rows", () => {
-    const csv = `name,total_market_value,domestic_competition_id\n"Paris Saint-Germain",1100000000,L1\n"FC Bayern",950000000,L1`;
-    const clubs = parseClubsCSV(csv);
-    assert.equal(clubs.length, 2);
-    assert.equal(clubs[0].name, "Paris Saint-Germain");
-    assert.equal(clubs[0].totalMarketValueEur, 1100000000);
-  });
-
-  it("parseClubsCSV returns empty on bad input", () => {
-    assert.deepEqual(parseClubsCSV(""), []);
-    assert.deepEqual(parseClubsCSV("only one line"), []);
-  });
-});

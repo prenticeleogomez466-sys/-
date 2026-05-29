@@ -100,24 +100,26 @@ function hasFile(name) {
 // ───── 检查函数 ─────
 
 function countDataSources() {
-  const sources = ["china-web-sources", "fotmob", "understat-fetcher", "openfootball-loader",
-                    "transfermarkt-loader", "csl-loader", "statsbomb-loader",
-                    "public-jingcai-fixtures", "free-odds-source-registry"];
+  // GG 档清理:csl-loader/transfermarkt-loader/understat-fetcher/public-jingcai-fixtures
+  // 已被删除(经实测对命中率无贡献),scorecard 移除对它们的依赖。
+  const sources = ["china-web-sources", "fotmob", "openfootball-loader",
+                    "statsbomb-loader", "footballdata-loader",
+                    "free-odds-source-registry", "jingcai-fivehundred-stage"];
   const count = sources.filter((s) => hasFile(`${s}.js`)).length;
-  return { score: Math.min(5, count * 0.6), found: count, max: 5 };
+  return { score: Math.min(5, count * 0.75), found: count, max: 5 };
 }
 
 function countLeaguesCovered() {
-  // 检查别名表 + openfootball + CSL
+  // openfootball + statsbomb + footballdata-loader 覆盖五大联赛 + 国家队 + 历史回填
   const team = hasFile("team-aliases.js");
   const of = hasFile("openfootball-loader.js");
-  const csl = hasFile("csl-loader.js");
+  const fd = hasFile("footballdata-loader.js");
   const sb = hasFile("statsbomb-loader.js");
-  return { score: (team ? 1 : 0) + (of ? 1 : 0) + (csl ? 1 : 0) + (sb ? 2 : 0), max: 5 };
+  return { score: (team ? 1 : 0) + (of ? 1 : 0) + (fd ? 1 : 0) + (sb ? 2 : 0), max: 5 };
 }
 
 function hasAdvancedFeatures() {
-  const adv = ["form-momentum-features", "understat-fetcher", "advanced-football-features"];
+  const adv = ["form-momentum-features", "shot-based-xg", "advanced-football-features"];
   const count = adv.filter((s) => hasFile(`${s}.js`)).length;
   return { score: Math.min(5, count * 1.7), found: count, max: 5 };
 }

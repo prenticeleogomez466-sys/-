@@ -8,6 +8,7 @@ import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibrat
 import { applyTemperature } from "./temperature-calibration.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
 import { buildEnsemblePrediction } from "./ratings-ensemble.js";
+import { loadEnsembleWeightsProfile } from "./ensemble-weights-profile.js";
 import { bootstrapRatings } from "./ratings-bootstrap.js";
 import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
 import { applyLayer2Signals } from "./feature-enhancers.js";
@@ -348,7 +349,9 @@ export function buildEnsembleViewFromBootstrap(fixture, bootstrap, oddsProbabili
       if (p?.probabilities) preds.bivariatePoisson = p.probabilities;
     } catch { /* */ }
   }
-  const result = buildEnsemblePrediction(preds);
+  // GG 档:回测学到的 ensemble 权重 profile 优先(若不存在则用 ratings-ensemble 默认权重)
+  const learnedWeights = loadEnsembleWeightsProfile()?.weights;
+  const result = buildEnsemblePrediction(preds, learnedWeights ? { weights: learnedWeights } : {});
   if (!result.ok) return null;
   return {
     probabilities: result.probabilities,

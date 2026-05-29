@@ -41,6 +41,7 @@ import { compareAdjustedForm, adjustedFormSummary } from "./opponent-strength-ad
 import { teamChainXgAverage, compareChainXg } from "./xg-chains.js";
 import { teamPossessionAdjustedAverage, comparePossessionStyles } from "./possession-adjusted-xg.js";
 import { computeSetPieceProfile } from "./set-piece-model.js";
+import { analyzeAsianHandicapWater, analyzeMultipleBookmakers } from "./asian-handicap-water.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getExportDir } from "./paths.js";
@@ -575,6 +576,40 @@ function signalSetPiece(prior, fixture, advancedData, context) {
   };
 }
 
+/**
+ * 亚盘水位变化(国内博彩 know-how):皇冠/澳门/立博等风向标公司
+ * 早盘→晚盘水位 +5pp 升水 = 庄家鼓励下注让球方,反向警示;
+ * 让球方降水 5pp = 资金过多,庄家避险,让球方反 dangerous。
+ * 数据源:context.asianHandicapWater = { lateHome, lateAway, earlyHome, earlyAway, line } 单家
+ *        或 [{bookmaker, ...}] 多家
+ */
+function signalAsianHandicapWater(prior, fixture, advancedData, context) {
+  const water = context.asianHandicapWater ?? fixtureLayer(advancedData, fixture, "asianHandicapWater");
+  if (!water) return { name: "asian-handicap-water", source: "context.asianHandicapWater", dormant: "no-water-data" };
+  const analysis = Array.isArray(water)
+    ? analyzeMultipleBookmakers(water)?.consensus
+    : analyzeAsianHandicapWater(water);
+  if (!analysis) return { name: "asian-handicap-water", source: "context.asianHandicapWater", dormant: "analysis-empty" };
+  const signal = analysis.signal ?? analysis.dominantSignal;
+  if (!signal) return { name: "asian-handicap-water", source: "context.asianHandicapWater", dormant: "no-signal" };
+  const lrMap = {
+    "warn-home":            { home: 0.92, draw: 1.03, away: 1.08 },
+    "warn-away":            { home: 1.08, draw: 1.03, away: 0.92 },
+    "danger-home":          { home: 0.88, draw: 1.05, away: 1.12 },
+    "danger-away":          { home: 1.12, draw: 1.05, away: 0.88 },
+    "favorite-strongly-backed": null,
+    "favorite-suspicious":  { home: 0.95, draw: 1.05, away: 1.00 },
+    "slight-up":            null,
+    "slight-down":          null,
+    "neutral":              null
+  };
+  const raw = lrMap[signal];
+  if (!raw) return { name: "asian-handicap-water", source: "context.asianHandicapWater", dormant: `weak-signal:${signal}` };
+  const lr = clampLR(raw);
+  if (!lr) return { name: "asian-handicap-water", source: "context.asianHandicapWater", dormant: "neutral" };
+  return { name: "asian-handicap-water", source: "context.asianHandicapWater", lr, detail: signal };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -598,7 +633,8 @@ const SIGNAL_HANDLERS = [
   signalOpponentStrengthForm,
   signalXgChains,
   signalPADJxG,
-  signalSetPiece
+  signalSetPiece,
+  signalAsianHandicapWater
 ];
 
 /** 所有信号名(供消融回测 / 权重调优枚举)。 */
@@ -607,7 +643,8 @@ export const SIGNAL_NAMES = [
   "streak", "fatigue", "rotation", "home-away-split", "time-decay-form", "line-movement",
   "weather", "manager", "derby", "standings-pressure", "big-game-form",
   "travel-distance", "tactical-matchup",
-  "referee", "opponent-strength-form", "xg-chains", "padj-xg", "set-piece"
+  "referee", "opponent-strength-form", "xg-chains", "padj-xg", "set-piece",
+  "asian-handicap-water"
 ];
 
 /**

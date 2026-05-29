@@ -1,55 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildTeamGraphEmbedding } from "../src/team-graph-embedding.js";
 import { attentionWeightedForm, compareTwoTeamsAttention } from "../src/sequence-attention.js";
-import { fitMCMC } from "../src/mcmc-sampler.js";
 import { sharpenOdds } from "../src/multi-source-odds-sharpener.js";
 import { analyzeLineMovement, batchAnalyzeMovements } from "../src/line-movement-tracker.js";
 import { buildFormFeatures, buildMatchupFeatures } from "../src/form-momentum-features.js";
-
-describe("team-graph-embedding", () => {
-  it("rejects insufficient matches", () => {
-    const r = buildTeamGraphEmbedding([{ home: "A", away: "B", homeGoals: 1, awayGoals: 0 }]);
-    assert.equal(r.ok, false);
-  });
-
-  it("builds embeddings for all teams", () => {
-    const matches = [];
-    for (let i = 0; i < 30; i++) {
-      matches.push({ home: "A", away: "B", homeGoals: 2, awayGoals: 1, date: "2026-04-01" });
-      matches.push({ home: "C", away: "D", homeGoals: 1, awayGoals: 1, date: "2026-04-15" });
-      matches.push({ home: "A", away: "C", homeGoals: 3, awayGoals: 0, date: "2026-04-20" });
-    }
-    const r = buildTeamGraphEmbedding(matches);
-    assert.equal(r.ok, true);
-    assert.equal(r.teamCount, 4);
-    assert.ok(r.embeddings["A"]);
-    assert.equal(r.embeddings["A"].length, 8);
-  });
-
-  it("similarity returns [-1, 1]", () => {
-    const matches = [];
-    for (let i = 0; i < 20; i++) {
-      matches.push({ home: "A", away: "B", homeGoals: 2, awayGoals: 1, date: "2026-04-01" });
-      matches.push({ home: "C", away: "D", homeGoals: 1, awayGoals: 1, date: "2026-04-15" });
-    }
-    const r = buildTeamGraphEmbedding(matches);
-    const sim = r.similarity("A", "B");
-    assert.ok(sim >= -1 && sim <= 1);
-  });
-
-  it("nearestTo returns top k similar teams", () => {
-    const matches = [];
-    for (let i = 0; i < 30; i++) {
-      matches.push({ home: "Strong1", away: "Weak1", homeGoals: 3, awayGoals: 0, date: "2026-04-01" });
-      matches.push({ home: "Strong2", away: "Weak2", homeGoals: 3, awayGoals: 0, date: "2026-04-15" });
-      matches.push({ home: "Strong1", away: "Weak2", homeGoals: 3, awayGoals: 0, date: "2026-04-20" });
-    }
-    const r = buildTeamGraphEmbedding(matches);
-    const top = r.nearestTo("Strong1", 3);
-    assert.ok(top.length >= 1);
-  });
-});
 
 describe("sequence-attention", () => {
   it("returns null for empty matches", () => {
@@ -89,42 +43,6 @@ describe("sequence-attention", () => {
     const r = compareTwoTeamsAttention(home, away, { opponentRating: 1500 });
     assert.ok(r);
     assert.ok(r.formGap > 0);  // 主队 form 更好
-  });
-});
-
-describe("mcmc-sampler", () => {
-  it("rejects too many teams", () => {
-    const matches = [];
-    for (let i = 0; i < 40; i++) {
-      matches.push({ home: `T${i}`, away: `T${i+1}`, homeGoals: 1, awayGoals: 0 });
-    }
-    const r = fitMCMC(matches, { maxTeams: 30, steps: 100 });
-    assert.equal(r.ok, false);
-  });
-
-  it("fits and returns posterior aggregates", () => {
-    const matches = [];
-    for (let i = 0; i < 40; i++) {
-      matches.push({ home: "Strong", away: "Weak", homeGoals: 3, awayGoals: 0 });
-      matches.push({ home: "Weak", away: "Strong", homeGoals: 0, awayGoals: 2 });
-    }
-    const r = fitMCMC(matches, { steps: 500, burnIn: 100 });
-    assert.equal(r.ok, true);
-    assert.ok(r.teams["Strong"]);
-    assert.ok(r.teams["Weak"]);
-    assert.ok(r.teams["Strong"].attack.mean > r.teams["Weak"].attack.mean);
-  });
-
-  it("predictWithUncertainty returns probabilities", () => {
-    const matches = [];
-    for (let i = 0; i < 30; i++) {
-      matches.push({ home: "A", away: "B", homeGoals: 2, awayGoals: 1 });
-      matches.push({ home: "B", away: "A", homeGoals: 1, awayGoals: 2 });
-    }
-    const r = fitMCMC(matches, { steps: 300, burnIn: 50 });
-    const pred = r.predictWithUncertainty("A", "B");
-    assert.ok(pred);
-    assert.ok(Math.abs(pred.home + pred.draw + pred.away - 1) < 0.01);
   });
 });
 

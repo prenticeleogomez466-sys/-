@@ -5,7 +5,6 @@ import { fitColleyRatings } from "../src/colley-ratings.js";
 import { fitBivariatePoisson, bivariatePoissonMatrix } from "../src/bivariate-poisson.js";
 import { buildEnsemblePrediction, adaptiveWeightsFromBacktest } from "../src/ratings-ensemble.js";
 import { fitHierarchicalPoisson } from "../src/hierarchical-poisson.js";
-import { extractEmbeddedJSON, unescapeHexString, normalizeUnderstatMatch, summarizeMatchXG } from "../src/understat-fetcher.js";
 
 describe("Massey ratings", () => {
   it("rejects insufficient samples", () => {
@@ -220,51 +219,3 @@ describe("Hierarchical Poisson", () => {
   });
 });
 
-describe("Understat fetcher utilities", () => {
-  it("unescapeHexString decodes \\xNN sequences", () => {
-    assert.equal(unescapeHexString("\\x7B\\x22a\\x22\\x3A1\\x7D"), '{"a":1}');
-    assert.equal(unescapeHexString("plain"), "plain");
-  });
-
-  it("extractEmbeddedJSON parses JSON.parse('...') pattern", () => {
-    const html = `<script>var datesData = JSON.parse('\\x5B\\x7B\\x22a\\x22\\x3A1\\x7D\\x5D');</script>`;
-    const data = extractEmbeddedJSON(html, "datesData");
-    assert.deepEqual(data, [{ a: 1 }]);
-  });
-
-  it("extractEmbeddedJSON returns null when var not found", () => {
-    assert.equal(extractEmbeddedJSON("<html>no script</html>", "datesData"), null);
-  });
-
-  it("normalizeUnderstatMatch flattens nested team and goals", () => {
-    const raw = {
-      id: "12345",
-      datetime: "2024-08-17 14:00:00",
-      h: { title: "Liverpool" },
-      a: { title: "Ipswich" },
-      goals: { h: "2", a: "0" },
-      xG: { h: "1.85", a: "0.42" }
-    };
-    const out = normalizeUnderstatMatch(raw, "EPL", 2024);
-    assert.equal(out.home, "Liverpool");
-    assert.equal(out.away, "Ipswich");
-    assert.equal(out.homeGoals, 2);
-    assert.equal(out.homeXg, 1.85);
-    assert.equal(out.isResult, true);
-  });
-
-  it("summarizeMatchXG aggregates shots", () => {
-    const shots = {
-      h: [{ xG: "0.3", result: "Goal" }, { xG: "0.1", result: "MissedShots" }, { xG: "0.45", result: "SavedShot" }],
-      a: [{ xG: "0.5", result: "BlockedShot" }, { xG: "0.2", result: "Goal" }]
-    };
-    const sum = summarizeMatchXG(shots);
-    assert.equal(sum.homeShots, 3);
-    assert.equal(sum.awayShots, 2);
-    assert.ok(Math.abs(sum.homeXG - 0.85) < 0.001);
-    assert.ok(Math.abs(sum.awayXG - 0.7) < 0.001);
-    // SOT = Goal + SavedShot
-    assert.equal(sum.homeShotsOnTarget, 2);
-    assert.equal(sum.awayShotsOnTarget, 1);
-  });
-});

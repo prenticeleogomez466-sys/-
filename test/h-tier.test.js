@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { skellamPMF, skellamDistribution, asianHandicapFromSkellam, overUnderFromSkellam, besselI } from "../src/skellam-distribution.js";
-import { createLiveTracker, buildLiveProbabilityTrajectory } from "../src/live-probability-tracker.js";
 import { computeReturnsFromLedger, sharpeRatio, sortinoRatio, calmarRatio, performanceReport, riskParityAllocation } from "../src/betting-performance.js";
-import { crossValidate } from "../src/cross-validation.js";
 import { sensitivityAnalysis } from "../src/sensitivity-analysis.js";
 import { detectDistributionShift } from "../src/adversarial-validation.js";
 import { createDeepPipeline } from "../src/integrated-deep-pipeline.js";
@@ -38,46 +36,6 @@ describe("skellam-distribution", () => {
     const ou = overUnderFromSkellam(1.5, 0.9, 2.5);
     assert.ok(ou.over > 0.3 && ou.over < 0.6);
     assert.ok(Math.abs(ou.over + ou.under - 1) < 0.001);
-  });
-});
-
-describe("live-probability-tracker", () => {
-  it("advances time and updates probabilities", () => {
-    const t = createLiveTracker({ lambdaHomeFull: 1.5, muAwayFull: 0.9 });
-    const snap0 = t.snapshot();
-    t.advance(45);
-    const snap45 = t.snapshot();
-    // 没事件,概率不应剧变
-    assert.ok(Math.abs(snap0.probabilities.home - snap45.probabilities.home) < 0.2);
-  });
-
-  it("goal event shifts probabilities", () => {
-    const t = createLiveTracker({ lambdaHomeFull: 1.5, muAwayFull: 0.9 });
-    t.advance(20);
-    const before = t.snapshot().probabilities.home;
-    t.event("goal-home");
-    const after = t.snapshot().probabilities.home;
-    assert.ok(after > before, `before=${before}, after=${after}`);
-  });
-
-  it("red card to home reduces home probability", () => {
-    const t = createLiveTracker({ lambdaHomeFull: 2.0, muAwayFull: 1.0 });
-    t.advance(30);
-    const before = t.snapshot().probabilities.home;
-    t.event("red-home");
-    const after = t.snapshot().probabilities.home;
-    assert.ok(after < before);
-  });
-
-  it("trajectory builder returns snapshots", () => {
-    const traj = buildLiveProbabilityTrajectory(1.5, 0.9, [
-      { advance: 15 },
-      { event: "goal-home" },
-      { advance: 30 },
-      { event: "goal-away" }
-    ]);
-    assert.equal(traj.length, 5);  // kickoff + 4 events
-    assert.ok(traj[0].label === "kickoff");
   });
 });
 
@@ -132,38 +90,6 @@ describe("betting-performance", () => {
     const a = r.allocations.find((x) => x.id === "A");
     const b = r.allocations.find((x) => x.id === "B");
     assert.ok(a.weight > b.weight);
-  });
-});
-
-describe("cross-validation", () => {
-  it("rejects insufficient rows", () => {
-    const r = crossValidate([{ date: "2026-01-01" }], () => ({ rps: 0.2 }));
-    assert.equal(r.ok, false);
-  });
-
-  it("runs K folds and aggregates metrics", () => {
-    const rows = [];
-    for (let i = 0; i < 60; i++) rows.push({ date: `2026-${String(Math.floor(i/4)+1).padStart(2,"0")}-01`, id: i });
-    const r = crossValidate(rows, (train, evalRows) => ({
-      rps: 0.2 + Math.random() * 0.05,
-      hitRate: 0.5 + Math.random() * 0.05
-    }), { folds: 4, minTrainSize: 20 });
-    assert.equal(r.ok, true);
-    assert.equal(r.folds, 4);
-    assert.ok(r.aggregated.rps);
-    assert.ok(r.aggregated.rps.mean > 0);
-  });
-
-  it("detects overfitting when last fold metric worse", () => {
-    const rows = [];
-    for (let i = 0; i < 50; i++) rows.push({ date: `2026-${String(Math.floor(i/3)+1).padStart(2,"0")}-01` });
-    let foldIdx = 0;
-    const r = crossValidate(rows, (train, evalRows) => {
-      foldIdx++;
-      return { rps: foldIdx === 1 ? 0.20 : foldIdx >= 4 ? 0.35 : 0.22 };  // 最后一折显著恶化
-    }, { folds: 4, minTrainSize: 20 });
-    assert.equal(r.ok, true);
-    assert.ok(r.overfittingSignal?.detected);
   });
 });
 
