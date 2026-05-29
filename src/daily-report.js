@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getExportDir } from "./paths.js";
 import { judgmentFactorColumns, judgmentFactorRow } from "./factor-analysis.js";
-import { recommendFixtures, outcomeCodeToChinese } from "./prediction-engine.js";
+import { recommendFixtures, outcomeCodeToChinese, competitionCategory } from "./prediction-engine.js";
 import { auditRecommendations, writeRecommendationAudit } from "./recommendation-audit.js";
 import { assertLatestRealtimeSourceGate } from "./realtime-source-gate.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
@@ -53,36 +53,39 @@ export function buildDailyRecommendationPackage(date, options = {}) {
 
 function toJingcaiRow(prediction) {
   const fixture = prediction.fixture;
-  const snapshot = prediction.marketSnapshot;
+  const probs = prediction.probabilities ?? {};
+  const upset = upsetRiskLabel(probs.home, probs.draw, probs.away);
+  // 排版:核心推荐(wld→让球→比分→半全场)前置,概率/爆冷/信心紧跟,赔率细节
+  // 移到别 sheet("赔率变化对比"已有)。一行只显示用户每天看的关键决策信息。
   return [
-    fixture.date,
-    fixture.sequence,
-    fixture.competition,
-    fixture.homeTeam,
-    fixture.awayTeam,
-    fixture.kickoff,
-    snapshot ? "实时赔率已接入" : "缺少完整实时赔率",
-    oddsText(snapshot?.europeanOdds),
-    oddsText(snapshot?.asianHandicap),
-    oddsText(snapshot?.handicapOdds),
-    handicapRecommendText(prediction),  // 新:让球推荐方向(基于 score 锚点派生,确保跟胜平负一致)
-    outcomeCodeToChinese(prediction.pick.code),
-    outcomeCodeToChinese(prediction.secondaryPick.code),
-    pct(prediction.probabilities.home),
-    pct(prediction.probabilities.draw),
-    pct(prediction.probabilities.away),
-    prediction.scorePicks.primary,
-    prediction.scorePicks.secondary,
-    prediction.halfFullPicks.primary,
-    prediction.halfFullPicks.secondary,
-    prediction.risk,
-    confidenceLabel(prediction.confidence),  // 新:信心等级(高/较高/中/低)+ 数字
-    bettingTier(prediction.probabilities, prediction.fixture?.competition),
-    prediction.bankroll?.decision ?? "",
-    prediction.bankroll?.ev ?? "",
-    prediction.bankroll?.stakeUnitsPer100 ?? "",
-    enrichedRationale(prediction)  // 新:理由加上支撑因素 + 风险提示
+    fixture.sequence,                                            // 1 场次
+    competitionCategory(fixture?.competition),                   // 2 赛事类型
+    `${fixture.homeTeam} 对 ${fixture.awayTeam}`,                // 3 对阵
+    fixture.kickoff,                                             // 4 开赛
+    outcomeCodeToChinese(prediction.pick.code),                  // 5 胜平负首选
+    handicapRecommendText(prediction),                           // 6 让球推荐(让 X → wld)
+    prediction.scorePicks.primary,                               // 7 比分首选
+    prediction.halfFullPicks.primary,                            // 8 半全场首选
+    pct(probs.home),                                             // 9 主胜%
+    pct(probs.draw),                                             // 10 平局%
+    pct(probs.away),                                             // 11 客胜%
+    upset,                                                       // 12 爆冷指数
+    prediction.risk,                                             // 13 风险
+    confidenceLabel(prediction.confidence),                      // 14 信心
+    bettingTier(prediction.probabilities, fixture?.competition), // 15 下注分级
+    enrichedRationale(prediction)                                // 16 选择理由
   ];
+}
+
+// 爆冷指数:模型不看好的弱势一方仍占 ≥22% 时,14 场/竞彩历史上常爆冷于此
+function upsetRiskLabel(homeProb, drawProb, awayProb) {
+  const weaker = Math.min(Number(homeProb ?? 0), Number(awayProb ?? 0));
+  const draw = Number(drawProb ?? 0);
+  if (weaker >= 0.25) return "⚠ 高(弱势 ≥25%)";
+  if (weaker >= 0.22) return "🟡 中(弱势 ≥22%)";
+  if (draw >= 0.30) return "🟡 平局可期(≥30%)";
+  if (weaker >= 0.15) return "标准";
+  return "公认 favorite";
 }
 
 // 让球推荐方向:展示"模型从比分锚点派生"的让球方向,跟胜平负/比分一致
@@ -135,15 +138,20 @@ export function bettingTier(probabilities, league = null) {
 }
 
 function toFourteenRow(selection) {
+  const p = selection.probabilities ?? {};
   return [
     selection.index,
     selection.match,
-    selection.competitionType ?? "—",  // 新:赛事类型(欧冠/欧联/友谊/五大联赛/...)
+    selection.competitionType ?? "—",
     selection.single,
     selection.compound,
     selection.type,
+    p.home ?? "",
+    p.draw ?? "",
+    p.away ?? "",
+    selection.upsetRisk ?? "—",
     selection.risk,
-    confidenceLabel(selection.confidence),  // 等级+数字
+    confidenceLabel(selection.confidence),
     selection.reason
   ];
 }
@@ -341,37 +349,50 @@ function updateLedger(date, rows) {
 }
 
 function jingcaiHeaders() {
-  return ["日期", "场次", "赛事", "主队", "客队", "开赛", "赔率实时状态", "胜平负赔率", "亚洲盘口", "让球胜平负赔率", "让球推荐方向", "胜平负首选", "胜平负次选", "主胜概率", "平局概率", "客胜概率", "比分首选", "比分次选", "半全场首选", "半全场次选", "风险", "信心", "下注分级", "资金决策", "EV", "每100单位建议", "推荐理由"];
+  return [
+    "场次", "赛事类型", "对阵", "开赛",
+    "胜平负首选", "让球推荐", "比分首选", "半全场首选",
+    "主胜%", "平局%", "客胜%",
+    "爆冷指数", "风险", "信心", "下注分级", "选择理由"
+  ];
 }
 
 function fourteenHeaders() {
-  return ["场次", "比赛", "赛事类型", "单式推荐", "覆盖选择", "类型", "风险", "信心", "选择理由"];
+  return ["场次", "比赛", "赛事类型", "单式推荐", "覆盖选择", "类型", "主胜%", "平局%", "客胜%", "爆冷指数", "风险", "信心", "选择理由"];
 }
 
-// 任选9 sheet:从 14 场挑最稳 9 场单选,9 场全对即中。
+// 任选9 sheet:从 14 场挑最稳 9 场。每场独立给胆/双选/全选(同 14 场逻辑)。
 function renxuan9Rows(renxuan9) {
-  const header = ["序", "比赛", "赛事类型", "推荐", "主胜概率", "信心", "风险", "概率差", "选择理由"];
+  const header = ["序", "比赛", "赛事类型", "单式推荐", "覆盖选择", "类型", "主胜%", "平局%", "客胜%", "风险", "信心", "选择理由"];
+  const empty = (n) => new Array(n).fill("");
   if (!renxuan9?.ok) {
-    return [header, ["—", renxuan9?.reason ?? "任选9 不可用(可选场次不足 9)", "", "", "", "", "", "", ""]];
+    return [header, ["—", renxuan9?.reason ?? "任选9 不可用(可选场次不足 9)", ...empty(10)]];
   }
-  const rows = renxuan9.picks.map((p) => [
-    p.rank,
-    p.match,
-    p.competitionType ?? "—",
-    p.pick,
-    pct(p.probability),
-    confidenceLabel(p.confidence),
-    p.risk,
-    p.gap,
-    p.reason ?? ""
-  ]);
+  const rows = renxuan9.picks.map((p) => {
+    const prob = p.probabilities ?? {};
+    return [
+      p.rank,
+      p.match,
+      p.competitionType ?? "—",
+      p.pick,
+      p.compound ?? p.pick,
+      p.type ?? "—",
+      prob.home ?? "",
+      prob.draw ?? "",
+      prob.away ?? "",
+      p.risk,
+      confidenceLabel(p.confidence),
+      p.reason ?? ""
+    ];
+  });
   const ind = renxuan9.parlay?.jointProbabilityIndependent ?? null;
   const adj = renxuan9.parlay?.jointProbabilityCorrelated ?? null;
   const summary = [
-    new Array(9).fill(""),
-    ["单式串", renxuan9.singleLine, "", "", "", "", "", "", ""],
-    ["9 串联合命中率", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", "", "", "", "", "", ""],
-    ["说明", renxuan9.note, "", "", "", "", "", "", ""]
+    empty(12),
+    ["单式串", renxuan9.singleLine, ...empty(10)],
+    ["9 串联合命中率", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", ...empty(9)],
+    ["覆盖串(胆+双/全选)", renxuan9.picks.map((p) => p.compound ?? p.pick).join(" | "), ...empty(10)],
+    ["说明", renxuan9.note, ...empty(10)]
   ];
   return [header, ...rows, ...summary];
 }
