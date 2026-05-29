@@ -10,6 +10,7 @@ import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { bootstrapRatings } from "./ratings-bootstrap.js";
 import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
 import { applyLayer2Signals } from "./feature-enhancers.js";
+import { fuseSignals } from "./signal-fusion-layer.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
 
 const OUTCOMES = [
@@ -121,7 +122,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       : { probabilities: seededProbabilities(fixture, index), blendSource: "seeded-fallback", dcWeight: 0, dcResult: null };
   const baseProbabilities = blendResult.probabilities;
   const probabilityAdjustment = adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
-  const calibrated = calibrateProbabilities(probabilityAdjustment.probabilities, options.calibrationProfile, { fixture, snapshot });
+  // V 档:贝叶斯信号融合层 —— 把伤停/H2H/赛季阶段/赛事性质等信号以 LR 证据融进概率。
+  // 缺数据的信号自动休眠(见 fusion.dormant),冷启动下只有元数据类信号会真 fire。
+  const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, options.fusionContext ?? {});
+  probabilityAdjustment.fusion = fusion;
+  const calibrated = calibrateProbabilities(fusion.probabilities, options.calibrationProfile, { fixture, snapshot });
   const probabilities = calibrated.probabilities;
   probabilityAdjustment.calibration = calibrated.calibration;
   const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);
