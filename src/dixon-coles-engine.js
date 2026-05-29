@@ -44,7 +44,12 @@ export function fitFromFixtureStore(opts = {}) {
   const maxDates = opts.maxDates ?? 120;
   const minMatches = opts.minMatches ?? 60;
   const homeAdvantage = opts.homeAdvantage ?? 1.28;
-  const dates = listFixtureDates().slice(0, maxDates);
+  // beforeDate(可选):只用严格早于该日期的赛果拟合 —— 给 walk-forward 回测防数据泄漏用。
+  const beforeDate = opts.beforeDate ?? null;
+  const allDates = listFixtureDates();
+  const dates = (beforeDate ? allDates.filter((d) => d < beforeDate) : allDates).slice(0, maxDates);
+  // 时间衰减参考点:walk-forward 时以预测日为参考,否则用最新日期。
+  const referenceDate = beforeDate ?? dates[0];
   const matches = [];
   for (const date of dates) {
     const { fixtures } = loadFixtures(date);
@@ -56,7 +61,7 @@ export function fitFromFixtureStore(opts = {}) {
         homeGoals: f.result.home,
         awayGoals: f.result.away,
         date: f.date,
-        daysAgo: daysBetween(f.date, dates[0]),
+        daysAgo: daysBetween(f.date, referenceDate),
       });
     }
   }
