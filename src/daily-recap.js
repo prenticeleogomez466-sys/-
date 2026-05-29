@@ -191,11 +191,13 @@ function recapSummaryRows(summary) {
 function tierBreakdownRows(tb) {
   if (!tb) return [];
   const expect = { "🟢 建议下注": "回测期望~73%", "🟡 可选": "回测期望~64-67%", "⚪ 慎选/观望": "回测低于全推54%" };
-  return Object.entries(tb).map(([tier, v]) => [
+  const rows = Object.entries(tb).map(([tier, v]) => [
     `分级命中率 ${tier}`,
     v.total ? pct(v.accuracy) : "无样本",
     v.total ? `${v.hit}/${v.total}（${expect[tier]}${v.total < 10 ? "；样本不足,仅参考" : ""}）` : `${expect[tier]};当日无此分级场次`
   ]);
+  rows.push(["分级阈值说明", "基于五大联赛标定", "北欧/J联/小联赛方差更大、赔率效率低,🟢在冷门联赛真实命中通常低于回测期望,要打折看"]);
+  return rows;
 }
 
 function recapDetailHeaders() {
