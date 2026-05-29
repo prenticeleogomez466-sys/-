@@ -72,9 +72,17 @@ async function loadOne(league, season, fetchImpl) {
     const ftag = num(cells, idx("FTAG"));
     if (!date || !home || !away || fthg === null || ftag === null) continue;
     // 赔率:优先市场均值,退回 Bet365
+    // odds        = 开盘均赔(market consensus 早盘,= 当前 prior)
+    // oddsClose   = 收盘均赔(AvgC*,博彩界公认最有效价格,只在 kickoff 已知)
+    // oddsPinnacle/oddsPinnacleClose = Pinnacle 开/收(PS*/PSC*,最 sharp 的庄,锐钱风向)
     const odds =
       impliedProbs(num(cells, idx("AvgH")), num(cells, idx("AvgD")), num(cells, idx("AvgA"))) ??
       impliedProbs(num(cells, idx("B365H")), num(cells, idx("B365D")), num(cells, idx("B365A")));
+    const oddsClose =
+      impliedProbs(num(cells, idx("AvgCH")), num(cells, idx("AvgCD")), num(cells, idx("AvgCA"))) ??
+      impliedProbs(num(cells, idx("B365CH")), num(cells, idx("B365CD")), num(cells, idx("B365CA")));
+    const oddsPinnacle = impliedProbs(num(cells, idx("PSH")), num(cells, idx("PSD")), num(cells, idx("PSA")));
+    const oddsPinnacleClose = impliedProbs(num(cells, idx("PSCH")), num(cells, idx("PSCD")), num(cells, idx("PSCA")));
     out.push({
       date,
       league,
@@ -85,7 +93,10 @@ async function loadOne(league, season, fetchImpl) {
       halfHome: num(cells, idx("HTHG")),
       halfAway: num(cells, idx("HTAG")),
       referee: (cells[idx("Referee")] || "").trim() || null,
-      odds // {home,draw,away} 去 vig 后的隐含概率,或 null
+      odds, // {home,draw,away} 去 vig 后的隐含概率,或 null(开盘均赔)
+      oddsClose, // 收盘均赔隐含,或 null
+      oddsPinnacle, // Pinnacle 开盘隐含,或 null
+      oddsPinnacleClose // Pinnacle 收盘隐含,或 null
     });
   }
   return out;
@@ -113,6 +124,8 @@ export async function loadFootballDataMatches(opts = {}) {
     ok: all.length > 0,
     matches: all,
     withOdds: all.filter((m) => m.odds).length,
+    withClosing: all.filter((m) => m.oddsClose).length,
+    withPinnacle: all.filter((m) => m.oddsPinnacle).length,
     byLeague
   };
 }

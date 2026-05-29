@@ -26,6 +26,7 @@ import { detectCleanSheetStreak, cleanSheetStreakToLR } from "./clean-sheet-stre
 import { estimateRotationProbability, rotationToLR } from "./rotation-policy-model.js";
 import { detectStreak, streakToLR } from "./streak-detector.js";
 import { compareFatigue, applyFatigueBias } from "./schedule-fatigue-model.js";
+import { lineMovementToLR, analyzeLineMovement } from "./line-movement-signal.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const LR_MIN = 0.5;
@@ -187,6 +188,25 @@ function signalFatigue(prior, fixture, advancedData, context) {
   return { name: "fatigue", source: "context.recentMatches", lr, detail: `主息${homePrev}→客息${awayPrev}` };
 }
 
+function signalLineMovement(prior, fixture, advancedData, context) {
+  // 数据源:context.openingOdds(开盘隐含)+ context.currentOdds(当前/收盘快照隐含)。
+  // 两者齐全才 fire —— live jingcai 多次捕获赔率变化时装配;缺则休眠(向后兼容)。
+  const opening = context.openingOdds;
+  const later = context.currentOdds ?? context.closingOdds;
+  if (!opening || !later) {
+    return { name: "line-movement", source: "context.openingOdds+currentOdds", dormant: "no-odds-snapshots" };
+  }
+  const lr = clampLR(lineMovementToLR(opening, later, context.lineMovementOpts ?? {}));
+  if (!lr) return { name: "line-movement", source: "context.openingOdds+currentOdds", dormant: "movement-below-noise-floor" };
+  const a = analyzeLineMovement(opening, later);
+  return {
+    name: "line-movement",
+    source: "context.openingOdds+currentOdds",
+    lr,
+    detail: a ? `${a.classification} steam→${a.steamOutcome}(${a.steamMagnitude >= 0 ? "+" : ""}${a.steamMagnitude})` : null
+  };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -195,7 +215,8 @@ const SIGNAL_HANDLERS = [
   signalCleanSheetStreak,
   signalStreak,
   signalFatigue,
-  signalRotation
+  signalRotation,
+  signalLineMovement
 ];
 
 /**
