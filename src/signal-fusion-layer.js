@@ -24,6 +24,7 @@ import { compareInjuryImpact, injuryToLR } from "./injury-impact-model.js";
 import { analyzeH2H, h2hToLR } from "./head-to-head-history.js";
 import { detectCleanSheetStreak, cleanSheetStreakToLR } from "./clean-sheet-streak.js";
 import { estimateRotationProbability, rotationToLR } from "./rotation-policy-model.js";
+import { detectStreak, streakToLR } from "./streak-detector.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const LR_MIN = 0.5;
@@ -143,12 +144,41 @@ function signalRotation(prior, fixture, advancedData, context) {
   return { name: "rotation", source: "context.rotationContext", lr };
 }
 
+function mirrorLR(lr) {
+  return lr ? { home: lr.away, draw: lr.draw, away: lr.home } : null;
+}
+
+function signalStreak(prior, fixture, advancedData, context) {
+  const homeMatches = context.homeRecentMatches;
+  const awayMatches = context.awayRecentMatches;
+  if (!Array.isArray(homeMatches) && !Array.isArray(awayMatches)) {
+    return { name: "streak", source: "context.recentMatches", dormant: "no-recent-match-history" };
+  }
+  // detectStreak 需最近在末尾;recentMatchesFor 给最近在前 → 反转副本
+  const homeStreak = Array.isArray(homeMatches) ? detectStreak([...homeMatches].reverse()) : null;
+  const awayStreak = Array.isArray(awayMatches) ? detectStreak([...awayMatches].reverse()) : null;
+  const homeLR = streakToLR(homeStreak);
+  const awayLR = mirrorLR(streakToLR(awayStreak));
+  if (!homeLR && !awayLR) return { name: "streak", source: "context.recentMatches", dormant: "no-significant-streak" };
+  const combined = {
+    home: (homeLR?.home ?? 1) * (awayLR?.home ?? 1),
+    draw: (homeLR?.draw ?? 1) * (awayLR?.draw ?? 1),
+    away: (homeLR?.away ?? 1) * (awayLR?.away ?? 1)
+  };
+  const lr = clampLR(combined);
+  if (!lr) return { name: "streak", source: "context.recentMatches", dormant: "net-neutral" };
+  const detail = [homeStreak?.type !== "none" ? `主${homeStreak?.type}×${homeStreak?.length}` : null,
+    awayStreak?.type !== "none" ? `客${awayStreak?.type}×${awayStreak?.length}` : null].filter(Boolean).join(" ");
+  return { name: "streak", source: "context.recentMatches", lr, detail: detail || null };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
   signalInjury,
   signalH2H,
   signalCleanSheetStreak,
+  signalStreak,
   signalRotation
 ];
 

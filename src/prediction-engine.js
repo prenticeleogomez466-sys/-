@@ -11,6 +11,7 @@ import { bootstrapRatings } from "./ratings-bootstrap.js";
 import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
 import { applyLayer2Signals } from "./feature-enhancers.js";
 import { fuseSignals } from "./signal-fusion-layer.js";
+import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
 
 const OUTCOMES = [
@@ -50,7 +51,10 @@ export function recommendFixtures(date) {
   } catch {
     // bootstrap 失败 → 跳过,主路径仍工作
   }
-  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap })));
+  // V 档:从历史赛果(严格早于当前比赛日,防泄漏)装配每场的 fusionContext,
+  // 激活信号融合层里的 h2h / clean-sheet-streak / streak 信号(内部数据源,无需外部 API)。
+  const history = loadHistoricalResults({ beforeDate: fixtureSet.date });
+  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history) })));
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
