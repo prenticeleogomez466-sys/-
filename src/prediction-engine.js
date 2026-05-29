@@ -15,6 +15,8 @@ import { fuseSignals, loadFusionWeightProfile, SIGNAL_NAMES } from "./signal-fus
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
 import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
+import { buildExtendedMarkets } from "./extended-markets.js";
+import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -179,6 +181,21 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, blendResult.dcResult);
   const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, blendResult.dcResult);
+  // FF 档:从 dc matrix 派生扩展玩法(大小球/单双/上半场/亚盘/双胜彩/比分组/总进球)。
+  // 缺 matrix 时 buildExtendedMarkets 自动返回 null,daily-report 据此决定是否输出该列。
+  const extendedMarkets = blendResult.dcResult?.matrix
+    ? buildExtendedMarkets(blendResult.dcResult.matrix)
+    : null;
+  // FF 档:让球方向以比分锚点 + asian handicap line 派生,确保跟 score 严格一致。
+  // 缺亚盘 snapshot 时 line=0,deriveHandicapFromScore 等价于 deriveWldFromScore。
+  const handicapLine = Number(snapshot?.asianHandicap?.current?.line
+    ?? snapshot?.asianHandicap?.initial?.line
+    ?? snapshot?.asianHandicap?.final?.line
+    ?? 0);
+  const handicapDirection = scorePicks.primary
+    ? deriveHandicapFromScore(scorePicks.primary, handicapLine)
+    : null;
+  const handicapPick = handicapDirection ? { line: handicapLine, direction: handicapDirection } : null;
   const expectedValue = computeExpectedValueLabels(ranked, snapshot);
   // D 档接入(2026-05-28):用 bootstrap 传入的多评级算 ensembleView 作为 supplementary.
   // 不替换 main 路径 — 主推荐仍走 calibrated probabilities;ensembleView 用于 backtest 对比和未来切主.
@@ -207,6 +224,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     confidence,
     scorePicks,
     halfFullPicks,
+    handicapPick,
+    extendedMarkets,
     expectedValue,
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
   };
@@ -270,6 +289,18 @@ export function validatePredictionConsistency(prediction) {
   ];
   for (const [label, score, halfFull] of pathChecks) {
     if (score && halfFull && !scoreHalfFullConsistent(score, halfFull)) errors.push(`${label} ${score} 与 ${halfFull} 路径冲突`);
+  }
+  // FF 档:让球方向跟比分锚点一致性。
+  // 注:不传 halfFull,因 prediction-engine 用 "主胜-主胜" 格式而 consistency-derivation
+  // 期望"胜胜" 单字符格式;halfFull 一致性由上面的 scoreHalfFullConsistent 已覆盖。
+  if (prediction.scorePicks?.primary && prediction.handicapPick) {
+    const derivErrors = verifyRecommendationConsistency({
+      score: prediction.scorePicks.primary,
+      wld: prediction.pick?.label,
+      handicapDirection: prediction.handicapPick.direction,
+      handicapLine: prediction.handicapPick.line
+    });
+    for (const e of derivErrors) errors.push(`首选派生冲突: ${e}`);
   }
   return errors;
 }

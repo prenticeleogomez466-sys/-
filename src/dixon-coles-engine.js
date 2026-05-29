@@ -205,6 +205,9 @@ export function predictFromFitted(fitted, fixture) {
     expectedGoals: { home: round(lambda), away: round(mu) },
     topScores: topScorelines(matrix, 6),
     overUnder: overUnderProbs(matrix, 2.5),
+    // 暴露 matrix 给下游(extended-markets 用于产大小球/单双/上半场/亚盘/双胜彩/比分组)。
+    // 此前隐藏在闭包里只产 topScores+overUnder,导致 extended-markets 模块成孤儿。
+    matrix,
     teamStrength: {
       home: { attack: round(th.attack), defense: round(th.defense), coldStart: Boolean(th.coldStart) },
       away: { attack: round(ta.attack), defense: round(ta.defense), coldStart: Boolean(ta.coldStart) },
