@@ -52,7 +52,7 @@ export function loadFusionWeightProfile() {
     if (!existsSync(p)) { _weightProfileCache = null; return null; }
     const profile = JSON.parse(readFileSync(p, "utf8"));
     _weightProfileCache = profile?.usable
-      ? { signalWeights: profile.signalWeights ?? {}, disabledSignals: profile.disabledSignals ?? [], chosen: profile.chosen }
+      ? { signalWeights: profile.signalWeights ?? {}, disabledSignals: profile.disabledSignals ?? [], chosen: profile.chosen, temperature: Number.isFinite(profile.temperature) ? profile.temperature : null }
       : null;
   } catch { _weightProfileCache = null; }
   return _weightProfileCache;

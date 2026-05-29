@@ -93,7 +93,9 @@ describe("prediction derived market consistency", () => {
 
     assert.equal(prediction.probabilityAdjustment.applied, true);
     assert.ok(prediction.probabilityAdjustment.signals.some((signal) => signal.key === "elo"));
-    assert.ok(prediction.probabilities.home > prediction.baseProbabilities.home);
+    // 调整层(Elo/form)应抬高 home;最终概率之后还会过融合+温度校准(回测拟合 T 软化过度自信),
+    // 故方向性断言落在 adjustment 层,而非已被软化的最终 probabilities。
+    assert.ok(prediction.probabilityAdjustment.probabilities.home > prediction.baseProbabilities.home);
     assert.ok(prediction.probabilityAdjustment.maxShift <= 0.1);
     assert.equal(prediction.simulation.iterations, 20000);
     assert.ok(prediction.simulation.topScores.length > 0);

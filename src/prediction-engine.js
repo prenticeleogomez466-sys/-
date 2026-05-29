@@ -5,6 +5,7 @@ import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
+import { applyTemperature } from "./temperature-calibration.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
 import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { bootstrapRatings } from "./ratings-bootstrap.js";
@@ -147,8 +148,16 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     : {});
   const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext, fusionOpts);
   probabilityAdjustment.fusion = fusion;
+  // 温度校准(回测拟合,治过度自信):单调软化,不改 argmax/命中,只把虚高的强热门拉回。
+  // 放在 cold-start favorite 收缩之前,软化后多数 favorite 已 <0.65,二者互补不重复收缩。
+  let fusedProbs = fusion.probabilities;
+  const fusionTemperature = weightProfile?.temperature;
+  if (Number.isFinite(fusionTemperature) && fusionTemperature > 0 && fusionTemperature !== 1) {
+    fusedProbs = applyTemperature(fusedProbs, fusionTemperature);
+    probabilityAdjustment.temperature = fusionTemperature;
+  }
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
-  const calibrated = calibrateProbabilities(fusion.probabilities, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
+  const calibrated = calibrateProbabilities(fusedProbs, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
   const probabilities = calibrated.probabilities;
   probabilityAdjustment.calibration = calibrated.calibration;
   const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);

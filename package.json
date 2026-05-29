@@ -25,6 +25,7 @@
     "backtest:walkforward": "node scripts/run-walkforward-backtest.mjs",
     "backtest:ablation": "node scripts/run-signal-ablation.mjs",
     "weights:search": "node scripts/run-weight-search.mjs",
+    "calibration:temperature": "node scripts/run-temperature-fit.mjs",
     "backtest:odds": "node scripts/run-walkforward-odds.mjs",
     "calibration:train": "node scripts/run-calibration-train.mjs",
     "backtest:linemove": "node scripts/run-line-movement-backtest.mjs",
