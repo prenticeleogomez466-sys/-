@@ -62,6 +62,32 @@ const staged = stageJingcaiIntoStore(date, captures, asian);
 // 3) 出推荐包(skip 闸门:竞彩官方源不可达,数据来自 500.com 兜底)
 const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
 
+// 4) 美化 xlsx(openpyxl 加表头/条件格式/列宽/边框 — daily-report 写 XML 时只能基础样式)
+import { spawnSync } from "node:child_process";
+import { existsSync as exists2 } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const polishScript = join(__dirname, "polish-xlsx.py");
+let polishStatus = "skipped";
+if (exists2(polishScript) && exists2(pkg.dailyPath)) {
+  const proc = spawnSync("python", [polishScript, pkg.dailyPath], { encoding: "utf8" });
+  polishStatus = proc.status === 0 ? "ok" : `failed:${proc.stderr?.trim() ?? proc.status}`;
+}
+
+// 5) Copy 到桌面(用户硬性偏好"输出到桌面")
+import { copyFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename } from "node:path";
+const desktopPath = join(homedir(), "Desktop", basename(pkg.dailyPath));
+let desktopStatus = "skipped";
+try {
+  copyFileSync(pkg.dailyPath, desktopPath);
+  desktopStatus = "ok";
+} catch (err) {
+  desktopStatus = `failed:${err.message}`;
+}
+
 const jingcai = pkg.recommendations.predictions.filter((p) => p.fixture.marketType === "jingcai").length;
 console.log(JSON.stringify({
   date,
@@ -71,4 +97,7 @@ console.log(JSON.stringify({
   recommendations: { jingcai, fourteen: pkg.recommendations.fourteen.selections.length },
   audit: pkg.audit.summary,
   dailyPath: pkg.dailyPath,
+  desktopPath: desktopStatus === "ok" ? desktopPath : null,
+  polishStatus,
+  desktopStatus,
 }, null, 2));

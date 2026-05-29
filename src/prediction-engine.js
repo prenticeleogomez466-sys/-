@@ -38,10 +38,11 @@ const HALF_FULL_POOLS = {
 };
 
 const FOURTEEN_DEFAULT_MAX_BANKERS = 6;
-const FOURTEEN_DEFAULT_BANKER_MIN_GAP = 0.18;
-// 用户反馈"选不出几个胆"。再降一档:35 让中等置信 + 概率差 ≥18% 也能进胆池。
-// 同时加"市场共识胆":favorite 赔率 ≤1.6 + 模型 pick 跟市场同 → 直接胆,不看模型 confidence。
-const FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE = 35;
+const FOURTEEN_DEFAULT_BANKER_MIN_GAP = 0.22;
+// 用户指令(2026-05-29)"别降级门槛 推出最合理的真实分析"。
+// 恢复合理门槛:置信 ≥50 + 概率差 ≥22%(标准 14 场胆门槛)。
+// 模型本来就保守,出几个胆就几个胆,不靠降门槛凑数。
+const FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE = 50;
 const FOURTEEN_DEFAULT_DOUBLE_MIN_GAP = 0.08;
 
 export function recommendFixtures(date) {
@@ -784,36 +785,22 @@ export function buildFourteenPlan(predictions) {
   // 让模型仍能基于赔率给出胆材,同时维持"不容易给胆"的保守特性。
   const coldStartAll = source.every((p) => (p.advancedFeatures?.quality?.score ?? 0) < 62);
 
-  // 候选胆:同前(市场共识 / 高置信 + 概率差),然后按分数排序
+  // 候选胆:严格按 模型置信 + 概率差 双达标(不再有"市场共识"降级旁路)
   const candidates = source
     .map((prediction, index) => {
       const gap = prediction.pick.probability - prediction.secondaryPick.probability;
       const eo = prediction.marketSnapshot?.europeanOdds?.current ?? prediction.marketSnapshot?.europeanOdds?.initial;
       const favOdds = eo ? Math.min(Number(eo.home || 99), Number(eo.draw || 99), Number(eo.away || 99)) : 99;
-      const marketConsensus = favOdds <= 1.65 && (
-        (Number(eo?.home) === favOdds && prediction.pick.code === "3") ||
-        (Number(eo?.draw) === favOdds && prediction.pick.code === "1") ||
-        (Number(eo?.away) === favOdds && prediction.pick.code === "0")
-      );
-      const isDeepFav = favOdds <= 1.65;  // 深盘
-      const isMid = favOdds > 1.65 && favOdds <= 2.30;  // 中等
-      return { index, prediction, gap, marketConsensus, favOdds, isDeepFav, isMid, code: prediction.pick.code };
+      const isDeepFav = favOdds <= 1.65;
+      return { index, prediction, gap, favOdds, isDeepFav, code: prediction.pick.code };
     })
     .filter((item) => {
       if (item.prediction.risk === "高") return false;
-      if (item.marketConsensus) return true;
-      if (item.gap >= rules.bankerMinGap && item.prediction.confidence >= rules.bankerMinConfidence) {
-        const qualityOk = (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62;
-        if (qualityOk) return true;
-        if (coldStartAll && item.gap >= 0.30 && item.prediction.confidence >= 50) return true;
-      }
-      return false;
+      if (item.gap < rules.bankerMinGap) return false;
+      if (item.prediction.confidence < rules.bankerMinConfidence) return false;
+      return true;
     })
-    .sort((a, b) => {
-      if (a.marketConsensus && !b.marketConsensus) return -1;
-      if (!a.marketConsensus && b.marketConsensus) return 1;
-      return (b.gap * b.prediction.confidence) - (a.gap * a.prediction.confidence);
-    });
+    .sort((a, b) => (b.gap * b.prediction.confidence) - (a.gap * a.prediction.confidence));
 
   // 多样化约束:不让 6 胆全是深盘 favorite。挑选时:
   //   - 同一方向(主胜/平/客胜)最多 3 个胆
@@ -972,14 +959,8 @@ export function buildRenxuan9(source) {
       singleNote = "平局倾向";
     }
 
-    // 任选 9 胆门槛也降:gap≥18% + 置信≥40 或 市场赔率 ≤1.7 共识胆
-    const eo9 = prediction.marketSnapshot?.europeanOdds?.current ?? prediction.marketSnapshot?.europeanOdds?.initial;
-    const favOdds9 = eo9 ? Math.min(Number(eo9.home || 99), Number(eo9.draw || 99), Number(eo9.away || 99)) : 99;
-    const marketBanker9 = favOdds9 <= 1.70 && (
-      (Number(eo9?.home) === favOdds9 && prediction.pick.code === "3") ||
-      (Number(eo9?.away) === favOdds9 && prediction.pick.code === "0")
-    );
-    const isBanker = (marketBanker9 || (gap >= 0.18 && prediction.confidence >= 40))
+    // 任选 9 胆门槛恢复:置信 ≥50 + 概率差 ≥22%,不靠市场降级
+    const isBanker = gap >= 0.22 && prediction.confidence >= 50
                      && prediction.risk !== "高" && singleCode !== "1";
     let codes, coverageReason;
     if (isBanker) {
