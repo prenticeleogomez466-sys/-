@@ -35,15 +35,15 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   const fourteen = recommendations.fourteen.selections;
   const recapRows = recommendations.predictions.map(toLedgerRow);
   const ledger = updateLedger(date, recapRows);
-  const dailyPath = join(exportDir, `football-recommendations-${date}.xlsx`);
-  const masterPath = join(exportDir, "football-recap-master.xlsx");
+  const dailyPath = join(exportDir, `神选-竞彩推荐-${date}.xlsx`);
+  const masterPath = join(exportDir, "神选-复盘总表.xlsx");
   writeXlsxWorkbook(dailyPath, [
-    { name: "竞彩足球", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
-    { name: "14场胜负彩", rows: [fourteenHeaders(), ...fourteen.map(toFourteenRow)] },
-    { name: "任选9", rows: renxuan9Rows(recommendations.fourteen.renxuan9) },
-    { name: "赔率变化对比", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
-    { name: "融合判断要点", rows: [judgmentHeaders(), ...recommendations.predictions.map(toJudgmentRow)] },
-    { name: "大小球阵容特色", rows: [totalGoalsLineupHeaders(), ...recommendations.predictions.map(toTotalGoalsLineupRow)] },
+    { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
+    { name: "神选·14场", rows: [fourteenHeaders(), ...fourteen.map(toFourteenRow)] },
+    { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.renxuan9) },
+    { name: "赔率变化", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
+    { name: "融合判断", rows: [judgmentHeaders(), ...recommendations.predictions.map(toJudgmentRow)] },
+    { name: "大小球·阵容", rows: [totalGoalsLineupHeaders(), ...recommendations.predictions.map(toTotalGoalsLineupRow)] },
     { name: "复盘对比", rows: [recapHeaders(), ...recapRows.map(Object.values)] },
     { name: "模型健康", rows: modelHealthRows(sourceGate, audit) }
   ]);
