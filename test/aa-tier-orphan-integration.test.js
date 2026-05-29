@@ -339,3 +339,24 @@ test("bettingTier 按首选概率分级(阈值依据 coverage 曲线)", () => {
   assert.match(bettingTier({ home: 0.45, draw: 0.30, away: 0.25 }), /慎选|观望/);
   assert.match(bettingTier({ home: 0.34, draw: 0.33, away: 0.33 }), /慎选|观望/);
 });
+
+// ---- 复盘按下注分级统计真实命中率(闭合反馈环)----
+import { summarizeByTier } from "../src/daily-recap.js";
+
+test("summarizeByTier 按 tier 分组统计真实命中率;旧行用概率回退", () => {
+  const settled = [
+    { tier: "🟢 建议下注", hit: true },
+    { tier: "🟢 建议下注", hit: false },
+    { tier: "🟡 可选", hit: true },
+    // 旧行无 tier,概率回退:top=0.7 → 🟢
+    { probabilityHome: 0.7, probabilityDraw: 0.18, probabilityAway: 0.12, hit: true },
+    // top=0.4 → ⚪
+    { probabilityHome: 0.4, probabilityDraw: 0.33, probabilityAway: 0.27, hit: false }
+  ];
+  const tb = summarizeByTier(settled);
+  assert.equal(tb["🟢 建议下注"].total, 3, "2显式+1概率回退");
+  assert.equal(tb["🟢 建议下注"].hit, 2);
+  assert.equal(tb["🟡 可选"].total, 1);
+  assert.equal(tb["⚪ 慎选/观望"].total, 1);
+  assert.equal(tb["⚪ 慎选/观望"].accuracy, 0);
+});

@@ -251,6 +251,7 @@ function toLedgerRow(prediction) {
     monteCarloTopScores: prediction.simulation?.topScores?.slice(0, 3).map((item) => `${item.score}:${pct(item.probability)}`).join(" / ") ?? "",
     risk: prediction.risk,
     confidence: prediction.confidence,
+    tier: bettingTier(prediction.probabilities),
     bankrollDecision: prediction.bankroll?.decision ?? "",
     ev: prediction.bankroll?.ev ?? null,
     stakeUnitsPer100: prediction.bankroll?.stakeUnitsPer100 ?? null,

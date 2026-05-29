@@ -120,6 +120,8 @@ function buildRecapSummary(date, rows, syncResults) {
   const halfFullCover = rate(settled, (row) => row.halfFullHit === true || row.halfFullSecondaryHit === true);
   // CLV:分析师建议的真 KPI —— 下注价 vs 收盘线,衡量是否长期击败市场(比短期命中率更可靠)。
   const clv = summarizeLedgerCLV(settled);
+  // 下注分级真实命中率:验证🟢建议下注场是否真命中~73%(选择性推荐落地的反馈环)。
+  const tierBreakdown = summarizeByTier(settled);
   return {
     date,
     predictions: rows.length,
@@ -132,6 +134,7 @@ function buildRecapSummary(date, rows, syncResults) {
     halfFullPrimary,
     halfFullCover,
     clv,
+    tierBreakdown,
     sync: syncResults.map((item) => ({
       date: item.date,
       fetched: item.fetched,
@@ -141,6 +144,27 @@ function buildRecapSummary(date, rows, syncResults) {
       sources: item.sources?.map((source) => `${source.name}:${source.ok ? "ok" : source.error}`).join(" / ") ?? ""
     }))
   };
+}
+
+// 行的下注分级:优先用 ledger 存的 tier,旧行回退按概率重算(阈值同 daily-report.bettingTier)。
+function tierOf(row) {
+  if (typeof row.tier === "string" && row.tier) return row.tier;
+  const top = Math.max(Number(row.probabilityHome) || 0, Number(row.probabilityDraw) || 0, Number(row.probabilityAway) || 0);
+  if (top >= 0.65) return "🟢 建议下注";
+  if (top >= 0.50) return "🟡 可选";
+  return "⚪ 慎选/观望";
+}
+
+// 按下注分级汇总真实首选命中率(验证分级是否名副其实)。
+export function summarizeByTier(settled) {
+  const tiers = ["🟢 建议下注", "🟡 可选", "⚪ 慎选/观望"];
+  const out = {};
+  for (const t of tiers) {
+    const rows = settled.filter((r) => tierOf(r) === t);
+    const hit = rows.filter((r) => r.hit === true).length;
+    out[t] = { total: rows.length, hit, accuracy: rows.length ? Math.round((hit / rows.length) * 10000) / 10000 : null };
+  }
+  return out;
 }
 
 function recapSummaryRows(summary) {
@@ -158,8 +182,20 @@ function recapSummaryRows(summary) {
     ["半全场含备选命中率", pct(summary.halfFullCover.accuracy), `${summary.halfFullCover.hit}/${summary.halfFullCover.total}`],
     ["CLV 收盘线价值", summary.clv?.measurable ? `${Math.round((summary.clv.avgCLV ?? 0) * 1000) / 10}%` : "不可测", summary.clv?.verdict ?? "需收盘赔率快照"],
     ["CLV 击败收盘线率", summary.clv?.measurable ? `${Math.round((summary.clv.positiveRate ?? 0) * 100)}%` : "—", `样本 ${summary.clv?.samples ?? 0};长期盈利需 ≥55%`],
+    ...tierBreakdownRows(summary.tierBreakdown),
     ["赛果同步", summary.sync.map((item) => `${item.date} fetched=${item.fetched} matched=${item.matched} updated=${item.updated}`).join("；"), "每天上午11点自动同步前一天与次日赛果"]
   ];
+}
+
+// 下注分级真实命中率行(样本不足时诚实标注,不夸大)。
+function tierBreakdownRows(tb) {
+  if (!tb) return [];
+  const expect = { "🟢 建议下注": "回测期望~73%", "🟡 可选": "回测期望~64-67%", "⚪ 慎选/观望": "回测低于全推54%" };
+  return Object.entries(tb).map(([tier, v]) => [
+    `分级命中率 ${tier}`,
+    v.total ? pct(v.accuracy) : "无样本",
+    v.total ? `${v.hit}/${v.total}（${expect[tier]}${v.total < 10 ? "；样本不足,仅参考" : ""}）` : `${expect[tier]};当日无此分级场次`
+  ]);
 }
 
 function recapDetailHeaders() {
