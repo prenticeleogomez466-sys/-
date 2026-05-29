@@ -127,6 +127,7 @@ export function runWalkForwardBacktest(opts = {}) {
   let skippedDates = 0;
   let coldStartPreds = 0;
   let fusionApplied = 0;
+  const leagueAcc = {}; // 按联赛:DC 臂命中/总数(诚实告诉用户模型在哪些联赛靠谱)
 
   for (const { date, matches } of datesWithResults) {
     if (usedDates >= maxTestDates) break;
@@ -147,6 +148,12 @@ export function runWalkForwardBacktest(opts = {}) {
       // A. 纯 DC
       const probsDc = pred.probabilities;
       record(accDc, probsDc, actual);
+      // 按联赛记 DC 命中(top-pick)
+      const lg = f.competition || "未知";
+      const top = OUTCOMES.reduce((a, b) => (probsDc[b] > probsDc[a] ? b : a), "home");
+      if (!leagueAcc[lg]) leagueAcc[lg] = { total: 0, hit: 0 };
+      leagueAcc[lg].total++;
+      if (top === actual) leagueAcc[lg].hit++;
 
       // B. DC + 信号融合(历史 context 让 h2h/streak/clean-sheet/fatigue fire)
       const ctx = buildFusionContext(fixture, histBefore);
@@ -174,7 +181,8 @@ export function runWalkForwardBacktest(opts = {}) {
       fusion: finalize(accFusion),
       calibrated: finalize(accCal)
     },
-    note: "三臂对比:dc=纯模型核心,fusion=+贝叶斯信号融合,calibrated=+65%+收缩。胜平负随机基线≈0.33,纯模型(无赔率)上限≈0.50-0.55。"
+    byLeague: summarizeLeagueAccuracy(leagueAcc),
+    note: "三臂对比:dc=纯模型核心,fusion=+贝叶斯信号融合,calibrated=+65%+收缩。胜平负随机基线≈0.33,纯模型(无赔率)上限≈0.50-0.55。byLeague=各联赛 DC 命中率(诚实显示模型在哪些联赛靠谱;样本<20仅参考)。"
   };
 }
 
@@ -365,6 +373,19 @@ export function runWeightSearch(candidates = [], opts = {}) {
     dc: finalize(accDc),
     candidates: candidates.map((c, i) => ({ name: c.name, signalWeights: c.signalWeights ?? null, ...finalize(accs[i]) }))
   };
+}
+
+// 各联赛 DC 命中率,按命中率降序;标注样本是否充足(<20 仅参考)。
+export function summarizeLeagueAccuracy(leagueAcc) {
+  return Object.entries(leagueAcc)
+    .map(([league, v]) => ({
+      league,
+      total: v.total,
+      hit: v.hit,
+      accuracy: v.total ? round(v.hit / v.total) : null,
+      reliable: v.total >= 20
+    }))
+    .sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0));
 }
 
 function round(v) {

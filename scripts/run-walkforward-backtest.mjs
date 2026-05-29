@@ -33,4 +33,11 @@ for (const [label, a] of arms) {
   const b = a.reliability["65-101"];
   if (b?.samples) console.log(`  ${label}: n=${b.samples}, 预测=${b.predicted}, 实际=${b.actual}, 偏差=${b.gap}`);
 }
+if (Array.isArray(res.byLeague) && res.byLeague.length) {
+  console.log("\n各联赛 DC 命中率(模型在哪些联赛靠谱;样本<20仅参考):");
+  for (const l of res.byLeague) {
+    console.log(`  ${l.league.padEnd(10)} ${(l.accuracy * 100).toFixed(1)}%  (${l.hit}/${l.total})${l.reliable ? "" : "  ⚠️样本不足"}`);
+  }
+}
+
 console.log(`\n${res.note}`);

@@ -360,3 +360,19 @@ test("summarizeByTier 按 tier 分组统计真实命中率;旧行用概率回退
   assert.equal(tb["⚪ 慎选/观望"].total, 1);
   assert.equal(tb["⚪ 慎选/观望"].accuracy, 0);
 });
+
+// ---- 按联赛命中率分解(诚实显示模型在哪些联赛靠谱)----
+import { summarizeLeagueAccuracy } from "../src/walkforward-backtest.js";
+
+test("summarizeLeagueAccuracy 按命中率降序 + 样本充足标注", () => {
+  const out = summarizeLeagueAccuracy({
+    "英超": { total: 30, hit: 18 },
+    "挪超": { total: 8, hit: 2 },
+    "西甲": { total: 25, hit: 10 }
+  });
+  assert.equal(out[0].league, "英超", "命中率最高排第一");
+  assert.equal(out[0].accuracy, 0.6);
+  assert.equal(out[0].reliable, true);
+  const nor = out.find((x) => x.league === "挪超");
+  assert.equal(nor.reliable, false, "样本<20标注不可靠");
+});
