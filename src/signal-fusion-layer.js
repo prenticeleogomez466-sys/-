@@ -29,6 +29,11 @@ import { compareFatigue, applyFatigueBias } from "./schedule-fatigue-model.js";
 import { lineMovementToLR, analyzeLineMovement } from "./line-movement-signal.js";
 import { splitStats, homeAwaySplitToLR } from "./home-away-split-stats.js";
 import { timeDecayFormToLR } from "./time-decay-weighting.js";
+import { weatherXgMultiplier } from "./weather-adjusted-xg.js";
+import { computeManagerInfluence } from "./manager-effect-model.js";
+import { detectDerby, derbyToLR } from "./derby-intensity.js";
+import { computePressureProfile, pressureToFormMultiplier } from "./standings-pressure.js";
+import { bigGameReadinessLR } from "./big-game-form.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getExportDir } from "./paths.js";
@@ -268,6 +273,123 @@ function signalLineMovement(prior, fixture, advancedData, context) {
   };
 }
 
+/**
+ * 极端天气(precip + wind + cold/heat)→ xG 折扣;转 LR 走"恶劣比赛 → 平局率上升、
+ * 净进球减少"的常规假设。数据源:context.weather 或 advancedData fixture 层 weather。
+ * 缺数据/天气适宜 → dormant。
+ */
+function signalWeather(prior, fixture, advancedData, context) {
+  const weather = context.weather ?? fixtureLayer(advancedData, fixture, "weather");
+  if (!weather) return { name: "weather", source: "context.weather", dormant: "no-weather-data" };
+  const wm = weatherXgMultiplier(weather);
+  if (!wm || wm.multiplier >= 0.95) {
+    return { name: "weather", source: "context.weather", dormant: "weather-mild" };
+  }
+  // 极端天气 → 整体进球下降(multiplier < 1)→ 平局率上升 + 主客胜率下降
+  const drawShift = (1 - wm.multiplier) * 0.5;
+  const lr = clampLR({
+    home: 1 - drawShift / 2,
+    draw: 1 + drawShift,
+    away: 1 - drawShift / 2
+  });
+  if (!lr) return { name: "weather", source: "context.weather", dormant: "negligible-shift" };
+  return { name: "weather", source: "context.weather", lr, detail: wm.narrative };
+}
+
+/**
+ * 教练加成:档次(elite/top/.../bad)+ 蜜月期(接手前 15 场)的净 lift。
+ * 数据源:context.{home,away}ManagerProfile + context.{home,away}TenureMatches。
+ * 通常由 fitManagerProfiles 拟合后塞进 context。
+ */
+function signalManager(prior, fixture, advancedData, context) {
+  const homeMgr = context.homeManagerProfile ?? fixtureLayer(advancedData, fixture, "homeManager");
+  const awayMgr = context.awayManagerProfile ?? fixtureLayer(advancedData, fixture, "awayManager");
+  if (!homeMgr && !awayMgr) {
+    return { name: "manager", source: "context.{home,away}ManagerProfile", dormant: "no-manager-profiles" };
+  }
+  const homeInfluence = computeManagerInfluence(homeMgr, context.homeTenureMatches);
+  const awayInfluence = computeManagerInfluence(awayMgr, context.awayTenureMatches);
+  const netLift = homeInfluence.lift - awayInfluence.lift;
+  if (Math.abs(netLift) < 0.02) {
+    return { name: "manager", source: "context.{home,away}ManagerProfile", dormant: "net-lift-below-floor" };
+  }
+  const lr = clampLR({
+    home: 1 + netLift,
+    draw: 1 - Math.abs(netLift) * 0.2,
+    away: 1 - netLift
+  });
+  if (!lr) return { name: "manager", source: "context.{home,away}ManagerProfile", dormant: "neutral" };
+  return {
+    name: "manager", source: "context.{home,away}ManagerProfile", lr,
+    detail: `主${homeInfluence.tier ?? "-"}(${homeInfluence.lift >= 0 ? "+" : ""}${homeInfluence.lift}) vs 客${awayInfluence.tier ?? "-"}(${awayInfluence.lift >= 0 ? "+" : ""}${awayInfluence.lift})`
+  };
+}
+
+/**
+ * 同城/历史宿敌 derby:平局率显著上升,主客胜率压缩。
+ * 数据源:fixture.homeTeam/awayTeam 直接命中已注册的 18 个宿敌对 + 可选 context.distanceKm。
+ */
+function signalDerby(prior, fixture, advancedData, context) {
+  if (!fixture?.homeTeam || !fixture?.awayTeam) {
+    return { name: "derby", source: "fixture.teams", dormant: "no-team-names" };
+  }
+  const derby = detectDerby(fixture.homeTeam, fixture.awayTeam, { distanceKm: context.distanceKm });
+  if (!derby.isDerby) {
+    return { name: "derby", source: "fixture.teams", dormant: "not-a-derby" };
+  }
+  const lr = clampLR(derbyToLR(derby));
+  if (!lr) return { name: "derby", source: "fixture.teams", dormant: "neutral" };
+  return { name: "derby", source: "fixture.teams", lr, detail: `${derby.intensity}` };
+}
+
+/**
+ * 排名压力(争冠/保级/欧战席位/已锁定/摆烂)→ 战力发挥乘子。
+ * 数据源:context.homeStandings / awayStandings(由 league-table 拟合后塞)。
+ */
+function signalStandingsPressure(prior, fixture, advancedData, context) {
+  const homeStd = context.homeStandings ?? fixtureLayer(advancedData, fixture, "homeStandings");
+  const awayStd = context.awayStandings ?? fixtureLayer(advancedData, fixture, "awayStandings");
+  if (!homeStd && !awayStd) {
+    return { name: "standings-pressure", source: "context.{home,away}Standings", dormant: "no-standings" };
+  }
+  const homeProfile = homeStd ? computePressureProfile(homeStd) : null;
+  const awayProfile = awayStd ? computePressureProfile(awayStd) : null;
+  const homeMult = homeProfile ? pressureToFormMultiplier(homeProfile) : 1;
+  const awayMult = awayProfile ? pressureToFormMultiplier(awayProfile) : 1;
+  if (Math.abs(homeMult - awayMult) < 0.01) {
+    return { name: "standings-pressure", source: "context.{home,away}Standings", dormant: "balanced-pressure" };
+  }
+  // 主队 mult > 1 → 利主胜;mult < 1(已锁/摆烂)→ 利客胜
+  const homeAdvantage = homeMult / awayMult - 1;
+  const lr = clampLR({
+    home: 1 + homeAdvantage * 0.5,
+    draw: 1 - Math.abs(homeAdvantage) * 0.1,
+    away: 1 - homeAdvantage * 0.5
+  });
+  if (!lr) return { name: "standings-pressure", source: "context.{home,away}Standings", dormant: "neutral" };
+  const detail = `主${homeProfile?.tier ?? "-"} × 客${awayProfile?.tier ?? "-"}`;
+  return { name: "standings-pressure", source: "context.{home,away}Standings", lr, detail };
+}
+
+/**
+ * 强强对决专项 form(只在双方 Elo ≥ 1600 等"大场子"时有效)。
+ * 数据源:context.{home,away}FormProfile(由 computeBigGameForm 产)。
+ * 任一队没"大场子"样本 → dormant。
+ */
+function signalBigGameForm(prior, fixture, advancedData, context) {
+  const homeProfile = context.homeFormProfile ?? fixtureLayer(advancedData, fixture, "homeFormProfile");
+  const awayProfile = context.awayFormProfile ?? fixtureLayer(advancedData, fixture, "awayFormProfile");
+  if (!homeProfile?.bigGameDataAvailable || !awayProfile?.bigGameDataAvailable) {
+    return { name: "big-game-form", source: "context.{home,away}FormProfile", dormant: "no-big-game-data" };
+  }
+  const lr = clampLR(bigGameReadinessLR(homeProfile, awayProfile));
+  if (!lr) return { name: "big-game-form", source: "context.{home,away}FormProfile", dormant: "neutral-readiness" };
+  return {
+    name: "big-game-form", source: "context.{home,away}FormProfile", lr,
+    detail: `主大场ppm${homeProfile.bigGamePpm} vs 客${awayProfile.bigGamePpm}`
+  };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -279,13 +401,19 @@ const SIGNAL_HANDLERS = [
   signalRotation,
   signalHomeAwaySplit,
   signalTimeDecayForm,
-  signalLineMovement
+  signalLineMovement,
+  signalWeather,
+  signalManager,
+  signalDerby,
+  signalStandingsPressure,
+  signalBigGameForm
 ];
 
 /** 所有信号名(供消融回测 / 权重调优枚举)。 */
 export const SIGNAL_NAMES = [
   "season-phase", "competition-type", "injury", "h2h", "clean-sheet-streak",
-  "streak", "fatigue", "rotation", "home-away-split", "time-decay-form", "line-movement"
+  "streak", "fatigue", "rotation", "home-away-split", "time-decay-form", "line-movement",
+  "weather", "manager", "derby", "standings-pressure", "big-game-form"
 ];
 
 /**
