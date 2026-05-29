@@ -111,7 +111,10 @@ export async function runWalkForwardWithOdds(opts = {}) {
   const testDates = dates.slice(-maxTestDates);
   const firstTestDate = testDates[0];
 
-  const arms = { market: makeAcc(), dc: makeAcc(), dcShot: makeAcc(), blend: makeAcc(), blendShot: makeAcc(), blendFusion: makeAcc(), blendFusionCal: makeAcc(), blendFusionLineMove: makeAcc() };
+  const arms = { market: makeAcc(), dc: makeAcc(), dcShot: makeAcc(), blend: makeAcc(), blendShot: makeAcc(), blendFusion: makeAcc(), blendFusionCal: makeAcc(), blendFusionLineMove: makeAcc(),
+    // 杠杆B:更 sharp 的锚(收盘均赔 / Pinnacle 收盘)。注:收盘只在 kickoff 已知=上限,
+    // 生产用最新捕获 current 近似。仅在该场有对应字段时计入(故 n 可能小于 blend 臂)。
+    marketClose: makeAcc(), blendClose: makeAcc(), marketPinnacleClose: makeAcc(), blendPinnacleClose: makeAcc() };
   const coverageSamples = []; // 选择性推荐:blend 臂每场 {topProb, hit},供 hit-vs-coverage 曲线
   let usedDates = 0, skipped = 0, noOdds = 0, fusionApplied = 0, lineMoveFired = 0, shotApplied = 0;
 
@@ -149,6 +152,18 @@ export async function runWalkForwardWithOdds(opts = {}) {
       {
         const top = OUTCOMES.reduce((x, y) => (blendProbs[y] > blendProbs[x] ? y : x), "home");
         coverageSamples.push({ topProb: blendProbs[top], hit: top === actual });
+      }
+
+      // 杠杆B:更 sharp 的锚对比(收盘均赔 / Pinnacle 收盘)。仅在该场有对应字段时计入。
+      if (m.oddsClose) {
+        record(arms.marketClose, m.oddsClose, actual);
+        const bc = blendWithOdds(m.oddsClose, pred, { competition: m.league });
+        record(arms.blendClose, bc.probabilities ?? m.oddsClose, actual);
+      }
+      if (m.oddsPinnacleClose) {
+        record(arms.marketPinnacleClose, m.oddsPinnacleClose, actual);
+        const bpc = blendWithOdds(m.oddsPinnacleClose, pred, { competition: m.league });
+        record(arms.blendPinnacleClose, bpc.probabilities ?? m.oddsPinnacleClose, actual);
       }
 
       // market + shot-regressed DC
@@ -196,7 +211,11 @@ export async function runWalkForwardWithOdds(opts = {}) {
       blendShot: finalize(arms.blendShot),
       blendFusion: finalize(arms.blendFusion),
       blendFusionCal: finalize(arms.blendFusionCal),
-      blendFusionLineMove: finalize(arms.blendFusionLineMove)
+      blendFusionLineMove: finalize(arms.blendFusionLineMove),
+      marketClose: finalize(arms.marketClose),
+      blendClose: finalize(arms.blendClose),
+      marketPinnacleClose: finalize(arms.marketPinnacleClose),
+      blendPinnacleClose: finalize(arms.blendPinnacleClose)
     },
     note: "market=市场赔率隐含(基准,含全部公开信息,极难打败);dc/dcShot=纯 DC(进球 vs 射门去噪);blend/blendShot=赔率+对应 DC;后三臂叠加融合/校准。"
   };

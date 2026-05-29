@@ -24,10 +24,16 @@ const order = [
   ["blend 赔率+DC射门 ", res.arms.blendShot],
   ["blend+融合        ", res.arms.blendFusion],
   ["blend+融合+校准   ", res.arms.blendFusionCal],
-  ["+盘口移动(开→收) ", res.arms.blendFusionLineMove]
+  ["+盘口移动(开→收) ", res.arms.blendFusionLineMove],
+  ["—— 杠杆B 更sharp锚 ——", null],
+  ["marketClose 收盘均赔", res.arms.marketClose],
+  ["blendClose 收盘+DC  ", res.arms.blendClose],
+  ["marketPinClose 收盘P", res.arms.marketPinnacleClose],
+  ["blendPinClose 收盘P+DC", res.arms.blendPinnacleClose]
 ];
 console.log("臂                  命中率    Brier    RPS     LogLoss   n");
 for (const [label, a] of order) {
+  if (!a) { console.log(label); continue; }
   console.log(`${label}  ${(a.accuracy * 100).toFixed(1)}%   ${a.brier.toFixed(4)}  ${a.rps.toFixed(4)}  ${a.logLoss.toFixed(4)}  ${a.tested}`);
 }
 
@@ -35,6 +41,7 @@ const mk = res.arms.market, bf = res.arms.blendFusionCal;
 console.log(`\n对市场基准:命中率 ${((bf.accuracy - mk.accuracy) * 100).toFixed(2)}pp,RPS ${(bf.rps - mk.rps).toFixed(4)}(RPS 负=比市场好)`);
 console.log("\n65%+ 强热门校准:");
 for (const [label, a] of order) {
+  if (!a) continue;
   const b = a.reliability["65-101"];
   if (b?.samples) console.log(`  ${label}: n=${b.samples}, 预测=${b.predicted}, 实际=${b.actual}, 偏差=${b.gap}`);
 }
