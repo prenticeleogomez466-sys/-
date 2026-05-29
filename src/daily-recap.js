@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import "./env.js";
 import { getExportDir } from "./paths.js";
 import { loadFixtures } from "./fixture-store.js";
+import { loadMarketSnapshots, findMarketSnapshot } from "./market-data-store.js";
+import { enrichLedgerRow, summarizeLedgerCLV } from "./clv-tracker.js";
 import { syncAuthorizedFixturesAndResults } from "./authorized-fixtures.js";
 import { syncFootballArtifacts } from "./artifact-sync.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
@@ -25,7 +27,14 @@ export async function runDailyRecap(date, options = {}) {
   const fixtures = loadFixtures(targetDate).fixtures;
   const nextFixtures = loadFixtures(addDays(targetDate, 1)).fixtures;
   const fixturePool = [...fixtures, ...nextFixtures];
-  const nextLedger = ledger.map((row) => (row.date === targetDate ? updateLedgerRow(row, fixturePool) : row));
+  // CLV:载入收盘快照,结算时与下注价对比(分析师建议的真 KPI)。
+  let snapshotPool = [];
+  try {
+    snapshotPool = [...loadMarketSnapshots(targetDate).snapshots, ...loadMarketSnapshots(addDays(targetDate, 1)).snapshots];
+  } catch {
+    snapshotPool = [];
+  }
+  const nextLedger = ledger.map((row) => (row.date === targetDate ? updateLedgerRow(row, fixturePool, snapshotPool) : row));
   writeFileSync(ledgerPath, `${JSON.stringify(nextLedger, null, 2)}\n`, "utf8");
   const targetRows = nextLedger.filter((row) => row.date === targetDate);
   const summary = buildRecapSummary(targetDate, targetRows, syncResults);
@@ -55,13 +64,13 @@ function mirrorRecapExports(date, summaryPath, masterPath) {
   return { dSummaryPath, dMasterPath };
 }
 
-function updateLedgerRow(row, fixtures) {
+function updateLedgerRow(row, fixtures, snapshots = []) {
   const fixture = findFixtureForLedger(row, fixtures);
   if (!fixture?.result) return { ...row, actualStatus: "pending-result" };
   const actualCode = resultCode(fixture.result);
   const actualScore = `${fixture.result.home}-${fixture.result.away}`;
   const actualHalfFull = halfFullFromResult(fixture.result);
-  return {
+  const settled = {
     ...row,
     actual: outcomeCodeToChinese(actualCode),
     actualCode,
@@ -76,6 +85,29 @@ function updateLedgerRow(row, fixtures) {
     halfFullSecondaryHit: normalizeHalfFull(row.halfFullSecondary) === actualHalfFull,
     settledAt: new Date().toISOString()
   };
+  return enrichSettledWithCLV(settled, fixture, snapshots);
+}
+
+// 取某选项(3=主/1=平/0=客)在欧赔里的小数赔率。
+function pickDecimalOdds(europeanOdds, pickCode) {
+  const key = pickCode === "3" ? "home" : pickCode === "1" ? "draw" : pickCode === "0" ? "away" : null;
+  if (!key) return null;
+  const v = Number(europeanOdds?.[key]);
+  return Number.isFinite(v) && v > 1 ? v : null;
+}
+
+// 结算行附 CLV:用收盘快照(final/current 最新捕获=最接近收盘)对比下注价。
+// 只有当收盘捕获时刻晚于下注捕获时刻,才算"真收盘"(measured=true),否则单次捕获不计入 CLV 统计。
+function enrichSettledWithCLV(settled, fixture, snapshots) {
+  if (!Number.isFinite(Number(settled.primaryOdds)) || !Array.isArray(snapshots) || !snapshots.length) return settled;
+  const snapshot = findMarketSnapshot(fixture, snapshots);
+  const closingEu = snapshot?.europeanOdds?.final ?? snapshot?.europeanOdds?.current;
+  const pickCode = outcomeCode(settled.primary);
+  const closingOdds = pickDecimalOdds(closingEu, pickCode);
+  if (closingOdds == null) return settled;
+  const closeAt = snapshot?.collectedAt ?? null;
+  const measured = Boolean(closeAt && settled.betCapturedAt && closeAt > settled.betCapturedAt);
+  return enrichLedgerRow(settled, closingOdds, { measured });
 }
 
 function buildRecapSummary(date, rows, syncResults) {
@@ -86,6 +118,8 @@ function buildRecapSummary(date, rows, syncResults) {
   const scoreCover = rate(settled, (row) => row.scoreHit === true || row.scoreSecondaryHit === true);
   const halfFullPrimary = rate(settled, (row) => row.halfFullHit === true);
   const halfFullCover = rate(settled, (row) => row.halfFullHit === true || row.halfFullSecondaryHit === true);
+  // CLV:分析师建议的真 KPI —— 下注价 vs 收盘线,衡量是否长期击败市场(比短期命中率更可靠)。
+  const clv = summarizeLedgerCLV(settled);
   return {
     date,
     predictions: rows.length,
@@ -97,6 +131,7 @@ function buildRecapSummary(date, rows, syncResults) {
     scoreCover,
     halfFullPrimary,
     halfFullCover,
+    clv,
     sync: syncResults.map((item) => ({
       date: item.date,
       fetched: item.fetched,
@@ -121,6 +156,8 @@ function recapSummaryRows(summary) {
     ["比分含备选命中率", pct(summary.scoreCover.accuracy), `${summary.scoreCover.hit}/${summary.scoreCover.total}`],
     ["半全场首选命中率", pct(summary.halfFullPrimary.accuracy), `${summary.halfFullPrimary.hit}/${summary.halfFullPrimary.total}`],
     ["半全场含备选命中率", pct(summary.halfFullCover.accuracy), `${summary.halfFullCover.hit}/${summary.halfFullCover.total}`],
+    ["CLV 收盘线价值", summary.clv?.measurable ? `${Math.round((summary.clv.avgCLV ?? 0) * 1000) / 10}%` : "不可测", summary.clv?.verdict ?? "需收盘赔率快照"],
+    ["CLV 击败收盘线率", summary.clv?.measurable ? `${Math.round((summary.clv.positiveRate ?? 0) * 100)}%` : "—", `样本 ${summary.clv?.samples ?? 0};长期盈利需 ≥55%`],
     ["赛果同步", summary.sync.map((item) => `${item.date} fetched=${item.fetched} matched=${item.matched} updated=${item.updated}`).join("；"), "每天上午11点自动同步前一天与次日赛果"]
   ];
 }

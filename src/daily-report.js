@@ -200,9 +200,22 @@ function toJudgmentRow(prediction) {
   ];
 }
 
+// 取某选项(pickCode 3=主/1=平/0=客)在一组欧赔里的小数赔率。
+function pickDecimalOdds(europeanOdds, pickCode) {
+  const key = pickCode === "3" ? "home" : pickCode === "1" ? "draw" : pickCode === "0" ? "away" : null;
+  if (!key) return null;
+  const v = Number(europeanOdds?.[key]);
+  return Number.isFinite(v) && v > 1 ? v : null;
+}
+
 function toLedgerRow(prediction) {
   const fixture = prediction.fixture;
   const actual = fixture.result ? resultCode(fixture.result) : "";
+  // CLV(分析师建议的真 KPI):记录下注时该选项的小数赔率 + 开盘价 + 捕获时刻,
+  // 结算时与收盘快照对比算 CLV。current 是我们生成推荐时的"下注价"。
+  const snap = prediction.marketSnapshot;
+  const euBet = snap?.europeanOdds?.current ?? snap?.europeanOdds?.final;
+  const euOpen = snap?.europeanOdds?.initial;
   return {
     date: fixture.date,
     sequence: fixture.sequence,
@@ -235,6 +248,10 @@ function toLedgerRow(prediction) {
     ensembleAway: prediction.ensembleView?.probabilities?.away ?? "",
     ensembleMethods: prediction.ensembleView?.methodCount ?? 0,
     reason: prediction.rationale,
+    // CLV 原料(结算时用):primaryOdds=下注价,primaryOpeningOdds=开盘价,betCapturedAt=捕获时刻
+    primaryOdds: pickDecimalOdds(euBet, prediction.pick.code),
+    primaryOpeningOdds: pickDecimalOdds(euOpen, prediction.pick.code),
+    betCapturedAt: snap?.collectedAt ?? null,
     actual: outcomeCodeToChinese(actual),
     actualScore: fixture.result ? `${fixture.result.home}-${fixture.result.away}` : "",
     hit: actual ? actual === prediction.pick.code : null

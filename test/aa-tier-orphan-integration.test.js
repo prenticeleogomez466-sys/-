@@ -4,6 +4,7 @@ import { collectFusionEvidence, fuseSignals } from "../src/signal-fusion-layer.j
 import { homeAwaySplitToLR, splitStats } from "../src/home-away-split-stats.js";
 import { recentMatchesFor } from "../src/fusion-context-builder.js";
 import { buildFourteenPlan } from "../src/prediction-engine.js";
+import { enrichLedgerRow, summarizeLedgerCLV } from "../src/clv-tracker.js";
 
 // 合成一条 prediction(只给 buildFourteenPlan 用到的字段)
 function pred({ id, home, away, comp, date, pickCode, pickProb, secProb, conf, risk = "中", quality = 70 }) {
@@ -103,4 +104,42 @@ test("buildFourteenPlan 胆腿不足时 bankerParlay 安全返回 ok:false", () 
   ];
   const plan = buildFourteenPlan(predictions);
   assert.equal(plan.bankerParlay.ok, false, "0~1 胆腿无法串关");
+});
+
+test("enrichLedgerRow 附 CLV 字段并尊重 measured 标记", () => {
+  // 下注价 2.10 → 收盘 1.95(庄家压低=抓到 sharp 价)= 正 CLV
+  const row = { match: "甲 对 乙", primaryOdds: 2.10 };
+  const enriched = enrichLedgerRow(row, 1.95, { measured: true });
+  assert.ok(enriched.clv > 0, "收盘<下注 → 正 CLV");
+  assert.equal(enriched.clvVerdict, "strong-positive");
+  assert.equal(enriched.clvMeasured, true);
+  assert.equal(enriched.closingOdds, 1.95);
+  // measured:false(单次捕获)仍写字段但不计统计
+  const unmeasured = enrichLedgerRow(row, 1.95, { measured: false });
+  assert.equal(unmeasured.clvMeasured, false);
+  // 无 primaryOdds → 原样返回
+  assert.deepEqual(enrichLedgerRow({ match: "x" }, 1.95), { match: "x" });
+});
+
+test("summarizeLedgerCLV 只统计 measured 行,正 CLV 多数 → 长期盈利信号", () => {
+  const rows = [
+    { clv: 0.05, clvMeasured: true },
+    { clv: 0.04, clvMeasured: true },
+    { clv: 0.02, clvMeasured: true },
+    { clv: -0.01, clvMeasured: true },
+    { clv: 0.99, clvMeasured: false } // 未测,应被忽略
+  ];
+  const s = summarizeLedgerCLV(rows);
+  assert.equal(s.ok, true);
+  assert.equal(s.samples, 4, "只数 measured");
+  assert.ok(s.avgCLV > 0);
+  assert.equal(s.positiveRate, 0.75, "4 条里 3 条正");
+  assert.equal(s.longTermProfitable, true, "avg>0 且 正率≥0.55");
+});
+
+test("summarizeLedgerCLV 无可测行时诚实返回 measurable:false(不误报亏损)", () => {
+  const s = summarizeLedgerCLV([{ clv: 0, clvMeasured: false }, { hit: true }]);
+  assert.equal(s.ok, false);
+  assert.equal(s.measurable, false);
+  assert.match(s.verdict, /暂无可测 CLV/);
 });

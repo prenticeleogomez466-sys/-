@@ -105,10 +105,54 @@ export function buildCLVTracker() {
      * 给 ledger row 加 CLV 字段(prediction.bet → closing.match)
      */
     enrichLedgerRow(row, closingOdds) {
-      if (!row || closingOdds == null || !Number.isFinite(row.primaryOdds)) return row;
-      const r = computeCLV(row.primaryOdds, closingOdds);
-      return { ...row, closingOdds, clv: r.clv, clvVerdict: r.verdict };
+      return enrichLedgerRow(row, closingOdds);
     }
+  };
+}
+
+/**
+ * 给单条 ledger row 计算并附加 CLV 字段。
+ * @param {Object} row 含 primaryOdds(下注时该选项的小数赔率)
+ * @param {number} closingOdds 收盘小数赔率
+ * @param {{measured?: boolean}} opts measured=false 表示无真收盘快照(收盘=下注同价/同次捕获),
+ *   仅占位不计入 CLV 统计,避免单次捕获把 CLV 误报成 0/🔴。
+ * @returns {Object} 带 closingOdds/clv/clvVerdict/clvMeasured 的新 row(无法计算时原样返回)
+ */
+export function enrichLedgerRow(row, closingOdds, opts = {}) {
+  if (!row || closingOdds == null || !Number.isFinite(Number(row.primaryOdds))) return row;
+  const r = computeCLV(row.primaryOdds, closingOdds);
+  if (r.clv == null) return row;
+  const measured = opts.measured ?? true;
+  return { ...row, closingOdds: Number(closingOdds), clv: r.clv, clvVerdict: r.verdict, clvMeasured: measured };
+}
+
+/**
+ * 汇总一批已结算 ledger row 的 CLV(分析师建议的真 KPI:看下注价 vs 收盘线,而非短期命中率)。
+ * 只统计 clvMeasured===true 的行;无真收盘数据时诚实返回 measurable:false 而非误报亏损。
+ * @param {Array} rows
+ * @returns {{ok, samples, avgCLV?, positiveRate?, strongPositiveRate?, longTermProfitable?, verdict, measurable}}
+ */
+export function summarizeLedgerCLV(rows = []) {
+  const clvRows = (Array.isArray(rows) ? rows : []).filter((r) => r && r.clvMeasured === true && Number.isFinite(Number(r.clv)));
+  if (!clvRows.length) {
+    return { ok: false, samples: 0, measurable: false, verdict: "⚪ 暂无可测 CLV(需收盘赔率快照;单次捕获无法测 CLV)" };
+  }
+  const clvs = clvRows.map((r) => Number(r.clv));
+  const avgCLV = clvs.reduce((s, v) => s + v, 0) / clvs.length;
+  const positiveRate = clvs.filter((v) => v > POSITIVE_CLV_THRESHOLD).length / clvs.length;
+  const strongPositiveRate = clvs.filter((v) => v > STRONG_CLV_THRESHOLD).length / clvs.length;
+  const longTermProfitable = avgCLV > 0 && positiveRate >= 0.55;
+  return {
+    ok: true,
+    samples: clvRows.length,
+    measurable: true,
+    avgCLV: round(avgCLV),
+    positiveRate: round(positiveRate),
+    strongPositiveRate: round(strongPositiveRate),
+    longTermProfitable,
+    verdict: longTermProfitable
+      ? `🟢 平均 CLV ${round(avgCLV * 100)}%,${Math.round(positiveRate * 100)}% 击败收盘线 → 长期盈利信号`
+      : `🔴 平均 CLV ${round(avgCLV * 100)}%,${Math.round(positiveRate * 100)}% 击败收盘线(需 ≥55%)→ 长期盈利信号弱`
   };
 }
 
