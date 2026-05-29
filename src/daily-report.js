@@ -28,6 +28,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   writeXlsxWorkbook(dailyPath, [
     { name: "竞彩足球", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
     { name: "14场胜负彩", rows: [fourteenHeaders(), ...fourteen.map(toFourteenRow)] },
+    { name: "任选9", rows: renxuan9Rows(recommendations.fourteen.renxuan9) },
     { name: "赔率变化对比", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
     { name: "融合判断要点", rows: [judgmentHeaders(), ...recommendations.predictions.map(toJudgmentRow)] },
     { name: "大小球阵容特色", rows: [totalGoalsLineupHeaders(), ...recommendations.predictions.map(toTotalGoalsLineupRow)] },
@@ -271,6 +272,32 @@ function jingcaiHeaders() {
 
 function fourteenHeaders() {
   return ["场次", "比赛", "单式推荐", "覆盖选择", "类型", "风险", "信心", "选择理由"];
+}
+
+// 任选9 sheet:从 14 场挑最稳 9 场单选,9 场全对即中。
+function renxuan9Rows(renxuan9) {
+  const header = ["序", "比赛", "推荐", "主胜概率", "信心", "风险", "概率差"];
+  if (!renxuan9?.ok) {
+    return [header, ["—", renxuan9?.reason ?? "任选9 不可用(可选场次不足 9)", "", "", "", "", ""]];
+  }
+  const rows = renxuan9.picks.map((p) => [
+    p.rank,
+    p.match,
+    p.pick,
+    pct(p.probability),
+    p.confidence,
+    p.risk,
+    p.gap
+  ]);
+  const ind = renxuan9.parlay?.jointProbabilityIndependent ?? null;
+  const adj = renxuan9.parlay?.jointProbabilityCorrelated ?? null;
+  const summary = [
+    ["", "", "", "", "", "", ""],
+    ["单式串", renxuan9.singleLine, "", "", "", "", ""],
+    ["9 串联合命中率", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", "", "", "", ""],
+    ["说明", renxuan9.note, "", "", "", "", ""]
+  ];
+  return [header, ...rows, ...summary];
 }
 
 function judgmentHeaders() {

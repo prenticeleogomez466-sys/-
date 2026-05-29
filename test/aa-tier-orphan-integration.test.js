@@ -278,3 +278,37 @@ test("fitTemperature 对过度自信样本拟合出 T>1", () => {
   assert.equal(fit.ok, true);
   assert.ok(fit.temperature > 1.1, "高自信低命中 → 需软化 T>1");
 });
+
+// ---- 任选9(从14场挑最稳9场单选)----
+import { buildRenxuan9 } from "../src/prediction-engine.js";
+
+function predForR9({ home, away, pickCode, pickProb, secProb, conf, risk = "中" }) {
+  return {
+    fixture: { id: `${home}-${away}`, homeTeam: home, awayTeam: away, competition: "测试", date: "2026-05-29" },
+    pick: { code: pickCode, probability: pickProb },
+    secondaryPick: { code: "1", probability: secProb },
+    confidence: conf, risk
+  };
+}
+
+test("buildRenxuan9 从≥9场里挑置信最高9场单选 + 联合命中率", () => {
+  const preds = [];
+  for (let i = 0; i < 12; i++) {
+    preds.push(predForR9({ home: `H${i}`, away: `A${i}`, pickCode: "3", pickProb: 0.5 + i * 0.02, secProb: 0.25, conf: 50 + i }));
+  }
+  const r9 = buildRenxuan9(preds);
+  assert.equal(r9.ok, true);
+  assert.equal(r9.picks.length, 9, "正好9场");
+  assert.equal(r9.needCorrect, 9);
+  // 应取置信最高的9场(conf 53..61),最高 conf=61 排第1
+  assert.equal(r9.picks[0].confidence, 61);
+  assert.ok(r9.parlay.jointProbabilityIndependent > 0 && r9.parlay.jointProbabilityIndependent < 1);
+  assert.equal(r9.singleLine.split(" ").length, 9);
+});
+
+test("buildRenxuan9 不足9场诚实返回 ok:false 不硬凑", () => {
+  const preds = [predForR9({ home: "A", away: "B", pickCode: "3", pickProb: 0.6, secProb: 0.2, conf: 70 })];
+  const r9 = buildRenxuan9(preds);
+  assert.equal(r9.ok, false);
+  assert.equal(r9.picks.length, 0);
+});

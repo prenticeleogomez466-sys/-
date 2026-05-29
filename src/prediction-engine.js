@@ -781,12 +781,65 @@ export function buildFourteenPlan(predictions) {
       awayTeam: prediction.fixture.awayTeam
     }));
   const bankerParlay = adjustParlayForCorrelation(bankerLegs);
+
+  // 任选9:从 14 场里任选 9 场、全对即中(比 14 场全中容易得多)。
+  // 推荐 = 取最稳的 9 场(按 置信度→概率差 排序)的单选,给联合命中率(独立+相关性修正)。
+  const renxuan9 = buildRenxuan9(source);
+
   return {
     count: selections.length,
     singleLine: selections.map((item) => item.single).join(" "),
     compoundLine: selections.map((item) => item.compound).join(" "),
     selections,
-    bankerParlay
+    bankerParlay,
+    renxuan9
+  };
+}
+
+/**
+ * 任选9 选场:从给定预测里挑置信度最高的 9 场单选,算 9 串联合命中率。
+ * 不足 9 场返回 ok:false(诚实,不硬凑)。
+ */
+export function buildRenxuan9(source) {
+  if (!Array.isArray(source) || source.length < 9) {
+    return { ok: false, reason: `可选场次不足 9(${source?.length ?? 0})`, picks: [] };
+  }
+  const ranked = source
+    .map((prediction, index) => ({
+      index,
+      prediction,
+      gap: prediction.pick.probability - prediction.secondaryPick.probability
+    }))
+    .sort((a, b) => b.prediction.confidence - a.prediction.confidence || b.gap - a.gap)
+    .slice(0, 9);
+  const picks = ranked.map(({ prediction, gap }, i) => ({
+    rank: i + 1,
+    match: `${prediction.fixture.homeTeam} 对 ${prediction.fixture.awayTeam}`,
+    pick: outcomeCodeToChinese(prediction.pick.code),
+    code: prediction.pick.code,
+    probability: prediction.pick.probability,
+    confidence: prediction.confidence,
+    risk: prediction.risk,
+    gap: Math.round(gap * 100) / 100
+  }));
+  const legs = ranked.map(({ prediction }) => ({
+    fixtureId: prediction.fixture.id,
+    league: prediction.fixture.competition,
+    kickoffDate: prediction.fixture.date,
+    outcome: prediction.pick.code,
+    probability: prediction.pick.probability,
+    homeTeam: prediction.fixture.homeTeam,
+    awayTeam: prediction.fixture.awayTeam
+  }));
+  const parlay = adjustParlayForCorrelation(legs);
+  const singleLine = picks.map((p) => p.pick).join(" ");
+  return {
+    ok: true,
+    needCorrect: 9,
+    picks,
+    singleLine,
+    parlay,
+    note: "从 14 场挑置信最高的 9 场单选;9 场全对即中任选9。联合命中率见 parlay(相关性修正后更诚实)。"
   };
 }
 
