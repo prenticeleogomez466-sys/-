@@ -263,6 +263,65 @@ export function runSignalAblation(opts = {}) {
   return { testDatesUsed: usedDates, tested: accFull.tested, full, signals: signalReports };
 }
 
+/**
+ * 权重搜索:单次数据遍历同时评估多个候选「融合信号权重组合」。
+ * 复用每日唯一的 DC 拟合,对每场比赛把同一份 prior+context 喂给每个候选(fusion 很便宜),
+ * 各自累计命中/Brier/LogLoss。避免对每个候选重跑昂贵的拟合。
+ *
+ * @param {Array<{name:string, signalWeights?:Object, disabledSignals?:string[]}>} candidates
+ * @param {Object} opts testDates/minTrainMatches/maxDates
+ * @returns {{tested, dc:{accuracy,brier,...}, candidates:Array<{name, accuracy, brier, rps, logLoss}>}}
+ */
+export function runWeightSearch(candidates = [], opts = {}) {
+  const maxTestDates = opts.testDates ?? 50;
+  const minTrainMatches = opts.minTrainMatches ?? 200;
+  const maxDates = opts.maxDates ?? 240;
+
+  const allHistory = loadHistoricalResults();
+  const datesDesc = listFixtureDates();
+  const datesWithResults = [];
+  for (const date of datesDesc) {
+    const { fixtures } = loadFixtures(date);
+    const withResult = (fixtures || []).filter(
+      (f) => f.result && Number.isFinite(Number(f.result.home)) && Number.isFinite(Number(f.result.away))
+    );
+    if (withResult.length) datesWithResults.push({ date, matches: withResult });
+  }
+
+  const accDc = makeAcc();
+  const accs = candidates.map(() => makeAcc());
+  let usedDates = 0;
+  for (const { date, matches } of datesWithResults) {
+    if (usedDates >= maxTestDates) break;
+    const fit = fitFromFixtureStore({ beforeDate: date, maxDates });
+    if (!fit?.usable || fit.coldStart || (fit.matches ?? 0) < minTrainMatches) continue;
+    usedDates++;
+    const histBefore = allHistory.filter((m) => m.date < date);
+    for (const f of matches) {
+      const pred = predictFromFitted(fit, { homeTeam: f.homeTeam, awayTeam: f.awayTeam });
+      if (!pred?.probabilities) continue;
+      const actual = actualOutcome(f.result);
+      const fixture = { id: f.id, homeTeam: f.homeTeam, awayTeam: f.awayTeam, competition: f.competition, date };
+      const ctx = buildFusionContext(fixture, histBefore);
+      record(accDc, pred.probabilities, actual);
+      for (let i = 0; i < candidates.length; i++) {
+        const c = candidates[i];
+        const fused = fuseSignals(pred.probabilities, fixture, {}, ctx, {
+          signalWeights: c.signalWeights,
+          disabledSignals: c.disabledSignals
+        });
+        record(accs[i], fused.probabilities, actual);
+      }
+    }
+  }
+  return {
+    testDatesUsed: usedDates,
+    tested: accDc.tested,
+    dc: finalize(accDc),
+    candidates: candidates.map((c, i) => ({ name: c.name, signalWeights: c.signalWeights ?? null, ...finalize(accs[i]) }))
+  };
+}
+
 function round(v) {
   return Math.round(v * 10000) / 10000;
 }

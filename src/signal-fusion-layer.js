@@ -29,6 +29,9 @@ import { compareFatigue, applyFatigueBias } from "./schedule-fatigue-model.js";
 import { lineMovementToLR, analyzeLineMovement } from "./line-movement-signal.js";
 import { splitStats, homeAwaySplitToLR } from "./home-away-split-stats.js";
 import { timeDecayFormToLR } from "./time-decay-weighting.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { getExportDir } from "./paths.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const LR_MIN = 0.5;
@@ -38,6 +41,24 @@ const DEFAULT_MAX_TOTAL_SHIFT = 0.12;
 function round(v) {
   return Math.round(v * 10000) / 10000;
 }
+
+// 回测学到的融合信号权重 profile(由 npm run weights:search --apply 写)。
+// 进程内缓存一次,避免每场预测都读盘;生产路径据此弱化/剔除害校准的信号。
+let _weightProfileCache;
+export function loadFusionWeightProfile() {
+  if (_weightProfileCache !== undefined) return _weightProfileCache;
+  try {
+    const p = join(getExportDir(), "fusion-signal-weights.json");
+    if (!existsSync(p)) { _weightProfileCache = null; return null; }
+    const profile = JSON.parse(readFileSync(p, "utf8"));
+    _weightProfileCache = profile?.usable
+      ? { signalWeights: profile.signalWeights ?? {}, disabledSignals: profile.disabledSignals ?? [], chosen: profile.chosen }
+      : null;
+  } catch { _weightProfileCache = null; }
+  return _weightProfileCache;
+}
+// 测试/重载用
+export function _resetFusionWeightCache() { _weightProfileCache = undefined; }
 
 // 对一个 {home,draw,away} LR 做幂缩放:lr^w(w<1 弱化信号、w>1 放大),再夹回区间。
 function scaleLR(lr, w) {

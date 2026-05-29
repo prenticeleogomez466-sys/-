@@ -237,3 +237,19 @@ test("signalWeights<1 弱化信号 LR(朝中性 1 收缩),=0 等于禁用", () =
   const zero = collectFusionEvidence(prior, fixture, {}, ctx, { signalWeights: { "time-decay-form": 0 } });
   assert.ok(!zero.evidence.some((e) => e.name === "time-decay-form"), "w=0 等于禁用");
 });
+
+// ---- 融合权重 profile 加载(命中率优化闭环③:回测学到的权重接进生产)----
+import { loadFusionWeightProfile, _resetFusionWeightCache } from "../src/signal-fusion-layer.js";
+
+test("loadFusionWeightProfile 返回 {signalWeights,disabledSignals} 或 null,并进程内缓存", () => {
+  _resetFusionWeightCache();
+  const p = loadFusionWeightProfile();
+  // profile 可能存在(D盘 exports)也可能不存在;两种都要安全
+  if (p !== null) {
+    assert.ok(typeof p === "object");
+    assert.ok(Array.isArray(p.disabledSignals));
+    assert.ok(p.signalWeights && typeof p.signalWeights === "object");
+  }
+  // 第二次调用走缓存,返回同一引用(或同为 null)
+  assert.equal(loadFusionWeightProfile(), p);
+});

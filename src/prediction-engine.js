@@ -10,7 +10,7 @@ import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { bootstrapRatings } from "./ratings-bootstrap.js";
 import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
 import { applyLayer2Signals } from "./feature-enhancers.js";
-import { fuseSignals } from "./signal-fusion-layer.js";
+import { fuseSignals, loadFusionWeightProfile } from "./signal-fusion-layer.js";
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
 import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
@@ -140,7 +140,12 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       ? { openingOdds: probabilitiesFromOdds(snapshot.europeanOdds.initial), currentOdds: oddsProbabilities }
       : {})
   };
-  const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext);
+  // 回测学到的信号权重 profile(剔除/弱化害校准的融合信号);options 可覆盖。
+  const weightProfile = loadFusionWeightProfile();
+  const fusionOpts = options.fusionOpts ?? (weightProfile
+    ? { signalWeights: weightProfile.signalWeights, disabledSignals: weightProfile.disabledSignals }
+    : {});
+  const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext, fusionOpts);
   probabilityAdjustment.fusion = fusion;
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
   const calibrated = calibrateProbabilities(fusion.probabilities, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
