@@ -251,6 +251,11 @@ const RAW_ALIASES = {
   "burnleyfc": "伯恩利", "伯恩利": "伯恩利", "burnley": "伯恩利",
   "lutontownfc": "卢顿", "卢顿": "卢顿", "luton": "卢顿", "lutontown": "卢顿",
   "sheffieldunitedfc": "谢菲尔德联", "谢菲尔德联": "谢菲尔德联", "谢菲联": "谢菲尔德联", "sheffieldunited": "谢菲尔德联",
+  // FPL 官方简写补全(Y 档 — 免授权伤停源队名对齐)
+  "manutd": "曼联", "nottmforest": "诺丁汉森林",
+  "leeds": "利兹联", "leedsunited": "利兹联", "leedsunitedfc": "利兹联", "利兹联": "利兹联", "利兹": "利兹联",
+  "sunderland": "桑德兰", "sunderlandafc": "桑德兰", "桑德兰": "桑德兰",
+  "sheffieldutd": "谢菲尔德联",
   // 西甲
   "clubatleticodemadrid": "马竞",
   "realbetisbalompie": "皇家贝蒂斯", "皇家贝蒂斯": "皇家贝蒂斯", "贝蒂斯": "皇家贝蒂斯", "realbetis": "皇家贝蒂斯", "betis": "皇家贝蒂斯",
