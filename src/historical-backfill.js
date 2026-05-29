@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { fixtureDir, loadFixtures, saveFixtures } from "./fixture-store.js";
 import { loadOpenFootballMatches } from "./openfootball-loader.js";
 import { loadStatsbombSeasonForTraining } from "./statsbomb-loader.js";
+import { loadFootballDataMatches, EXTENDED_LEAGUES, LEAGUE_LABELS } from "./footballdata-loader.js";
 
 /**
  * 回填指定时间窗口的历史数据.
@@ -31,7 +32,7 @@ export async function backfillHistorical(opts = {}) {
     { competitionId: 16, seasonId: 4 }      // 2018-19 Champions League
   ];
 
-  const summary = { openfootball: 0, statsbomb: 0, written: 0, skipped: 0 };
+  const summary = { openfootball: 0, statsbomb: 0, footballdata: 0, written: 0, skipped: 0 };
   const allMatches = [];
 
   // 1. OpenFootball
@@ -68,10 +69,35 @@ export async function backfillHistorical(opts = {}) {
     }
   }
 
-  // 3. 按日期分组写入 fixture-store
+  // 3. football-data.co.uk 扩展联赛(Z 档):英冠/德乙/意乙/西乙/法乙/荷甲/比甲/葡超/土超/希超/苏超…
+  //    big-5 已由 OpenFootball 覆盖,这里只回填扩展集(无重复)。同源带赔率,扩 DC + h2h 覆盖。
+  if (opts.includeFootballData) {
+    const fdLeagues = opts.footballDataLeagues ?? EXTENDED_LEAGUES;
+    const fd = await loadFootballDataMatches({ leagues: fdLeagues, seasons: opts.footballDataSeasons, fetch: fetchImpl });
+    if (fd.ok) {
+      summary.footballdata = fd.matches.length;
+      for (const m of fd.matches) {
+        allMatches.push({
+          home: m.home,
+          away: m.away,
+          homeGoals: m.homeGoals,
+          awayGoals: m.awayGoals,
+          date: m.date,
+          league: LEAGUE_LABELS[m.league] ?? m.league,
+          source: "football-data"
+        });
+      }
+    }
+  }
+
+  // 4. 按日期分组写入 fixture-store(先按 date+home+away 去重,防多源同场重复)
+  const seen = new Set();
   const byDate = new Map();
   for (const m of allMatches) {
     if (!m.date) continue;
+    const key = `${m.date}|${normalizeName(m.home)}|${normalizeName(m.away)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     if (!byDate.has(m.date)) byDate.set(m.date, []);
     byDate.get(m.date).push(m);
   }

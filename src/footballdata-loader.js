@@ -12,6 +12,15 @@
 
 const BASE = "https://www.football-data.co.uk/mmz4281";
 const DEFAULT_LEAGUES = ["E0", "SP1", "D1", "I1", "F1"];
+// 扩展联赛(Z 档):football-data.co.uk 免费同格式覆盖、且带开盘+收盘赔率的其余 13 个联赛。
+// big-5 已由 OpenFootball 回填,故扩展集只含新联赛,避免与 big-5 重复。
+export const EXTENDED_LEAGUES = ["E1", "E2", "EC", "SC0", "D2", "I2", "SP2", "F2", "N1", "B1", "P1", "T1", "G1"];
+export const ALL_LEAGUES = [...DEFAULT_LEAGUES, ...EXTENDED_LEAGUES];
+export const LEAGUE_LABELS = {
+  E0: "英超", E1: "英冠", E2: "英甲", EC: "英乙", SC0: "苏超",
+  SP1: "西甲", SP2: "西乙", D1: "德甲", D2: "德乙", I1: "意甲", I2: "意乙",
+  F1: "法甲", F2: "法乙", N1: "荷甲", B1: "比甲", P1: "葡超", T1: "土超", G1: "希腊超"
+};
 const DEFAULT_SEASONS = ["2425", "2324", "2223"];
 
 function parseCsv(text) {
