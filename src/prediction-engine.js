@@ -12,6 +12,7 @@ import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
 import { applyLayer2Signals } from "./feature-enhancers.js";
 import { fuseSignals } from "./signal-fusion-layer.js";
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
+import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
 
 const OUTCOMES = [
@@ -701,7 +702,7 @@ function normalizeHalfFull(value) {
   return raw;
 }
 
-function buildFourteenPlan(predictions) {
+export function buildFourteenPlan(predictions) {
   const selected = predictions.filter((prediction) => prediction.fixture.marketType === "shengfucai" || prediction.fixture.tags.includes("14场胜负彩")).slice(0, 14);
   const source = selected.length ? selected : predictions.slice(0, 14);
   const rules = fourteenSelectionRules();
@@ -740,11 +741,28 @@ function buildFourteenPlan(predictions) {
       reason: `概率差 ${Math.round(gap * 100)}%；14场严格定胆规则：${isBanker ? "进入强胆池" : "未入强胆池，降为覆盖"}；${prediction.rationale}`
     };
   });
+  // 胆腿串关相关性修正(接孤儿模块 parlay-correlation-adjuster):
+  // 14 场胆是同一天、常同联赛的多腿串关,独立连乘 ∏p_i 会系统性误估真实联合命中率。
+  // 这里给出"独立估计"与"相关性修正估计"两个诚实数字,供报告/风控参考(不改变选胆)。
+  const bankerLegs = source
+    .map((prediction, index) => ({ prediction, index }))
+    .filter(({ index }) => bankerIndexes.has(index))
+    .map(({ prediction }) => ({
+      fixtureId: prediction.fixture.id,
+      league: prediction.fixture.competition,
+      kickoffDate: prediction.fixture.date,
+      outcome: prediction.pick.code,
+      probability: prediction.pick.probability,
+      homeTeam: prediction.fixture.homeTeam,
+      awayTeam: prediction.fixture.awayTeam
+    }));
+  const bankerParlay = adjustParlayForCorrelation(bankerLegs);
   return {
     count: selections.length,
     singleLine: selections.map((item) => item.single).join(" "),
     compoundLine: selections.map((item) => item.compound).join(" "),
-    selections
+    selections,
+    bankerParlay
   };
 }
 

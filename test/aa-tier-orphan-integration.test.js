@@ -3,6 +3,20 @@ import test from "node:test";
 import { collectFusionEvidence, fuseSignals } from "../src/signal-fusion-layer.js";
 import { homeAwaySplitToLR, splitStats } from "../src/home-away-split-stats.js";
 import { recentMatchesFor } from "../src/fusion-context-builder.js";
+import { buildFourteenPlan } from "../src/prediction-engine.js";
+
+// 合成一条 prediction(只给 buildFourteenPlan 用到的字段)
+function pred({ id, home, away, comp, date, pickCode, pickProb, secProb, conf, risk = "中", quality = 70 }) {
+  return {
+    fixture: { id, homeTeam: home, awayTeam: away, competition: comp, date, marketType: "shengfucai", tags: ["14场胜负彩"] },
+    pick: { code: pickCode, label: "主胜", probability: pickProb },
+    secondaryPick: { code: "1", label: "平局", probability: secProb },
+    confidence: conf,
+    risk,
+    advancedFeatures: { quality: { score: quality } },
+    rationale: "test"
+  };
+}
 
 // 构造近期赛果(带 venue);最近在前
 function recent(venuesWins) {
@@ -63,4 +77,30 @@ test("home-away-split 无近期赛果时休眠不报错", () => {
   const split = dormant.find((d) => d.name === "home-away-split");
   assert.ok(split, "应在 dormant 列表");
   assert.equal(split.dormant, "no-recent-match-history");
+});
+
+test("buildFourteenPlan 接入串关相关性:多胆腿产联合命中率(独立+修正)", () => {
+  // 4 场强胆,2 场同英超(同 outcome 正相关),应产 bankerParlay
+  const predictions = [
+    pred({ id: "f1", home: "曼城", away: "伯恩利", comp: "英超", date: "2026-06-01", pickCode: "3", pickProb: 0.78, secProb: 0.14, conf: 80 }),
+    pred({ id: "f2", home: "拜仁", away: "波鸿", comp: "德甲", date: "2026-06-01", pickCode: "3", pickProb: 0.75, secProb: 0.16, conf: 78 }),
+    pred({ id: "f3", home: "利物浦", away: "卢顿", comp: "英超", date: "2026-06-01", pickCode: "3", pickProb: 0.74, secProb: 0.17, conf: 76 }),
+    pred({ id: "f4", home: "皇马", away: "赫罗纳", comp: "西甲", date: "2026-06-01", pickCode: "3", pickProb: 0.72, secProb: 0.18, conf: 75 })
+  ];
+  const plan = buildFourteenPlan(predictions);
+  assert.ok(plan.bankerParlay, "应带 bankerParlay 字段");
+  assert.equal(plan.bankerParlay.ok, true, "≥2 胆腿应可算");
+  assert.ok(plan.bankerParlay.legs >= 2, "至少 2 条胆腿");
+  assert.ok(plan.bankerParlay.jointProbabilityIndependent > 0, "独立联合概率 > 0");
+  assert.ok(plan.bankerParlay.correlations.length >= 1, "同英超同向应检出正相关");
+  // 修正后的联合概率应与独立估计不同(被相关性调整)
+  assert.notEqual(plan.bankerParlay.jointProbabilityCorrelated, plan.bankerParlay.jointProbabilityIndependent);
+});
+
+test("buildFourteenPlan 胆腿不足时 bankerParlay 安全返回 ok:false", () => {
+  const predictions = [
+    pred({ id: "g1", home: "曼城", away: "伯恩利", comp: "英超", date: "2026-06-01", pickCode: "3", pickProb: 0.5, secProb: 0.3, conf: 50, quality: 40 })
+  ];
+  const plan = buildFourteenPlan(predictions);
+  assert.equal(plan.bankerParlay.ok, false, "0~1 胆腿无法串关");
 });
