@@ -27,6 +27,7 @@
     "calibration:train": "node scripts/run-calibration-train.mjs",
     "backtest:linemove": "node scripts/run-line-movement-backtest.mjs",
     "sync:injuries": "node scripts/sync-free-injuries.mjs",
+    "sources:probe": "node scripts/probe-free-sources.mjs",
     "analyze:deep": "node scripts/run-analyze-deep.mjs",
     "jingcai:daily": "node scripts/jingcai-daily.mjs",
     "report:html": "node scripts/render-recommendation-html.mjs",

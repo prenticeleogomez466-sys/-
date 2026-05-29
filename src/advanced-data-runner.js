@@ -8,6 +8,7 @@ import { saveAdvancedData } from "./advanced-data-store.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 import { fetchAuthorizedFixtureLayer } from "./authorized-source-fetcher.js";
 import { syncFotmobAllLayers } from "./public-football-data.js";
+import { fetchFplInjuries, injuriesForFixture } from "./free-injury-source.js";
 
 // 三个 sync* 内共享同一份 fotmob 兜底结果 — 避免每层都各自发 day-index + matchDetails。
 // syncFotmobAllLayers 内部已经有文件+内存级缓存,这里再加一层是为了避免重复的 extract 工作。
@@ -159,7 +160,21 @@ async function syncInjuries(date, fixtures, fetchImpl, env, apiFootballFixtures)
     const fotmob = await getFotmobLayersMemoized(date, fixtures, fetchImpl, env);
     if (fotmob.injuries.ok) return fotmob.injuries;
   }
-  return { ok: false, source: generic.source ?? "INJURY_SOURCE_URL", count: 0, fixtureData: {}, warning: generic.warning ?? "未配置 INJURY_SOURCE_URL/API_FOOTBALL_KEY 且 fotmob 无匹配" };
+  // Y 档免授权兜底:FPL 英超伤停(零授权,全球实测后唯一现有数据的免 key 伤停源)。
+  // 只覆盖英超,匹配不到的非英超对阵不计入(正常)。
+  if (env.FPL_INJURIES_ENABLED !== "0") {
+    const fpl = await fetchFplInjuries({ fetch: fetchImpl });
+    if (fpl.ok) {
+      const fixtureData = {};
+      let count = 0;
+      for (const fixture of fixtures) {
+        const layer = injuriesForFixture(fixture, fpl.byTeam);
+        if (layer) { fixtureData[fixture.id] = layer; count += 1; }
+      }
+      if (count > 0) return { ok: true, source: "FPL bootstrap-static (free)", count, fixtureData };
+    }
+  }
+  return { ok: false, source: generic.source ?? "INJURY_SOURCE_URL", count: 0, fixtureData: {}, warning: generic.warning ?? "未配置 INJURY_SOURCE_URL/API_FOOTBALL_KEY,fotmob/FPL 亦无匹配" };
 }
 
 async function syncLineups(date, fixtures, fetchImpl, env, apiFootballFixtures) {
