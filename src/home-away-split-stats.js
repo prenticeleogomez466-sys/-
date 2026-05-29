@@ -90,6 +90,27 @@ export function projectHomeAwayMatch(homeSplit, awaySplit) {
   };
 }
 
+/**
+ * 把主客场分离表现转成信号融合层的 LR 证据。
+ * 逻辑:本场主队取其**主场** PPG,客队取其**客场** PPG,二者之差 = 各自在对应场地的相对强度。
+ *   - 主场强、客队客场弱 → 抬主胜;反之抬客胜。draw 中性。
+ * 数据门控:任一侧主/客样本 < 3 或净差 < 0.3 PPG(噪声地板)→ 返回 null(休眠)。
+ * @param {Object} homeSplit splitStats(主队近期赛果) 的返回
+ * @param {Object} awaySplit splitStats(客队近期赛果) 的返回
+ * @returns {{home,draw,away}|null}
+ */
+export function homeAwaySplitToLR(homeSplit, awaySplit) {
+  const hp = homeSplit?.home?.ppg;
+  const ap = awaySplit?.away?.ppg;
+  if (!Number.isFinite(hp) || !Number.isFinite(ap)) return null;
+  if ((homeSplit.home.sampleSize ?? 0) < 3 || (awaySplit.away.sampleSize ?? 0) < 3) return null;
+  const edge = hp - ap; // 主队主场 PPG − 客队客场 PPG,范围约 [-3,3]
+  if (Math.abs(edge) < 0.3) return null; // 噪声地板
+  const k = 0.18; // 1.5 PPG 净差 ≈ 朝优势侧 LR ~1.31
+  const fav = Math.exp(Math.max(-0.5, Math.min(0.5, k * edge)));
+  return { home: round(fav), draw: 1, away: round(1 / fav) };
+}
+
 function mean(xs) {
   return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0;
 }

@@ -27,6 +27,7 @@ import { estimateRotationProbability, rotationToLR } from "./rotation-policy-mod
 import { detectStreak, streakToLR } from "./streak-detector.js";
 import { compareFatigue, applyFatigueBias } from "./schedule-fatigue-model.js";
 import { lineMovementToLR, analyzeLineMovement } from "./line-movement-signal.js";
+import { splitStats, homeAwaySplitToLR } from "./home-away-split-stats.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const LR_MIN = 0.5;
@@ -188,6 +189,21 @@ function signalFatigue(prior, fixture, advancedData, context) {
   return { name: "fatigue", source: "context.recentMatches", lr, detail: `主息${homePrev}→客息${awayPrev}` };
 }
 
+function signalHomeAwaySplit(prior, fixture, advancedData, context) {
+  // 数据源:context.homeRecentMatches / awayRecentMatches(带 venue 标签,fusion-context-builder 装配)。
+  const homeMatches = context.homeRecentMatches;
+  const awayMatches = context.awayRecentMatches;
+  if (!Array.isArray(homeMatches) || !Array.isArray(awayMatches)) {
+    return { name: "home-away-split", source: "context.recentMatches", dormant: "no-recent-match-history" };
+  }
+  const homeSplit = splitStats(homeMatches);
+  const awaySplit = splitStats(awayMatches);
+  const lr = clampLR(homeAwaySplitToLR(homeSplit, awaySplit));
+  if (!lr) return { name: "home-away-split", source: "context.recentMatches", dormant: "thin-or-balanced-split" };
+  const detail = `主主场${homeSplit?.home?.ppg ?? "?"}ppg vs 客客场${awaySplit?.away?.ppg ?? "?"}ppg`;
+  return { name: "home-away-split", source: "context.recentMatches", lr, detail };
+}
+
 function signalLineMovement(prior, fixture, advancedData, context) {
   // 数据源:context.openingOdds(开盘隐含)+ context.currentOdds(当前/收盘快照隐含)。
   // 两者齐全才 fire —— live jingcai 多次捕获赔率变化时装配;缺则休眠(向后兼容)。
@@ -216,6 +232,7 @@ const SIGNAL_HANDLERS = [
   signalStreak,
   signalFatigue,
   signalRotation,
+  signalHomeAwaySplit,
   signalLineMovement
 ];
 

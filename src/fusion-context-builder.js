@@ -84,7 +84,8 @@ export function recentMatchesFor(history, team, limit = 10) {
       const isHome = m.homeCanon === t;
       const goalsFor = isHome ? m.homeGoals : m.awayGoals;
       const goalsAgainst = isHome ? m.awayGoals : m.homeGoals;
-      return { date: m.date, goalsFor, goalsAgainst, won: wonLabel(goalsFor, goalsAgainst) };
+      // venue 标签供 home-away-split 信号区分主客场表现;其余信号忽略此字段,向后兼容。
+      return { date: m.date, venue: isHome ? "home" : "away", goalsFor, goalsAgainst, won: wonLabel(goalsFor, goalsAgainst) };
     })
     .sort((x, y) => (x.date < y.date ? 1 : x.date > y.date ? -1 : 0))
     .slice(0, limit);
