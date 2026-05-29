@@ -39,6 +39,16 @@ function round(v) {
   return Math.round(v * 10000) / 10000;
 }
 
+// 对一个 {home,draw,away} LR 做幂缩放:lr^w(w<1 弱化信号、w>1 放大),再夹回区间。
+function scaleLR(lr, w) {
+  const out = {};
+  for (const o of OUTCOMES) {
+    const v = Number(lr[o]);
+    out[o] = Number.isFinite(v) && v > 0 ? Math.pow(v, w) : 1;
+  }
+  return clampLR(out) ?? { home: 1, draw: 1, away: 1 };
+}
+
 function clampLR(lr) {
   if (!lr) return null;
   const out = {};
@@ -251,12 +261,23 @@ const SIGNAL_HANDLERS = [
   signalLineMovement
 ];
 
+/** 所有信号名(供消融回测 / 权重调优枚举)。 */
+export const SIGNAL_NAMES = [
+  "season-phase", "competition-type", "injury", "h2h", "clean-sheet-streak",
+  "streak", "fatigue", "rotation", "home-away-split", "time-decay-form", "line-movement"
+];
+
 /**
  * 收集所有信号的 LR 证据,分 fired / dormant 两类。
+ * @param {{disabledSignals?: string[]|Set<string>, signalWeights?: Object}} [opts]
+ *   disabledSignals: 这些信号名直接跳过(消融回测用,记为 dormant:disabled)。
+ *   signalWeights: { 信号名: w } 对该信号 LR 做幂缩放 lr^w(w<1 弱化, w>1 放大, w=0 等于禁用)。
  */
-export function collectFusionEvidence(prior, fixture, advancedData = {}, context = {}) {
+export function collectFusionEvidence(prior, fixture, advancedData = {}, context = {}, opts = {}) {
   const evidence = [];
   const dormant = [];
+  const disabled = opts.disabledSignals instanceof Set ? opts.disabledSignals : new Set(opts.disabledSignals ?? []);
+  const weights = opts.signalWeights ?? null;
   for (const handler of SIGNAL_HANDLERS) {
     let result;
     try {
@@ -265,8 +286,18 @@ export function collectFusionEvidence(prior, fixture, advancedData = {}, context
       dormant.push({ name: handler.name, dormant: `error:${err.message}` });
       continue;
     }
+    if (result && disabled.has(result.name)) {
+      dormant.push({ name: result.name, source: result.source, dormant: "disabled" });
+      continue;
+    }
     if (result?.lr) {
-      evidence.push({ name: result.name, ratio: result.lr, source: result.source, detail: result.detail ?? null });
+      const w = weights ? Number(weights[result.name]) : 1;
+      const ratio = Number.isFinite(w) && w !== 1 ? scaleLR(result.lr, w) : result.lr;
+      if (Number.isFinite(w) && w <= 0) {
+        dormant.push({ name: result.name, source: result.source, dormant: "weight-zero" });
+        continue;
+      }
+      evidence.push({ name: result.name, ratio, source: result.source, detail: result.detail ?? null });
     } else if (result) {
       dormant.push({ name: result.name, source: result.source, dormant: result.dormant });
     }
@@ -296,7 +327,7 @@ export function fuseSignals(prior, fixture, advancedData = {}, context = {}, opt
   if (!prior || !OUTCOMES.every((o) => Number.isFinite(prior[o]))) {
     return { applied: false, probabilities: prior, evidence: [], dormant: [], posterior: prior, maxShift: 0, reason: "invalid-prior" };
   }
-  const { evidence, dormant } = collectFusionEvidence(prior, fixture, advancedData, context);
+  const { evidence, dormant } = collectFusionEvidence(prior, fixture, advancedData, context, opts);
   if (!evidence.length) {
     return { applied: false, probabilities: prior, evidence: [], dormant, posterior: prior, maxShift: 0 };
   }

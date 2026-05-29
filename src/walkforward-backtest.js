@@ -15,7 +15,7 @@
 import { listFixtureDates, loadFixtures } from "./fixture-store.js";
 import { fitFromFixtureStore, predictFromFitted } from "./dixon-coles-engine.js";
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
-import { fuseSignals } from "./signal-fusion-layer.js";
+import { fuseSignals, SIGNAL_NAMES } from "./signal-fusion-layer.js";
 import { calibrateProbabilities } from "./model-calibration.js";
 
 const OUTCOMES = ["home", "draw", "away"];
@@ -176,6 +176,91 @@ export function runWalkForwardBacktest(opts = {}) {
     },
     note: "三臂对比:dc=纯模型核心,fusion=+贝叶斯信号融合,calibrated=+65%+收缩。胜平负随机基线≈0.33,纯模型(无赔率)上限≈0.50-0.55。"
   };
+}
+
+/**
+ * 逐信号消融(leave-one-out):量化每个融合信号对命中率/Brier 的边际贡献。
+ * 对每场比赛跑「全融合」基线 + 「关掉某信号」各一遍,只复用一次 DC 拟合。
+ *
+ * 读法:对某信号,ablatedBrier − fullBrier > 0 ⇒ 关掉后变差 ⇒ **该信号有用**;
+ *       < 0 ⇒ 关掉后反而变好 ⇒ **该信号在害校准**(应弱化/剔除)。命中率同理(关掉后掉=有用)。
+ * 只统计该信号真正 fire 过的场次(firedSamples),避免被大量"休眠场"稀释。
+ *
+ * @param {Object} opts 同 runWalkForwardBacktest(testDates/minTrainMatches/maxDates)
+ * @returns {{tested, full:{accuracy,brier,rps,logLoss}, signals:Array}}
+ */
+export function runSignalAblation(opts = {}) {
+  const maxTestDates = opts.testDates ?? 50;
+  const minTrainMatches = opts.minTrainMatches ?? 200;
+  const maxDates = opts.maxDates ?? 240;
+  const signals = opts.signals ?? SIGNAL_NAMES;
+
+  const allHistory = loadHistoricalResults();
+  const datesDesc = listFixtureDates();
+  const datesWithResults = [];
+  for (const date of datesDesc) {
+    const { fixtures } = loadFixtures(date);
+    const withResult = (fixtures || []).filter(
+      (f) => f.result && Number.isFinite(Number(f.result.home)) && Number.isFinite(Number(f.result.away))
+    );
+    if (withResult.length) datesWithResults.push({ date, matches: withResult });
+  }
+
+  const accFull = makeAcc();
+  // 每信号:全量两套(用于整体边际)+ 仅 fire 场次两套(用于"它说话时"的边际)
+  const per = {};
+  for (const s of signals) per[s] = { full: makeAcc(), ablated: makeAcc(), firedFull: makeAcc(), firedAblated: makeAcc(), fired: 0 };
+
+  let usedDates = 0;
+  for (const { date, matches } of datesWithResults) {
+    if (usedDates >= maxTestDates) break;
+    const fit = fitFromFixtureStore({ beforeDate: date, maxDates });
+    if (!fit?.usable || fit.coldStart || (fit.matches ?? 0) < minTrainMatches) continue;
+    usedDates++;
+    const histBefore = allHistory.filter((m) => m.date < date);
+    for (const f of matches) {
+      const pred = predictFromFitted(fit, { homeTeam: f.homeTeam, awayTeam: f.awayTeam });
+      if (!pred?.probabilities) continue;
+      const actual = actualOutcome(f.result);
+      const fixture = { id: f.id, homeTeam: f.homeTeam, awayTeam: f.awayTeam, competition: f.competition, date };
+      const ctx = buildFusionContext(fixture, histBefore);
+      const full = fuseSignals(pred.probabilities, fixture, {}, ctx);
+      record(accFull, full.probabilities, actual);
+      const firedNames = new Set((full.evidence || []).map((e) => e.name));
+      for (const s of signals) {
+        const ablated = fuseSignals(pred.probabilities, fixture, {}, ctx, { disabledSignals: [s] });
+        record(per[s].full, full.probabilities, actual);
+        record(per[s].ablated, ablated.probabilities, actual);
+        if (firedNames.has(s)) {
+          per[s].fired++;
+          record(per[s].firedFull, full.probabilities, actual);
+          record(per[s].firedAblated, ablated.probabilities, actual);
+        }
+      }
+    }
+  }
+
+  const full = finalize(accFull);
+  const signalReports = signals.map((s) => {
+    const ff = finalize(per[s].firedFull);
+    const fa = finalize(per[s].firedAblated);
+    return {
+      signal: s,
+      firedSamples: per[s].fired,
+      // 只在"它 fire 的场次"上比:关掉后(ablated) vs 全量(full)
+      hitDelta: per[s].fired ? round(ff.accuracy - fa.accuracy) : 0, // >0 ⇒ 该信号提升命中
+      brierDelta: per[s].fired ? round(fa.brier - ff.brier) : 0, // >0 ⇒ 关掉后变差 ⇒ 该信号有用
+      logLossDelta: per[s].fired ? round(fa.logLoss - ff.logLoss) : 0,
+      firedHit: per[s].fired ? ff.accuracy : null,
+      firedBrierFull: per[s].fired ? ff.brier : null,
+      verdict: !per[s].fired ? "never-fired"
+        : (fa.brier - ff.brier) >= 0.002 ? "helps"
+        : (fa.brier - ff.brier) <= -0.002 ? "HURTS"
+        : "neutral"
+    };
+  }).sort((a, b) => b.brierDelta - a.brierDelta);
+
+  return { testDatesUsed: usedDates, tested: accFull.tested, full, signals: signalReports };
 }
 
 function round(v) {

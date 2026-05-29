@@ -197,3 +197,43 @@ test("signalTimeDecayForm 无近期赛历史时休眠(进 dormant 不进 evidenc
   assert.ok(!evidence.some((e) => e.name === "time-decay-form"), "无历史 → 不应 fire");
   assert.ok(dormant.some((d) => d.name === "time-decay-form"), "应记为 dormant");
 });
+
+// ---- 信号消融基建:disabledSignals / signalWeights(为命中率优化闭环服务)----
+import { SIGNAL_NAMES } from "../src/signal-fusion-layer.js";
+
+function strongHomeCtx() {
+  return {
+    homeRecentMatches: recentForm(["W", "W", "W", "D", "W"]),
+    awayRecentMatches: recentForm(["L", "L", "D", "L", "L"]),
+    h2hMatches: []
+  };
+}
+
+test("SIGNAL_NAMES 覆盖全部 handler(消融/调权枚举用)", () => {
+  assert.ok(SIGNAL_NAMES.includes("time-decay-form"));
+  assert.ok(SIGNAL_NAMES.includes("home-away-split"));
+  assert.equal(new Set(SIGNAL_NAMES).size, SIGNAL_NAMES.length, "无重复");
+});
+
+test("disabledSignals 能精确关掉指定信号(记为 dormant:disabled)", () => {
+  const prior = { home: 0.4, draw: 0.3, away: 0.3 };
+  const fixture = { homeTeam: "甲", awayTeam: "乙", date: "2026-05-22" };
+  const ctx = strongHomeCtx();
+  const on = collectFusionEvidence(prior, fixture, {}, ctx);
+  assert.ok(on.evidence.some((e) => e.name === "time-decay-form"), "默认应 fire");
+  const off = collectFusionEvidence(prior, fixture, {}, ctx, { disabledSignals: ["time-decay-form"] });
+  assert.ok(!off.evidence.some((e) => e.name === "time-decay-form"), "禁用后不应 fire");
+  assert.ok(off.dormant.some((d) => d.name === "time-decay-form" && d.dormant === "disabled"));
+});
+
+test("signalWeights<1 弱化信号 LR(朝中性 1 收缩),=0 等于禁用", () => {
+  const prior = { home: 0.4, draw: 0.3, away: 0.3 };
+  const fixture = { homeTeam: "甲", awayTeam: "乙", date: "2026-05-22" };
+  const ctx = strongHomeCtx();
+  const base = collectFusionEvidence(prior, fixture, {}, ctx).evidence.find((e) => e.name === "time-decay-form");
+  const weak = collectFusionEvidence(prior, fixture, {}, ctx, { signalWeights: { "time-decay-form": 0.3 } })
+    .evidence.find((e) => e.name === "time-decay-form");
+  assert.ok(base.ratio.home > weak.ratio.home && weak.ratio.home > 1, "w=0.3 应把 LR 朝 1 收缩但仍>1");
+  const zero = collectFusionEvidence(prior, fixture, {}, ctx, { signalWeights: { "time-decay-form": 0 } });
+  assert.ok(!zero.evidence.some((e) => e.name === "time-decay-form"), "w=0 等于禁用");
+});

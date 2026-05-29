@@ -23,6 +23,7 @@
     "model:scorecard": "node scripts/run-model-scorecard.mjs",
     "backfill:history": "node scripts/run-backfill-history.mjs",
     "backtest:walkforward": "node scripts/run-walkforward-backtest.mjs",
+    "backtest:ablation": "node scripts/run-signal-ablation.mjs",
     "backtest:odds": "node scripts/run-walkforward-odds.mjs",
     "calibration:train": "node scripts/run-calibration-train.mjs",
     "backtest:linemove": "node scripts/run-line-movement-backtest.mjs",
