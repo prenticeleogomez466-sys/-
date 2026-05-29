@@ -312,3 +312,19 @@ test("buildRenxuan9 不足9场诚实返回 ok:false 不硬凑", () => {
   assert.equal(r9.ok, false);
   assert.equal(r9.picks.length, 0);
 });
+
+// ---- 数据保护:失败同步不得用空集覆盖已有非空赛事(护选票)----
+import { saveFixtures, loadFixtures } from "../src/fixture-store.js";
+
+test("saveFixtures 拒绝用空集覆盖已有非空赛事(默认),allowEmpty 才清空", () => {
+  const d = "2099-12-31"; // 测试专用日期,避免碰真实数据
+  saveFixtures(d, [{ homeTeam: "甲", awayTeam: "乙", competition: "测试", date: d }], { source: "test-seed" });
+  assert.equal(loadFixtures(d).fixtures.length, 1, "先写入1场");
+  // 空集覆盖 → 应被拒绝,保留原有
+  const res = saveFixtures(d, [], { source: "failed-sync" });
+  assert.equal(res.refusedEmptyOverwrite, true, "应拒绝空覆盖");
+  assert.equal(loadFixtures(d).fixtures.length, 1, "原有赛事保留");
+  // 显式 allowEmpty → 允许清空
+  saveFixtures(d, [], { source: "manual-clear", allowEmpty: true });
+  assert.equal(loadFixtures(d).fixtures.length, 0, "allowEmpty 时才清空");
+});

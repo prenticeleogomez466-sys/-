@@ -24,13 +24,27 @@ export function loadFixtures(date = todayIso()) {
 export function saveFixtures(date, fixtures, metadata = {}) {
   ensureFixtureDir();
   const normalizedDate = safeDate(date);
+  const filePath = join(fixtureDir, `${normalizedDate}.json`);
+  const incoming = Array.isArray(fixtures) ? fixtures : [];
+
+  // 数据保护:失败的同步(源返回 0)不得用空集覆盖已有非空赛事(会毁当天选票)。
+  // 默认拒绝清空并保留旧数据;确需清空时显式传 metadata.allowEmpty=true。
+  if (incoming.length === 0 && existsSync(filePath)) {
+    let existing = [];
+    try { const prev = JSON.parse(readFileSync(filePath, "utf8")); existing = Array.isArray(prev) ? prev : prev.fixtures ?? []; } catch { existing = []; }
+    if (existing.length > 0 && !metadata.allowEmpty) {
+      try { writeFileSync(`${filePath}.bak`, readFileSync(filePath, "utf8"), "utf8"); } catch {}
+      return { date: normalizedDate, source: "preserved-existing", importedAt: null, fixtures: existing, refusedEmptyOverwrite: true };
+    }
+  }
+
   const payload = {
     date: normalizedDate,
     source: metadata.source ?? "manual",
     importedAt: new Date().toISOString(),
-    fixtures: fixtures.map((fixture, index) => normalizeFixture(fixture, normalizedDate, index))
+    fixtures: incoming.map((fixture, index) => normalizeFixture(fixture, normalizedDate, index))
   };
-  writeFileSync(join(fixtureDir, `${normalizedDate}.json`), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   return payload;
 }
 
