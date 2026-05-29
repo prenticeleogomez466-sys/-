@@ -34,6 +34,8 @@ import { computeManagerInfluence } from "./manager-effect-model.js";
 import { detectDerby, derbyToLR } from "./derby-intensity.js";
 import { computePressureProfile, pressureToFormMultiplier } from "./standings-pressure.js";
 import { bigGameReadinessLR } from "./big-game-form.js";
+import { computeTravelImpact } from "./travel-distance-model.js";
+import { getFormationLift } from "./tactical-matchup.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getExportDir } from "./paths.js";
@@ -390,6 +392,61 @@ function signalBigGameForm(prior, fixture, advancedData, context) {
   };
 }
 
+/**
+ * 客队跨城/跨洋长途旅行 + 时差 → 客队 form 折扣,主队净优势上升。
+ * 数据源:context.homeCity / awayCity(含 lat/lon/timezone)。
+ * 短途(<500 km)或缺城市 → dormant。
+ */
+function signalTravelDistance(prior, fixture, advancedData, context) {
+  const homeCity = context.homeCity ?? fixtureLayer(advancedData, fixture, "homeCity");
+  const awayCity = context.awayCity ?? fixtureLayer(advancedData, fixture, "awayCity");
+  if (!homeCity || !awayCity) {
+    return { name: "travel-distance", source: "context.{home,away}City", dormant: "no-city-coordinates" };
+  }
+  const travel = computeTravelImpact(homeCity, awayCity);
+  if (!travel.significant) {
+    return { name: "travel-distance", source: "context.{home,away}City", dormant: `short-travel-${travel.note}` };
+  }
+  const lift = travel.homeAdvantageFromTravel;  // > 0,客队折扣→主队净优势
+  const lr = clampLR({
+    home: 1 + lift,
+    draw: 1 + lift * 0.1,
+    away: 1 - lift
+  });
+  if (!lr) return { name: "travel-distance", source: "context.{home,away}City", dormant: "neutral" };
+  return { name: "travel-distance", source: "context.{home,away}City", lr, detail: `${travel.distanceKm}km/${travel.note}` };
+}
+
+/**
+ * 阵型克制(4-3-3 vs 5-4-1 等):需要 fitFormationMatchups 拟合的 matchup 表 +
+ * league baseline,以及双方排出的阵型。任一缺失 → dormant。
+ * 数据源:context.{home,away}Formation + context.formationMatchups + context.leagueBaseline。
+ */
+function signalTacticalMatchup(prior, fixture, advancedData, context) {
+  const hF = context.homeFormation ?? fixtureLayer(advancedData, fixture, "homeFormation");
+  const aF = context.awayFormation ?? fixtureLayer(advancedData, fixture, "awayFormation");
+  const matchups = context.formationMatchups;
+  if (!hF || !aF) return { name: "tactical-matchup", source: "context.{home,away}Formation", dormant: "no-formations" };
+  if (!matchups) return { name: "tactical-matchup", source: "context.formationMatchups", dormant: "no-matchup-table" };
+  const lift = getFormationLift(hF, aF, matchups, context.leagueBaseline);
+  if (!lift?.found) return { name: "tactical-matchup", source: "context.formationMatchups", dormant: "no-cell-for-pair" };
+  const factor = lift.homeLift ?? 1;
+  if (Math.abs(factor - 1) < 0.03) {
+    return { name: "tactical-matchup", source: "context.formationMatchups", dormant: "neutral-lift" };
+  }
+  // factor=1.2 → home LR 1.2;factor=0.8 → home LR 0.8 / away LR ~1.2
+  const lr = clampLR({
+    home: factor,
+    draw: 1 - Math.abs(factor - 1) * 0.15,
+    away: 2 - factor
+  });
+  if (!lr) return { name: "tactical-matchup", source: "context.formationMatchups", dormant: "neutral" };
+  return {
+    name: "tactical-matchup", source: "context.formationMatchups", lr,
+    detail: `${lift.formation.home}vs${lift.formation.away} ${lift.interpretation}(n=${lift.samples})`
+  };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -406,14 +463,17 @@ const SIGNAL_HANDLERS = [
   signalManager,
   signalDerby,
   signalStandingsPressure,
-  signalBigGameForm
+  signalBigGameForm,
+  signalTravelDistance,
+  signalTacticalMatchup
 ];
 
 /** 所有信号名(供消融回测 / 权重调优枚举)。 */
 export const SIGNAL_NAMES = [
   "season-phase", "competition-type", "injury", "h2h", "clean-sheet-streak",
   "streak", "fatigue", "rotation", "home-away-split", "time-decay-form", "line-movement",
-  "weather", "manager", "derby", "standings-pressure", "big-game-form"
+  "weather", "manager", "derby", "standings-pressure", "big-game-form",
+  "travel-distance", "tactical-matchup"
 ];
 
 /**
