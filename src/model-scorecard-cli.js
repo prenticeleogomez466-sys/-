@@ -138,25 +138,28 @@ function countCrawlerRetries() {
 }
 
 function countStatisticalModels() {
+  // GG 档:mcmc-sampler 已删除(conformal-prediction 替代);其余 5 个全是 DC 训练 + 实时模拟核心
   const models = ["dixon-coles-engine", "bivariate-poisson", "skellam-distribution",
-                  "hierarchical-poisson", "markov-match-simulator", "mcmc-sampler"];
+                  "hierarchical-poisson", "markov-match-simulator"];
   const count = models.filter((m) => hasFile(`${m}.js`)).length;
-  return { score: Math.min(8, count * 1.4), found: count, max: 8 };
+  return { score: Math.min(8, count * 1.7), found: count, max: 8 };
 }
 
 function countTeamRatings() {
-  const ratings = ["pi-ratings", "massey-ratings", "colley-ratings", "team-graph-embedding"];
+  // GG 档:team-graph-embedding 已删,similar-match-knn 替代
+  const ratings = ["pi-ratings", "massey-ratings", "colley-ratings", "similar-match-knn"];
   const count = ratings.filter((r) => hasFile(`${r}.js`)).length;
   // Elo 已有(advanced-data-runner 接 ClubElo)
-  return { score: Math.min(6, count * 1.5 + 1), found: count + 1, max: 6 };
+  return { score: Math.min(6, count * 1.3 + 1), found: count + 1, max: 6 };
 }
 
 function hasStackerAndEnsemble() {
-  const ls = hasFile("linear-stacker.js");
+  // GG 档:linear-stacker 删除,bb 档 weights:search + signal-fusion-layer 替代
+  const sfl = hasFile("signal-fusion-layer.js");
   const re = hasFile("ratings-ensemble.js");
   const idp = hasFile("integrated-deep-pipeline.js");
   const aw = hasFile("auto-weight-optimizer.js");
-  return { score: (ls ? 1 : 0) + (re ? 2 : 0) + (idp ? 2 : 0) + (aw ? 1 : 0), max: 6 };
+  return { score: (sfl ? 1 : 0) + (re ? 2 : 0) + (idp ? 2 : 0) + (aw ? 1 : 0), max: 6 };
 }
 
 function countCalibrationModules() {
@@ -194,17 +197,19 @@ function hasAutomationScript() {
 }
 
 function hasBacktestSystem() {
+  // GG 档:cross-validation 删除,walkforward-backtest 已做时间序列 CV
   const eb = hasFile("evolution-backtest.js");
   const dr = hasFile("daily-recap.js");
-  const cv = hasFile("cross-validation.js");
-  return { score: (eb ? 2 : 0) + (dr ? 1.5 : 0) + (cv ? 1.5 : 0), max: 5 };
+  const wf = hasFile("walkforward-backtest.js");
+  return { score: (eb ? 2 : 0) + (dr ? 1.5 : 0) + (wf ? 1.5 : 0), max: 5 };
 }
 
 function hasMetricRegistry() {
-  const mr = hasFile("eval-metrics-registry.js");
+  // GG 档:eval-metrics-registry 删除,walkforward-backtest 自有 Brier/RPS/logLoss
+  const wf = hasFile("walkforward-backtest.js");
   const av = hasFile("adversarial-validation.js");
   const aw = hasFile("auto-weight-optimizer.js");
-  return { score: (mr ? 2 : 0) + (av ? 1.5 : 0) + (aw ? 1.5 : 0), max: 5 };
+  return { score: (wf ? 2 : 0) + (av ? 1.5 : 0) + (aw ? 1.5 : 0), max: 5 };
 }
 
 function countTests() {
