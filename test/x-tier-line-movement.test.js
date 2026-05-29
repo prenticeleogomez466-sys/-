@@ -3,6 +3,7 @@ import test from "node:test";
 import { analyzeLineMovement, lineMovementToLR } from "../src/line-movement-signal.js";
 import { fuseSignals } from "../src/signal-fusion-layer.js";
 import { runLineMovementBacktest } from "../src/line-movement-backtest.js";
+import { predictFixture } from "../src/prediction-engine.js";
 
 test("analyzeLineMovement 识别漂移方向、幅度与分类", () => {
   const opening = { home: 0.50, draw: 0.27, away: 0.23 };
@@ -47,6 +48,27 @@ test("fuseSignals:无赔率快照时 line-movement 休眠,齐全时 fire", () =>
   const fired = firedRes.evidence.find((e) => e.name === "line-movement");
   assert.ok(fired, "齐全快照且显著移动时应 fire");
   assert.ok(fired.ratio.home > 1);
+});
+
+test("predictFixture 生产钩子:快照含开盘≠当前时 line-movement fire,仅当前则休眠", () => {
+  const fixture = {
+    id: "fx-lm", date: "2026-05-15", kickoff: "2026-05-15 20:00",
+    competition: "测试联赛", homeTeam: "主队", awayTeam: "客队", marketType: "jingcai", sequence: "001", tags: []
+  };
+  // 开盘主胜偏冷 → 当前钱进主队(显著移动)
+  const withMove = predictFixture(fixture, [{
+    fixtureId: fixture.id, date: fixture.date,
+    europeanOdds: { initial: { home: 2.2, draw: 3.3, away: 3.2 }, current: { home: 1.7, draw: 3.6, away: 5.2 } }
+  }]);
+  const fired = withMove.probabilityAdjustment.fusion.evidence.find((e) => e.name === "line-movement");
+  assert.ok(fired, "开盘≠当前且显著移动时,line-movement 应进 evidence");
+
+  // 只有 current(无 initial)→ 装不出 openingOdds,信号休眠
+  const onlyCurrent = predictFixture(fixture, [{
+    fixtureId: fixture.id, date: fixture.date, europeanOdds: { current: { home: 1.7, draw: 3.6, away: 5.2 } }
+  }]);
+  const dorm = onlyCurrent.probabilityAdjustment.fusion.dormant.find((d) => d.name === "line-movement");
+  assert.ok(dorm, "无开盘快照时 line-movement 应休眠");
 });
 
 // 含收盘 + Pinnacle 列的 mock CSV

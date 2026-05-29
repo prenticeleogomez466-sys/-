@@ -128,7 +128,18 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const probabilityAdjustment = adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
   // V 档:贝叶斯信号融合层 —— 把伤停/H2H/赛季阶段/赛事性质等信号以 LR 证据融进概率。
   // 缺数据的信号自动休眠(见 fusion.dormant),冷启动下只有元数据类信号会真 fire。
-  const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, options.fusionContext ?? {});
+  // X 档(2026-05-29):把市场开盘→当前的盘口移动接进融合层。europeanOdds.initial=开盘、
+  // current=当前(竞彩多次捕获赔率变化时更新)。line-movement 信号据此 fire。
+  // ⚠️ 诚实标注:baseProbabilities 已用 current 赔率 blend,current 信息大部分已计入 prior;
+  // 本信号是"近期盘口移动显著时、略偏向更 sharp 的当前价"的二阶修正(LR 夹 [0.5,2]、
+  // 融合总位移每 outcome 封顶 ±12%,且其后 market-prior isotonic 校准会再纠一次),不重复放大。
+  const fusionContext = {
+    ...(options.fusionContext ?? {}),
+    ...(oddsProbabilities && snapshot?.europeanOdds?.initial
+      ? { openingOdds: probabilitiesFromOdds(snapshot.europeanOdds.initial), currentOdds: oddsProbabilities }
+      : {})
+  };
+  const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext);
   probabilityAdjustment.fusion = fusion;
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
   const calibrated = calibrateProbabilities(fusion.probabilities, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });

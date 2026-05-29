@@ -92,8 +92,8 @@ export async function runWalkForwardWithOdds(opts = {}) {
   const testDates = dates.slice(-maxTestDates);
   const firstTestDate = testDates[0];
 
-  const arms = { market: makeAcc(), dc: makeAcc(), blend: makeAcc(), blendFusion: makeAcc(), blendFusionCal: makeAcc() };
-  let usedDates = 0, skipped = 0, noOdds = 0, fusionApplied = 0;
+  const arms = { market: makeAcc(), dc: makeAcc(), blend: makeAcc(), blendFusion: makeAcc(), blendFusionCal: makeAcc(), blendFusionLineMove: makeAcc() };
+  let usedDates = 0, skipped = 0, noOdds = 0, fusionApplied = 0, lineMoveFired = 0;
 
   for (const date of testDates) {
     const prior = matches.filter((m) => m.date < date);
@@ -127,6 +127,14 @@ export async function runWalkForwardWithOdds(opts = {}) {
 
       const cal = calibrateProbabilities(fusion.probabilities, undefined, { fixture, hasMarketPrior: true });
       record(arms.blendFusionCal, cal.probabilities ?? fusion.probabilities, actual);
+
+      // 第 6 臂(X 档):+ 盘口移动信号。prior 仍用开盘 blend,信号把它朝收盘 sharp 价微调。
+      // 诚实测量:收盘比开盘准 +0.64pp,这条信号能恢复多少?(收盘只在 kickoff 已知 → 这是上限)
+      const ctxLM = { ...ctx, openingOdds: m.odds, currentOdds: m.oddsClose ?? m.odds };
+      const fusionLM = fuseSignals(blendProbs, fixture, {}, ctxLM);
+      if (fusionLM.evidence?.some((e) => e.name === "line-movement")) lineMoveFired++;
+      const calLM = calibrateProbabilities(fusionLM.probabilities, undefined, { fixture, hasMarketPrior: true });
+      record(arms.blendFusionLineMove, calLM.probabilities ?? fusionLM.probabilities, actual);
     }
   }
 
@@ -140,12 +148,14 @@ export async function runWalkForwardWithOdds(opts = {}) {
     skippedDates: skipped,
     noOddsMatches: noOdds,
     fusionAppliedRate: round(fusionApplied / (arms.blendFusion.n || 1)),
+    lineMoveFiredRate: round(lineMoveFired / (arms.blendFusionLineMove.n || 1)),
     arms: {
       market: finalize(arms.market),
       dc: finalize(arms.dc),
       blend: finalize(arms.blend),
       blendFusion: finalize(arms.blendFusion),
-      blendFusionCal: finalize(arms.blendFusionCal)
+      blendFusionCal: finalize(arms.blendFusionCal),
+      blendFusionLineMove: finalize(arms.blendFusionLineMove)
     },
     note: "market=市场赔率隐含(基准,含全部公开信息,极难打败);blend=赔率+DC 实战 prior;后两臂叠加融合/校准。"
   };

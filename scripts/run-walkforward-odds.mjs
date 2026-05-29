@@ -14,14 +14,15 @@ const res = await runWalkForwardWithOdds({
 if (!res.ok) { console.error("失败:", res.reason); process.exit(1); }
 
 console.log(`\n数据:${res.loadedMatches} 场(含赔率 ${res.withOdds})| 联赛 ${JSON.stringify(res.byLeague)}`);
-console.log(`测试日 ${res.testDatesUsed}(跳过 ${res.skippedDates})| 无赔率场次 ${res.noOddsMatches} | 融合 fire 率 ${(res.fusionAppliedRate * 100).toFixed(1)}%\n`);
+console.log(`测试日 ${res.testDatesUsed}(跳过 ${res.skippedDates})| 无赔率场次 ${res.noOddsMatches} | 融合 fire 率 ${(res.fusionAppliedRate * 100).toFixed(1)}% | 盘口移动 fire 率 ${((res.lineMoveFiredRate ?? 0) * 100).toFixed(1)}%\n`);
 
 const order = [
   ["market 市场赔率   ", res.arms.market],
   ["dc 纯模型         ", res.arms.dc],
   ["blend 赔率+DC     ", res.arms.blend],
   ["blend+融合        ", res.arms.blendFusion],
-  ["blend+融合+校准   ", res.arms.blendFusionCal]
+  ["blend+融合+校准   ", res.arms.blendFusionCal],
+  ["+盘口移动(开→收) ", res.arms.blendFusionLineMove]
 ];
 console.log("臂                  命中率    Brier    RPS     LogLoss   n");
 for (const [label, a] of order) {
