@@ -25,6 +25,8 @@
     "backtest:walkforward": "node scripts/run-walkforward-backtest.mjs",
     "backtest:odds": "node scripts/run-walkforward-odds.mjs",
     "analyze:deep": "node scripts/run-analyze-deep.mjs",
+    "jingcai:daily": "node scripts/jingcai-daily.mjs",
+    "report:html": "node scripts/render-recommendation-html.mjs",
     "daily": "node src/daily-evolution.js",
     "daily:allow-missing": "node src/daily-evolution.js --allow-missing-odds",
     "daily:no-web": "node src/daily-evolution.js --allow-missing-odds",
