@@ -125,7 +125,7 @@ export async function runWalkForwardWithOdds(opts = {}) {
       if (fusion.applied) fusionApplied++;
       record(arms.blendFusion, fusion.probabilities, actual);
 
-      const cal = calibrateProbabilities(fusion.probabilities, undefined, { fixture });
+      const cal = calibrateProbabilities(fusion.probabilities, undefined, { fixture, hasMarketPrior: true });
       record(arms.blendFusionCal, cal.probabilities ?? fusion.probabilities, actual);
     }
   }

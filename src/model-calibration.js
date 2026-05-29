@@ -26,9 +26,15 @@ export function calibrateProbabilities(probabilities, profile = emptyProfile(), 
   if (!profile.usable) {
     // 冷启动:profile 不可用时,套一层"favorite-longshot bias"先验。
     // 学术与博彩历史一致表明:赔率市场对高概率主队普遍高估 2~5 个点,
-    // 对长程冷门低估同等程度。这里只对 ≥0.65 的强主队收缩 15% 多余部分,
-    // 是已知行为的最小修正,不引入未经验证的趋势。一旦 calibration profile
-    // 通过 backtest 训练出来,这条先验会被覆盖。
+    // 对长程冷门低估同等程度。这里对 ≥0.65 的强主队累进收缩,是已知行为的
+    // 最小修正。一旦 calibration profile 通过 backtest 训练出来,这条先验会被覆盖。
+    //
+    // 闸门(2026-05-29,赔率版 walk-forward 验证):当 prior 已由市场赔率混合得出
+    // (hasMarketPrior),其 65%+ 桶已近完美校准(实测 gap -0.001),再套 cold-start
+    // 收缩会过度收缩(→ +0.042 反向偏差)。收缩只应在**无赔率**的弱 prior 上生效。
+    if (context.hasMarketPrior) {
+      return { probabilities: normalized, calibration: { applied: false, reason: "market-prior-already-calibrated", bucket, scope: "skip-cold-start" } };
+    }
     return applyColdStartCalibration(normalized, favorite, bucket, profile.reason);
   }
   // 优先级 0(新增 2026-05-28):isotonic regression 映射

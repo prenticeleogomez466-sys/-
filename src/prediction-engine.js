@@ -130,7 +130,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 缺数据的信号自动休眠(见 fusion.dormant),冷启动下只有元数据类信号会真 fire。
   const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, options.fusionContext ?? {});
   probabilityAdjustment.fusion = fusion;
-  const calibrated = calibrateProbabilities(fusion.probabilities, options.calibrationProfile, { fixture, snapshot });
+  // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
+  const calibrated = calibrateProbabilities(fusion.probabilities, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
   const probabilities = calibrated.probabilities;
   probabilityAdjustment.calibration = calibrated.calibration;
   const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);
