@@ -39,6 +39,25 @@ function rps(p, a) {
 function logLoss(p, a) { return -Math.log(Math.max(1e-12, p[a])); }
 function round(v) { return Math.round(v * 10000) / 10000; }
 
+// 选择性推荐 hit-vs-coverage:只推 blend top-prob ≥ 阈值的比赛,看推荐命中率随覆盖率的权衡。
+// 实际推荐时设一个阈值,命中率↑但覆盖率(能推几场)↓。诚实展示这个 trade-off。
+function selectiveCoverage(samples, thresholds = [0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75]) {
+  const total = samples.length || 1;
+  return {
+    total: samples.length,
+    curve: thresholds.map((t) => {
+      const sel = samples.filter((s) => s.topProb >= t);
+      const hit = sel.filter((s) => s.hit).length;
+      return {
+        threshold: t,
+        recommended: sel.length,
+        coverage: round(sel.length / total),
+        hitRate: sel.length ? round(hit / sel.length) : null
+      };
+    })
+  };
+}
+
 function makeAcc() {
   const buckets = {};
   for (const [lo, hi] of BUCKETS) buckets[`${Math.round(lo * 100)}-${Math.round(hi * 100)}`] = { n: 0, predSum: 0, hit: 0 };
@@ -93,6 +112,7 @@ export async function runWalkForwardWithOdds(opts = {}) {
   const firstTestDate = testDates[0];
 
   const arms = { market: makeAcc(), dc: makeAcc(), dcShot: makeAcc(), blend: makeAcc(), blendShot: makeAcc(), blendFusion: makeAcc(), blendFusionCal: makeAcc(), blendFusionLineMove: makeAcc() };
+  const coverageSamples = []; // 选择性推荐:blend 臂每场 {topProb, hit},供 hit-vs-coverage 曲线
   let usedDates = 0, skipped = 0, noOdds = 0, fusionApplied = 0, lineMoveFired = 0, shotApplied = 0;
 
   for (const date of testDates) {
@@ -126,6 +146,10 @@ export async function runWalkForwardWithOdds(opts = {}) {
       const blended = blendWithOdds(m.odds, pred, { competition: m.league });
       const blendProbs = blended.probabilities ?? m.odds;
       record(arms.blend, blendProbs, actual);
+      {
+        const top = OUTCOMES.reduce((x, y) => (blendProbs[y] > blendProbs[x] ? y : x), "home");
+        coverageSamples.push({ topProb: blendProbs[top], hit: top === actual });
+      }
 
       // market + shot-regressed DC
       if (predShot?.probabilities) {
@@ -163,6 +187,7 @@ export async function runWalkForwardWithOdds(opts = {}) {
     fusionAppliedRate: round(fusionApplied / (arms.blendFusion.n || 1)),
     lineMoveFiredRate: round(lineMoveFired / (arms.blendFusionLineMove.n || 1)),
     shotRegressedSamples: shotApplied,
+    selectiveCoverage: selectiveCoverage(coverageSamples),
     arms: {
       market: finalize(arms.market),
       dc: finalize(arms.dc),
