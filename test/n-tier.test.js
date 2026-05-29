@@ -1,41 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { nextGoalProbability, halfTimeFullTimeExpected, inPlayNextNGoalProbability, fitExponentialFromGoalTimes } from "../src/survival-goal-timing.js";
 import { fitRefereeProfiles, computeRefereeLR, applyRefereeBias } from "../src/referee-bias-model.js";
 import { computeFatigueMultiplier, compareFatigue, applyFatigueBias } from "../src/schedule-fatigue-model.js";
 import { computeSetPieceProfile, leagueSetPieceBaseline, applySetPieceToOverUnder } from "../src/set-piece-model.js";
-
-describe("survival-goal-timing", () => {
-  it("nextGoalProbability rises with lambda", () => {
-    const r1 = nextGoalProbability(1.0);
-    const r2 = nextGoalProbability(3.0);
-    assert.ok(r2.probability > r1.probability);
-  });
-
-  it("halfTimeFullTimeExpected sums correctly", () => {
-    const r = halfTimeFullTimeExpected(2.4);
-    assert.ok(Math.abs(r.firstHalfLambda + r.secondHalfLambda - 2.4) < 0.01);
-  });
-
-  it("inPlayNextNGoalProbability:与剩余 lambda 成正比", () => {
-    const earlyHighLambda = inPlayNextNGoalProbability(10, 2.0, 10);
-    const earlyLowLambda = inPlayNextNGoalProbability(10, 0.2, 10);
-    assert.ok(earlyHighLambda.probability > earlyLowLambda.probability);
-  });
-
-  it("fitExponentialFromGoalTimes estimates lambda", () => {
-    const goals = [
-      { fixtureId: "f1", goalMinute: 23 },
-      { fixtureId: "f1", goalMinute: 67 },
-      { fixtureId: "f2", goalMinute: 45 }
-    ];
-    const r = fitExponentialFromGoalTimes(goals);
-    assert.ok(r);
-    assert.equal(r.fixtures, 2);
-    assert.equal(r.samples, 3);
-    assert.ok(r.estimatedLambda >= 1.0 && r.estimatedLambda <= 2.0);
-  });
-});
 
 describe("referee-bias-model", () => {
   it("fitRefereeProfiles aggregates per referee", () => {

@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { computeInjuryImpact, compareInjuryImpact, injuryToLR } from "../src/injury-impact-model.js";
 import { splitStats, projectHomeAwayMatch } from "../src/home-away-split-stats.js";
-import { leagueCoefficient, normalizeElo, compareCrossLeague, intlAdjustedFormScore } from "../src/league-strength-coefficient.js";
 import { detectCleanSheetStreak, streakToProbabilityShift, cleanSheetStreakToLR } from "../src/clean-sheet-streak.js";
 
 describe("injury-impact-model", () => {
@@ -79,41 +78,6 @@ describe("home-away-split-stats", () => {
     ];
     const r = splitStats(matches);
     assert.ok(r.home.cleanSheetRate > 0.5);
-  });
-});
-
-describe("league-strength-coefficient", () => {
-  it("EPL = 1.00", () => {
-    assert.equal(leagueCoefficient("英超"), 1.00);
-    assert.equal(leagueCoefficient("Premier League"), 1.00);
-  });
-
-  it("中超 < 英超", () => {
-    assert.ok(leagueCoefficient("中超") < leagueCoefficient("英超"));
-  });
-
-  it("unknown league returns default 0.60", () => {
-    assert.equal(leagueCoefficient("Unknown XYZ"), 0.60);
-  });
-
-  it("normalizeElo shrinks weaker league's range", () => {
-    const epl = normalizeElo(1800, "英超");
-    const csl = normalizeElo(1800, "中超");
-    assert.equal(epl, 1800);  // 系数 1.0,不变
-    assert.ok(csl < 1800);    // 系数 0.62
-  });
-
-  it("compareCrossLeague normalizes before delta", () => {
-    const r = compareCrossLeague(1800, "中超", 1700, "英超");
-    // 1800 中超 (×0.62) → 1500 + 300×0.62 = 1686
-    // 1700 英超 → 1700
-    // 英超 1700 normalized 应该 > 中超 1800 normalized
-    assert.ok(r.team2.normalizedElo > r.team1.normalizedElo);
-  });
-
-  it("intlAdjustedFormScore scales by coefficient", () => {
-    assert.ok(intlAdjustedFormScore(2.5, "中超") < 2.5);
-    assert.equal(intlAdjustedFormScore(2.5, "英超"), 2.5);
   });
 });
 

@@ -36,6 +36,11 @@ import { computePressureProfile, pressureToFormMultiplier } from "./standings-pr
 import { bigGameReadinessLR } from "./big-game-form.js";
 import { computeTravelImpact } from "./travel-distance-model.js";
 import { getFormationLift } from "./tactical-matchup.js";
+import { computeRefereeLR } from "./referee-bias-model.js";
+import { compareAdjustedForm, adjustedFormSummary } from "./opponent-strength-adjustment.js";
+import { teamChainXgAverage, compareChainXg } from "./xg-chains.js";
+import { teamPossessionAdjustedAverage, comparePossessionStyles } from "./possession-adjusted-xg.js";
+import { computeSetPieceProfile } from "./set-piece-model.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getExportDir } from "./paths.js";
@@ -447,6 +452,129 @@ function signalTacticalMatchup(prior, fixture, advancedData, context) {
   };
 }
 
+/**
+ * 主裁判 bias:某些裁判主胜率显著偏离联赛 baseline。
+ * 数据源:context.refereeProfile(由 fitRefereeProfiles 拟合)+ context.leagueBaseline。
+ */
+function signalReferee(prior, fixture, advancedData, context) {
+  const profile = context.refereeProfile ?? fixtureLayer(advancedData, fixture, "referee");
+  const baseline = context.leagueBaseline;
+  if (!profile || !baseline) {
+    return { name: "referee", source: "context.refereeProfile", dormant: "no-referee-or-baseline" };
+  }
+  const lr = clampLR(computeRefereeLR(profile, baseline));
+  if (!lr) return { name: "referee", source: "context.refereeProfile", dormant: "neutral-or-thin" };
+  return { name: "referee", source: "context.refereeProfile", lr, detail: profile.refereeId ?? profile.name ?? null };
+}
+
+/**
+ * 对手强度调整的 form 差:adjusted PPG 比 raw PPG 更能反映"真实质量"。
+ * 输入主客队近期赛 + 对手 Elo(每场)→ 净 adjustedPpg 差转 LR。
+ * 数据源:context.homeRecentMatchesWithElo / awayRecentMatchesWithElo(带 opponentElo)。
+ */
+function signalOpponentStrengthForm(prior, fixture, advancedData, context) {
+  const homeMatches = context.homeRecentMatchesWithElo;
+  const awayMatches = context.awayRecentMatchesWithElo;
+  if (!Array.isArray(homeMatches) || !Array.isArray(awayMatches) || !homeMatches.length || !awayMatches.length) {
+    return { name: "opponent-strength-form", source: "context.recentMatchesWithElo", dormant: "no-elo-tagged-recent-matches" };
+  }
+  const homeAdj = adjustedFormSummary(homeMatches);
+  const awayAdj = adjustedFormSummary(awayMatches);
+  if (!homeAdj || !awayAdj) return { name: "opponent-strength-form", source: "context.recentMatchesWithElo", dormant: "thin-form" };
+  const cmp = compareAdjustedForm(homeAdj, awayAdj);
+  if (!cmp || Math.abs(cmp.gap) < 0.4) {  // PPG 净差 < 0.4 视为噪声
+    return { name: "opponent-strength-form", source: "context.recentMatchesWithElo", dormant: "gap-below-floor" };
+  }
+  const k = 0.12;  // 1.5 PPG 净差 ≈ ~1.2 LR
+  const fav = Math.exp(Math.max(-0.5, Math.min(0.5, k * cmp.gap)));
+  const lr = clampLR({ home: fav, draw: 1, away: 1 / fav });
+  if (!lr) return { name: "opponent-strength-form", source: "context.recentMatchesWithElo", dormant: "neutral" };
+  return { name: "opponent-strength-form", source: "context.recentMatchesWithElo", lr, detail: cmp.interpretation };
+}
+
+/**
+ * xG-Chains 进攻链生产力差:近期 build-up + shot 整链 xG 平均的主客差。
+ * 数据源:context.homeChainEvents / awayChainEvents(每场带 events 数组,含 isShot/xg/chainLength/completedPasses)。
+ */
+function signalXgChains(prior, fixture, advancedData, context) {
+  const homeMatches = context.homeChainEvents;
+  const awayMatches = context.awayChainEvents;
+  if (!Array.isArray(homeMatches) || !Array.isArray(awayMatches) || !homeMatches.length || !awayMatches.length) {
+    return { name: "xg-chains", source: "context.{home,away}ChainEvents", dormant: "no-chain-event-data" };
+  }
+  const homeAvg = teamChainXgAverage(homeMatches);
+  const awayAvg = teamChainXgAverage(awayMatches);
+  if (!homeAvg || !awayAvg) return { name: "xg-chains", source: "context.{home,away}ChainEvents", dormant: "thin-chain-samples" };
+  const cmp = compareChainXg(homeAvg, awayAvg);
+  if (!cmp || Math.abs(cmp.diff) < 0.2) {  // chainXG 差 < 0.2 视为噪声
+    return { name: "xg-chains", source: "context.{home,away}ChainEvents", dormant: "diff-below-floor" };
+  }
+  const k = 0.25;
+  const fav = Math.exp(Math.max(-0.4, Math.min(0.4, k * cmp.diff)));
+  const lr = clampLR({ home: fav, draw: 1 - Math.abs(cmp.diff) * 0.05, away: 1 / fav });
+  if (!lr) return { name: "xg-chains", source: "context.{home,away}ChainEvents", dormant: "neutral" };
+  return { name: "xg-chains", source: "context.{home,away}ChainEvents", lr, detail: cmp.homeProductionEdge };
+}
+
+/**
+ * Possession-Adjusted xG 风格 matchup:控球率标准化后的 xG-for / xG-against。
+ * 数据源:context.homePossMatches / awayPossMatches(每场含 xgFor/xgAgainst/possession)。
+ */
+function signalPADJxG(prior, fixture, advancedData, context) {
+  const homeMatches = context.homePossMatches;
+  const awayMatches = context.awayPossMatches;
+  if (!Array.isArray(homeMatches) || !Array.isArray(awayMatches) || !homeMatches.length || !awayMatches.length) {
+    return { name: "padj-xg", source: "context.{home,away}PossMatches", dormant: "no-possession-data" };
+  }
+  const homeAvg = teamPossessionAdjustedAverage(homeMatches);
+  const awayAvg = teamPossessionAdjustedAverage(awayMatches);
+  if (!homeAvg || !awayAvg) return { name: "padj-xg", source: "context.{home,away}PossMatches", dormant: "thin-poss-samples" };
+  const cmp = comparePossessionStyles(homeAvg, awayAvg);
+  if (!cmp) return { name: "padj-xg", source: "context.{home,away}PossMatches", dormant: "no-comparable-styles" };
+  const projectedHome = cmp.projectedHomeXg;
+  const projectedAway = cmp.projectedAwayXg;
+  const xgDiff = projectedHome - projectedAway;
+  if (Math.abs(xgDiff) < 0.25) {
+    return { name: "padj-xg", source: "context.{home,away}PossMatches", dormant: "xg-diff-below-floor" };
+  }
+  const k = 0.20;
+  const fav = Math.exp(Math.max(-0.4, Math.min(0.4, k * xgDiff)));
+  const lr = clampLR({ home: fav, draw: 1, away: 1 / fav });
+  if (!lr) return { name: "padj-xg", source: "context.{home,away}PossMatches", dormant: "neutral" };
+  return { name: "padj-xg", source: "context.{home,away}PossMatches", lr, detail: cmp.matchup };
+}
+
+/**
+ * 定位球专项:双方都 set-piece-specialist → 进球率上升,平局率下降。
+ * 数据源:context.homeGoalsByType / awayGoalsByType(每条 { type: "corner"/"open"/... })。
+ */
+function signalSetPiece(prior, fixture, advancedData, context) {
+  const homeGoals = context.homeGoalsByType;
+  const awayGoals = context.awayGoalsByType;
+  if (!Array.isArray(homeGoals) || !Array.isArray(awayGoals) || homeGoals.length < 5 || awayGoals.length < 5) {
+    return { name: "set-piece", source: "context.{home,away}GoalsByType", dormant: "no-goal-type-breakdown" };
+  }
+  const homeProfile = Object.values(computeSetPieceProfile(homeGoals))[0];
+  const awayProfile = Object.values(computeSetPieceProfile(awayGoals))[0];
+  if (!homeProfile || !awayProfile) return { name: "set-piece", source: "context.{home,away}GoalsByType", dormant: "no-profiles" };
+  const avgSetShare = ((homeProfile.setPieceShare ?? 0.25) + (awayProfile.setPieceShare ?? 0.25)) / 2;
+  // 双方 set-piece 高 → 比赛变更"事件多元",平局率下降、决胜概率上升
+  // 双方 set-piece 低 → 比赛变化少,平局略上升
+  let lr;
+  if (avgSetShare > 0.32) {
+    lr = clampLR({ home: 1.03, draw: 0.92, away: 1.03 });
+  } else if (avgSetShare < 0.20) {
+    lr = clampLR({ home: 0.98, draw: 1.05, away: 0.98 });
+  } else {
+    return { name: "set-piece", source: "context.{home,away}GoalsByType", dormant: "neutral-set-share" };
+  }
+  if (!lr) return { name: "set-piece", source: "context.{home,away}GoalsByType", dormant: "neutral" };
+  return {
+    name: "set-piece", source: "context.{home,away}GoalsByType", lr,
+    detail: `主${homeProfile.classification} × 客${awayProfile.classification}(set-share avg ${(avgSetShare*100).toFixed(0)}%)`
+  };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -465,7 +593,12 @@ const SIGNAL_HANDLERS = [
   signalStandingsPressure,
   signalBigGameForm,
   signalTravelDistance,
-  signalTacticalMatchup
+  signalTacticalMatchup,
+  signalReferee,
+  signalOpponentStrengthForm,
+  signalXgChains,
+  signalPADJxG,
+  signalSetPiece
 ];
 
 /** 所有信号名(供消融回测 / 权重调优枚举)。 */
@@ -473,7 +606,8 @@ export const SIGNAL_NAMES = [
   "season-phase", "competition-type", "injury", "h2h", "clean-sheet-streak",
   "streak", "fatigue", "rotation", "home-away-split", "time-decay-form", "line-movement",
   "weather", "manager", "derby", "standings-pressure", "big-game-form",
-  "travel-distance", "tactical-matchup"
+  "travel-distance", "tactical-matchup",
+  "referee", "opponent-strength-form", "xg-chains", "padj-xg", "set-piece"
 ];
 
 /**
