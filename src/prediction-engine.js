@@ -39,7 +39,9 @@ const HALF_FULL_POOLS = {
 
 const FOURTEEN_DEFAULT_MAX_BANKERS = 4;
 const FOURTEEN_DEFAULT_BANKER_MIN_GAP = 0.22;
-const FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE = 60;
+// 2026-05-29 调:60 太严,实际冷启动场置信极少过 60 → 全部场降双选,胆=0。
+// 改为 45 让"概率差 ≥22% + 风险≤中" 的高分场能进胆池,符合用户"要选胆出来"的预期。
+const FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE = 45;
 const FOURTEEN_DEFAULT_DOUBLE_MIN_GAP = 0.08;
 
 export function recommendFixtures(date) {
@@ -788,9 +790,10 @@ export function buildFourteenPlan(predictions) {
       single: outcomeCodeToChinese(prediction.pick.code),
       compound: codes.map(outcomeCodeToChinese).join("/"),
       type: codes.length === 1 ? "胆" : codes.length === 2 ? "双选" : "全选",
+      competitionType: competitionCategory(prediction.fixture?.competition),
       risk: prediction.risk,
       confidence: prediction.confidence,
-      reason: `概率差 ${Math.round(gap * 100)}%；14场严格定胆规则：${isBanker ? "进入强胆池" : "未入强胆池，降为覆盖"}；${prediction.rationale}`
+      reason: `概率差 ${Math.round(gap * 100)}%；定胆判定：${isBanker ? "✅ 进胆池(信心+概率差双达标)" : "未入胆池(信心或概率差未达标，降为覆盖)"}；${prediction.rationale}`
     };
   });
   // 胆腿串关相关性修正(接孤儿模块 parlay-correlation-adjuster):
@@ -843,12 +846,14 @@ export function buildRenxuan9(source) {
   const picks = ranked.map(({ prediction, gap }, i) => ({
     rank: i + 1,
     match: `${prediction.fixture.homeTeam} 对 ${prediction.fixture.awayTeam}`,
+    competitionType: competitionCategory(prediction.fixture?.competition),
     pick: outcomeCodeToChinese(prediction.pick.code),
     code: prediction.pick.code,
     probability: prediction.pick.probability,
     confidence: prediction.confidence,
     risk: prediction.risk,
-    gap: Math.round(gap * 100) / 100
+    gap: Math.round(gap * 100) / 100,
+    reason: prediction.rationale ?? ""
   }));
   const legs = ranked.map(({ prediction }) => ({
     fixtureId: prediction.fixture.id,
@@ -869,6 +874,25 @@ export function buildRenxuan9(source) {
     parlay,
     note: "从 14 场挑置信最高的 9 场单选;9 场全对即中任选9。联合命中率见 parlay(相关性修正后更诚实)。"
   };
+}
+
+/**
+ * 把 fixture.competition 中文/英文联赛名归类成竞猜场景标签,用户看 xlsx 时能直观分辨
+ * "这是欧冠/联赛/国家队赛/友谊赛"。归类影响推理 prior(欧冠 / 联赛差异大)。
+ */
+export function competitionCategory(competition) {
+  if (!competition) return "未知赛事";
+  const s = String(competition);
+  if (/欧冠|Champions/i.test(s)) return "🏆 欧冠";
+  if (/欧联|Europa/i.test(s)) return "🏆 欧联";
+  if (/欧会|Conference/i.test(s)) return "🏆 欧会";
+  if (/友谊|Friendly/i.test(s)) return "⚠ 友谊赛(战意低、随机性高)";
+  if (/世预|World Cup Q/i.test(s)) return "🌍 世预赛";
+  if (/国家|National|国际赛/.test(s)) return "🌍 国家队赛";
+  if (/英超|Premier/i.test(s) || /西甲|La Liga/i.test(s) || /德甲|Bundesliga/i.test(s) || /意甲|Serie A/i.test(s) || /法甲|Ligue 1/i.test(s)) return "🥇 五大联赛";
+  if (/杯|Cup/i.test(s)) return "🏅 杯赛";
+  if (/超|甲|联赛|League|Liga/i.test(s)) return "⚽ 联赛";
+  return s;
 }
 
 export function fourteenSelectionRules(env = process.env) {

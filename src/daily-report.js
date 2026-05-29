@@ -135,7 +135,17 @@ export function bettingTier(probabilities, league = null) {
 }
 
 function toFourteenRow(selection) {
-  return [selection.index, selection.match, selection.single, selection.compound, selection.type, selection.risk, selection.confidence, selection.reason];
+  return [
+    selection.index,
+    selection.match,
+    selection.competitionType ?? "—",  // 新:赛事类型(欧冠/欧联/友谊/五大联赛/...)
+    selection.single,
+    selection.compound,
+    selection.type,
+    selection.risk,
+    confidenceLabel(selection.confidence),  // 等级+数字
+    selection.reason
+  ];
 }
 
 function toOddsComparisonRow(prediction) {
@@ -335,31 +345,33 @@ function jingcaiHeaders() {
 }
 
 function fourteenHeaders() {
-  return ["场次", "比赛", "单式推荐", "覆盖选择", "类型", "风险", "信心", "选择理由"];
+  return ["场次", "比赛", "赛事类型", "单式推荐", "覆盖选择", "类型", "风险", "信心", "选择理由"];
 }
 
 // 任选9 sheet:从 14 场挑最稳 9 场单选,9 场全对即中。
 function renxuan9Rows(renxuan9) {
-  const header = ["序", "比赛", "推荐", "主胜概率", "信心", "风险", "概率差"];
+  const header = ["序", "比赛", "赛事类型", "推荐", "主胜概率", "信心", "风险", "概率差", "选择理由"];
   if (!renxuan9?.ok) {
-    return [header, ["—", renxuan9?.reason ?? "任选9 不可用(可选场次不足 9)", "", "", "", "", ""]];
+    return [header, ["—", renxuan9?.reason ?? "任选9 不可用(可选场次不足 9)", "", "", "", "", "", "", ""]];
   }
   const rows = renxuan9.picks.map((p) => [
     p.rank,
     p.match,
+    p.competitionType ?? "—",
     p.pick,
     pct(p.probability),
-    p.confidence,
+    confidenceLabel(p.confidence),
     p.risk,
-    p.gap
+    p.gap,
+    p.reason ?? ""
   ]);
   const ind = renxuan9.parlay?.jointProbabilityIndependent ?? null;
   const adj = renxuan9.parlay?.jointProbabilityCorrelated ?? null;
   const summary = [
-    ["", "", "", "", "", "", ""],
-    ["单式串", renxuan9.singleLine, "", "", "", "", ""],
-    ["9 串联合命中率", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", "", "", "", ""],
-    ["说明", renxuan9.note, "", "", "", "", ""]
+    new Array(9).fill(""),
+    ["单式串", renxuan9.singleLine, "", "", "", "", "", "", ""],
+    ["9 串联合命中率", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", "", "", "", "", "", ""],
+    ["说明", renxuan9.note, "", "", "", "", "", "", ""]
   ];
   return [header, ...rows, ...summary];
 }
