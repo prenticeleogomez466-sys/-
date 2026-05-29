@@ -187,16 +187,18 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const extendedMarkets = blendResult.dcResult?.matrix
     ? buildExtendedMarkets(blendResult.dcResult.matrix)
     : null;
-  // FF 档:让球方向以比分锚点 + asian handicap line 派生,确保跟 score 严格一致。
-  // 缺亚盘 snapshot 时 line=0,deriveHandicapFromScore 等价于 deriveWldFromScore。
+  // 2026-05-29 用户指令:**所有推荐以胜负平方向为锚**,handicap direction 直接 = wld,
+  // 不再从 score 反推。原因:模型先决定 wld(pick.label),用户玩让球时买的就是这个方向;
+  // score 选满足该 wld 的最高概率比分(已在 buildScorePicks 里做),半全场再跟 score 同步。
+  // wld + score 可能不严格"几球领先"对齐 line(例 wld=主胜 + score=1-0 + 让 -1 实际让球后平),
+  // 但这是诚实模型的局限,不掩盖。让球玩法的方向 = wld 主推荐方向,跟比分独立解读。
   const handicapLine = Number(snapshot?.asianHandicap?.current?.line
     ?? snapshot?.asianHandicap?.initial?.line
     ?? snapshot?.asianHandicap?.final?.line
     ?? 0);
-  const handicapDirection = scorePicks.primary
-    ? deriveHandicapFromScore(scorePicks.primary, handicapLine)
+  const handicapPick = ranked[0]?.label
+    ? { line: handicapLine, direction: ranked[0].label }
     : null;
-  const handicapPick = handicapDirection ? { line: handicapLine, direction: handicapDirection } : null;
   const expectedValue = computeExpectedValueLabels(ranked, snapshot);
   // D 档接入(2026-05-28):用 bootstrap 传入的多评级算 ensembleView 作为 supplementary.
   // 不替换 main 路径 — 主推荐仍走 calibrated probabilities;ensembleView 用于 backtest 对比和未来切主.
@@ -291,18 +293,10 @@ export function validatePredictionConsistency(prediction) {
   for (const [label, score, halfFull] of pathChecks) {
     if (score && halfFull && !scoreHalfFullConsistent(score, halfFull)) errors.push(`${label} ${score} 与 ${halfFull} 路径冲突`);
   }
-  // FF 档:让球方向跟比分锚点一致性。
-  // 注:不传 halfFull,因 prediction-engine 用 "主胜-主胜" 格式而 consistency-derivation
-  // 期望"胜胜" 单字符格式;halfFull 一致性由上面的 scoreHalfFullConsistent 已覆盖。
-  if (prediction.scorePicks?.primary && prediction.handicapPick) {
-    const derivErrors = verifyRecommendationConsistency({
-      score: prediction.scorePicks.primary,
-      wld: prediction.pick?.label,
-      handicapDirection: prediction.handicapPick.direction,
-      handicapLine: prediction.handicapPick.line
-    });
-    for (const e of derivErrors) errors.push(`首选派生冲突: ${e}`);
-  }
+  // 2026-05-29:wld 锚改动后,handicap direction = wld 直接,不再从 score 反推。
+  // handicap vs wld 必然一致(直接等);score vs wld 已由上面 checks 校验。
+  // 让球玩法跟比分玩法对用户来说是独立赔种,内部"score 让球后方向 ≠ wld" 不是矛盾,
+  // 只是模型的一个 transparency:同一比分,玩 wld 买主胜、玩让球也买主胜方向。
   return errors;
 }
 
