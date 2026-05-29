@@ -49,75 +49,103 @@ function safeName(value) {
     .slice(0, 56) || "x";
 }
 
+function parseOdds(oddsCell) {
+  const o = String(oddsCell ?? "").trim().split(/\s+/).map(oddsNum);
+  // 让0档欧赔 = o[0..2];让球胜平负(让N档) = o[3..5]
+  return { euro: { home: o[0], draw: o[1], away: o[2] }, hcp: { home: o[3], draw: o[4], away: o[5] } };
+}
+const validTriple = (t) => t && t.home && t.draw && t.away;
+
 /**
- * 把抓到的 500.com 行解析成 { fixtures, snapshots }(官方同款 shape)。
- * @param {Array<Array<string>>} rows
- * @param {string} date  业务日期 YYYY-MM-DD
- * @param {string} collectedAt  快照采集时间 ISO(默认 now)
+ * 解析一组行(单次捕获)成 { fixtures, oddsBySeq }。
  */
-export function parseFiveHundredRows(rows, date, collectedAt = new Date().toISOString()) {
+function parseRows(rows) {
   const fixtures = [];
-  const snapshots = [];
+  const oddsBySeq = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
     const [seq, league, kickoff, teamCell, handicapCell, oddsCell] = row;
     const [homeTeam, awayTeam] = splitTeams(teamCell);
     if (!homeTeam || !awayTeam) continue;
-    const o = String(oddsCell ?? "").trim().split(/\s+/).map(oddsNum);
-    // 让0档欧赔 = o[0..2];让球胜平负(让N档) = o[3..5]
-    const euro = { home: o[0], draw: o[1], away: o[2] };
-    const hcp = { home: o[3], draw: o[4], away: o[5] };
-    const year = String(date).slice(0, 4);
-    const id = `jc-${date}-${safeName(seq)}-${safeName(homeTeam)}-${safeName(awayTeam)}`;
+    const key = String(seq ?? `${homeTeam}-${awayTeam}`);
+    oddsBySeq.set(key, parseOdds(oddsCell));
+    fixtures.push({ seq: String(seq ?? ""), league: String(league ?? "竞彩足球"), kickoff, homeTeam, awayTeam, handicapCell });
+  }
+  return { fixtures, oddsBySeq };
+}
+
+/**
+ * 单次捕获:解析成 { fixtures, snapshots }(官方同款 shape)。initial=current。
+ */
+export function parseFiveHundredRows(rows, date, collectedAt = new Date().toISOString()) {
+  return parseFiveHundredCaptures([{ collectedAt, rows }], date);
+}
+
+/**
+ * 多次捕获:每场 initial=最早一次, current=最新一次 → 真实赔率变化(满足"每次生成必须实时赔率变化")。
+ * @param {Array<{collectedAt:string, rows:Array<Array<string>>}>} captures  按时间先后
+ * @param {string} date
+ */
+export function parseFiveHundredCaptures(captures, date) {
+  const list = (Array.isArray(captures) ? captures : []).filter((c) => c && Array.isArray(c.rows));
+  if (!list.length) return { fixtures: [], snapshots: [] };
+  const sorted = list.slice().sort((a, b) => String(a.collectedAt).localeCompare(String(b.collectedAt)));
+  const first = parseRows(sorted[0].rows);
+  const last = parseRows(sorted[sorted.length - 1].rows);
+  const year = String(date).slice(0, 4);
+
+  const fixtures = [];
+  const snapshots = [];
+  for (const f of last.fixtures) {
+    const id = `jc-${date}-${safeName(f.seq)}-${safeName(f.homeTeam)}-${safeName(f.awayTeam)}`;
     fixtures.push({
-      id,
-      date,
-      sequence: String(seq ?? ""),
-      kickoff: kickoff ? `${year}-${kickoff}` : "",
-      competition: String(league ?? "竞彩足球"),
-      homeTeam,
-      awayTeam,
-      marketType: "jingcai",
-      tags: ["竞彩足球", "500.com-playwright"],
-      source: SCRAPE_SOURCE,
-      officialStatus: "scraped-fallback",
-      officialFixtureId: null,
-      notes: `500.com 抓取;让球=${handicapCell ?? ""}`,
+      id, date, sequence: f.seq,
+      kickoff: f.kickoff ? `${year}-${f.kickoff}` : "",
+      competition: f.league, homeTeam: f.homeTeam, awayTeam: f.awayTeam,
+      marketType: "jingcai", tags: ["竞彩足球", "500.com-playwright"],
+      source: SCRAPE_SOURCE, officialStatus: "scraped-fallback", officialFixtureId: null,
+      notes: `500.com 抓取;让球=${f.handicapCell ?? ""}`,
     });
-    const hasEuro = euro.home && euro.draw && euro.away;
-    const hasHcp = hcp.home && hcp.draw && hcp.away;
+    const cur = last.oddsBySeq.get(f.seq) ?? parseOdds("");
+    const ini = first.oddsBySeq.get(f.seq) ?? cur;
+    const euroIni = validTriple(ini.euro) ? ini.euro : null;
+    const euroCur = validTriple(cur.euro) ? cur.euro : null;
+    const hcpIni = validTriple(ini.hcp) ? ini.hcp : null;
+    const hcpCur = validTriple(cur.hcp) ? cur.hcp : null;
     snapshots.push({
-      date,
-      fixtureId: id,
-      sequence: String(seq ?? ""),
-      marketType: "jingcai",
-      competition: String(league ?? ""),
-      homeTeam,
-      awayTeam,
-      collectedAt,
-      // 单次抓取只有一档即时赔率,initial=current 以满足 usable/freshness。
-      europeanOdds: hasEuro ? { initial: euro, current: euro } : null,
-      handicapOdds: hasHcp ? { initial: hcp, current: hcp } : null,
+      date, fixtureId: id, sequence: f.seq, marketType: "jingcai",
+      competition: f.league, homeTeam: f.homeTeam, awayTeam: f.awayTeam,
+      collectedAt: sorted[sorted.length - 1].collectedAt,
+      europeanOdds: euroIni || euroCur ? { initial: euroIni ?? euroCur, current: euroCur ?? euroIni } : null,
+      handicapOdds: hcpIni || hcpCur ? { initial: hcpIni ?? hcpCur, current: hcpCur ?? hcpIni } : null,
+      capturedTimes: sorted.map((c) => c.collectedAt),
       source: SCRAPE_SOURCE,
     });
   }
   return { fixtures, snapshots };
 }
 
-/** 读取抓取 JSON 文件(支持 {date, collectedAt, rows} 或裸 rows 数组)。 */
+/**
+ * 读取抓取 JSON 文件。支持三种形态:
+ *   - 裸 rows 数组
+ *   - { rows, collectedAt }(单次)
+ *   - { captures:[{collectedAt,rows}], asian:{seq:{...}} }(多次捕获,有真实赔率变化)
+ * @returns {{ captures, asian }}
+ */
 export function loadScrapeFile(date, path = scrapeFilePath(date)) {
   if (!existsSync(path)) throw new Error(`缺少竞彩抓取文件：${path}。请先用 Playwright 抓 500.com 并写入。`);
   const payload = JSON.parse(readFileSync(path, "utf8"));
-  const rows = Array.isArray(payload) ? payload : payload.rows ?? [];
-  const collectedAt = (Array.isArray(payload) ? null : payload.collectedAt) ?? new Date().toISOString();
-  return { rows, collectedAt };
+  if (Array.isArray(payload)) return { captures: [{ collectedAt: new Date().toISOString(), rows: payload }], asian: {} };
+  if (Array.isArray(payload.captures)) return { captures: payload.captures, asian: payload.asian ?? {} };
+  return { captures: [{ collectedAt: payload.collectedAt ?? new Date().toISOString(), rows: payload.rows ?? [] }], asian: payload.asian ?? {} };
 }
 
 /**
- * 把竞彩抓取数据并入当日 store:保留官方 14 场胜负彩,替换 jingcai 部分。
+ * 把竞彩抓取数据(多次捕获)并入当日 store:保留官方 14 场胜负彩,替换 jingcai 部分。
+ * @param {Array<{collectedAt,rows}>} captures
  * @returns {{ jingcaiFixtures, shengfucaiKept, marketSnapshots }}
  */
-export function stageJingcaiIntoStore(date, rows, collectedAt) {
-  const { fixtures, snapshots } = parseFiveHundredRows(rows, date, collectedAt);
+export function stageJingcaiIntoStore(date, captures) {
+  const { fixtures, snapshots } = parseFiveHundredCaptures(captures, date);
 
   const existing = loadFixtures(date);
   const kept = existing.fixtures.filter((f) => f.marketType === "shengfucai");

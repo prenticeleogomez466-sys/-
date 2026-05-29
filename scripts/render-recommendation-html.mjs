@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { recommendFixtures } from "../src/prediction-engine.js";
 import { fitFromFixtureStore } from "../src/dixon-coles-engine.js";
 import { getExportDir } from "../src/paths.js";
+import { loadScrapeFile } from "../src/jingcai-fivehundred-stage.js";
 
 const args = process.argv.slice(2);
 const readArg = (name) => {
@@ -26,6 +27,49 @@ const exportDir = getExportDir();
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pct = (x) => (Number.isFinite(x) ? (x * 100).toFixed(0) + "%" : "—");
+
+// 加载抓取文件里的皇冠亚盘(队伍专属水位/盘口),按 seq 索引
+let asianBySeq = {};
+try { asianBySeq = loadScrapeFile(date).asian ?? {}; } catch { asianBySeq = {}; }
+
+// 赔率变化箭头:cur 相对 ini 升/降(降=变热)
+function mv(ini, cur) {
+  if (!Number.isFinite(ini) || !Number.isFinite(cur)) return esc(cur ?? ini ?? "—");
+  const a = cur.toFixed(2);
+  if (Math.abs(cur - ini) < 0.005) return `${a}`;
+  return cur < ini ? `${ini.toFixed(2)}<span class="dn">↓</span>${a}` : `${ini.toFixed(2)}<span class="up">↑</span>${a}`;
+}
+// 欧赔三项 初→即
+function euroMoveCell(eo) {
+  if (!eo) return "—";
+  const i = eo.initial ?? eo.current, c = eo.current ?? eo.initial;
+  if (!i || !c) return "—";
+  return `主 ${mv(i.home, c.home)} · 平 ${mv(i.draw, c.draw)} · 客 ${mv(i.away, c.away)}`;
+}
+// 亚盘水位 初→即(皇冠)
+function asianCell(a) {
+  if (!a) return '<span class="mute">缺(详情页未取)</span>';
+  const line = a.curLine === a.iniLine ? esc(a.curLine) : `${esc(a.iniLine)}→${esc(a.curLine)}`;
+  return `盘口 <b>${line}</b> · 主水 ${mv(Number(a.iniHome), Number(a.curHome))} · 客水 ${mv(Number(a.iniAway), Number(a.curAway))}`;
+}
+// 综合判读:欧赔即时方向 + 亚盘水位偏移 + 让球方向
+function synthesize(p, a) {
+  const sf = p.pick.label.includes("主") ? "主" : p.pick.label.includes("客") ? "客" : "平";
+  const bits = [`欧赔倾向<b>${sf}</b>`];
+  const eo = p.marketSnapshot?.europeanOdds;
+  if (eo?.initial && eo?.current) {
+    const dHome = eo.current.home - eo.initial.home, dAway = eo.current.away - eo.initial.away;
+    if (Math.abs(dHome) > 0.02 || Math.abs(dAway) > 0.02) {
+      bits.push(dHome < dAway ? "主赔走低(资金偏主)" : "客赔走低(资金偏客)");
+    } else bits.push("欧赔基本稳定");
+  }
+  if (a) {
+    const dH = Number(a.curHome) - Number(a.iniHome);
+    const moved = a.curLine !== a.iniLine ? `盘口${a.iniLine}→${a.curLine}` : "";
+    bits.push(`亚盘${moved || a.curLine}·${dH < -0.02 ? "主水降(看主受让)" : dH > 0.02 ? "主水升(看客)" : "水位稳"}`);
+  } else bits.push("亚盘缺");
+  return bits.join(" / ");
+}
 
 // 从 fixture.notes 取让球线,如 "让球=0 +1" → +1(主队让球数,正=主队受让)
 function handicapLine(fixture) {
@@ -85,6 +129,7 @@ const settledHits = settled.filter((x) => x.hit === true).length;
 function matchCard(p) {
   const f = p.fixture;
   const pr = p.probabilities;
+  const asian = asianBySeq[f.sequence];
   const sfDir = p.pick.label.includes("主") ? "主胜" : p.pick.label.includes("客") ? "客胜" : "平局";
   const line = handicapLine(f);
   const lineTxt = line == null ? "" : line > 0 ? `主受让+${line}` : line < 0 ? `主让${line}` : "平手";
@@ -103,17 +148,20 @@ function matchCard(p) {
       ${actionable ? '<span class="tag ok">可下注</span>' : '<span class="tag mute">观察</span>'}</div>
     <div class="teams">${esc(f.homeTeam)} <b>vs</b> ${esc(f.awayTeam)}</div>
     <table class="mk">
-      <tr><th>方向(大前提:胜负平)</th><th>首选</th><th>次选</th><th>概率/说明</th></tr>
-      <tr class="anchor"><td>① 胜负平</td><td class="pick">${esc(p.pick.label)}</td><td>${esc(p.secondaryPick.label)}</td>
-          <td>主 ${pct(pr.home)} · 平 ${pct(pr.draw)} · 客 ${pct(pr.away)}</td></tr>
-      <tr><td>② 让球胜负平${lineTxt ? `（${lineTxt}）` : ""}</td><td class="pick">${hcpCell}</td><td>—</td>
-          <td>500.com 让球盘去水;${hcpNote}</td></tr>
-      <tr><td>③ 比分</td><td class="pick">${esc(p.scorePicks.primary)}</td><td>${esc(p.scorePicks.secondary)}</td>
+      <tr><th>维度(欧赔为主)</th><th>首选</th><th>次选/方向</th><th>赔率对比(初→即)/说明</th></tr>
+      <tr class="anchor"><td>① 胜负平(欧赔)</td><td class="pick">${esc(p.pick.label)}</td><td>${esc(p.secondaryPick.label)}</td>
+          <td>${euroMoveCell(p.marketSnapshot?.europeanOdds)}<br><span class="mute">模型概率 主${pct(pr.home)}/平${pct(pr.draw)}/客${pct(pr.away)}</span></td></tr>
+      <tr><td>② 让球胜负平${lineTxt ? `（${lineTxt}）` : ""}</td><td class="pick">${hcpCell}</td><td>${hcpNote}</td>
+          <td>500.com 让球盘:${euroMoveCell(p.marketSnapshot?.handicapOdds)}</td></tr>
+      <tr><td>③ 亚盘水位(皇冠)</td><td colspan="2">${asianCell(asian)}</td>
+          <td>${asian ? "队伍专属·真实初→即变化" : '<span class="mute">odds.500本机拒连,详情页未取</span>'}</td></tr>
+      <tr><td>④ 比分</td><td class="pick">${esc(p.scorePicks.primary)}</td><td>${esc(p.scorePicks.secondary)}</td>
           <td>锚定①方向${genericNote}</td></tr>
-      <tr><td>④ 半全场</td><td class="pick">${esc(p.halfFullPicks.primary)}</td><td>${esc(p.halfFullPicks.secondary)}</td>
+      <tr><td>⑤ 半全场</td><td class="pick">${esc(p.halfFullPicks.primary)}</td><td>${esc(p.halfFullPicks.secondary)}</td>
           <td>由①派生${genericNote}</td></tr>
     </table>
-    <div class="meta">概率优势 ${esc(p.confidence)}(未校准,非可下注度) · 资金信号 <b>${esc(stake)}</b>${p.bankroll?.ev != null ? ` · EV ${(p.bankroll.ev).toFixed(3)}` : ""}${inHistory ? "" : " · ⚠出历史,方向来自赔率隐含"}</div>
+    <div class="synth">🧭 综合判读:${synthesize(p, asian)}</div>
+    <div class="meta">概率优势 ${esc(p.confidence)}(未校准,非可下注度) · 资金信号 <b>${esc(stake)}</b>${p.bankroll?.ev != null ? ` · EV ${(p.bankroll.ev).toFixed(3)}` : ""}${inHistory ? "" : " · ⚠出历史,队伍专属信号仅欧赔+亚盘+让球"}</div>
   </div>`;
 }
 
@@ -158,6 +206,9 @@ const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
   h3{font-size:14px;color:#9fb0cc;margin:16px 0 6px}
   tr.anchor td{background:#13251a}
   .tag.mute{background:#2a3346;color:#8b97ad}
+  .up{color:#ff7676;font-weight:700;padding:0 2px} .dn{color:#56d98a;font-weight:700;padding:0 2px}
+  .mute{color:#6f7c93;font-size:11px}
+  .synth{background:#10202f;border:1px solid #1d3a52;border-radius:6px;padding:6px 9px;margin-top:7px;font-size:12.5px;color:#bcd6f0}
   .sub{color:#8b97ad;font-size:12px;margin:6px 0 0}
   .panel{background:#18203044;border:1px solid #26314a;border-radius:8px;padding:10px 12px;margin:10px 0;font-size:13px}
   .card{background:#161d2c;border:1px solid #26314a;border-radius:10px;padding:12px;margin:10px 0}
