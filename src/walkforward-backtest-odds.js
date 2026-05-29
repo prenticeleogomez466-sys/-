@@ -92,8 +92,8 @@ export async function runWalkForwardWithOdds(opts = {}) {
   const testDates = dates.slice(-maxTestDates);
   const firstTestDate = testDates[0];
 
-  const arms = { market: makeAcc(), dc: makeAcc(), blend: makeAcc(), blendFusion: makeAcc(), blendFusionCal: makeAcc(), blendFusionLineMove: makeAcc() };
-  let usedDates = 0, skipped = 0, noOdds = 0, fusionApplied = 0, lineMoveFired = 0;
+  const arms = { market: makeAcc(), dc: makeAcc(), dcShot: makeAcc(), blend: makeAcc(), blendShot: makeAcc(), blendFusion: makeAcc(), blendFusionCal: makeAcc(), blendFusionLineMove: makeAcc() };
+  let usedDates = 0, skipped = 0, noOdds = 0, fusionApplied = 0, lineMoveFired = 0, shotApplied = 0;
 
   for (const date of testDates) {
     const prior = matches.filter((m) => m.date < date);
@@ -101,6 +101,9 @@ export async function runWalkForwardWithOdds(opts = {}) {
     const train = prior.slice(-maxTrainMatches);
     const fit = fitFromMatches(train, { referenceDate: date });
     if (!fit?.usable) { skipped++; continue; }
+    // shot-regressed 臂(分析师 P0):同一训练集,把进球向射门期望回归去噪后拟合。
+    const fitShot = fitFromMatches(train, { referenceDate: date, goalSignal: "shot-regressed", shotWeight: opts.shotWeight ?? 0.5 });
+    if (fitShot?.shotApplied) shotApplied += fitShot.shotApplied;
     usedDates++;
     const histForCtx = prior; // 已是 {date,homeTeam,awayTeam,homeCanon,awayCanon,homeGoals,awayGoals}
     const dayMatches = matches.filter((m) => m.date === date);
@@ -113,12 +116,22 @@ export async function runWalkForwardWithOdds(opts = {}) {
       const dcProbs = pred.probabilities;
       record(arms.dc, dcProbs, actual);
 
+      // shot-regressed 纯 DC
+      const predShot = predictFromFitted(fitShot, { homeTeam: m.home, awayTeam: m.away });
+      if (predShot?.probabilities) record(arms.dcShot, predShot.probabilities, actual);
+
       if (!m.odds) { noOdds++; continue; } // 无赔率的场次不计入 market/blend 臂
       record(arms.market, m.odds, actual);
 
       const blended = blendWithOdds(m.odds, pred, { competition: m.league });
       const blendProbs = blended.probabilities ?? m.odds;
       record(arms.blend, blendProbs, actual);
+
+      // market + shot-regressed DC
+      if (predShot?.probabilities) {
+        const blendedShot = blendWithOdds(m.odds, predShot, { competition: m.league });
+        record(arms.blendShot, blendedShot.probabilities ?? m.odds, actual);
+      }
 
       const ctx = buildFusionContext(fixture, histForCtx);
       const fusion = fuseSignals(blendProbs, fixture, {}, ctx);
@@ -149,14 +162,17 @@ export async function runWalkForwardWithOdds(opts = {}) {
     noOddsMatches: noOdds,
     fusionAppliedRate: round(fusionApplied / (arms.blendFusion.n || 1)),
     lineMoveFiredRate: round(lineMoveFired / (arms.blendFusionLineMove.n || 1)),
+    shotRegressedSamples: shotApplied,
     arms: {
       market: finalize(arms.market),
       dc: finalize(arms.dc),
+      dcShot: finalize(arms.dcShot),
       blend: finalize(arms.blend),
+      blendShot: finalize(arms.blendShot),
       blendFusion: finalize(arms.blendFusion),
       blendFusionCal: finalize(arms.blendFusionCal),
       blendFusionLineMove: finalize(arms.blendFusionLineMove)
     },
-    note: "market=市场赔率隐含(基准,含全部公开信息,极难打败);blend=赔率+DC 实战 prior;后两臂叠加融合/校准。"
+    note: "market=市场赔率隐含(基准,含全部公开信息,极难打败);dc/dcShot=纯 DC(进球 vs 射门去噪);blend/blendShot=赔率+对应 DC;后三臂叠加融合/校准。"
   };
 }

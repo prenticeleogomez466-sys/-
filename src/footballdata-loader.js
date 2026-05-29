@@ -92,6 +92,14 @@ async function loadOne(league, season, fetchImpl) {
       impliedProbs(num(cells, idx("B365CH")), num(cells, idx("B365CD")), num(cells, idx("B365CA")));
     const oddsPinnacle = impliedProbs(num(cells, idx("PSH")), num(cells, idx("PSD")), num(cells, idx("PSA")));
     const oddsPinnacleClose = impliedProbs(num(cells, idx("PSCH")), num(cells, idx("PSCD")), num(cells, idx("PSCA")));
+    // 射门 / 射正(HS/AS/HST/AST):pre-xG 时代期望进球代理的原料。
+    // football-data.co.uk 五大联赛逐场都有,缺失(部分低级别联赛)则为 null,下游自动忽略。
+    const hs = num(cells, idx("HS"));
+    const as = num(cells, idx("AS"));
+    const hst = num(cells, idx("HST"));
+    const ast = num(cells, idx("AST"));
+    const shots = hs !== null && as !== null ? { home: hs, away: as } : null;
+    const sot = hst !== null && ast !== null ? { home: hst, away: ast } : null;
     out.push({
       date,
       league,
@@ -102,6 +110,8 @@ async function loadOne(league, season, fetchImpl) {
       halfHome: num(cells, idx("HTHG")),
       halfAway: num(cells, idx("HTAG")),
       referee: (cells[idx("Referee")] || "").trim() || null,
+      shots, // {home,away} 总射门数,或 null
+      sot, // {home,away} 射正数,或 null
       odds, // {home,draw,away} 去 vig 后的隐含概率,或 null(开盘均赔)
       oddsClose, // 收盘均赔隐含,或 null
       oddsPinnacle, // Pinnacle 开盘隐含,或 null
@@ -135,6 +145,7 @@ export async function loadFootballDataMatches(opts = {}) {
     withOdds: all.filter((m) => m.odds).length,
     withClosing: all.filter((m) => m.oddsClose).length,
     withPinnacle: all.filter((m) => m.oddsPinnacle).length,
+    withShots: all.filter((m) => m.shots && m.sot).length,
     byLeague
   };
 }

@@ -23,6 +23,7 @@
 
 import { listFixtureDates, loadFixtures } from "./fixture-store.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
+import { annotateRegressedGoals } from "./shot-based-xg.js";
 
 const MAX_GOALS = 8;
 const OUTCOMES = ["home", "draw", "away"];
@@ -93,8 +94,21 @@ export function fitFromMatches(rawMatches = [], opts = {}) {
   const minMatches = opts.minMatches ?? 60;
   const homeAdvantage = opts.homeAdvantage ?? 1.28;
   const referenceDate = opts.referenceDate ?? rawMatches.reduce((mx, m) => (m.date > mx ? m.date : mx), "0000-00-00");
+  // shot-regressed(分析师 P0):有 shots/SOT 时,把高方差的实际进球向射门期望回归去噪后再拟合,
+  // 攻防强度更接近"潜在实力"而非"运气实现值"。转化率从训练切片自校准(walk-forward 不泄漏)。
+  let source = rawMatches;
+  let shotConversion = null;
+  let shotApplied = 0;
+  if (opts.goalSignal === "shot-regressed") {
+    const annotated = annotateRegressedGoals(rawMatches, { weight: opts.shotWeight ?? 0.5 });
+    if (annotated.applied > 0) {
+      source = annotated.matches;
+      shotConversion = annotated.conversion;
+      shotApplied = annotated.applied;
+    }
+  }
   const matches = [];
-  for (const m of rawMatches) {
+  for (const m of source) {
     if (!Number.isFinite(Number(m.homeGoals)) || !Number.isFinite(Number(m.awayGoals))) continue;
     matches.push({
       home: canonicalName(m.home),
@@ -116,6 +130,9 @@ export function fitFromMatches(rawMatches = [], opts = {}) {
   fitted.usable = true;
   fitted.coldStart = false;
   fitted.matches = matches.length;
+  fitted.goalSignal = shotConversion ? "shot-regressed" : "actual";
+  fitted.shotConversion = shotConversion;
+  fitted.shotApplied = shotApplied;
   fitted.fittedAt = new Date().toISOString();
   return fitted;
 }

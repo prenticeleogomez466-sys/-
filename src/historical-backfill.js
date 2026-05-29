@@ -14,6 +14,7 @@ import { fixtureDir, loadFixtures, saveFixtures } from "./fixture-store.js";
 import { loadOpenFootballMatches } from "./openfootball-loader.js";
 import { loadStatsbombSeasonForTraining } from "./statsbomb-loader.js";
 import { loadFootballDataMatches, EXTENDED_LEAGUES, LEAGUE_LABELS } from "./footballdata-loader.js";
+import { loadEspnResults } from "./espn-results-source.js";
 
 /**
  * 回填指定时间窗口的历史数据.
@@ -32,7 +33,7 @@ export async function backfillHistorical(opts = {}) {
     { competitionId: 16, seasonId: 4 }      // 2018-19 Champions League
   ];
 
-  const summary = { openfootball: 0, statsbomb: 0, footballdata: 0, written: 0, skipped: 0 };
+  const summary = { openfootball: 0, statsbomb: 0, footballdata: 0, espn: 0, written: 0, skipped: 0 };
   const allMatches = [];
 
   // 1. OpenFootball
@@ -86,6 +87,17 @@ export async function backfillHistorical(opts = {}) {
           league: LEAGUE_LABELS[m.league] ?? m.league,
           source: "football-data"
         });
+      }
+    }
+  }
+
+  // 3b. ESPN 洲际联赛(Z2 档):美职/巴甲/日职/沙特联/中超/阿甲/墨超/韩K —— football-data 不覆盖。
+  if (opts.includeEspn) {
+    const espn = await loadEspnResults({ leagues: opts.espnLeagues, from: opts.espnFrom, to: opts.espnTo, fetch: fetchImpl });
+    if (espn.ok) {
+      summary.espn = espn.matches.length;
+      for (const m of espn.matches) {
+        allMatches.push({ home: m.home, away: m.away, homeGoals: m.homeGoals, awayGoals: m.awayGoals, date: m.date, league: m.league, source: "espn" });
       }
     }
   }
