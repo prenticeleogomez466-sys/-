@@ -37,11 +37,24 @@ export function calibrateProbabilities(probabilities, profile = emptyProfile(), 
     }
     return applyColdStartCalibration(normalized, favorite, bucket, profile.reason);
   }
-  // 优先级 0(新增 2026-05-28):isotonic regression 映射
+  // 优先级 0(新增 2026-05-28,2026-05-29 W 档双映射):isotonic regression 映射
   // 学术界对 calibration 的标准做法。从 (predicted, actual) 对学单调非递减映射,
-  // 比 "bucket shift" 精度高。仅在样本 ≥30(buildIsotonicMap 时已经检查)时启用。
-  if (profile.isotonicMap?.knots?.length) {
-    const isotonicTarget = applyIsotonicMap(profile.isotonicMap, favorite.probability);
+  // 比 "bucket shift" 精度高。
+  //
+  // W 档:训练器(calibration-trainer.js)对**两条路径分开**学映射,因失准方向相反:
+  //   isotonicMap        —— 纯模型/无赔率路径,纠正 65%+ 强热门系统性过度自信。
+  //   isotonicMapMarket  —— blend(赔率+DC)路径,市场已近完美校准 → 近恒等微调。
+  // 按 hasMarketPrior 选用对应映射。若有市场先验但 profile 没训出 market 专属映射,
+  // 则放行(market prior 已被市场校准,不拿模型路径的映射误伤它)。
+  // 关键:市场先验路径**只**用 market 专属映射;若没训出 market 映射,绝不退回模型路径的
+  // isotonicMap(失准方向相反,会反向误伤),而是继续走下面的 bucket/global 规则
+  // (老 ledger profile 的 bucket/global 本就是市场派生的,可安全沿用)。
+  const activeMap = context.hasMarketPrior
+    ? (profile.isotonicMapMarket?.knots?.length ? profile.isotonicMapMarket : null)
+    : (profile.isotonicMap?.knots?.length ? profile.isotonicMap : null);
+  const activeScope = context.hasMarketPrior ? "isotonic-market" : "isotonic-model";
+  if (activeMap?.knots?.length) {
+    const isotonicTarget = applyIsotonicMap(activeMap, favorite.probability);
     if (Number.isFinite(isotonicTarget)) {
       const clamped = clamp(
         isotonicTarget,
@@ -54,9 +67,9 @@ export function calibrateProbabilities(probabilities, profile = emptyProfile(), 
         calibration: {
           applied: true,
           source: "isotonic-regression",
-          scope: "isotonic",
+          scope: activeScope,
           bucket,
-          samples: profile.isotonicMap.samples,
+          samples: activeMap.samples,
           adjustment: round(clamped - favorite.probability),
           context: {
             marketType: context.fixture?.marketType ?? "",
@@ -256,6 +269,10 @@ function normalizeProfile(profile) {
     global: profile.global ?? { samples: 0, adjustment: 0 },
     buckets: profile.buckets ?? {},
     isotonicMap: profile.isotonicMap ?? null,
+    isotonicMapMarket: profile.isotonicMapMarket ?? null,
+    reliability: profile.reliability ?? null,
+    marketReliability: profile.marketReliability ?? null,
+    meta: profile.meta ?? null,
     byRisk: profile.byRisk ?? {},
     byMarketType: profile.byMarketType ?? {},
     byCompetition: profile.byCompetition ?? {}

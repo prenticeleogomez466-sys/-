@@ -24,6 +24,7 @@
     "backfill:history": "node scripts/run-backfill-history.mjs",
     "backtest:walkforward": "node scripts/run-walkforward-backtest.mjs",
     "backtest:odds": "node scripts/run-walkforward-odds.mjs",
+    "calibration:train": "node scripts/run-calibration-train.mjs",
     "analyze:deep": "node scripts/run-analyze-deep.mjs",
     "jingcai:daily": "node scripts/jingcai-daily.mjs",
     "report:html": "node scripts/render-recommendation-html.mjs",
