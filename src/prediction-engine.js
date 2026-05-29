@@ -783,42 +783,64 @@ export function buildFourteenPlan(predictions) {
   // 严格 quality 门槛会过滤所有场次到 0 胆。这时改用更严格的概率/置信筛选,
   // 让模型仍能基于赔率给出胆材,同时维持"不容易给胆"的保守特性。
   const coldStartAll = source.every((p) => (p.advancedFeatures?.quality?.score ?? 0) < 62);
-  const bankerIndexes = new Set(
-    source
-      .map((prediction, index) => {
-        const gap = prediction.pick.probability - prediction.secondaryPick.probability;
-        const eo = prediction.marketSnapshot?.europeanOdds?.current ?? prediction.marketSnapshot?.europeanOdds?.initial;
-        const favOdds = eo ? Math.min(Number(eo.home || 99), Number(eo.draw || 99), Number(eo.away || 99)) : 99;
-        // 市场共识胆:favorite 赔率极低(≤1.65)且模型同方向 → 胆,不看 confidence
-        // 这是 14 场胜负彩的真实玩家策略:跟着市场强共识下重注
-        const marketConsensus = favOdds <= 1.65 && (
-          (Number(eo?.home) === favOdds && prediction.pick.code === "3") ||
-          (Number(eo?.draw) === favOdds && prediction.pick.code === "1") ||
-          (Number(eo?.away) === favOdds && prediction.pick.code === "0")
-        );
-        return { index, prediction, gap, marketConsensus, favOdds };
-      })
-      .filter((item) => {
-        if (item.prediction.risk === "高") return false;
-        // 路径 1:市场共识胆(赔率 ≤1.65 + 模型同方向)→ 通过
-        if (item.marketConsensus) return true;
-        // 路径 2:模型置信 + 概率差双达标
-        if (item.gap >= rules.bankerMinGap && item.prediction.confidence >= rules.bankerMinConfidence) {
-          const qualityOk = (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62;
-          if (qualityOk) return true;
-          if (coldStartAll && item.gap >= 0.30 && item.prediction.confidence >= 50) return true;
-        }
-        return false;
-      })
-      .sort((a, b) => {
-        // 排序:市场共识胆优先(赔率低的稳),其次按 gap × confidence 综合
-        if (a.marketConsensus && !b.marketConsensus) return -1;
-        if (!a.marketConsensus && b.marketConsensus) return 1;
-        return (b.gap * b.prediction.confidence) - (a.gap * a.prediction.confidence);
-      })
-      .slice(0, rules.maxBankers)
-      .map((item) => item.index)
-  );
+
+  // 候选胆:同前(市场共识 / 高置信 + 概率差),然后按分数排序
+  const candidates = source
+    .map((prediction, index) => {
+      const gap = prediction.pick.probability - prediction.secondaryPick.probability;
+      const eo = prediction.marketSnapshot?.europeanOdds?.current ?? prediction.marketSnapshot?.europeanOdds?.initial;
+      const favOdds = eo ? Math.min(Number(eo.home || 99), Number(eo.draw || 99), Number(eo.away || 99)) : 99;
+      const marketConsensus = favOdds <= 1.65 && (
+        (Number(eo?.home) === favOdds && prediction.pick.code === "3") ||
+        (Number(eo?.draw) === favOdds && prediction.pick.code === "1") ||
+        (Number(eo?.away) === favOdds && prediction.pick.code === "0")
+      );
+      const isDeepFav = favOdds <= 1.65;  // 深盘
+      const isMid = favOdds > 1.65 && favOdds <= 2.30;  // 中等
+      return { index, prediction, gap, marketConsensus, favOdds, isDeepFav, isMid, code: prediction.pick.code };
+    })
+    .filter((item) => {
+      if (item.prediction.risk === "高") return false;
+      if (item.marketConsensus) return true;
+      if (item.gap >= rules.bankerMinGap && item.prediction.confidence >= rules.bankerMinConfidence) {
+        const qualityOk = (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62;
+        if (qualityOk) return true;
+        if (coldStartAll && item.gap >= 0.30 && item.prediction.confidence >= 50) return true;
+      }
+      return false;
+    })
+    .sort((a, b) => {
+      if (a.marketConsensus && !b.marketConsensus) return -1;
+      if (!a.marketConsensus && b.marketConsensus) return 1;
+      return (b.gap * b.prediction.confidence) - (a.gap * a.prediction.confidence);
+    });
+
+  // 多样化约束:不让 6 胆全是深盘 favorite。挑选时:
+  //   - 同一方向(主胜/平/客胜)最多 3 个胆
+  //   - 深盘胆(赔率≤1.65)最多 3 个,剩下用中等胆填(避免一翻车整票完)
+  //   - 优先保留前 N 个高分,但分类后强制平衡
+  const pickedBankers = [];
+  const codeCounts = { "3": 0, "1": 0, "0": 0 };
+  let deepCount = 0;
+  for (const item of candidates) {
+    if (pickedBankers.length >= rules.maxBankers) break;
+    if (codeCounts[item.code] >= 3) continue;
+    if (item.isDeepFav && deepCount >= 3) continue;
+    pickedBankers.push(item);
+    codeCounts[item.code]++;
+    if (item.isDeepFav) deepCount++;
+  }
+  // 深盘 cap 卡掉名额时,把跳过的中等胆补回来
+  if (pickedBankers.length < rules.maxBankers) {
+    for (const item of candidates) {
+      if (pickedBankers.length >= rules.maxBankers) break;
+      if (pickedBankers.includes(item)) continue;
+      if (codeCounts[item.code] >= 3) continue;
+      pickedBankers.push(item);
+      codeCounts[item.code]++;
+    }
+  }
+  const bankerIndexes = new Set(pickedBankers.map((item) => item.index));
   const selections = source.map((prediction, index) => {
     const probs = prediction.probabilities ?? {};
     const drawProb = Number(probs.draw ?? 0);
