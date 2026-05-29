@@ -55,25 +55,28 @@ function toJingcaiRow(prediction) {
   const fixture = prediction.fixture;
   const probs = prediction.probabilities ?? {};
   const upset = upsetRiskLabel(probs.home, probs.draw, probs.away);
-  // 排版:核心推荐(wld→让球→比分→半全场)前置,概率/爆冷/信心紧跟,赔率细节
-  // 移到别 sheet("赔率变化对比"已有)。一行只显示用户每天看的关键决策信息。
+  const probSummary = `主 ${pct(probs.home)} / 平 ${pct(probs.draw)} / 客 ${pct(probs.away)}`;
+  const tier = bettingTier(prediction.probabilities, fixture?.competition);
+  const ev = prediction.bankroll?.ev;
+  const stake = prediction.bankroll?.stakeUnitsPer100;
+  // 资金决策合到信心列尾巴:用户一眼看到信心+EV+下注分级 不用 3 列分开
+  const confDetail = [confidenceLabel(prediction.confidence), tier]
+    .concat(Number.isFinite(ev) ? [`EV ${(ev*100).toFixed(1)}%`] : [])
+    .concat(Number.isFinite(stake) && stake > 0 ? [`${stake}/100`] : [])
+    .join(" · ");
   return [
-    fixture.sequence,                                            // 1 场次
+    fixture.sequence,                                            // 1 序号
     competitionCategory(fixture?.competition),                   // 2 赛事类型
-    `${fixture.homeTeam} 对 ${fixture.awayTeam}`,                // 3 对阵
-    fixture.kickoff,                                             // 4 开赛
-    outcomeCodeToChinese(prediction.pick.code),                  // 5 胜平负首选
-    handicapRecommendText(prediction),                           // 6 让球推荐(让 X → wld)
-    prediction.scorePicks.primary,                               // 7 比分首选
-    prediction.halfFullPicks.primary,                            // 8 半全场首选
-    pct(probs.home),                                             // 9 主胜%
-    pct(probs.draw),                                             // 10 平局%
-    pct(probs.away),                                             // 11 客胜%
-    upset,                                                       // 12 爆冷指数
-    prediction.risk,                                             // 13 风险
-    confidenceLabel(prediction.confidence),                      // 14 信心
-    bettingTier(prediction.probabilities, fixture?.competition), // 15 下注分级
-    enrichedRationale(prediction)                                // 16 选择理由
+    `${fixture.homeTeam} vs ${fixture.awayTeam}`,                // 3 对阵
+    fixture.kickoff?.slice(5, 16) ?? "",                         // 4 开赛(月-日 时:分)
+    outcomeCodeToChinese(prediction.pick.code),                  // 5 胜平负
+    handicapRecommendText(prediction),                           // 6 让球
+    prediction.scorePicks.primary,                               // 7 比分
+    prediction.halfFullPicks.primary,                            // 8 半全场
+    probSummary,                                                 // 9 三概率(主/平/客 合一列)
+    upset,                                                       // 10 爆冷
+    confDetail,                                                  // 11 信心+分级+EV+注码
+    enrichedRationale(prediction)                                // 12 选择理由
   ];
 }
 
@@ -139,18 +142,16 @@ export function bettingTier(probabilities, league = null) {
 
 function toFourteenRow(selection) {
   const p = selection.probabilities ?? {};
+  const probSummary = `主 ${p.home ?? "—"} / 平 ${p.draw ?? "—"} / 客 ${p.away ?? "—"}`;
   return [
     selection.index,
-    selection.match,
     selection.competitionType ?? "—",
+    selection.match,
     selection.single,
     selection.compound,
     selection.type,
-    p.home ?? "",
-    p.draw ?? "",
-    p.away ?? "",
+    probSummary,
     selection.upsetRisk ?? "—",
-    selection.risk,
     confidenceLabel(selection.confidence),
     selection.reason
   ];
@@ -350,37 +351,35 @@ function updateLedger(date, rows) {
 
 function jingcaiHeaders() {
   return [
-    "场次", "赛事类型", "对阵", "开赛",
-    "胜平负首选", "让球推荐", "比分首选", "半全场首选",
-    "主胜%", "平局%", "客胜%",
-    "爆冷指数", "风险", "信心", "下注分级", "选择理由"
+    "序", "赛事类型", "对阵", "开赛",
+    "胜平负", "让球", "比分", "半全场",
+    "概率分布(主/平/客)", "爆冷",
+    "信心 · 分级 · EV", "选择理由"
   ];
 }
 
 function fourteenHeaders() {
-  return ["场次", "比赛", "赛事类型", "单式推荐", "覆盖选择", "类型", "主胜%", "平局%", "客胜%", "爆冷指数", "风险", "信心", "选择理由"];
+  return ["序", "赛事类型", "比赛", "单式", "覆盖", "类型", "概率(主/平/客)", "爆冷", "信心", "选择理由"];
 }
 
-// 任选9 sheet:从 14 场挑最稳 9 场。每场独立给胆/双选/全选(同 14 场逻辑)。
+// 任选9 sheet:同 14 场结构,每场独立胆/双选/全选 + 概率 + 信心 + 理由。
 function renxuan9Rows(renxuan9) {
-  const header = ["序", "比赛", "赛事类型", "单式推荐", "覆盖选择", "类型", "主胜%", "平局%", "客胜%", "风险", "信心", "选择理由"];
+  const header = ["序", "赛事类型", "比赛", "单式", "覆盖", "类型", "概率(主/平/客)", "信心", "选择理由"];
   const empty = (n) => new Array(n).fill("");
   if (!renxuan9?.ok) {
-    return [header, ["—", renxuan9?.reason ?? "任选9 不可用(可选场次不足 9)", ...empty(10)]];
+    return [header, ["—", "", renxuan9?.reason ?? "任选9 不可用(可选场次不足 9)", ...empty(6)]];
   }
   const rows = renxuan9.picks.map((p) => {
     const prob = p.probabilities ?? {};
+    const probSummary = `主 ${prob.home ?? "—"} / 平 ${prob.draw ?? "—"} / 客 ${prob.away ?? "—"}`;
     return [
       p.rank,
-      p.match,
       p.competitionType ?? "—",
+      p.match,
       p.pick,
       p.compound ?? p.pick,
       p.type ?? "—",
-      prob.home ?? "",
-      prob.draw ?? "",
-      prob.away ?? "",
-      p.risk,
+      probSummary,
       confidenceLabel(p.confidence),
       p.reason ?? ""
     ];
@@ -388,11 +387,11 @@ function renxuan9Rows(renxuan9) {
   const ind = renxuan9.parlay?.jointProbabilityIndependent ?? null;
   const adj = renxuan9.parlay?.jointProbabilityCorrelated ?? null;
   const summary = [
-    empty(12),
-    ["单式串", renxuan9.singleLine, ...empty(10)],
-    ["9 串联合命中率", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", ...empty(9)],
-    ["覆盖串(胆+双/全选)", renxuan9.picks.map((p) => p.compound ?? p.pick).join(" | "), ...empty(10)],
-    ["说明", renxuan9.note, ...empty(10)]
+    empty(9),
+    ["单式串", "", renxuan9.singleLine, ...empty(6)],
+    ["9 串联合命中率", "", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", ...empty(5)],
+    ["覆盖串", "", renxuan9.picks.map((p) => p.compound ?? p.pick).join(" | "), ...empty(6)],
+    ["说明", "", renxuan9.note, ...empty(6)]
   ];
   return [header, ...rows, ...summary];
 }
