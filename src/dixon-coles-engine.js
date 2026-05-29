@@ -84,6 +84,43 @@ export function fitFromFixtureStore(opts = {}) {
 }
 
 /**
+ * 从内存里的比赛数组拟合(给 walk-forward 回测 / football-data 等外部源用),
+ * 与 fitFromFixtureStore 共用同一套冷启动兜底 + fit 逻辑。
+ * @param {Array<{home,away,homeGoals,awayGoals,date}>} rawMatches
+ * @param {{minMatches?,homeAdvantage?,referenceDate?,iterations?,decayDays?}} opts
+ */
+export function fitFromMatches(rawMatches = [], opts = {}) {
+  const minMatches = opts.minMatches ?? 60;
+  const homeAdvantage = opts.homeAdvantage ?? 1.28;
+  const referenceDate = opts.referenceDate ?? rawMatches.reduce((mx, m) => (m.date > mx ? m.date : mx), "0000-00-00");
+  const matches = [];
+  for (const m of rawMatches) {
+    if (!Number.isFinite(Number(m.homeGoals)) || !Number.isFinite(Number(m.awayGoals))) continue;
+    matches.push({
+      home: canonicalName(m.home),
+      away: canonicalName(m.away),
+      homeGoals: Number(m.homeGoals),
+      awayGoals: Number(m.awayGoals),
+      date: m.date,
+      daysAgo: daysBetween(m.date, referenceDate),
+    });
+  }
+  if (matches.length < minMatches) {
+    return coldStartFit(matches, minMatches, homeAdvantage);
+  }
+  const fitted = fit(matches, {
+    iterations: opts.iterations ?? 80,
+    homeAdvantage,
+    decayHalfLife: opts.decayDays ?? 180,
+  });
+  fitted.usable = true;
+  fitted.coldStart = false;
+  fitted.matches = matches.length;
+  fitted.fittedAt = new Date().toISOString();
+  return fitted;
+}
+
+/**
  * 冷启动模式拟合:
  *   - 样本 0 场:完全用联赛先验(baseRate=1.35, 主场=1.28, 球队全部中性 1.0)
  *   - 样本 1~minMatches-1 场:用 Bayesian shrinkage 把观测进球率与先验混合,

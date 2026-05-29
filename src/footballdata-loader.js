@@ -1,0 +1,118 @@
+/**
+ * football-data.co.uk 加载器
+ * ────────────────────────────────────────────────────────────
+ * 免费历史源,CSV 同时含:赛果(FTHG/FTAG/FTR)、半场(HTHG/HTAG)、
+ * 多家博彩赔率(B365/Pinnacle/Avg)、裁判、射门角球牌。
+ * 用于 walk-forward 实战级回测 —— 终于能把"赔率隐含概率"纳入对比,
+ * 回答"模型+融合能否赢过市场"。
+ *
+ * 联赛代码:E0=英超 SP1=西甲 D1=德甲 I1=意甲 F1=法甲。
+ * 赔率优先用 Avg*(市场均值,最稳),缺失退回 B365*。
+ */
+
+const BASE = "https://www.football-data.co.uk/mmz4281";
+const DEFAULT_LEAGUES = ["E0", "SP1", "D1", "I1", "F1"];
+const DEFAULT_SEASONS = ["2425", "2324", "2223"];
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length);
+  if (!lines.length) return [];
+  const header = lines[0].split(",").map((h) => h.trim());
+  const idx = (name) => header.indexOf(name);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split(",");
+    if (cells.length < header.length / 2) continue;
+    rows.push({ idx, cells });
+  }
+  return { header, rows };
+}
+
+function toIsoDate(ddmmyyyy) {
+  // DD/MM/YYYY 或 DD/MM/YY → YYYY-MM-DD
+  const m = String(ddmmyyyy || "").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return null;
+  let [, d, mo, y] = m;
+  if (y.length === 2) y = (Number(y) > 50 ? "19" : "20") + y;
+  return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+}
+
+function num(cells, i) {
+  if (i < 0) return null;
+  const v = Number(cells[i]);
+  return Number.isFinite(v) ? v : null;
+}
+
+function impliedProbs(oh, od, oa) {
+  if (!oh || !od || !oa || oh <= 1 || od <= 1 || oa <= 1) return null;
+  const raw = { home: 1 / oh, draw: 1 / od, away: 1 / oa };
+  const total = raw.home + raw.draw + raw.away; // 去除 overround(vig)
+  return { home: raw.home / total, draw: raw.draw / total, away: raw.away / total };
+}
+
+async function loadOne(league, season, fetchImpl) {
+  const url = `${BASE}/${season}/${league}.csv`;
+  let text;
+  try {
+    const r = await fetchImpl(url);
+    if (!r.ok) return [];
+    text = await r.text();
+  } catch {
+    return [];
+  }
+  const parsed = parseCsv(text);
+  if (!parsed.rows) return [];
+  const { rows } = parsed;
+  const out = [];
+  for (const { idx, cells } of rows) {
+    const date = toIsoDate(cells[idx("Date")]);
+    const home = (cells[idx("HomeTeam")] || "").trim();
+    const away = (cells[idx("AwayTeam")] || "").trim();
+    const fthg = num(cells, idx("FTHG"));
+    const ftag = num(cells, idx("FTAG"));
+    if (!date || !home || !away || fthg === null || ftag === null) continue;
+    // 赔率:优先市场均值,退回 Bet365
+    const odds =
+      impliedProbs(num(cells, idx("AvgH")), num(cells, idx("AvgD")), num(cells, idx("AvgA"))) ??
+      impliedProbs(num(cells, idx("B365H")), num(cells, idx("B365D")), num(cells, idx("B365A")));
+    out.push({
+      date,
+      league,
+      home,
+      away,
+      homeGoals: fthg,
+      awayGoals: ftag,
+      halfHome: num(cells, idx("HTHG")),
+      halfAway: num(cells, idx("HTAG")),
+      referee: (cells[idx("Referee")] || "").trim() || null,
+      odds // {home,draw,away} 去 vig 后的隐含概率,或 null
+    });
+  }
+  return out;
+}
+
+/**
+ * @param {{leagues?, seasons?, fetch?}} opts
+ * @returns {Promise<{ok, matches, withOdds, byLeague}>}
+ */
+export async function loadFootballDataMatches(opts = {}) {
+  const fetchImpl = opts.fetch ?? globalThis.fetch;
+  const leagues = opts.leagues ?? DEFAULT_LEAGUES;
+  const seasons = opts.seasons ?? DEFAULT_SEASONS;
+  const all = [];
+  const byLeague = {};
+  for (const league of leagues) {
+    for (const season of seasons) {
+      const rows = await loadOne(league, season, fetchImpl);
+      all.push(...rows);
+      byLeague[league] = (byLeague[league] ?? 0) + rows.length;
+    }
+  }
+  all.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return {
+    ok: all.length > 0,
+    matches: all,
+    withOdds: all.filter((m) => m.odds).length,
+    byLeague
+  };
+}
