@@ -37,11 +37,11 @@ const HALF_FULL_POOLS = {
   "0": ["客胜-客胜", "平局-客胜", "主胜-客胜"]
 };
 
-const FOURTEEN_DEFAULT_MAX_BANKERS = 4;
-const FOURTEEN_DEFAULT_BANKER_MIN_GAP = 0.22;
-// 2026-05-29 调:60 太严,实际冷启动场置信极少过 60 → 全部场降双选,胆=0。
-// 改为 45 让"概率差 ≥22% + 风险≤中" 的高分场能进胆池,符合用户"要选胆出来"的预期。
-const FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE = 45;
+const FOURTEEN_DEFAULT_MAX_BANKERS = 6;
+const FOURTEEN_DEFAULT_BANKER_MIN_GAP = 0.18;
+// 用户反馈"选不出几个胆"。再降一档:35 让中等置信 + 概率差 ≥18% 也能进胆池。
+// 同时加"市场共识胆":favorite 赔率 ≤1.6 + 模型 pick 跟市场同 → 直接胆,不看模型 confidence。
+const FOURTEEN_DEFAULT_BANKER_MIN_CONFIDENCE = 35;
 const FOURTEEN_DEFAULT_DOUBLE_MIN_GAP = 0.08;
 
 export function recommendFixtures(date) {
@@ -125,7 +125,11 @@ function canonicalTeamName(value) {
 export function predictFixture(fixture, marketSnapshots = [], index = 0, options = {}) {
   const snapshot = findMarketSnapshot(fixture, marketSnapshots);
   const oddsProbabilities = snapshot?.europeanOdds?.current ? probabilitiesFromOdds(snapshot.europeanOdds.current) : null;
-  const dcResult = options.dixonColesFitted ? predictFromFitted(options.dixonColesFitted, fixture) : null;
+  // 2026-05-29:删除冷启动 fallback。冷启动队若有亚盘+大小球 → 走市场推断 λ;否则 dcResult=null。
+  const _asianLineHint = Number(snapshot?.asianHandicap?.current?.line ?? snapshot?.asianHandicap?.initial?.line ?? snapshot?.asianHandicap?.final?.line);
+  const _ouLineHint = Number(snapshot?.totalGoals?.current?.line ?? snapshot?.totalGoals?.initial?.line ?? 2.55);
+  const _marketHints = Number.isFinite(_asianLineHint) ? { asianLine: _asianLineHint, overUnderLine: _ouLineHint } : null;
+  const dcResult = options.dixonColesFitted ? predictFromFitted(options.dixonColesFitted, fixture, _marketHints) : null;
   const blendResult = oddsProbabilities
     ? blendWithOdds(oddsProbabilities, dcResult, { competition: fixture.competition, weightProfile: loadSignalWeights() })
     : dcResult
@@ -198,9 +202,24 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     ?? snapshot?.asianHandicap?.initial?.line
     ?? snapshot?.asianHandicap?.final?.line
     ?? 0);
-  const handicapPick = ranked[0]?.label
-    ? { line: handicapLine, direction: ranked[0].label }
-    : null;
+  // 让球方向真算:用 expectedGoals λ_home - μ_away 加 line,得到让球后净期望
+  // λH - μA + line > 0.3 → 主胜让球;< -0.3 → 客胜让球;否则平局
+  // 这样让球方向独立于 wld(不只是复制),反映"主队让球后还有多大优势"的真预测
+  const handicapPick = (() => {
+    if (!ranked[0]?.label) return null;
+    const eg = blendResult.dcResult?.expectedGoals;
+    let direction;
+    if (eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)) {
+      const netExpected = Number(eg.home) - Number(eg.away) + handicapLine;
+      if (netExpected > 0.3) direction = "主胜";
+      else if (netExpected < -0.3) direction = "客胜";
+      else direction = "平局";
+    } else {
+      // fallback:λ 缺时退回 wld(诚实降级)
+      direction = ranked[0].label;
+    }
+    return { line: handicapLine, direction };
+  })();
   const expectedValue = computeExpectedValueLabels(ranked, snapshot);
   // D 档接入(2026-05-28):用 bootstrap 传入的多评级算 ensembleView 作为 supplementary.
   // 不替换 main 路径 — 主推荐仍走 calibrated probabilities;ensembleView 用于 backtest 对比和未来切主.
@@ -766,17 +785,37 @@ export function buildFourteenPlan(predictions) {
   const coldStartAll = source.every((p) => (p.advancedFeatures?.quality?.score ?? 0) < 62);
   const bankerIndexes = new Set(
     source
-      .map((prediction, index) => ({ index, prediction, gap: prediction.pick.probability - prediction.secondaryPick.probability }))
-      .filter((item) => item.gap >= rules.bankerMinGap && item.prediction.confidence >= rules.bankerMinConfidence)
+      .map((prediction, index) => {
+        const gap = prediction.pick.probability - prediction.secondaryPick.probability;
+        const eo = prediction.marketSnapshot?.europeanOdds?.current ?? prediction.marketSnapshot?.europeanOdds?.initial;
+        const favOdds = eo ? Math.min(Number(eo.home || 99), Number(eo.draw || 99), Number(eo.away || 99)) : 99;
+        // 市场共识胆:favorite 赔率极低(≤1.65)且模型同方向 → 胆,不看 confidence
+        // 这是 14 场胜负彩的真实玩家策略:跟着市场强共识下重注
+        const marketConsensus = favOdds <= 1.65 && (
+          (Number(eo?.home) === favOdds && prediction.pick.code === "3") ||
+          (Number(eo?.draw) === favOdds && prediction.pick.code === "1") ||
+          (Number(eo?.away) === favOdds && prediction.pick.code === "0")
+        );
+        return { index, prediction, gap, marketConsensus, favOdds };
+      })
       .filter((item) => {
         if (item.prediction.risk === "高") return false;
-        const qualityOk = (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62;
-        if (qualityOk) return true;
-        // 冷启动放宽:gap ≥ 0.35 且置信 ≥ 65 也允许进强胆池,但单独打 cold-start 标签
-        if (coldStartAll && item.gap >= 0.35 && item.prediction.confidence >= 65) return true;
+        // 路径 1:市场共识胆(赔率 ≤1.65 + 模型同方向)→ 通过
+        if (item.marketConsensus) return true;
+        // 路径 2:模型置信 + 概率差双达标
+        if (item.gap >= rules.bankerMinGap && item.prediction.confidence >= rules.bankerMinConfidence) {
+          const qualityOk = (item.prediction.advancedFeatures?.quality?.score ?? 0) >= 62;
+          if (qualityOk) return true;
+          if (coldStartAll && item.gap >= 0.30 && item.prediction.confidence >= 50) return true;
+        }
         return false;
       })
-      .sort((a, b) => b.gap - a.gap || b.prediction.confidence - a.prediction.confidence)
+      .sort((a, b) => {
+        // 排序:市场共识胆优先(赔率低的稳),其次按 gap × confidence 综合
+        if (a.marketConsensus && !b.marketConsensus) return -1;
+        if (!a.marketConsensus && b.marketConsensus) return 1;
+        return (b.gap * b.prediction.confidence) - (a.gap * a.prediction.confidence);
+      })
       .slice(0, rules.maxBankers)
       .map((item) => item.index)
   );
@@ -911,7 +950,15 @@ export function buildRenxuan9(source) {
       singleNote = "平局倾向";
     }
 
-    const isBanker = gap >= 0.25 && prediction.confidence >= 50 && prediction.risk !== "高" && singleCode !== "1";
+    // 任选 9 胆门槛也降:gap≥18% + 置信≥40 或 市场赔率 ≤1.7 共识胆
+    const eo9 = prediction.marketSnapshot?.europeanOdds?.current ?? prediction.marketSnapshot?.europeanOdds?.initial;
+    const favOdds9 = eo9 ? Math.min(Number(eo9.home || 99), Number(eo9.draw || 99), Number(eo9.away || 99)) : 99;
+    const marketBanker9 = favOdds9 <= 1.70 && (
+      (Number(eo9?.home) === favOdds9 && prediction.pick.code === "3") ||
+      (Number(eo9?.away) === favOdds9 && prediction.pick.code === "0")
+    );
+    const isBanker = (marketBanker9 || (gap >= 0.18 && prediction.confidence >= 40))
+                     && prediction.risk !== "高" && singleCode !== "1";
     let codes, coverageReason;
     if (isBanker) {
       codes = [singleCode];

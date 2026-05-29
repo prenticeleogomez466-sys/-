@@ -176,42 +176,72 @@ function coldStartFit(matches, minMatches, homeAdvantage) {
  * @param {Object} fixture 来自 fixture-store 的 fixture 对象
  * @returns {Object|null} 预测结果，或 null（球队不在训练集中）
  */
-export function predictFromFitted(fitted, fixture) {
+export function predictFromFitted(fitted, fixture, marketHints = null) {
   if (!fitted?.usable) return null;
   const home = canonicalName(fixture.homeTeam);
   const away = canonicalName(fixture.awayTeam);
-  // 冷启动 / 球队不在训练集时,退回中性强度(1.0),仍可输出基于
-  // baseRate + 主场优势的概率,而不是 return null 让上游降级到 odds-only。
-  const th = fitted.teams[home] ?? { attack: 1, defense: 1, coldStart: true };
-  const ta = fitted.teams[away] ?? { attack: 1, defense: 1, coldStart: true };
-  const teamColdStart = Boolean(th.coldStart || ta.coldStart || fitted.coldStart);
+  const th = fitted.teams[home];
+  const ta = fitted.teams[away];
+
+  // 用户硬性规则(2026-05-29):**删除冷启动 fallback**。
+  // 之前没有训练数据时退回 attack=defense=1 + baseRate=1.3 → 所有场 λ ≈ 1.3 同质化,
+  // 比分永远 2-1/1-0,模型推荐套路化"敷衍"。
+  //
+  // 现在:
+  //   - 球队在训练集 → 用真 attack/defense 算 λ(正常路径)
+  //   - 球队不在训练集 但 有亚盘/大小球 → 用市场推断 λ(λH = (total - line)/2, μA = (total + line)/2)
+  //   - 都没有 → return null,上游降级到 odds-only / 不出推荐
+  let attackHome, attackAway, defenseHome, defenseAway, baseRate, homeAdv;
+  let marketDerivedLambda = null;
+  let trainedTeams = Boolean(th && ta);
+  if (trainedTeams) {
+    attackHome = th.attack;       defenseHome = th.defense;
+    attackAway = ta.attack;       defenseAway = ta.defense;
+    baseRate = fitted.baseRate;
+    homeAdv = fitted.homeAdvantage;
+  } else if (marketHints) {
+    const asianLine = Number(marketHints.asianLine);
+    const totalGoals = Number(marketHints.overUnderLine ?? 2.55);
+    if (Number.isFinite(asianLine) && Number.isFinite(totalGoals) && totalGoals > 0.5) {
+      const lambdaH = Math.max(0.3, (totalGoals - asianLine) / 2);
+      const muA = Math.max(0.3, (totalGoals + asianLine) / 2);
+      const ratio = Math.sqrt(lambdaH / Math.max(0.01, muA));
+      baseRate = (lambdaH + muA) / 2;
+      attackHome = ratio;       defenseAway = ratio;
+      attackAway = 1 / ratio;   defenseHome = 1 / ratio;
+      homeAdv = 1;
+      marketDerivedLambda = { home: lambdaH, away: muA };
+    } else {
+      return null;  // 无市场线索 → 拒绝出"假" DC 结果
+    }
+  } else {
+    return null;
+  }
 
   const { matrix, lambda, mu } = scoreMatrix({
-    attackHome: th.attack,
-    defenseHome: th.defense,
-    attackAway: ta.attack,
-    defenseAway: ta.defense,
-    homeAdv: fitted.homeAdvantage,
-    baseRate: fitted.baseRate,
+    attackHome,
+    defenseHome,
+    attackAway,
+    defenseAway,
+    homeAdv,
+    baseRate,
     rho: fitted.rho ?? -0.08,
     tauModel: fitted.tauModel ?? (process.env.DC_TAU_MODEL ?? "dixon-coles"),
   });
 
   const probs = outcomeProbs(matrix);
   return {
-    source: teamColdStart ? "dixon-coles:cold-start" : "dixon-coles",
-    coldStart: teamColdStart,
+    source: marketDerivedLambda ? "dixon-coles:market-derived" : "dixon-coles",
+    marketDerivedLambda: marketDerivedLambda ?? null,
     probabilities: probs,
     expectedGoals: { home: round(lambda), away: round(mu) },
     topScores: topScorelines(matrix, 6),
     overUnder: overUnderProbs(matrix, 2.5),
-    // 暴露 matrix 给下游(extended-markets 用于产大小球/单双/上半场/亚盘/双胜彩/比分组)。
-    // 此前隐藏在闭包里只产 topScores+overUnder,导致 extended-markets 模块成孤儿。
     matrix,
-    teamStrength: {
-      home: { attack: round(th.attack), defense: round(th.defense), coldStart: Boolean(th.coldStart) },
-      away: { attack: round(ta.attack), defense: round(ta.defense), coldStart: Boolean(ta.coldStart) },
-    },
+    teamStrength: trainedTeams ? {
+      home: { attack: round(th.attack), defense: round(th.defense) },
+      away: { attack: round(ta.attack), defense: round(ta.defense) },
+    } : null,
   };
 }
 
