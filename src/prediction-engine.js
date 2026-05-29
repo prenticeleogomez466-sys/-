@@ -11,7 +11,7 @@ import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { bootstrapRatings } from "./ratings-bootstrap.js";
 import { getSignalScale, loadSignalWeights } from "./signal-weight-tuner.js";
 import { applyLayer2Signals } from "./feature-enhancers.js";
-import { fuseSignals, loadFusionWeightProfile } from "./signal-fusion-layer.js";
+import { fuseSignals, loadFusionWeightProfile, SIGNAL_NAMES } from "./signal-fusion-layer.js";
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
 import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
@@ -143,10 +143,20 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   };
   // 回测学到的信号权重 profile(剔除/弱化害校准的融合信号);options 可覆盖。
   const weightProfile = loadFusionWeightProfile();
-  const fusionOpts = options.fusionOpts ?? (weightProfile
-    ? { signalWeights: weightProfile.signalWeights, disabledSignals: weightProfile.disabledSignals }
-    : {});
+  // 头号杠杆 A(backtest:odds 实证):市场赔率隐含=54.8% 命中,blend=54.2%,但 blend+融合层
+  // 反而掉到 52.9%。即「有市场 prior 时融合层是净负的」——市场价已含全部公开信息,
+  // 模型的 LR 信号反而引入噪声/过度自信。故有 prior 时默认关闭融合(可用 profile.fuseWithMarketPrior=true
+  // 或 options.fuseWithMarketPrior 覆盖)。无赔率场次保留融合(那里它相对纯 DC 是正的)。
+  const hasMarketPrior = Boolean(oddsProbabilities);
+  const fuseWithMarketPrior = options.fuseWithMarketPrior ?? weightProfile?.fuseWithMarketPrior ?? false;
+  const gateFusionOff = hasMarketPrior && !fuseWithMarketPrior;
+  const fusionOpts = options.fusionOpts ?? (gateFusionOff
+    ? { disabledSignals: SIGNAL_NAMES }
+    : weightProfile
+      ? { signalWeights: weightProfile.signalWeights, disabledSignals: weightProfile.disabledSignals }
+      : {});
   const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext, fusionOpts);
+  probabilityAdjustment.fusionGatedOff = gateFusionOff;
   probabilityAdjustment.fusion = fusion;
   // 温度校准(回测拟合,治过度自信):单调软化,不改 argmax/命中,只把虚高的强热门拉回。
   // 放在 cold-start favorite 收缩之前,软化后多数 favorite 已 <0.65,二者互补不重复收缩。

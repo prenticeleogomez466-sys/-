@@ -55,18 +55,28 @@ test("predictFixture 生产钩子:快照含开盘≠当前时 line-movement fire
     id: "fx-lm", date: "2026-05-15", kickoff: "2026-05-15 20:00",
     competition: "测试联赛", homeTeam: "主队", awayTeam: "客队", marketType: "jingcai", sequence: "001", tags: []
   };
-  // 开盘主胜偏冷 → 当前钱进主队(显著移动)
+  // 开盘主胜偏冷 → 当前钱进主队(显著移动)。
+  // 注:默认策略「有市场 prior 时关闭融合层」(backtest:odds 实证融合害命中),
+  // 故显式 fuseWithMarketPrior:true 验证 line-movement 信号机制本身仍工作。
   const withMove = predictFixture(fixture, [{
     fixtureId: fixture.id, date: fixture.date,
     europeanOdds: { initial: { home: 2.2, draw: 3.3, away: 3.2 }, current: { home: 1.7, draw: 3.6, away: 5.2 } }
-  }]);
+  }], 0, { fuseWithMarketPrior: true });
   const fired = withMove.probabilityAdjustment.fusion.evidence.find((e) => e.name === "line-movement");
-  assert.ok(fired, "开盘≠当前且显著移动时,line-movement 应进 evidence");
+  assert.ok(fired, "开盘≠当前且显著移动时(融合启用),line-movement 应进 evidence");
 
-  // 只有 current(无 initial)→ 装不出 openingOdds,信号休眠
+  // 默认策略:有市场 prior(赔率快照)时融合层被门控关闭 → 命中率不被融合拖累
+  const gated = predictFixture(fixture, [{
+    fixtureId: fixture.id, date: fixture.date,
+    europeanOdds: { initial: { home: 2.2, draw: 3.3, away: 3.2 }, current: { home: 1.7, draw: 3.6, away: 5.2 } }
+  }]);
+  assert.equal(gated.probabilityAdjustment.fusionGatedOff, true, "有市场 prior 时默认关闭融合");
+  assert.equal(gated.probabilityAdjustment.fusion.applied, false, "门控下融合不应用");
+
+  // 只有 current(无 initial)→ 装不出 openingOdds,信号休眠(显式启用融合下验证)
   const onlyCurrent = predictFixture(fixture, [{
     fixtureId: fixture.id, date: fixture.date, europeanOdds: { current: { home: 1.7, draw: 3.6, away: 5.2 } }
-  }]);
+  }], 0, { fuseWithMarketPrior: true });
   const dorm = onlyCurrent.probabilityAdjustment.fusion.dormant.find((d) => d.name === "line-movement");
   assert.ok(dorm, "无开盘快照时 line-movement 应休眠");
 });
