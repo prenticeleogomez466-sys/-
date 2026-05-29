@@ -785,45 +785,57 @@ export function buildFourteenPlan(predictions) {
     const drawProb = Number(probs.draw ?? 0);
     const homeProb = Number(probs.home ?? 0);
     const awayProb = Number(probs.away ?? 0);
+    const maxProb = Math.max(homeProb, drawProb, awayProb);
     const gap = prediction.pick.probability - prediction.secondaryPick.probability;
     const isBanker = bankerIndexes.has(index);
 
-    // 14 场是爆冷天堂(历史平局率 25-30%,客胜 30-35%),必须主动覆盖平局/反向客胜:
-    //   - 平局 prob ≥ 25% 强制平局进覆盖(即使 pick 是主胜/客胜也加 draw 进双选)
-    //   - 主胜/客胜双方都 prob ≥ 30% → 平局 + 弱侧 → 三选全
-    //   - 反向爆冷:模型 prob 弱侧 > 25% 标 "反向有戏" 加进覆盖
+    // 14 场单式优先级:argmax 是默认,但**爆冷场强制让平局当 single**:
+    //   draw ≥ 28% 且 favorite 优势 < 12pp → single = 平局(反 favorite 押爆冷)
+    //   draw ≥ 32% 且 favorite 优势 < 8pp → 极端平局倾向,信号更强
+    let singleCode = prediction.pick.code;
+    let singleNote = "";
+    if (drawProb >= 0.32 && maxProb - drawProb < 0.08) {
+      singleCode = "1";
+      singleNote = "平局倾向(draw≥32%,favorite优势<8pp)";
+    } else if (drawProb >= 0.28 && maxProb - drawProb < 0.12 && drawProb >= Math.min(homeProb, awayProb)) {
+      singleCode = "1";
+      singleNote = "平局倾向(draw≥28%,favorite优势<12pp)";
+    }
+
+    // 覆盖逻辑同前,但参考 singleCode 决定覆盖中是否含 draw
     let codes;
     let coverageReason;
     if (isBanker) {
-      codes = [prediction.pick.code];
+      codes = [singleCode];
       coverageReason = "✅ 胆码";
-    } else if (drawProb >= 0.30 && Math.max(homeProb, awayProb) - drawProb < 0.10) {
+    } else if (drawProb >= 0.30 && maxProb - drawProb < 0.10) {
       codes = ["3", "1", "0"];
       coverageReason = "⚠ 平局 ≥30% 且接近最高,三选全覆盖";
-    } else if (drawProb >= 0.25 && prediction.pick.code !== "1") {
-      // pick 是主胜或客胜,但 draw 25%+ → 把 draw 加进双选(不管 secondaryPick 是啥)
-      codes = [prediction.pick.code, "1"];
+    } else if (drawProb >= 0.25 && singleCode !== "1") {
+      codes = [singleCode, "1"];
       coverageReason = "⚠ 平局 ≥25% 强制覆盖,搏爆冷";
     } else if (Math.min(homeProb, awayProb) >= 0.28 && Math.abs(homeProb - awayProb) <= 0.10) {
-      // 双方实力接近(都 ≥28% 且差距 ≤10pp)→ 三选全
       codes = ["3", "1", "0"];
       coverageReason = "⚠ 主客实力接近,三选全防爆冷";
+    } else if (singleCode === "1") {
+      // 平局倾向时,覆盖一定带主胜或客胜 fallback
+      codes = ["1", maxProb === homeProb ? "3" : "0"];
+      coverageReason = "平局倾向 + 一侧 fallback";
     } else if (gap >= rules.doubleMinGap) {
-      codes = [prediction.pick.code, prediction.secondaryPick.code];
+      codes = [singleCode, prediction.secondaryPick.code];
       coverageReason = `双选(概率差 ${Math.round(gap * 100)}%)`;
     } else {
       codes = ["3", "1", "0"];
       coverageReason = `三选全(概率差仅 ${Math.round(gap * 100)}%,信号弱)`;
     }
 
-    // 爆冷指数:模型不看好的一方但赔率反映市场不极端 → 14 场爆冷常发于此
     const weakerProb = Math.min(homeProb, awayProb);
     const upsetRisk = weakerProb >= 0.22 ? "⚠ 爆冷有戏" : weakerProb >= 0.15 ? "标准" : "公认 favorite";
 
     return {
       index: index + 1,
       match: `${prediction.fixture.homeTeam} 对 ${prediction.fixture.awayTeam}`,
-      single: outcomeCodeToChinese(prediction.pick.code),
+      single: outcomeCodeToChinese(singleCode),
       compound: codes.map(outcomeCodeToChinese).join("/"),
       type: codes.length === 1 ? "胆" : codes.length === 2 ? "双选" : "全选",
       competitionType: competitionCategory(prediction.fixture?.competition),
@@ -831,7 +843,7 @@ export function buildFourteenPlan(predictions) {
       upsetRisk,
       risk: prediction.risk,
       confidence: prediction.confidence,
-      reason: `${coverageReason}；爆冷:${upsetRisk}；${prediction.rationale}`
+      reason: `${singleNote ? singleNote + "；" : ""}${coverageReason}；爆冷:${upsetRisk}；${prediction.rationale}`
     };
   });
   // 胆腿串关相关性修正(接孤儿模块 parlay-correlation-adjuster):
@@ -886,38 +898,50 @@ export function buildRenxuan9(source) {
     const drawProb = Number(probs.draw ?? 0);
     const homeProb = Number(probs.home ?? 0);
     const awayProb = Number(probs.away ?? 0);
-    // 任选 9 也按 14 场胆/双选/全选规则,但门槛更松:
-    //   - 任选 9 已经是从 14 场挑置信前 9 → 这 9 场基线就有信心
-    //   - 胆门槛:gap ≥ 25% 且置信 ≥ 50(略高于 14 场胆门槛)
-    //   - 双选:gap ≥ 10% OR draw prob ≥ 22%
-    //   - 全选:剩余(实力接近 or 信号弱)
-    const isBanker = gap >= 0.25 && prediction.confidence >= 50 && prediction.risk !== "高";
+    const maxProb = Math.max(homeProb, drawProb, awayProb);
+
+    // 单式 = argmax 默认,平局倾向场强制改 single = 平局(同 14 场规则)
+    let singleCode = prediction.pick.code;
+    let singleNote = "";
+    if (drawProb >= 0.30 && maxProb - drawProb < 0.10) {
+      singleCode = "1";
+      singleNote = "平局倾向(任选 9 严选 draw≥30%,gap<10pp)";
+    } else if (drawProb >= 0.26 && maxProb - drawProb < 0.12 && drawProb >= Math.min(homeProb, awayProb)) {
+      singleCode = "1";
+      singleNote = "平局倾向";
+    }
+
+    const isBanker = gap >= 0.25 && prediction.confidence >= 50 && prediction.risk !== "高" && singleCode !== "1";
     let codes, coverageReason;
     if (isBanker) {
-      codes = [prediction.pick.code];
-      coverageReason = "✅ 胆(任选 9 高置信单选)";
-    } else if (drawProb >= 0.30 && Math.max(homeProb, awayProb) - drawProb < 0.10) {
+      codes = [singleCode];
+      coverageReason = "✅ 胆(高置信)";
+    } else if (drawProb >= 0.30 && maxProb - drawProb < 0.10) {
       codes = ["3", "1", "0"];
       coverageReason = "⚠ 平局 ≥30% 三选全";
-    } else if (drawProb >= 0.22 && prediction.pick.code !== "1") {
-      codes = [prediction.pick.code, "1"];
+    } else if (drawProb >= 0.22 && singleCode !== "1") {
+      codes = [singleCode, "1"];
       coverageReason = "⚠ 平局 ≥22% 强制覆盖";
     } else if (Math.min(homeProb, awayProb) >= 0.28 && Math.abs(homeProb - awayProb) <= 0.10) {
       codes = ["3", "1", "0"];
       coverageReason = "⚠ 主客接近,三选全";
+    } else if (singleCode === "1") {
+      codes = ["1", maxProb === homeProb ? "3" : "0"];
+      coverageReason = "平局倾向 + 一侧 fallback";
     } else if (gap >= 0.10) {
-      codes = [prediction.pick.code, prediction.secondaryPick.code];
+      codes = [singleCode, prediction.secondaryPick.code];
       coverageReason = `双选(差 ${Math.round(gap * 100)}%)`;
     } else {
       codes = ["3", "1", "0"];
       coverageReason = `三选全(差 ${Math.round(gap * 100)}%,信号弱)`;
     }
+
     return {
       rank: i + 1,
       match: `${prediction.fixture.homeTeam} 对 ${prediction.fixture.awayTeam}`,
       competitionType: competitionCategory(prediction.fixture?.competition),
-      pick: outcomeCodeToChinese(prediction.pick.code),
-      code: prediction.pick.code,
+      pick: outcomeCodeToChinese(singleCode),
+      code: singleCode,
       probability: prediction.pick.probability,
       probabilities: { home: pctOrEmpty(homeProb), draw: pctOrEmpty(drawProb), away: pctOrEmpty(awayProb) },
       compound: codes.map(outcomeCodeToChinese).join("/"),
@@ -925,7 +949,7 @@ export function buildRenxuan9(source) {
       confidence: prediction.confidence,
       risk: prediction.risk,
       gap: Math.round(gap * 100) / 100,
-      reason: `${coverageReason}；${prediction.rationale ?? ""}`
+      reason: `${singleNote ? singleNote + "；" : ""}${coverageReason}；${prediction.rationale ?? ""}`
     };
   });
   const legs = ranked.map(({ prediction }) => ({

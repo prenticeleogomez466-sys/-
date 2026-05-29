@@ -71,13 +71,41 @@ function toJingcaiRow(prediction) {
     fixture.kickoff?.slice(5, 16) ?? "",                         // 4 开赛(月-日 时:分)
     outcomeCodeToChinese(prediction.pick.code),                  // 5 胜平负
     handicapRecommendText(prediction),                           // 6 让球
-    prediction.scorePicks.primary,                               // 7 比分
-    prediction.halfFullPicks.primary,                            // 8 半全场
+    buildScoreCandidates(prediction),                            // 7 比分(首选 + 备选,不再单一)
+    buildHalfFullCandidates(prediction),                         // 8 半全场(首选 + 备选)
     probSummary,                                                 // 9 三概率(主/平/客 合一列)
     upset,                                                       // 10 爆冷
     confDetail,                                                  // 11 信心+分级+EV+注码
     enrichedRationale(prediction)                                // 12 选择理由
   ];
+}
+
+// 比分候选:DC top-3 概率比分,首选 + 2 备选,打破单一 2-1 套路
+function buildScoreCandidates(prediction) {
+  const primary = prediction.scorePicks?.primary;
+  const secondary = prediction.scorePicks?.secondary;
+  const dcTops = prediction.dixonColes?.expectedGoals ? (prediction.dixonColes?.topScores ?? []) : [];
+  const seen = new Set();
+  const list = [];
+  for (const s of [primary, secondary].concat(dcTops.map((t) => t?.score))) {
+    if (!s) continue;
+    const clean = String(s).trim();
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    list.push(clean);
+    if (list.length >= 3) break;
+  }
+  if (!list.length) return primary ?? "—";
+  if (list.length === 1) return list[0];
+  return `${list[0]} | 备 ${list.slice(1).join(", ")}`;
+}
+
+function buildHalfFullCandidates(prediction) {
+  const primary = prediction.halfFullPicks?.primary;
+  const secondary = prediction.halfFullPicks?.secondary;
+  if (!primary) return "—";
+  if (!secondary || secondary === primary) return primary;
+  return `${primary} | 备 ${secondary}`;
 }
 
 // 爆冷指数:模型不看好的弱势一方仍占 ≥22% 时,14 场/竞彩历史上常爆冷于此

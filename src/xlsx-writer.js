@@ -17,36 +17,108 @@ function buildWorkbookFiles(sheets) {
     "xl/styles.xml": stylesXml()
   };
   sheets.forEach((sheet, index) => {
-    files[`xl/worksheets/sheet${index + 1}.xml`] = sheetXml(sheet.rows ?? []);
+    files[`xl/worksheets/sheet${index + 1}.xml`] = sheetXml(sheet.rows ?? [], sheet.name ?? "");
   });
   return files;
 }
 
-function sheetXml(rows) {
+function sheetXml(rows, sheetName = "") {
   const maxColumns = rows.reduce((max, row) => Math.max(max, row.length), 0);
-  const body = rows.map((row, rowIndex) => `<row r="${rowIndex + 1}">${row.map((value, columnIndex) => cellXml(rowIndex + 1, columnIndex + 1, value, rowIndex === 0)).join("")}</row>`).join("");
-  const cols = maxColumns ? `<cols>${Array.from({ length: maxColumns }, (_, index) => `<col min="${index + 1}" max="${index + 1}" width="${columnWidth(index)}" customWidth="1"/>`).join("")}</cols>` : "";
+  const widths = chooseColumnWidths(sheetName, rows[0] ?? [], maxColumns);
+  const body = rows.map((row, rowIndex) => {
+    const heightAttr = rowIndex === 0 ? ' ht="28" customHeight="1"' : ' ht="22" customHeight="1"';
+    return `<row r="${rowIndex + 1}"${heightAttr}>${row.map((value, columnIndex) => cellXml(rowIndex + 1, columnIndex + 1, value, rowIndex === 0, rowIndex)).join("")}</row>`;
+  }).join("");
+  const cols = maxColumns ? `<cols>${Array.from({ length: maxColumns }, (_, index) => `<col min="${index + 1}" max="${index + 1}" width="${widths[index]}" customWidth="1"/>`).join("")}</cols>` : "";
   const views = rows.length > 1 ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` : "";
   const filter = rows.length > 1 && maxColumns ? `<autoFilter ref="A1:${columnName(maxColumns)}${rows.length}"/>` : "";
   return `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${views}${cols}<sheetData>${body}</sheetData>${filter}</worksheet>`;
 }
 
-function cellXml(row, column, value, isHeader = false) {
+// 样式 ID:
+//   0 = 默认
+//   1 = 表头(深蓝底/白字加粗居中)
+//   2 = 数据行 居中(数字 + 短文本)
+//   3 = 数据行 左对齐(对阵 + 选择理由 这种长文本)
+//   4 = 偶数数据行 居中 + 浅灰底
+//   5 = 偶数数据行 左对齐 + 浅灰底
+function cellXml(row, column, value, isHeader = false, dataRowIndex = 0) {
   const ref = `${columnName(column)}${row}`;
-  const style = isHeader ? ' s="1"' : "";
+  let styleId;
+  if (isHeader) {
+    styleId = 1;
+  } else {
+    const isLongText = typeof value === "string" && value.length > 16;
+    const isEven = dataRowIndex % 2 === 0;  // dataRowIndex 1 = first data row;1 % 2 = 1 → 奇数 = 白底
+    if (isLongText) styleId = isEven ? 5 : 3;
+    else            styleId = isEven ? 4 : 2;
+  }
+  const style = ` s="${styleId}"`;
   if (typeof value === "number" && Number.isFinite(value)) return `<c r="${ref}"${style}><v>${value}</v></c>`;
   return `<c r="${ref}" t="inlineStr"${style}><is><t>${escapeXml(value ?? "")}</t></is></c>`;
 }
 
 function stylesXml() {
-  return `<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Microsoft YaHei"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Microsoft YaHei"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  // 字体:0 黑色普通 / 1 白色加粗(表头用)
+  // 填充:0 无 / 1 gray125(占位)/ 2 深蓝 表头 / 3 浅灰 偶数行底色
+  // 边框:0 无 / 1 上下左右细线灰
+  // cellXfs:0 默认 / 1 表头(白字+深蓝底+加粗+居中)/ 2 居中数据 / 3 左对齐数据
+  //         / 4 居中数据+浅灰底 / 5 左对齐数据+浅灰底
+  return `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<fonts count="2">` +
+      `<font><sz val="11"/><name val="Microsoft YaHei"/></font>` +
+      `<font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Microsoft YaHei"/></font>` +
+    `</fonts>` +
+    `<fills count="4">` +
+      `<fill><patternFill patternType="none"/></fill>` +
+      `<fill><patternFill patternType="gray125"/></fill>` +
+      `<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill>` +
+      `<fill><patternFill patternType="solid"><fgColor rgb="FFF2F6FB"/><bgColor indexed="64"/></patternFill></fill>` +
+    `</fills>` +
+    `<borders count="2">` +
+      `<border><left/><right/><top/><bottom/><diagonal/></border>` +
+      `<border><left style="thin"><color rgb="FFD9DDE3"/></left><right style="thin"><color rgb="FFD9DDE3"/></right><top style="thin"><color rgb="FFD9DDE3"/></top><bottom style="thin"><color rgb="FFD9DDE3"/></bottom></border>` +
+    `</borders>` +
+    `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+    `<cellXfs count="6">` +
+      `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+      `<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+      `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+      `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>` +
+      `<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>` +
+      `<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>` +
+    `</cellXfs>` +
+    `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>` +
+    `</styleSheet>`;
 }
 
-function columnWidth(index) {
-  if (index <= 1) return 14;
-  if (index <= 5) return 18;
-  if (index >= 20) return 52;
-  return 16;
+// 根据 sheet 名和 header 文本自动算列宽(基于中文宽度经验值)
+function chooseColumnWidths(sheetName, headers, count) {
+  const widths = new Array(count).fill(14);
+  for (let i = 0; i < count; i++) {
+    const h = String(headers[i] ?? "");
+    widths[i] = guessWidth(sheetName, h, i);
+  }
+  return widths;
+}
+
+function guessWidth(sheetName, header, index) {
+  // 关键字段单独宽度
+  if (/选择理由|理由|说明|融合判断要点|narrative|reason/i.test(header)) return 56;
+  if (/对阵|比赛/.test(header)) return 26;
+  if (/概率分布|概率\(|主胜.*平局.*客胜/.test(header)) return 26;
+  if (/信心.*分级|信心 · 分级 · EV/.test(header)) return 30;
+  if (/让球|半全场|比分/.test(header)) return 22;
+  if (/赛事类型|爆冷/.test(header)) return 16;
+  if (/胜平负/.test(header)) return 12;
+  if (/开赛/.test(header)) return 14;
+  if (/^序|^场次/.test(header)) return 10;
+  if (/^类型$|^单式$|^覆盖$/.test(header)) return 14;
+  // fallback 按列序粗判
+  if (index === 0) return 10;
+  if (index <= 3) return 16;
+  return 18;
 }
 
 function buildZip(files) {
