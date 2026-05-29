@@ -80,31 +80,53 @@ function toJingcaiRow(prediction) {
   ];
 }
 
-// 比分候选:DC top-3 概率比分,首选 + 2 备选,打破单一 2-1 套路
+// 比分候选:DC top-N 概率比分中**强制跟 wld 一致 + 不同进球结构** 的 3 个比分
+// 不再让"1-1 平局" 出现在主胜场的备选里
 function buildScoreCandidates(prediction) {
+  const wldCode = prediction.pick?.code;
   const primary = prediction.scorePicks?.primary;
   const secondary = prediction.scorePicks?.secondary;
-  const dcTops = prediction.dixonColes?.expectedGoals ? (prediction.dixonColes?.topScores ?? []) : [];
+  const dcTops = prediction.dixonColes?.topScores ?? [];
+  const matchesWld = (s) => {
+    const m = String(s ?? "").match(/^(\d+)\s*-\s*(\d+)$/);
+    if (!m) return false;
+    const h = Number(m[1]), a = Number(m[2]);
+    if (wldCode === "3") return h > a;
+    if (wldCode === "1") return h === a;
+    if (wldCode === "0") return h < a;
+    return false;
+  };
   const seen = new Set();
-  const list = [];
+  const candidates = [];
   for (const s of [primary, secondary].concat(dcTops.map((t) => t?.score))) {
     if (!s) continue;
     const clean = String(s).trim();
-    if (!clean || seen.has(clean)) continue;
+    if (!clean || seen.has(clean) || !matchesWld(clean)) continue;
     seen.add(clean);
-    list.push(clean);
-    if (list.length >= 3) break;
+    candidates.push(clean);
+    if (candidates.length >= 3) break;
   }
-  if (!list.length) return primary ?? "—";
-  if (list.length === 1) return list[0];
-  return `${list[0]} | 备 ${list.slice(1).join(", ")}`;
+  if (!candidates.length) return primary ?? "—";
+  if (candidates.length === 1) return candidates[0];
+  return `${candidates[0]} | 备 ${candidates.slice(1).join(", ")}`;
 }
 
+// 半全场候选:首选(wld 锚)+ 备选,备选 first-half 必须跟首选不同
+// 避免 "主胜-主胜 备 主胜-主胜" 这种重复
 function buildHalfFullCandidates(prediction) {
   const primary = prediction.halfFullPicks?.primary;
   const secondary = prediction.halfFullPicks?.secondary;
   if (!primary) return "—";
-  if (!secondary || secondary === primary) return primary;
+  const firstHalfOf = (s) => String(s ?? "").split("-")[0]?.trim() ?? "";
+  const primaryFirst = firstHalfOf(primary);
+  // 备选 first 跟首选不同才有意义(否则信息冗余)
+  if (!secondary || secondary === primary || firstHalfOf(secondary) === primaryFirst) {
+    // 主动构造一个有意义的备:跟首选 first 不同的"平局-{wld}" 或 "主胜-{wld}"
+    const wld = String(prediction.pick?.label ?? primary.split("-").pop());
+    const alts = ["主胜", "平局", "客胜"].filter((f) => f !== primaryFirst).map((f) => `${f}-${wld}`);
+    if (alts.length) return `${primary} | 备 ${alts[0]}`;
+    return primary;
+  }
   return `${primary} | 备 ${secondary}`;
 }
 

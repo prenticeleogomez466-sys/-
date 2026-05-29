@@ -594,11 +594,9 @@ export function scoreFromDcResult(dcResult, code, excluded = new Set()) {
 }
 
 // 半全场分布:DC 引擎给了全场 expectedGoals { home: λ, away: μ }。
-// 我们假设上半场进球率 ≈ 全场的 halfRatio(默认 0.46,这是英超/五大联赛大量历史数据
-// 上半场进球占比的稳定经验值)。下半场进球率 = 全场 - 上半场。
-// 半场和下半场进球独立(简化假设,实际有微弱负相关但量级小可忽略)。
-// 联合分布 -> 6 outcome 概率聚合,挑符合 final outcome 的最高 outcome,
-// 并保证跟 score 路径一致(scoreHalfFullConsistent)。
+// 联合分布 → 9 outcome 概率聚合,挑符合 final outcome + 跟 score 兼容的最高 prob 的。
+// 改进(2026-05-29 用户反馈"半全场全一样"):secondary 从原本"按 prob 第二"变成
+// "first-half 不同的 prob 最高"— 这样主胜场不会出现 主胜-主胜 备 主胜-主胜 的废话备选。
 export function halfFullFromDcResult(dcResult, code, excluded = new Set(), score = "") {
   if (!dcResult?.expectedGoals) return null;
   const halfRatio = Number(process.env.DC_HALF_RATIO ?? 0.46);
@@ -608,6 +606,13 @@ export function halfFullFromDcResult(dcResult, code, excluded = new Set(), score
     .filter(([halfFull]) => !excluded.has(halfFull))
     .filter(([halfFull]) => !score || scoreHalfFullConsistent(score, halfFull))
     .sort((a, b) => b[1] - a[1]);
+  // 如果 excluded 非空,说明这是 secondary 调用,且首选 first-half 已记入 excluded
+  // —— 此时挑跟首选 first-half 不同的最高 prob 半全场,而不是 prob 第二(可能 first 相同)
+  if (excluded.size > 0) {
+    const excludedFirsts = new Set([...excluded].map((s) => String(s).split("-")[0]?.trim()));
+    const diff = candidates.find(([halfFull]) => !excludedFirsts.has(String(halfFull).split("-")[0]?.trim()));
+    if (diff) return diff[0];
+  }
   return candidates[0]?.[0] ?? null;
 }
 
