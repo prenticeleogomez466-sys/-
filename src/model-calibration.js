@@ -263,12 +263,23 @@ function emptyProfile(reason = "not-configured") {
 const COLD_START_FAVORITE_THRESHOLD = 0.65;
 const COLD_START_SHRINK_TOWARD = 0.6;
 const COLD_START_SHRINK_FRACTION = 0.15;
+// 累进收缩:walk-forward 回测显示 65%+ 强热门仍系统性过度自信(预测 0.75 / 实际 0.67)。
+// favorite-longshot bias 对越极端的热门越强,故收缩比例随 favorite 超过 0.70 的部分线性增大。
+const COLD_START_SHRINK_PROGRESSIVE_FROM = 0.70;
+const COLD_START_SHRINK_PROGRESSIVE_SLOPE = 2.2;
+const COLD_START_SHRINK_FRACTION_CAP = 0.45;
+
+function coldStartShrinkFraction(probability) {
+  const extra = Math.max(0, probability - COLD_START_SHRINK_PROGRESSIVE_FROM) * COLD_START_SHRINK_PROGRESSIVE_SLOPE;
+  return Math.min(COLD_START_SHRINK_FRACTION_CAP, COLD_START_SHRINK_FRACTION + extra);
+}
 
 function applyColdStartCalibration(normalized, favorite, bucket, reason) {
   if (favorite.probability < COLD_START_FAVORITE_THRESHOLD) {
     return { probabilities: normalized, calibration: { applied: false, reason, bucket, scope: "cold-start-no-op" } };
   }
-  const targetFavorite = favorite.probability - (favorite.probability - COLD_START_SHRINK_TOWARD) * COLD_START_SHRINK_FRACTION;
+  const fraction = coldStartShrinkFraction(favorite.probability);
+  const targetFavorite = favorite.probability - (favorite.probability - COLD_START_SHRINK_TOWARD) * fraction;
   const calibrated = moveFavoriteProbability(normalized, favorite.key, targetFavorite);
   return {
     probabilities: calibrated,

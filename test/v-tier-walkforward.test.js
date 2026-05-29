@@ -15,6 +15,15 @@ test("runWalkForwardBacktest 返回良构、指标在合理域内", () => {
   assert.ok(res.logLoss >= 0, "LogLoss 不应为负");
 });
 
+test("三臂对比结构完整,calibrated 不劣于纯 DC 的 Brier", () => {
+  const res = runWalkForwardBacktest({ testDates: 10, minTrainMatches: 150, maxDates: 220 });
+  assert.ok(res.arms?.dc && res.arms?.fusion && res.arms?.calibrated, "缺三臂");
+  if (res.tested >= 50) {
+    // 校准是为了改善概率质量:Brier 不应明显变差
+    assert.ok(res.arms.calibrated.brier <= res.arms.dc.brier + 0.01, "校准后 Brier 明显恶化,收缩过头");
+  }
+});
+
 test("有训练数据时:命中率显著高于随机基线 0.33", () => {
   const res = runWalkForwardBacktest({ testDates: 20, minTrainMatches: 200, maxDates: 240 });
   if (res.tested < 50) {

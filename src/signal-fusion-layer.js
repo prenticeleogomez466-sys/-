@@ -25,6 +25,7 @@ import { analyzeH2H, h2hToLR } from "./head-to-head-history.js";
 import { detectCleanSheetStreak, cleanSheetStreakToLR } from "./clean-sheet-streak.js";
 import { estimateRotationProbability, rotationToLR } from "./rotation-policy-model.js";
 import { detectStreak, streakToLR } from "./streak-detector.js";
+import { compareFatigue, applyFatigueBias } from "./schedule-fatigue-model.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const LR_MIN = 0.5;
@@ -172,6 +173,20 @@ function signalStreak(prior, fixture, advancedData, context) {
   return { name: "streak", source: "context.recentMatches", lr, detail: detail || null };
 }
 
+function signalFatigue(prior, fixture, advancedData, context) {
+  const homePrev = context.homePrevMatchDate ?? context.homeRecentMatches?.[0]?.date;
+  const awayPrev = context.awayPrevMatchDate ?? context.awayRecentMatches?.[0]?.date;
+  const matchDate = matchDateOf(fixture, advancedData);
+  if (!homePrev || !awayPrev || !matchDate) {
+    return { name: "fatigue", source: "context.recentMatches", dormant: "no-prev-match-dates" };
+  }
+  const cmp = compareFatigue(homePrev, awayPrev, matchDate);
+  if (!cmp.significant) return { name: "fatigue", source: "context.recentMatches", dormant: "rest-balanced" };
+  const lr = clampLR(lrFromAdjustment(prior, applyFatigueBias(prior, cmp)));
+  if (!lr) return { name: "fatigue", source: "context.recentMatches", dormant: "negligible" };
+  return { name: "fatigue", source: "context.recentMatches", lr, detail: `主息${homePrev}→客息${awayPrev}` };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -179,6 +194,7 @@ const SIGNAL_HANDLERS = [
   signalH2H,
   signalCleanSheetStreak,
   signalStreak,
+  signalFatigue,
   signalRotation
 ];
 

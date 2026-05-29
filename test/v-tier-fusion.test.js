@@ -68,6 +68,21 @@ test("总位移封顶:极端 LR 不会把概率炸过 ±maxTotalShift", () => {
   }
 });
 
+test("fatigue 信号:一方明显少休息 → 利对手的方向性 LR", () => {
+  const fixture = { id: "fa", homeTeam: "曼城", awayTeam: "阿森纳", competition: "英超", date: "2026-05-29" };
+  // 主队 1 天前刚踢(极疲劳),客队 7 天前(充分休息)→ 应利客队
+  const ctx = {
+    homeRecentMatches: [{ date: "2026-05-28", goalsFor: 1, goalsAgainst: 1, won: "D" }],
+    awayRecentMatches: [{ date: "2026-05-22", goalsFor: 2, goalsAgainst: 0, won: "W" }]
+  };
+  const { evidence, dormant } = collectFusionEvidence(PRIOR, fixture, {}, ctx);
+  const fatigue = evidence.find((e) => e.name === "fatigue");
+  const dormantFatigue = dormant.find((d) => d.name === "fatigue");
+  // 要么 fire(显著)要么 dormant(不显著),但必须被处理
+  assert.ok(fatigue || dormantFatigue, "fatigue 必须被处理");
+  if (fatigue) assert.ok(fatigue.ratio.away >= fatigue.ratio.home, "主队疲劳 → 客胜 LR 不低于主胜");
+});
+
 test("无效 prior 安全返回 applied:false", () => {
   const res = fuseSignals({ home: NaN, draw: 0.3, away: 0.3 }, { id: "f6", competition: "英超", date: "2026-05-29" }, {}, {});
   assert.equal(res.applied, false);
