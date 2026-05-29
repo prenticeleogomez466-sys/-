@@ -124,6 +124,8 @@ function Run-Weekly {
   Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free source matrix review" "npm run freeodds:audit"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
+  # 自调优闭环:walk-forward 回测驱动信号权重 + 温度校准自动调参(--apply 内置只在变好时才写护栏)
+  Invoke-Step "self-tuning optimize loop" "npm run optimize:loop" $true
 }
 
 Write-Log "Football automation started: Mode=$Mode Date=$Date AllowMissingOdds=$AllowMissingOdds"
