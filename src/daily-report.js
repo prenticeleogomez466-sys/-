@@ -64,11 +64,22 @@ function toJingcaiRow(prediction) {
     prediction.halfFullPicks.secondary,
     prediction.risk,
     prediction.confidence,
+    bettingTier(prediction.probabilities),
     prediction.bankroll?.decision ?? "",
     prediction.bankroll?.ev ?? "",
     prediction.bankroll?.stakeUnitsPer100 ?? "",
     prediction.rationale
   ];
+}
+
+// 下注分级:按首选(top-prob)分桶,阈值依据 recommend:coverage 曲线
+// (≥65%→历史命中~73%,50-65%→~64-67%,<50%→低于全推基线 54%)。
+// 仅是「帮你挑高把握场」的过滤,不改变模型预测本身。
+export function bettingTier(probabilities) {
+  const top = Math.max(probabilities?.home ?? 0, probabilities?.draw ?? 0, probabilities?.away ?? 0);
+  if (top >= 0.65) return "🟢 建议下注";
+  if (top >= 0.50) return "🟡 可选";
+  return "⚪ 慎选/观望";
 }
 
 function toFourteenRow(selection) {
@@ -267,7 +278,7 @@ function updateLedger(date, rows) {
 }
 
 function jingcaiHeaders() {
-  return ["日期", "场次", "赛事", "主队", "客队", "开赛", "赔率实时状态", "胜平负赔率", "亚洲盘口", "让球胜平负", "胜平负首选", "胜平负次选", "主胜概率", "平局概率", "客胜概率", "比分首选", "比分次选", "半全场首选", "半全场次选", "风险", "信心", "资金决策", "EV", "每100单位建议", "推荐理由"];
+  return ["日期", "场次", "赛事", "主队", "客队", "开赛", "赔率实时状态", "胜平负赔率", "亚洲盘口", "让球胜平负", "胜平负首选", "胜平负次选", "主胜概率", "平局概率", "客胜概率", "比分首选", "比分次选", "半全场首选", "半全场次选", "风险", "信心", "下注分级", "资金决策", "EV", "每100单位建议", "推荐理由"];
 }
 
 function fourteenHeaders() {
