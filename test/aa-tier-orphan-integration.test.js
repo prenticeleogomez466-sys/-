@@ -143,3 +143,57 @@ test("summarizeLedgerCLV 无可测行时诚实返回 measurable:false(不误报�
   assert.equal(s.measurable, false);
   assert.match(s.verdict, /暂无可测 CLV/);
 });
+
+// ---- time-decay-form 信号接入(孤儿模块 time-decay-weighting)----
+import { timeDecayFormToLR } from "../src/time-decay-weighting.js";
+
+// 造一串离参考日很近的比赛(ESS 高),结果按 W/D/L 指定
+function recentForm(results, refDate = "2026-05-20") {
+  const base = Date.parse(refDate);
+  return results.map((won, i) => ({
+    date: new Date(base - (i + 1) * 5 * 86400000).toISOString().slice(0, 10),
+    venue: i % 2 ? "away" : "home",
+    goalsFor: won === "W" ? 2 : won === "D" ? 1 : 0,
+    goalsAgainst: won === "L" ? 2 : won === "D" ? 1 : 0,
+    won
+  }));
+}
+
+test("timeDecayFormToLR:主强客弱近期 form → 朝主队 LR>1,对称 away<1", () => {
+  const homeM = recentForm(["W", "W", "W", "D", "W"]);
+  const awayM = recentForm(["L", "L", "D", "L", "L"]);
+  const lr = timeDecayFormToLR(homeM, awayM, { referenceDate: "2026-05-22" });
+  assert.ok(lr && lr.home > 1, "主队近期更强 → home LR>1");
+  assert.ok(lr.away < 1, "对称压低 away");
+  assert.equal(lr.draw, 1);
+});
+
+test("timeDecayFormToLR:净差不足时休眠返回 null", () => {
+  const homeM = recentForm(["W", "D", "L", "W", "D"]);
+  const awayM = recentForm(["W", "D", "L", "W", "D"]);
+  assert.equal(timeDecayFormToLR(homeM, awayM, { referenceDate: "2026-05-22" }), null);
+});
+
+test("timeDecayFormToLR:有效样本太薄(单场)时休眠", () => {
+  assert.equal(timeDecayFormToLR(recentForm(["W"]), recentForm(["L"]), { referenceDate: "2026-05-22" }), null);
+});
+
+test("signalTimeDecayForm 经融合层真 fire(出现在 evidence 里)", () => {
+  const prior = { home: 0.4, draw: 0.3, away: 0.3 };
+  const fixture = { homeTeam: "甲", awayTeam: "乙", date: "2026-05-22" };
+  const context = {
+    homeRecentMatches: recentForm(["W", "W", "W", "D", "W"]),
+    awayRecentMatches: recentForm(["L", "L", "D", "L", "L"])
+  };
+  const { evidence } = collectFusionEvidence(prior, fixture, {}, context);
+  const hit = evidence.find((e) => e.name === "time-decay-form");
+  assert.ok(hit, "time-decay-form 应进入 fired evidence");
+  assert.ok(hit.ratio.home > 1, "方向朝主队");
+});
+
+test("signalTimeDecayForm 无近期赛历史时休眠(进 dormant 不进 evidence),不报错", () => {
+  const prior = { home: 0.4, draw: 0.3, away: 0.3 };
+  const { evidence, dormant } = collectFusionEvidence(prior, { homeTeam: "甲", awayTeam: "乙", date: "2026-05-22" }, {}, {});
+  assert.ok(!evidence.some((e) => e.name === "time-decay-form"), "无历史 → 不应 fire");
+  assert.ok(dormant.some((d) => d.name === "time-decay-form"), "应记为 dormant");
+});

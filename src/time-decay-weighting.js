@@ -88,6 +88,35 @@ export function effectiveSampleSize(matches, opts = {}) {
   return round(sum * sum / sumSq);
 }
 
+/**
+ * 把"主客近期 form 的时间衰减加权 PPG 差"转成 {home,draw,away} 方向性 LR(供信号融合层)。
+ *
+ * 与 home-away-split(分场地 PPG)、streak(连续结果)不同:本信号用 Dixon-Coles 半衰期
+ * 指数衰减,对**越近的比赛权重越高**,衡量"球队近期状态趋势"的主客净差。参考日取比赛日
+ * (referenceDate),所以衰减是相对赛前而非 now,可回测复现。
+ *
+ * @param {Array} homeMatches 主队近期赛(含 date / won 'W'|'D'|'L')
+ * @param {Array} awayMatches 客队近期赛
+ * @param {{referenceDate?: Date|string|number, halfLife?: number, k?: number, minEss?: number, floor?: number}} opts
+ * @returns {{home:number,draw:number,away:number}|null} 净差不足/样本太薄时返回 null(休眠)
+ */
+export function timeDecayFormToLR(homeMatches, awayMatches, opts = {}) {
+  if (!Array.isArray(homeMatches) || !Array.isArray(awayMatches)) return null;
+  if (!homeMatches.length || !awayMatches.length) return null;
+  const wOpts = { referenceDate: opts.referenceDate, halfLife: opts.halfLife };
+  const homePpg = weightedPpg(homeMatches, wOpts);
+  const awayPpg = weightedPpg(awayMatches, wOpts);
+  if (!Number.isFinite(homePpg) || !Number.isFinite(awayPpg)) return null;
+  const minEss = opts.minEss ?? 2.5; // 有效样本太小(全是陈旧/单场)则不可信
+  if (effectiveSampleSize(homeMatches, wOpts) < minEss || effectiveSampleSize(awayMatches, wOpts) < minEss) return null;
+  const edge = homePpg - awayPpg; // 范围约 [-3,3]
+  const floor = opts.floor ?? 0.4; // 噪声地板(略高于 split,因与其余 form 信号部分重叠)
+  if (Math.abs(edge) < floor) return null;
+  const k = opts.k ?? 0.14; // 1.5 PPG 净差 ≈ 朝优势侧 LR ~1.23
+  const fav = Math.exp(Math.max(-0.5, Math.min(0.5, k * edge)));
+  return { home: round(fav), draw: 1, away: round(1 / fav) };
+}
+
 function parseDate(d) {
   if (d instanceof Date) return d.getTime();
   if (typeof d === "number") return d;

@@ -28,6 +28,7 @@ import { detectStreak, streakToLR } from "./streak-detector.js";
 import { compareFatigue, applyFatigueBias } from "./schedule-fatigue-model.js";
 import { lineMovementToLR, analyzeLineMovement } from "./line-movement-signal.js";
 import { splitStats, homeAwaySplitToLR } from "./home-away-split-stats.js";
+import { timeDecayFormToLR } from "./time-decay-weighting.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const LR_MIN = 0.5;
@@ -204,6 +205,19 @@ function signalHomeAwaySplit(prior, fixture, advancedData, context) {
   return { name: "home-away-split", source: "context.recentMatches", lr, detail };
 }
 
+function signalTimeDecayForm(prior, fixture, advancedData, context) {
+  // 数据源:context.homeRecentMatches / awayRecentMatches(fusion-context-builder 装配,带 date)。
+  // 参考日取比赛日,使半衰期衰减相对赛前、可回测复现。
+  const homeMatches = context.homeRecentMatches;
+  const awayMatches = context.awayRecentMatches;
+  if (!Array.isArray(homeMatches) || !Array.isArray(awayMatches)) {
+    return { name: "time-decay-form", source: "context.recentMatches", dormant: "no-recent-match-history" };
+  }
+  const lr = clampLR(timeDecayFormToLR(homeMatches, awayMatches, { referenceDate: fixture?.date }));
+  if (!lr) return { name: "time-decay-form", source: "context.recentMatches", dormant: "thin-ess-or-balanced-form" };
+  return { name: "time-decay-form", source: "context.recentMatches", lr, detail: "Dixon-Coles 90d 半衰期加权近期 PPG 净差" };
+}
+
 function signalLineMovement(prior, fixture, advancedData, context) {
   // 数据源:context.openingOdds(开盘隐含)+ context.currentOdds(当前/收盘快照隐含)。
   // 两者齐全才 fire —— live jingcai 多次捕获赔率变化时装配;缺则休眠(向后兼容)。
@@ -233,6 +247,7 @@ const SIGNAL_HANDLERS = [
   signalFatigue,
   signalRotation,
   signalHomeAwaySplit,
+  signalTimeDecayForm,
   signalLineMovement
 ];
 
