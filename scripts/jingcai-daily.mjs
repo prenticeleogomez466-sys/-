@@ -55,8 +55,9 @@ if (afterCrawl.fixtures.filter((f) => f.marketType === "shengfucai").length === 
 }
 
 // 2) 装配 500.com 竞彩(注意:必须在 crawler 重爬之后,否则被覆盖)
-const { captures } = loadScrapeFile(date);
-const staged = stageJingcaiIntoStore(date, captures);
+//    asian dict 同步装进 snapshot.asianHandicap,这样 line / handicapPick.direction 能算
+const { captures, asian } = loadScrapeFile(date);
+const staged = stageJingcaiIntoStore(date, captures, asian);
 
 // 3) 出推荐包(skip 闸门:竞彩官方源不可达,数据来自 500.com 兜底)
 const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });

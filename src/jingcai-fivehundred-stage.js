@@ -85,7 +85,7 @@ export function parseFiveHundredRows(rows, date, collectedAt = new Date().toISOS
  * @param {Array<{collectedAt:string, rows:Array<Array<string>>}>} captures  按时间先后
  * @param {string} date
  */
-export function parseFiveHundredCaptures(captures, date) {
+export function parseFiveHundredCaptures(captures, date, asianBySeq = null) {
   const list = (Array.isArray(captures) ? captures : []).filter((c) => c && Array.isArray(c.rows));
   if (!list.length) return { fixtures: [], snapshots: [] };
   const sorted = list.slice().sort((a, b) => String(a.collectedAt).localeCompare(String(b.collectedAt)));
@@ -111,11 +111,15 @@ export function parseFiveHundredCaptures(captures, date) {
     const euroCur = validTriple(cur.euro) ? cur.euro : null;
     const hcpIni = validTriple(ini.hcp) ? ini.hcp : null;
     const hcpCur = validTriple(cur.hcp) ? cur.hcp : null;
+    // 装亚盘 (asian 由调用方注入,seq → { iniHome,iniLine,iniAway,curHome,curLine,curAway,book })
+    const asianRaw = asianBySeq?.[f.seq];
+    const asianHandicap = buildAsianHandicapSnapshot(asianRaw);
     snapshots.push({
       date, fixtureId: id, sequence: f.seq, marketType: "jingcai",
       competition: f.league, homeTeam: f.homeTeam, awayTeam: f.awayTeam,
       collectedAt: sorted[sorted.length - 1].collectedAt,
       europeanOdds: euroIni || euroCur ? { initial: euroIni ?? euroCur, current: euroCur ?? euroIni } : null,
+      asianHandicap,
       handicapOdds: hcpIni || hcpCur ? { initial: hcpIni ?? hcpCur, current: hcpCur ?? hcpIni } : null,
       capturedTimes: sorted.map((c) => c.collectedAt),
       source: SCRAPE_SOURCE,
@@ -140,12 +144,67 @@ export function loadScrapeFile(date, path = scrapeFilePath(date)) {
 }
 
 /**
+ * 中文亚盘语义 → 主队让球数(主队视角,负=主队让球,正=主队受让)。
+ * 来源:500.com/皇冠常用术语。例 "受让半球" → 主队 +0.5(客队让 -0.5);"球半" → 主队 -1.5。
+ */
+const ASIAN_LINE_LEXICON = {
+  "平手": 0,
+  "平手/半球": -0.25, "平半": -0.25,
+  "半球": -0.5,
+  "半球/一球": -0.75, "半/一": -0.75,
+  "一球": -1.0,
+  "一球/球半": -1.25, "一/球半": -1.25,
+  "球半": -1.5,
+  "球半/两球": -1.75, "球半/二": -1.75,
+  "两球": -2.0, "二球": -2.0,
+  "两球/两球半": -2.25,
+  "两球半": -2.5, "二球半": -2.5,
+  "受让平手/半球": 0.25, "受让平半": 0.25,
+  "受让半球": 0.5,
+  "受让半球/一球": 0.75, "受让半/一": 0.75,
+  "受让一球": 1.0,
+  "受让一球/球半": 1.25, "受让一/球半": 1.25,
+  "受让球半": 1.5,
+  "受让球半/两球": 1.75,
+  "受让两球": 2.0, "受让二球": 2.0
+};
+
+export function parseAsianLineText(text) {
+  if (text == null) return null;
+  const t = String(text).trim();
+  if (!t) return null;
+  if (ASIAN_LINE_LEXICON.hasOwnProperty(t)) return ASIAN_LINE_LEXICON[t];
+  // 数字直传(已经是 -0.5 / 0.5 这种格式)
+  const num = Number(t);
+  return Number.isFinite(num) ? num : null;
+}
+
+function buildAsianHandicapSnapshot(raw) {
+  if (!raw) return null;
+  const iniLine = parseAsianLineText(raw.iniLine);
+  const curLine = parseAsianLineText(raw.curLine);
+  const iniHome = Number(raw.iniHome);
+  const iniAway = Number(raw.iniAway);
+  const curHome = Number(raw.curHome);
+  const curAway = Number(raw.curAway);
+  const initial = Number.isFinite(iniLine) || Number.isFinite(iniHome)
+    ? { line: iniLine, homeWater: Number.isFinite(iniHome) ? iniHome : null, awayWater: Number.isFinite(iniAway) ? iniAway : null }
+    : null;
+  const current = Number.isFinite(curLine) || Number.isFinite(curHome)
+    ? { line: curLine, homeWater: Number.isFinite(curHome) ? curHome : null, awayWater: Number.isFinite(curAway) ? curAway : null }
+    : null;
+  if (!initial && !current) return null;
+  return { initial: initial ?? current, current: current ?? initial, book: raw.book ?? null };
+}
+
+/**
  * 把竞彩抓取数据(多次捕获)并入当日 store:保留官方 14 场胜负彩,替换 jingcai 部分。
  * @param {Array<{collectedAt,rows}>} captures
+ * @param {Object} [asianBySeq] 可选:每场亚盘 dict { 周五001: {iniLine, curLine, ...} }
  * @returns {{ jingcaiFixtures, shengfucaiKept, marketSnapshots }}
  */
-export function stageJingcaiIntoStore(date, captures) {
-  const { fixtures, snapshots } = parseFiveHundredCaptures(captures, date);
+export function stageJingcaiIntoStore(date, captures, asianBySeq = null) {
+  const { fixtures, snapshots } = parseFiveHundredCaptures(captures, date, asianBySeq);
 
   const existing = loadFixtures(date);
   const kept = existing.fixtures.filter((f) => f.marketType === "shengfucai");

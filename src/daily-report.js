@@ -65,6 +65,7 @@ function toJingcaiRow(prediction) {
     oddsText(snapshot?.europeanOdds),
     oddsText(snapshot?.asianHandicap),
     oddsText(snapshot?.handicapOdds),
+    handicapRecommendText(prediction),  // 新:让球推荐方向(基于 score 锚点派生,确保跟胜平负一致)
     outcomeCodeToChinese(prediction.pick.code),
     outcomeCodeToChinese(prediction.secondaryPick.code),
     pct(prediction.probabilities.home),
@@ -75,13 +76,43 @@ function toJingcaiRow(prediction) {
     prediction.halfFullPicks.primary,
     prediction.halfFullPicks.secondary,
     prediction.risk,
-    prediction.confidence,
+    confidenceLabel(prediction.confidence),  // 新:信心等级(高/较高/中/低)+ 数字
     bettingTier(prediction.probabilities, prediction.fixture?.competition),
     prediction.bankroll?.decision ?? "",
     prediction.bankroll?.ev ?? "",
     prediction.bankroll?.stakeUnitsPer100 ?? "",
-    prediction.rationale
+    enrichedRationale(prediction)  // 新:理由加上支撑因素 + 风险提示
   ];
+}
+
+// 让球推荐方向:展示"模型从比分锚点派生"的让球方向,跟胜平负/比分一致
+function handicapRecommendText(prediction) {
+  const h = prediction.handicapPick;
+  if (!h) return "—";
+  const lineStr = h.line === 0 ? "平盘" : (h.line > 0 ? `+${h.line}` : `${h.line}`);
+  return `让 ${lineStr} → ${h.direction}`;
+}
+
+// 信心从裸数字变成"等级(数字)"对用户更友好
+function confidenceLabel(conf) {
+  const n = Number(conf);
+  if (!Number.isFinite(n)) return "—";
+  const rounded = Math.round(n * 10) / 10;
+  if (n >= 40) return `🟢 较高 (${rounded})`;
+  if (n >= 25) return `🟡 中等 (${rounded})`;
+  if (n >= 15) return `🟠 偏低 (${rounded})`;
+  return `🔴 低 (${rounded})`;
+}
+
+// 理由从纯模板变成"模板 + evidence 支撑因素 + 信号 dormant 风险"
+function enrichedRationale(prediction) {
+  const base = prediction.rationale ?? "";
+  const fusion = prediction.probabilityAdjustment?.fusion;
+  if (!fusion?.applied) return base;
+  const fired = (fusion.evidence ?? []).filter((e) => e?.lr || e?.ratio);
+  if (!fired.length) return base;
+  const top = fired.slice(0, 3).map((e) => e.detail ? `${e.name}(${e.detail})` : e.name).join("、");
+  return `${base}；融合信号: ${top}`;
 }
 
 // 下注分级:按首选(top-prob)分桶,阈值依据 recommend:coverage 曲线
@@ -300,7 +331,7 @@ function updateLedger(date, rows) {
 }
 
 function jingcaiHeaders() {
-  return ["日期", "场次", "赛事", "主队", "客队", "开赛", "赔率实时状态", "胜平负赔率", "亚洲盘口", "让球胜平负", "胜平负首选", "胜平负次选", "主胜概率", "平局概率", "客胜概率", "比分首选", "比分次选", "半全场首选", "半全场次选", "风险", "信心", "下注分级", "资金决策", "EV", "每100单位建议", "推荐理由"];
+  return ["日期", "场次", "赛事", "主队", "客队", "开赛", "赔率实时状态", "胜平负赔率", "亚洲盘口", "让球胜平负赔率", "让球推荐方向", "胜平负首选", "胜平负次选", "主胜概率", "平局概率", "客胜概率", "比分首选", "比分次选", "半全场首选", "半全场次选", "风险", "信心", "下注分级", "资金决策", "EV", "每100单位建议", "推荐理由"];
 }
 
 function fourteenHeaders() {
