@@ -126,6 +126,67 @@ if (existsSync(ledgerPath)) {
 const settledHits = settled.filter((x) => x.hit === true).length;
 
 // ── 3) 渲染 ──
+// ── 影响球队因素全景:模型能权衡的全部因素 + 真实状态 ──
+function firedSet(preds) {
+  const fired = new Set();
+  for (const p of preds) for (const x of p.probabilityAdjustment?.fusion?.fired ?? []) fired.add(x.name);
+  return fired;
+}
+function buildFactorCoverage(preds) {
+  const fired = firedSet(preds);
+  const anyMarket = (k) => preds.some((p) => p.marketSnapshot?.[k]);
+  const anyMove = preds.some((p) => {
+    const e = p.marketSnapshot?.europeanOdds;
+    return e?.initial && e?.current && JSON.stringify(e.initial) !== JSON.stringify(e.current);
+  });
+  const inHist = preds.some((p) => p.dixonColes?.teamStrength?.home?.coldStart === false);
+  const asianN = Object.keys(asianBySeq).length;
+  // [因素, 类别, 状态码, 说明]  状态:ok生效 / dormant休眠无数据 / orphan未接入主路径 / missing源缺失
+  return [
+    ["欧洲赔率(胜负平)", "市场", anyMarket("europeanOdds") ? "ok" : "missing", "500.com 让0欧赔,主依据"],
+    ["让球胜负平盘", "市场", anyMarket("handicapOdds") ? "ok" : "missing", "500.com 让N盘"],
+    ["亚盘水位/盘口", "市场", asianN > 0 ? "ok" : "missing", asianN > 0 ? `皇冠 titan007,${asianN} 场` : "odds.500本机拒连"],
+    ["赔率变化(资金流向)", "市场", anyMove ? "ok" : "dormant", anyMove ? "多次捕获初→即真实移动" : "需多次捕获"],
+    ["Dixon-Coles 进球模型", "实力", inHist ? "ok" : "dormant", inHist ? "回填历史拟合" : "出历史→常数退化"],
+    ["球队实力/Elo 评级", "实力", "ok", "ratings 集成(派生兜底)"],
+    ["赛季阶段", "情境", fired.has("season-phase") ? "ok" : "dormant", "由比赛日期"],
+    ["赛事性质", "情境", fired.has("competition-type") ? "ok" : "dormant", "联赛走基线→休眠"],
+    ["近况连胜连败(streak)", "状态", fired.has("streak") ? "ok" : "dormant", "内部历史;出历史球队无数据"],
+    ["净胜/零封(clean-sheet)", "状态", fired.has("clean-sheet-streak") ? "ok" : "dormant", "内部历史"],
+    ["交锋史 H2H", "状态", fired.has("h2h") ? "ok" : "dormant", "内部历史;多数无对战样本"],
+    ["体能/赛程疲劳", "状态", fired.has("fatigue") ? "ok" : "dormant", "需近期赛程,多数缺"],
+    ["伤停名单", "阵容", fired.has("injury") ? "ok" : "missing", "授权源 INJURY_URL 未配置"],
+    ["首发阵容", "阵容", preds.some((p) => p.advancedFeatures?.lineups) ? "ok" : "missing", "赛前~1h 才出,LINEUP_URL 未配置"],
+    ["轮换", "阵容", fired.has("rotation") ? "ok" : "dormant", "无轮换上下文"],
+    ["天气", "环境", "missing", "weather 源未接"],
+    ["裁判倾向", "情境", "orphan", "referee-bias-model 未接主路径"],
+    ["旅行距离", "环境", "orphan", "travel-distance-model 未接"],
+    ["战术克制", "战术", "orphan", "tactical-matchup 未接"],
+    ["教练效应", "情境", "orphan", "manager-effect-model 未接"],
+    ["定位球能力", "战术", "orphan", "set-piece-model 未接"],
+    ["联赛强度系数", "实力", "orphan", "league-strength-coefficient 未接"],
+    ["德比强度", "情境", "orphan", "derby-intensity 未接"],
+    ["排名压力", "情境", "orphan", "standings-pressure 未接"],
+    ["Kalman 状态追踪", "状态", "orphan", "kalman-form-tracker 未接"],
+    ["控球调整 xG", "战术", "orphan", "possession-adjusted-xg 未接"],
+  ];
+}
+function factorCoverageSection(preds) {
+  const rows = buildFactorCoverage(preds);
+  const badge = { ok: '<span class="fc ok">✅生效</span>', dormant: '<span class="fc dm">🟡休眠</span>', orphan: '<span class="fc or">⚪未接入</span>', missing: '<span class="fc ms">🔴源缺失</span>' };
+  const n = (c) => rows.filter((r) => r[2] === c).length;
+  return `<div class="sub" style="margin:6px 0">生效 ${n("ok")} · 休眠 ${n("dormant")} · 未接入主路径 ${n("orphan")} · 源缺失 ${n("missing")}（共 ${rows.length} 类因素)</div>
+  <table class="big"><tr><th>影响因素</th><th>类别</th><th>状态</th><th>说明</th></tr>
+  ${rows.map((r) => `<tr><td style="text-align:left">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${badge[r[2]]}</td><td style="text-align:left">${esc(r[3])}</td></tr>`).join("")}
+  </table>
+  <div class="sub">⚪未接入=模型有该模块但未接进 predictFixture 主路径(孤儿);🔴源缺失=需外部实时源(伤停/阵容/天气)当前未配置。两类都不影响今日方向(以①欧赔②亚盘③让球为准),但要"全面"需后续接入。</div>`;
+}
+
+function firedFactorsLine(p) {
+  const fired = (p.probabilityAdjustment?.fusion?.fired ?? []).map((x) => x.name);
+  return fired.length ? `本场生效信号:${fired.join("、")}` : "本场无额外信号生效(纯赔率+DC)";
+}
+
 function matchCard(p) {
   const f = p.fixture;
   const pr = p.probabilities;
@@ -160,7 +221,7 @@ function matchCard(p) {
       <tr><td>⑤ 半全场</td><td class="pick">${esc(p.halfFullPicks.primary)}</td><td>${esc(p.halfFullPicks.secondary)}</td>
           <td>由①派生${genericNote}</td></tr>
     </table>
-    <div class="synth">🧭 综合判读:${synthesize(p, asian)}</div>
+    <div class="synth">🧭 综合判读:${synthesize(p, asian)}<br><span class="mute">${firedFactorsLine(p)}</span></div>
     <div class="meta">概率优势 ${esc(p.confidence)}(未校准,非可下注度) · 资金信号 <b>${esc(stake)}</b>${p.bankroll?.ev != null ? ` · EV ${(p.bankroll.ev).toFixed(3)}` : ""}${inHistory ? "" : " · ⚠出历史,队伍专属信号仅欧赔+亚盘+让球"}</div>
   </div>`;
 }
@@ -209,6 +270,9 @@ const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
   .up{color:#ff7676;font-weight:700;padding:0 2px} .dn{color:#56d98a;font-weight:700;padding:0 2px}
   .mute{color:#6f7c93;font-size:11px}
   .synth{background:#10202f;border:1px solid #1d3a52;border-radius:6px;padding:6px 9px;margin-top:7px;font-size:12.5px;color:#bcd6f0}
+  .fc{font-size:11px;padding:1px 5px;border-radius:4px;white-space:nowrap}
+  .fc.ok{background:#16432a;color:#56d98a} .fc.dm{background:#4a3a16;color:#ffd166}
+  .fc.or{background:#2a3346;color:#9fb0cc} .fc.ms{background:#4a1d1d;color:#ff7676}
   .sub{color:#8b97ad;font-size:12px;margin:6px 0 0}
   .panel{background:#18203044;border:1px solid #26314a;border-radius:8px;padding:10px 12px;margin:10px 0;font-size:13px}
   .card{background:#161d2c;border:1px solid #26314a;border-radius:10px;padding:12px;margin:10px 0}
@@ -242,6 +306,9 @@ const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 </div>
 
 ${modelsAllPass ? "" : '<div class="panel" style="border-color:#ff7676">⚠ 模型未全部跑通,以下内容仅供参考,不作正式推荐。</div>'}
+
+<h2>影响因素全景(模型考虑的全部因素 · 诚实覆盖)</h2>
+${factorCoverageSection(jingcai)}
 
 <h2>竞彩足球（${jingcai.length} 场）</h2>
 <h3>今晚 ${esc(firstDay)}（${tonight.length} 场）</h3>
