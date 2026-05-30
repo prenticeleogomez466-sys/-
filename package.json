@@ -39,6 +39,7 @@
     "backtest:halffull": "node scripts/run-halffull-backtest.mjs",
     "backtest:scoredist": "node scripts/run-scoredist-backtest.mjs",
     "backtest:reliability": "node scripts/run-confidence-reliability.mjs",
+    "check:parlay-corr": "node scripts/run-parlay-correlation-check.mjs",
     "sim:kelly": "node scripts/run-kelly-sensitivity.mjs",
     "backtest:vennabers": "node scripts/run-vennabers-backtest.mjs",
     "backtest:clubelo": "node scripts/run-clubelo-backtest.mjs",
