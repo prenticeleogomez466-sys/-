@@ -3,6 +3,7 @@ import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js"
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
+import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix } from "./derived-score-model.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
 import { applyTemperature } from "./temperature-calibration.js";
@@ -101,8 +102,10 @@ function harmonizeDuplicatePredictions(predictions) {
     if (prediction.fixture.marketType !== "shengfucai") return prediction;
     const source = authoritative.get(fixtureIdentityKey(prediction.fixture));
     if (!source) return prediction;
-    const scorePicks = buildScorePicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index);
-    const halfFullPicks = buildHalfFullPicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scorePicks);
+    // 同场比分/半全场也走真矩阵(复用同场竞彩的 λ 构造真泊松矩阵),不落死表。
+    const scoreModel = buildDerivedScoreModel(source.simulation?.lambdas?.home, source.simulation?.lambdas?.away);
+    const scorePicks = buildScorePicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scoreModel);
+    const halfFullPicks = buildHalfFullPicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scorePicks, scoreModel);
     const next = {
       ...prediction,
       probabilities: { ...source.probabilities },
@@ -196,8 +199,14 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
-  const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, blendResult.dcResult);
-  const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, blendResult.dcResult);
+  // 比分/半全场真实来源(2026-05-30 用户硬要求"不许兜底"):
+  //   优先用训练 DC 矩阵;无训练 DC(冷门/友谊)时,用本场 λ(赔率/xG 推得)构造真 Dixon-Coles τ 泊松矩阵。
+  //   两者同形状({topScores, expectedGoals, matrix}),喂给现成 scoreFromDcResult / halfFullFromDcResult,
+  //   使比分/半全场恒由真矩阵派生,scoreForOutcome/halfFullForOutcome 死表不再触达。
+  const scoreModel = blendResult.dcResult
+    ?? buildDerivedScoreModel(simulation.lambdas?.home, simulation.lambdas?.away);
+  const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scoreModel);
+  const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, scoreModel);
   // FF 档:从 dc matrix 派生扩展玩法(大小球/单双/上半场/亚盘/双胜彩/比分组/总进球)。
   // 缺 matrix 时 buildExtendedMarkets 自动返回 null,daily-report 据此决定是否输出该列。
   const extendedMarkets = blendResult.dcResult?.matrix
@@ -217,11 +226,26 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 注:盘口线 line 仍来自市场,只是方向锚定 wld;netExpected 仅作内部参考量保留在 debug。
   const handicapPick = (() => {
     if (!ranked[0]?.label) return null;
-    const eg = blendResult.dcResult?.expectedGoals;
-    const netExpected = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)
-      ? Number(eg.home) - Number(eg.away) + handicapLine
+    // 让球分析强化(2026-05-30):方向仍锚 wld(用户硬规则,不反推),但从真泊松矩阵算
+    // 让球后真实覆盖/走盘概率 + 净期望 + 模型公平让球线,让"让球"不再只是"跟 wld + 让0"。
+    const eg = scoreModel?.expectedGoals ?? blendResult.dcResult?.expectedGoals;
+    const goalDiff = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)
+      ? round(Number(eg.home) - Number(eg.away))
       : null;
-    return { line: handicapLine, direction: ranked[0].label, anchor: "wld", netExpected };
+    const coverInfo = scoreModel?.matrix ? handicapCoverFromMatrix(scoreModel.matrix, handicapLine) : null;
+    const coverProbability = coverInfo
+      ? (ranked[0].code === "3" ? coverInfo.cover.home : ranked[0].code === "0" ? coverInfo.cover.away : coverInfo.cover.push)
+      : null;
+    return {
+      line: handicapLine,
+      direction: ranked[0].label,
+      anchor: "wld",
+      netExpected: goalDiff !== null ? round(goalDiff + handicapLine) : null,
+      expectedGoalDiff: goalDiff,
+      coverProbability,
+      coverBreakdown: coverInfo?.cover ?? null,
+      modelFairLine: coverInfo?.modelFairLine ?? null
+    };
   })();
   const expectedValue = computeExpectedValueLabels(ranked, snapshot);
   // D 档接入(2026-05-28):用 bootstrap 传入的多评级算 ensembleView 作为 supplementary.
@@ -550,36 +574,39 @@ function seededProbabilities(fixture, index) {
   return { home: round(home / total), draw: round(draw / total), away: round(away / total) };
 }
 
-// 比分预测优先级:
+// 比分预测优先级(2026-05-30 用户硬要求"不许兜底",已删 if-else 死表):
 //   1. snapshot.scoreOdds.top  ── sporttery 官方比分赔率(市场共识,准确度最高)
-//   2. dcResult.topScores      ── Dixon-Coles 泊松矩阵 (用历史进球独立估计的概率)
-//   3. scoreForOutcome         ── if-else 硬编码 fallback(coldStart 或 DC 不可用时)
-//
-// 之前(2026-05-28 之前)只走 1 和 3,DC 拿到的 topScores 完全闲置 — 这就是"敷衍"的根本原因。
+//   2. dcResult.topScores      ── Dixon-Coles 泊松矩阵 topScores(训练 DC 或 λ 派生矩阵)
+//   3. bestScoreFromMatrix     ── 全矩阵扫描该 wld 方向最高概率比分(保证有解,仍是真泊松,非死表)
+// dcResult 现恒为真矩阵(训练 DC 或 buildDerivedScoreModel 的 λ 泊松矩阵),scoreForOutcome 死表已不接入。
 function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, dcResult = null) {
+  const matrix = dcResult?.matrix ?? null;
   const fromMarket = scoreFromMarket(snapshot, code);
   const fromMarketSecondary = scoreFromMarket(snapshot, secondaryCode, new Set(fromMarket ? [fromMarket] : []));
   const fromDc = fromMarket ? null : scoreFromDcResult(dcResult, code);
   const exclusionForSecondary = new Set([fromMarket, fromDc].filter(Boolean));
   const fromDcSecondary = fromMarketSecondary ? null : scoreFromDcResult(dcResult, secondaryCode, exclusionForSecondary);
+  const primary = fromMarket ?? fromDc ?? bestScoreFromMatrix(matrix, code);
+  const secondaryExclusion = new Set([primary].filter(Boolean));
   return {
-    primary: fromMarket ?? fromDc ?? scoreForOutcome(code, 0, probabilities, index),
-    secondary: fromMarketSecondary ?? fromDcSecondary ?? scoreForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
+    primary,
+    secondary: fromMarketSecondary ?? fromDcSecondary ?? bestScoreFromMatrix(matrix, secondaryCode, secondaryExclusion) ?? bestScoreFromMatrix(matrix, secondaryCode)
   };
 }
 
-// 半全场预测优先级同上:市场 → DC 泊松半场分布 → 硬编码 fallback
+// 半全场预测优先级同上:市场比分赔率 → DC/λ 泊松半场联合分布(halfFullFromDcResult 从 expectedGoals 真算)。
+// dcResult 恒为真矩阵(带 expectedGoals),halfFullFromDcResult 必有解,halfFullForScore 死表已不接入。
 function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, scorePicks = {}, dcResult = null) {
-  const primaryScore = scorePicks.primary ?? scoreForOutcome(code, 0, probabilities, index);
-  const secondaryScore = scorePicks.secondary ?? scoreForOutcome(secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1);
+  const primaryScore = scorePicks.primary ?? bestScoreFromMatrix(dcResult?.matrix, code);
+  const secondaryScore = scorePicks.secondary ?? bestScoreFromMatrix(dcResult?.matrix, secondaryCode);
   const primaryFromMarket = halfFullFromMarket(snapshot, code, new Set(), primaryScore);
   const primaryFromDc = primaryFromMarket ? null : halfFullFromDcResult(dcResult, code, new Set(), primaryScore);
   const exclusion = new Set([primaryFromMarket, primaryFromDc].filter(Boolean));
   const secondaryFromMarket = halfFullFromMarket(snapshot, secondaryCode, exclusion, secondaryScore);
   const secondaryFromDc = secondaryFromMarket ? null : halfFullFromDcResult(dcResult, secondaryCode, exclusion, secondaryScore);
   return {
-    primary: primaryFromMarket ?? primaryFromDc ?? halfFullForScore(primaryScore, code, 0, probabilities, index),
-    secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullForScore(secondaryScore, secondaryCode, secondaryCode === code ? 1 : 0, probabilities, index + 1)
+    primary: primaryFromMarket ?? primaryFromDc ?? halfFullFromDcResult(dcResult, code, new Set(), primaryScore),
+    secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullFromDcResult(dcResult, secondaryCode, new Set(), secondaryScore)
   };
 }
 
