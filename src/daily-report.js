@@ -109,9 +109,27 @@ function toJingcaiRow(prediction) {
     buildHalfFullCandidates(prediction),                         // 8 半全场(首选 + 备选)
     probSummary,                                                 // 9 三概率(主/平/客 合一列)
     upset,                                                       // 10 爆冷
-    confDetail,                                                  // 11 信心+分级+EV+注码
-    enrichedRationale(prediction)                                // 12 选择理由
+    experienceCell(prediction),                                  // 11 历史经验(同情境:平局/大小球/赔率漂移)
+    confDetail,                                                  // 12 信心+分级+EV+注码
+    enrichedRationale(prediction)                                // 13 选择理由
   ];
+}
+
+// 历史经验列(2026-05-30/31):把 experienceContext 学到的"同联赛同情境真实结果"读数
+// 汇总成一格 —— 平局风险 / 大小球倾向 / 赔率开→收漂移兑现。纯透明展示,不改 wld 锚、不替用户弃赛。
+export function experienceCell(prediction) {
+  const ec = prediction.experienceContext;
+  if (!ec) return "—";
+  const lines = [];
+  if (ec.drawAlert) lines.push(ec.drawAlert);
+  if (ec.overUnderHint) lines.push(ec.overUnderHint);
+  if (ec.driftHint) lines.push(ec.driftHint);
+  if (!lines.length) {
+    // 无具体提示时,至少给样本量+来源让用户知道经验依据
+    if (Number.isFinite(ec.n) && ec.source) return `历史${ec.n}场(${ec.source})`;
+    return "—";
+  }
+  return lines.join("\n");
 }
 
 // 比分候选:DC top-N 概率比分中**强制跟 wld 一致 + 不同进球结构** 的 3 个比分
@@ -441,6 +459,7 @@ function jingcaiHeaders() {
     "序", "赛事类型", "对阵", "开赛",
     "胜平负", "让球", "比分", "半全场",
     "概率分布(主/平/客)", "爆冷",
+    "历史经验(同情境)",
     "信心 · 分级 · EV", "选择理由"
   ];
 }

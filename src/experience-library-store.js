@@ -50,10 +50,12 @@ export function getExperienceBaseline(fixture, probabilities, snapshot = null, m
       snapshot?.jingcaiHandicap?.line ??
       NaN
   );
-  // opening 用市场开盘隐含概率(若有)定档/算漂移;否则退回模型概率。
-  // closing 用市场当前(收盘)隐含概率——开盘+收盘双价齐全才出"赔率漂移"经验。
+  // opening 用市场开盘隐含概率(若有)定档;无真实开盘价则退回模型概率(仅用于定热门档)。
+  // 漂移(开→收)经验只在**有真实开盘价**时才算:否则拿"模型概率 vs 收盘"算出的是假漂移,
+  // /new/ 源(北欧/日职)仅收盘价 → 不报漂移(诚实降级,遵 feedback-no-fabrication-live-only)。
+  const hasRealOpening = Boolean(marketProbs?.opening);
   const opening = marketProbs?.opening ?? probabilities;
-  const closing = marketProbs?.closing ?? null;
+  const closing = hasRealOpening ? (marketProbs?.closing ?? null) : null;
   return queryExperience(lib, {
     league: fixture.competition,
     opening,
