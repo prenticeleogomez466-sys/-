@@ -9,7 +9,25 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
 const ledgerPath = join(exportDir, "recommendation-ledger.json");
 
-export function runEvolutionBacktest() {
+export // 盘上是否已有「数据驱动训练出的、可用的」校准档(非 ledger 版)。
+// ledger 版 source 为 daily-recap-ledger 且通常 usable:false;训练版 source 为
+// football-data-walkforward 且带 isotonicMap knots。只有后者才算生产权威档。
+function hasUsableTrainedProfile(path) {
+  if (!existsSync(path)) return false;
+  try {
+    const existing = JSON.parse(readFileSync(path, "utf8"));
+    return Boolean(
+      existing &&
+        existing.usable &&
+        existing.source &&
+        existing.source !== "daily-recap-ledger",
+    );
+  } catch {
+    return false;
+  }
+}
+
+function runEvolutionBacktest() {
   const rows = existsSync(ledgerPath) ? JSON.parse(readFileSync(ledgerPath, "utf8")) : [];
   const settled = rows.filter((row) => row.actual);
   const hit = settled.filter((row) => row.hit === true).length;
@@ -35,7 +53,19 @@ export function runEvolutionBacktest() {
   const signalProfile = buildSignalWeightsProfile();
   summary.signalWeights = signalWeightsSummary();
   writeFileSync(join(exportDir, "backtest-summary.json"), `${JSON.stringify(summary, null, 2)}\n`, "utf8");
-  writeFileSync(join(exportDir, "backtest-calibration-profile.json"), `${JSON.stringify(calibrationProfile, null, 2)}\n`, "utf8");
+  // ledger 版校准档始终写到独立文件留档(供诊断/对比),不碰生产档。
+  writeFileSync(
+    join(exportDir, "backtest-calibration-profile-ledger.json"),
+    `${JSON.stringify(calibrationProfile, null, 2)}\n`,
+    "utf8",
+  );
+  // 生产校准档由 calibration-trainer(isotonic,数据驱动)拥有。仅当盘上没有
+  // 已训练的可用档时,才用 ledger 版兜底写入,避免 daily-recap/evolution 自动化
+  // 把训练出的 isotonic 档刷回 usable:false 的 ledger 版(W/AI 档了结温度线的成果)。
+  const prodProfilePath = join(exportDir, "backtest-calibration-profile.json");
+  if (!hasUsableTrainedProfile(prodProfilePath)) {
+    writeFileSync(prodProfilePath, `${JSON.stringify(calibrationProfile, null, 2)}\n`, "utf8");
+  }
   return summary;
 }
 
