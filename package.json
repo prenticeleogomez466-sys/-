@@ -36,6 +36,7 @@
     "backtest:overunder": "node scripts/run-overunder-backtest.mjs",
     "backtest:decay": "node scripts/run-decay-tune-backtest.mjs",
     "backtest:asian": "node scripts/run-asian-backtest.mjs",
+    "backtest:halffull": "node scripts/run-halffull-backtest.mjs",
     "backtest:shrinkage": "node scripts/run-shrinkage-backtest.mjs",
     "backtest:rho": "node scripts/run-rho-tune-backtest.mjs",
     "backtest:homeadv": "node scripts/run-homeadv-tune-backtest.mjs",
