@@ -92,3 +92,31 @@ test("topHalfFull:半全场 9 路 top-n 按概率降序", () => {
   assert.equal(top.length, 4);
   assert.ok(top[0].probability >= top[3].probability);
 });
+
+import { evaluateDrawLean } from "../src/prediction-engine.js";
+
+test("evaluateDrawLean:低进球均势(平≥30%且与最高差≤5%)把平提为主推", () => {
+  const ranked = [
+    { code: "3", probability: 0.36 }, { code: "0", probability: 0.33 }, { code: "1", probability: 0.31 }
+  ];
+  const r = evaluateDrawLean(ranked);
+  assert.equal(r.applies, true);
+  assert.equal(r.ranked[0].code, "1", "平应提为主推");
+});
+
+test("evaluateDrawLean:热门明显领先(差>5%)不强行推平", () => {
+  const ranked = [
+    { code: "3", probability: 0.57 }, { code: "1", probability: 0.26 }, { code: "0", probability: 0.17 }
+  ];
+  const r = evaluateDrawLean(ranked);
+  assert.equal(r.applies, false);
+  assert.equal(r.ranked[0].code, "3");
+});
+
+test("evaluateDrawLean:平局概率偏低(<30%)不推平,即便接近", () => {
+  const ranked = [
+    { code: "3", probability: 0.40 }, { code: "0", probability: 0.38 }, { code: "1", probability: 0.22 }
+  ];
+  const r = evaluateDrawLean(ranked);
+  assert.equal(r.applies, false);
+});

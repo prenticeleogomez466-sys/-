@@ -88,6 +88,22 @@ export function recommendFixtures(date) {
 }
 
 // 取比赛真实开球日(YYYY-MM-DD)。kickoff 形如 "2026-05-31 21:00";退回 fixture.date。
+// 平局倾向判定:纯 argmax 永不推平是结构性缺陷。低进球均势("闷平")里平局是价值选择。
+// 判据(只用概率,平≥30% 本身已蕴含低进球均势):平不是最高、平≥0.30、平与最高差≤0.05 → 把平提为主推。
+// 阈值可由 env 覆盖。返回 { applies, ranked, margin }。
+export function evaluateDrawLean(ranked, env = process.env) {
+  const minDraw = Number(env.DRAW_LEAN_MIN_PROB ?? 0.30);
+  const maxGap = Number(env.DRAW_LEAN_MAX_GAP ?? 0.05);
+  const draw = ranked.find((r) => r.code === "1");
+  const leader = ranked[0];
+  if (!draw || leader.code === "1") return { applies: false, ranked };
+  const gap = leader.probability - draw.probability;
+  if (draw.probability < minDraw || gap > maxGap) return { applies: false, ranked };
+  // 把平提到首位,其余按概率降序(原热门退为次选)
+  const rest = ranked.filter((r) => r.code !== "1").sort((a, b) => b.probability - a.probability);
+  return { applies: true, ranked: [draw, ...rest], margin: round(gap) };
+}
+
 function fixtureKickoffDate(fixture) {
   return String(fixture?.kickoff ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? String(fixture?.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
 }
@@ -194,7 +210,13 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const probabilities = calibrated.probabilities;
   probabilityAdjustment.calibration = calibrated.calibration;
   const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);
-  const ranked = OUTCOMES.map((outcome) => ({ ...outcome, probability: probabilities[outcome.key] })).sort((a, b) => b.probability - a.probability);
+  let ranked = OUTCOMES.map((outcome) => ({ ...outcome, probability: probabilities[outcome.key] })).sort((a, b) => b.probability - a.probability);
+  // 平局倾向修正(2026-05-30 用户要求强化):纯 argmax 结构性永不推平(平局概率上限~30%,常低于热门胜率)。
+  // 真实足球知识:平局概率高(≥30%)本身只在"低进球+均势"profile 出现(高进球均势场平局概率反而低),
+  // 这类"闷平"里平局是价值选择。命中 draw-favorable(平≥30% 且与最高仅差≤5%)时把平提为主推。
+  const drawLean = evaluateDrawLean(ranked);
+  if (drawLean.applies) ranked = drawLean.ranked;
+  probabilityAdjustment.drawLean = drawLean.applies ? { margin: drawLean.margin, note: "低进球均势·平局为价值选择" } : null;
   const gap = ranked[0].probability - ranked[1].probability;
   const advancedFeatures = buildAdvancedFixtureFeatures(fixture, snapshot, probabilities, options);
   const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations });
