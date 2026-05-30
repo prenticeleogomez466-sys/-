@@ -16,6 +16,7 @@ import { fuseSignals, loadFusionWeightProfile, SIGNAL_NAMES } from "./signal-fus
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
 import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
+import { jingcaiWeekdayLabel, sequenceWeekdayPrefix } from "./jingcai-business-day.js";
 import { buildExtendedMarkets } from "./extended-markets.js";
 import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
 
@@ -62,7 +63,10 @@ export function recommendFixtures(date) {
   // V 档:从历史赛果(严格早于当前比赛日,防泄漏)装配每场的 fusionContext,
   // 激活信号融合层里的 h2h / clean-sheet-streak / streak 信号(内部数据源,无需外部 API)。
   const history = loadHistoricalResults({ beforeDate: fixtureSet.date });
-  const predictions = harmonizeDuplicatePredictions(fixtureSet.fixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history) })));
+  // 限业务日 + 跨源去重(2026-05-30):兜底/多源抓取会把次日(周日)与重复场次(XML 6001 与 Playwright 周六001 同场)
+  // 灌进当日,产生 34 场假象;此处收敛到目标业务日的去重竞彩单 + 原样保留 14 场/其它。
+  const scopedFixtures = scopeAndDedupeJingcai(fixtureSet.date, fixtureSet.fixtures);
+  const predictions = harmonizeDuplicatePredictions(scopedFixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history) })));
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
@@ -80,6 +84,42 @@ export function recommendFixtures(date) {
     } : null,
     fourteen: buildFourteenPlan(predictions)
   };
+}
+
+// 把当日 fixture 收敛成"目标业务日的去重竞彩单"。
+//   1. 限业务日:丢掉竞彩编号 周X 前缀与目标日不符的场次(次日漏入);
+//   2. 跨源去重:同一场(canonical 队名相同)只保留一条,优先官方 周X 编号(Playwright)over 数字编号(XML 兜底)
+//      并优先带让球盘/更全的源;
+//   3. 14 场胜负彩(shengfucai)与其它一律原样保留。
+function scopeAndDedupeJingcai(date, fixtures) {
+  const targetLabel = jingcaiWeekdayLabel(date);
+  const jingcai = fixtures.filter((f) => f.marketType === "jingcai");
+  const others = fixtures.filter((f) => f.marketType !== "jingcai");
+  let scoped = jingcai.filter((f) => {
+    const prefix = sequenceWeekdayPrefix(f.sequence);
+    // 有 周X 前缀且与目标日不符 → 丢(次日场次);无前缀(数字编号兜底)留待下一步裁决
+    return !targetLabel || !prefix || prefix === targetLabel;
+  });
+  // 官方 周X 编号存在时,数字编号(XML 兜底,如 6001)只是同一竞彩单的重复源 → 整批丢弃,
+  // 不依赖队名别名匹配(别名表对"神户胜利/神户胜利船"等变体可能未归一,纯靠 identityKey 去重会漏)。
+  // 仅当官方 周X 抓取失败(无任何 周X 场次)时,才退回数字编号兜底。
+  if (scoped.some((f) => sequenceWeekdayPrefix(f.sequence))) {
+    scoped = scoped.filter((f) => sequenceWeekdayPrefix(f.sequence));
+  }
+  const byKey = new Map();
+  for (const f of scoped) {
+    const key = fixtureIdentityKey(f);
+    const existing = byKey.get(key);
+    if (!existing || jingcaiFixturePreference(f) > jingcaiFixturePreference(existing)) byKey.set(key, f);
+  }
+  return [...others, ...byKey.values()];
+}
+
+function jingcaiFixturePreference(fixture) {
+  // 官方 周X 编号(2)优于数字兜底编号(1);带 handicap 标记再 +0.5(信息更全)
+  let score = sequenceWeekdayPrefix(fixture.sequence) ? 2 : 1;
+  if (String(fixture.source ?? "").includes("Playwright")) score += 0.25;
+  return score;
 }
 
 function harmonizeDuplicatePredictions(predictions) {

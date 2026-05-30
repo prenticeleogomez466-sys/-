@@ -2,6 +2,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fourteenSelectionRules, recommendFixtures, validatePredictionConsistency } from "./prediction-engine.js";
+import { canonicalTeamName } from "./team-aliases.js";
+import { jingcaiWeekdayLabel, sequenceWeekdayPrefix } from "./jingcai-business-day.js";
 import { getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -24,6 +26,33 @@ export function auditRecommendations(recommendations) {
     if (Math.abs(Object.values(prediction.probabilities ?? {}).reduce((sum, value) => sum + Number(value || 0), 0) - 1) > 0.02) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 胜平负概率未归一` });
     if (!prediction.scorePicks?.primary || !prediction.halfFullPicks?.primary) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 缺少比分或半全场派生` });
     for (const message of validatePredictionConsistency(prediction)) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} ${message}` });
+  }
+  // 竞彩与 14 场实质审核(2026-05-30 hard rule:每次出表前实质校验,不只查结构)
+  const jingcaiPreds = recommendations.predictions.filter((p) => p.fixture.marketType === "jingcai");
+  // ① 限业务日:竞彩编号 周X 前缀必须与业务日一致,杜绝次日(周日)混入当日单
+  const targetLabel = jingcaiWeekdayLabel(recommendations.date);
+  if (targetLabel) {
+    const offDay = jingcaiPreds.filter((p) => {
+      const prefix = sequenceWeekdayPrefix(p.fixture.sequence);
+      return prefix && prefix !== targetLabel;
+    });
+    if (offDay.length) {
+      checks.push({ level: "error", message: `竞彩混入非业务日(应为${targetLabel})场次 ${offDay.length} 场：${offDay.map((p) => p.fixture.sequence).join("、")}` });
+    }
+  }
+  // ② 跨源去重:同一场(canonical 队名相同)不得重复出现(Playwright 周六001 与 XML 6001 同场)
+  const identityCounts = new Map();
+  for (const p of jingcaiPreds) {
+    const key = `${canonicalTeamName(p.fixture.homeTeam)}__${canonicalTeamName(p.fixture.awayTeam)}`;
+    identityCounts.set(key, (identityCounts.get(key) ?? 0) + 1);
+  }
+  const dupGroups = [...identityCounts.values()].filter((n) => n > 1).length;
+  if (dupGroups) {
+    checks.push({ level: "error", message: `竞彩重复场次 ${dupGroups} 组(跨源未去重)` });
+  }
+  // ③ 14 场:存在即必须恰 14 腿
+  if (recommendations.fourteen?.available && recommendations.fourteen.count !== 14) {
+    checks.push({ level: "error", message: `14 场腿数异常:${recommendations.fourteen.count}/14` });
   }
   const rules = fourteenSelectionRules();
   const bankerCount = (recommendations.fourteen?.selections ?? []).filter((selection) => selection.type === "胆").length;
