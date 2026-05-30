@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, matrixOutcomeProbs } from "../src/derived-score-model.js";
+import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, matrixOutcomeProbs, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "../src/derived-score-model.js";
+import { halfFullProbsFromLambdas } from "../src/prediction-engine.js";
 
 test("buildDerivedScoreModel:从 λ 出真泊松矩阵,期望进球≈输入 λ", () => {
   const m = buildDerivedScoreModel(2.1, 0.7);
@@ -57,4 +58,37 @@ test("matrixOutcomeProbs:矩阵聚合的胜平负归一", () => {
   const m = buildDerivedScoreModel(1.5, 1.3);
   const o = matrixOutcomeProbs(m.matrix);
   assert.ok(Math.abs(o.home + o.draw + o.away - 1) < 0.02);
+});
+
+// 深度强化(2026-05-30):概率 + 分布 + 反超备选
+test("scoreProbFromMatrix:取具体比分真实概率,越界返回 null", () => {
+  const m = buildDerivedScoreModel(1.6, 1.1);
+  const p = scoreProbFromMatrix(m.matrix, "1-0");
+  assert.ok(p > 0 && p < 1, `1-0 概率应在(0,1),得 ${p}`);
+  assert.equal(scoreProbFromMatrix(m.matrix, "99-99"), null);
+  assert.equal(scoreProbFromMatrix(m.matrix, "x"), null);
+});
+
+test("topScoresWithProb:返回带概率+方向的 top 比分,按概率降序", () => {
+  const m = buildDerivedScoreModel(1.6, 1.1);
+  const top = topScoresWithProb(m.matrix, 5);
+  assert.equal(top.length, 5);
+  assert.ok(top[0].probability >= top[4].probability, "应降序");
+  assert.ok(["3", "1", "0"].includes(top[0].outcome));
+});
+
+test("bestDistinctFirstHalfHalfFull:主胜场挖出'平局-主胜'慢热反超(首半场≠主选)", () => {
+  const hf = halfFullProbsFromLambdas(2.15, 0.72, 0.46);
+  const alt = bestDistinctFirstHalfHalfFull(hf, "3", "主胜-主胜");
+  assert.ok(alt && alt.halfFull, "应有备选");
+  assert.notEqual(alt.halfFull.split("-")[0], "主胜", "首半场须不同于主选");
+  assert.equal(alt.halfFull.split("-")[1], "主胜", "终场须仍为主胜(锚 wld)");
+  assert.ok(alt.probability > 0);
+});
+
+test("topHalfFull:半全场 9 路 top-n 按概率降序", () => {
+  const hf = halfFullProbsFromLambdas(1.4, 1.2, 0.46);
+  const top = topHalfFull(hf, 4);
+  assert.equal(top.length, 4);
+  assert.ok(top[0].probability >= top[3].probability);
 });

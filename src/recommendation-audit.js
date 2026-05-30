@@ -47,6 +47,11 @@ export function auditRecommendations(recommendations) {
       if (!REAL_HALFFULL_SOURCES.has(prediction.halfFullPicks?.source)) {
         checks.push({ level: "error", message: `${label} 半全场非真实来源(${prediction.halfFullPicks?.source ?? "缺失"})——疑似死表兜底` });
       }
+      // 深度强化校验(2026-05-30):比分/半全场必须带真实概率 + 分布,证明是真分布而非单一裸值
+      if (!Number.isFinite(prediction.scorePicks?.primaryProbability)) checks.push({ level: "error", message: `${label} 比分首选缺概率——未附真实分布` });
+      if (!Number.isFinite(prediction.halfFullPicks?.primaryProbability)) checks.push({ level: "error", message: `${label} 半全场首选缺概率——未附真实分布` });
+      if (!Array.isArray(prediction.scorePicks?.distribution) || prediction.scorePicks.distribution.length < 3) checks.push({ level: "error", message: `${label} 比分分布缺失——深度不足` });
+      if (!prediction.halfFullPicks?.primaryAlt?.halfFull) checks.push({ level: "error", message: `${label} 半全场缺反超备选路径——深度不足` });
       // 让球强化字段必须真实跑出(覆盖概率/净期望/模型公平线为有限数)
       const h = prediction.handicapPick;
       if (!h) {

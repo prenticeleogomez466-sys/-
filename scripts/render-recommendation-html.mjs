@@ -218,14 +218,36 @@ function matchCard(p) {
           <td>500.com 让球盘:${euroMoveCell(p.marketSnapshot?.handicapOdds)}</td></tr>
       <tr><td>③ 亚盘水位(皇冠)</td><td colspan="2">${asianCell(asian)}</td>
           <td>${asian ? "队伍专属·真实初→即变化" : '<span class="mute">odds.500本机拒连,详情页未取</span>'}</td></tr>
-      <tr><td>④ 比分</td><td class="pick">${esc(p.scorePicks.primary)}</td><td>${esc(p.scorePicks.secondary)}</td>
-          <td>锚定①方向${genericNote}</td></tr>
-      <tr><td>⑤ 半全场</td><td class="pick">${esc(p.halfFullPicks.primary)}</td><td>${esc(p.halfFullPicks.secondary)}</td>
-          <td>由①派生${genericNote}</td></tr>
+      <tr><td>④ 比分</td><td class="pick">${esc(scoreCell(p))}</td><td>${esc(scoreDistCell(p))}</td>
+          <td>真泊松矩阵·锚①方向</td></tr>
+      <tr><td>⑤ 半全场</td><td class="pick">${esc(halfFullCell(p))}</td><td>${esc(halfFullDistCell(p))}</td>
+          <td>半场联合分布·锚①方向</td></tr>
     </table>
     <div class="synth">🧭 综合判读:${synthesize(p, asian)}<br><span class="mute">${firedFactorsLine(p)}</span></div>
     <div class="meta">概率优势 ${esc(p.confidence)}(未校准,非可下注度) · 资金信号 <b>${esc(stake)}</b>${p.bankroll?.ev != null ? ` · EV ${(p.bankroll.ev).toFixed(3)}` : ""}${inHistory ? "" : " · ⚠出历史,队伍专属信号仅欧赔+亚盘+让球"}</div>
   </div>`;
+}
+
+// 深度展示:比分/半全场带真实概率 + 分布 + 反超备选(2026-05-30 强化)
+function pctTag(v) { return Number.isFinite(v) ? ` ${Math.round(v * 100)}%` : ""; }
+function scoreCell(p) {
+  const s = p.scorePicks ?? {};
+  return `${s.primary ?? "—"}${pctTag(s.primaryProbability)}`;
+}
+function scoreDistCell(p) {
+  const dist = p.scorePicks?.distribution ?? [];
+  if (!dist.length) return p.scorePicks?.secondary ?? "—";
+  return "分布 " + dist.slice(0, 4).map((d) => `${d.score}${pctTag(d.probability)}`).join(" · ");
+}
+function halfFullCell(p) {
+  const h = p.halfFullPicks ?? {};
+  const main = `${h.primary ?? "—"}${pctTag(h.primaryProbability)}`;
+  return h.primaryAlt?.halfFull ? `${main}　|　另:${h.primaryAlt.halfFull}${pctTag(h.primaryAlt.probability)}` : main;
+}
+function halfFullDistCell(p) {
+  const dist = p.halfFullPicks?.distribution ?? [];
+  if (!dist.length) return p.halfFullPicks?.secondary ?? "—";
+  return "分布 " + dist.slice(0, 4).map((d) => `${d.halfFull}${pctTag(d.probability)}`).join(" · ");
 }
 
 function fourteenTable() {

@@ -82,6 +82,50 @@ export function handicapCoverFromMatrix(matrix, line = 0) {
   return { line: Number(line) || 0, cover: atLine, modelFairLine: fairLine };
 }
 
+// 从比分矩阵取某个具体比分("2-1")的真实概率;越界/无效返回 null。
+export function scoreProbFromMatrix(matrix, score) {
+  if (!Array.isArray(matrix) || typeof score !== "string") return null;
+  const m = score.match(/^(\d+)-(\d+)$/);
+  if (!m) return null;
+  const h = Number(m[1]); const a = Number(m[2]);
+  if (h >= matrix.length || a >= (matrix[h]?.length ?? 0)) return null;
+  return round(matrix[h][a]);
+}
+
+// 全场比分分布 top-n(按概率,含主胜/平/客胜各类),用于展示真实分布而非单一 argmax。
+export function topScoresWithProb(matrix, n = 5) {
+  if (!Array.isArray(matrix)) return [];
+  const out = [];
+  for (let h = 0; h < matrix.length; h++) {
+    for (let a = 0; a < matrix[h].length; a++) {
+      out.push({ score: `${h}-${a}`, probability: round(matrix[h][a]), outcome: h > a ? "3" : h === a ? "1" : "0" });
+    }
+  }
+  return out.sort((x, y) => y.probability - x.probability).slice(0, n);
+}
+
+// 半全场分布:在指定终场方向(code)内,挑首半场与已选不同的最高概率路径(如主胜场的"平局-主胜"慢热反超)。
+export function bestDistinctFirstHalfHalfFull(hfDist, code, chosen) {
+  if (!hfDist) return null;
+  const finalCh = { "3": "主胜", "1": "平局", "0": "客胜" }[code];
+  if (!finalCh) return null;
+  const chosenFirst = String(chosen ?? "").split("-")[0]?.trim();
+  const cands = Object.entries(hfDist)
+    .filter(([k]) => k.split("-")[1]?.trim() === finalCh)
+    .filter(([k]) => k.split("-")[0]?.trim() !== chosenFirst)
+    .sort((a, b) => b[1] - a[1]);
+  return cands.length ? { halfFull: cands[0][0], probability: round(cands[0][1]) } : null;
+}
+
+// 半全场全分布 top-n(9 路按概率)。
+export function topHalfFull(hfDist, n = 4) {
+  if (!hfDist) return [];
+  return Object.entries(hfDist)
+    .map(([halfFull, probability]) => ({ halfFull, probability: round(probability) }))
+    .sort((a, b) => b.probability - a.probability)
+    .slice(0, n);
+}
+
 export function matrixOutcomeProbs(matrix) {
   let home = 0, draw = 0, away = 0;
   for (let h = 0; h < matrix.length; h++) {

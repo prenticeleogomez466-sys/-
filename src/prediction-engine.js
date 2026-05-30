@@ -3,7 +3,7 @@ import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js"
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
-import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix } from "./derived-score-model.js";
+import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "./derived-score-model.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
 import { applyTemperature } from "./temperature-calibration.js";
@@ -106,6 +106,7 @@ function harmonizeDuplicatePredictions(predictions) {
     const scoreModel = buildDerivedScoreModel(source.simulation?.lambdas?.home, source.simulation?.lambdas?.away);
     const scorePicks = buildScorePicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scoreModel);
     const halfFullPicks = buildHalfFullPicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scorePicks, scoreModel);
+    enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, source.pick.code);
     const next = {
       ...prediction,
       probabilities: { ...source.probabilities },
@@ -207,6 +208,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     ?? buildDerivedScoreModel(simulation.lambdas?.home, simulation.lambdas?.away);
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scoreModel);
   const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, scoreModel);
+  // 深度强化(2026-05-30 用户要求):给比分/半全场附真实概率 + 主方向内反超备选 + 完整分布,
+  // 不再只给单一 argmax。所有附加量来自同一真泊松矩阵/半全场联合分布,可追溯、不破坏 wld 锚。
+  enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, ranked[0].code);
   // FF 档:从 dc matrix 派生扩展玩法(大小球/单双/上半场/亚盘/双胜彩/比分组/总进球)。
   // 缺 matrix 时 buildExtendedMarkets 自动返回 null,daily-report 据此决定是否输出该列。
   const extendedMarkets = blendResult.dcResult?.matrix
@@ -620,6 +624,24 @@ function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities 
     secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullFromDcResult(dcResult, secondaryCode, new Set(), secondaryScore),
     source
   };
+}
+
+// 深度强化:给比分/半全场附概率 + 分布 + 主方向内"不同首半场"反超备选(真实矩阵派生,可追溯)。
+function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCode) {
+  const matrix = scoreModel?.matrix ?? null;
+  scorePicks.primaryProbability = scoreProbFromMatrix(matrix, scorePicks.primary);
+  scorePicks.secondaryProbability = scoreProbFromMatrix(matrix, scorePicks.secondary);
+  scorePicks.distribution = topScoresWithProb(matrix, 5);
+  const eg = scoreModel?.expectedGoals;
+  const halfRatio = Number(process.env.DC_HALF_RATIO ?? 0.46);
+  const hfDist = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)
+    ? halfFullProbsFromLambdas(eg.home, eg.away, halfRatio)
+    : null;
+  halfFullPicks.primaryProbability = hfDist?.[halfFullPicks.primary] != null ? round(hfDist[halfFullPicks.primary]) : null;
+  halfFullPicks.secondaryProbability = hfDist?.[halfFullPicks.secondary] != null ? round(hfDist[halfFullPicks.secondary]) : null;
+  // 主方向内的反超/不同首半场备选(如主胜场的"平局-主胜"慢热反超),挖出被单 argmax 埋没的二线路径
+  halfFullPicks.primaryAlt = bestDistinctFirstHalfHalfFull(hfDist, primaryCode, halfFullPicks.primary);
+  halfFullPicks.distribution = topHalfFull(hfDist, 4);
 }
 
 // 从 Dixon-Coles 的 topScores(已经按概率从高到低排好)挑符合指定 outcome 的最高概率比分。

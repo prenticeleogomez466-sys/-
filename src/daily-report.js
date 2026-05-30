@@ -107,14 +107,19 @@ function buildScoreCandidates(prediction) {
     if (wldCode === "0") return h < a;
     return false;
   };
+  const pct = (v) => (Number.isFinite(v) ? ` (${Math.round(v * 100)}%)` : "");
+  // 用真实比分分布(带概率)里跟 wld 一致的 top 比分,首选在前;深度强化:展示概率而非裸比分
+  const probOf = new Map((prediction.scorePicks?.distribution ?? []).map((d) => [String(d.score).trim(), d.probability]));
+  probOf.set(String(primary ?? "").trim(), prediction.scorePicks?.primaryProbability ?? probOf.get(String(primary ?? "").trim()));
+  const ordered = [primary, secondary].concat((prediction.scorePicks?.distribution ?? []).map((d) => d.score)).concat(dcTops.map((t) => t?.score));
   const seen = new Set();
   const candidates = [];
-  for (const s of [primary, secondary].concat(dcTops.map((t) => t?.score))) {
+  for (const s of ordered) {
     if (!s) continue;
     const clean = String(s).trim();
     if (!clean || seen.has(clean) || !matchesWld(clean)) continue;
     seen.add(clean);
-    candidates.push(clean);
+    candidates.push(`${clean}${pct(probOf.get(clean))}`);
     if (candidates.length >= 3) break;
   }
   if (!candidates.length) return primary ?? "—";
@@ -125,20 +130,14 @@ function buildScoreCandidates(prediction) {
 // 半全场候选:首选(wld 锚)+ 备选,备选 first-half 必须跟首选不同
 // 避免 "主胜-主胜 备 主胜-主胜" 这种重复
 function buildHalfFullCandidates(prediction) {
-  const primary = prediction.halfFullPicks?.primary;
-  const secondary = prediction.halfFullPicks?.secondary;
+  const hp = prediction.halfFullPicks ?? {};
+  const primary = hp.primary;
   if (!primary) return "—";
-  const firstHalfOf = (s) => String(s ?? "").split("-")[0]?.trim() ?? "";
-  const primaryFirst = firstHalfOf(primary);
-  // 备选 first 跟首选不同才有意义(否则信息冗余)
-  if (!secondary || secondary === primary || firstHalfOf(secondary) === primaryFirst) {
-    // 主动构造一个有意义的备:跟首选 first 不同的"平局-{wld}" 或 "主胜-{wld}"
-    const wld = String(prediction.pick?.label ?? primary.split("-").pop());
-    const alts = ["主胜", "平局", "客胜"].filter((f) => f !== primaryFirst).map((f) => `${f}-${wld}`);
-    if (alts.length) return `${primary} | 备 ${alts[0]}`;
-    return primary;
-  }
-  return `${primary} | 备 ${secondary}`;
+  const pct = (v) => (Number.isFinite(v) ? ` (${Math.round(v * 100)}%)` : "");
+  const main = `${primary}${pct(hp.primaryProbability)}`;
+  // 深度强化:备选用真实"同终场方向、不同首半场"的最高概率路径(如主胜场的"平局-主胜"慢热反超),带概率。
+  if (hp.primaryAlt?.halfFull) return `${main} | 另 ${hp.primaryAlt.halfFull}${pct(hp.primaryAlt.probability)}`;
+  return main;
 }
 
 // 爆冷指数:模型不看好的弱势一方仍占 ≥22% 时,14 场/竞彩历史上常爆冷于此
