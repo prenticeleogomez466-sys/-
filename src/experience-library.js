@@ -237,23 +237,31 @@ export function queryExperience(lib, q) {
   const L = lib.leagues[q.league];
   // 赔率漂移情境(独立于主基线档,附加在结果上供透明展示)
   const drift = queryDriftContext(L, q);
-  const withDrift = (r) => (drift ? { ...r, drift } : r);
+  // 大小球留出回测(学习轮5)证:大小球**联赛级最稳最准**,按热门档细分反而过拟合
+  //   (样本外 Brier 联赛 0.2472 < 联赛+热门档 0.2496)。故附带联赛级大小球供 hint 优先用,
+  //   避免热门档小样本噪声。tier/asian 命中时也带上(matchedKey=league/global 时其自身即联赛/全局级)。
+  const leagueOU = L && L.n >= MIN_LEAGUE_N && L.overUnder ? { overUnder: L.overUnder, n: L.n } : null;
+  const enrich = (r) => {
+    let out = drift ? { ...r, drift } : r;
+    if (leagueOU && r.matchedKey !== "league") out = { ...out, leagueOverUnder: leagueOU };
+    return out;
+  };
   // 1) 亚盘细化档(主源,最精确)
   if (L && q.asianLine !== null && q.asianLine !== undefined) {
     const ab = asianBand(q.asianLine);
     const k = `${frame.side}|${ab}`;
     const b = L.asianTiers?.[k];
-    if (b && b.n >= MIN_TIER_N) return withDrift({ ...b, source: `联赛+亚盘档(${q.league}/${k})`, matchedKey: k });
+    if (b && b.n >= MIN_TIER_N) return enrich({ ...b, source: `联赛+亚盘档(${q.league}/${k})`, matchedKey: k });
   }
   // 2) 联赛 + 热门强度档
   if (L) {
     const k = `${frame.side}|${favBand(frame.favProb)}`;
     const b = L.tiers?.[k];
-    if (b && b.n >= MIN_TIER_N) return withDrift({ ...b, source: `联赛+热门档(${q.league}/${k})`, matchedKey: k });
+    if (b && b.n >= MIN_TIER_N) return enrich({ ...b, source: `联赛+热门档(${q.league}/${k})`, matchedKey: k });
     // 3) 联赛级
-    if (L.n >= MIN_LEAGUE_N) return withDrift({ ...L, tiers: undefined, asianTiers: undefined, driftTiers: undefined, source: `联赛级(${q.league})`, matchedKey: "league" });
+    if (L.n >= MIN_LEAGUE_N) return enrich({ ...L, tiers: undefined, asianTiers: undefined, driftTiers: undefined, source: `联赛级(${q.league})`, matchedKey: "league" });
   }
-  // 4) 全局兜底
-  if (lib.global) return withDrift({ ...lib.global, source: "全局经验", matchedKey: "global" });
+  // 4) 全局兜底(其自身 overUnder 即全局级,无需另附 leagueOverUnder)
+  if (lib.global) return enrich({ ...lib.global, source: "全局经验", matchedKey: "global" });
   return null;
 }

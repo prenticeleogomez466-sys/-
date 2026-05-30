@@ -426,9 +426,12 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
             experienceBaseline.drawRate >= 0.28 && ranked[0].code !== "1"
               ? `⚠️ 历史同情境平局率 ${(experienceBaseline.drawRate * 100).toFixed(0)}%(${experienceBaseline.n}场),平局风险偏高,可考虑兼顾平局`
               : null,
-          // 大小球经验(2026-05-30):历史同情境真实总进球分布 → 大小球倾向(只提示,不替用户弃赛/不改 wld 锚)
-          overUnder: experienceBaseline.overUnder ?? null,
-          overUnderHint: buildOverUnderHint(experienceBaseline.overUnder, experienceBaseline.n),
+          // 大小球经验(2026-05-30/31):历史同情境真实总进球分布 → 大小球倾向(只提示,不替用户弃赛/不改 wld 锚)。
+          // 留出回测(轮5)证大小球**联赛级最准**、热门档细分过拟合 → hint 优先用联赛级(n大稳),无则退桶级。
+          overUnder: experienceBaseline.leagueOverUnder?.overUnder ?? experienceBaseline.overUnder ?? null,
+          overUnderHint: experienceBaseline.leagueOverUnder
+            ? buildOverUnderHint(experienceBaseline.leagueOverUnder.overUnder, experienceBaseline.leagueOverUnder.n)
+            : buildOverUnderHint(experienceBaseline.overUnder, experienceBaseline.n),
           // 赔率漂移经验(2026-05-30):历史"同联赛+热门方+开→收漂移方向"的真实 WLD,
           // 学"赔率变化→结果"。只在开盘+收盘双价齐全时出;纯透明展示,不改 wld 锚。
           drift: experienceBaseline.drift ?? null,
