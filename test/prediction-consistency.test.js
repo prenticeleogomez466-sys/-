@@ -33,6 +33,19 @@ describe("prediction derived market consistency", () => {
     }
   });
 
+  it("无实时赔率且无 DC 训练 ⇒ 返回 unpredictable·data-missing,绝不编造方向(2026-05-30 根因修复)", () => {
+    // 不传任何 marketSnapshot(无赔率)、不传 dixonColesFitted(无 DC)⇒ 历史上会落 seeded 哈希假概率。
+    const prediction = predictFixture(baseFixture, [], 0, {});
+    assert.equal(prediction.unpredictable, true);
+    assert.equal(prediction.provenance, "data-missing");
+    // 关键:绝不产出任何胜平负/比分/半全场方向(不编造)。
+    assert.equal(prediction.pick, null);
+    assert.equal(prediction.probabilities, null);
+    assert.equal(prediction.scorePicks, null);
+    assert.equal(prediction.halfFullPicks, null);
+    assert.ok(prediction.dataMissingReason.includes("不预测"));
+  });
+
   it("fails audit when score or half-full conflicts with WDL outcome", () => {
     const prediction = predictFixture(baseFixture, [{ fixtureId: baseFixture.id, date: baseFixture.date, europeanOdds: { current: { home: 1.5, draw: 4.2, away: 6.5 } } }]);
     prediction.scorePicks.primary = "0-1";

@@ -68,11 +68,24 @@ export function recommendFixtures(date) {
   // 限业务日 + 跨源去重(2026-05-30):兜底/多源抓取会把次日(周日)与重复场次(XML 6001 与 Playwright 周六001 同场)
   // 灌进当日,产生 34 场假象;此处收敛到目标业务日的去重竞彩单 + 原样保留 14 场/其它。
   const scopedFixtures = scopeJingcaiFixtures(fixtureSet.date, fixtureSet.fixtures);
-  const predictions = harmonizeDuplicatePredictions(scopedFixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history) })));
+  const rawPredictions = scopedFixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history) }));
+  // 2026-05-30 诚实闸门:无真实先验的场(unpredictable=data-missing)绝不进推荐/14 场,
+  //   单列在 unpredictable[] 如实标注「未预测·需补抓赔率」,而非用假方向凑数。
+  const unpredictable = rawPredictions
+    .filter((p) => p.unpredictable)
+    .map((p) => ({
+      homeTeam: p.fixture.homeTeam,
+      awayTeam: p.fixture.awayTeam,
+      sequence: p.fixture.sequence ?? null,
+      marketType: p.fixture.marketType ?? null,
+      reason: p.dataMissingReason ?? "数据缺失·未预测"
+    }));
+  const predictions = harmonizeDuplicatePredictions(rawPredictions.filter((p) => !p.unpredictable));
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
     fixtures: predictions.length,
+    unpredictable,
     predictions,
     ratingsBootstrap: ratingsBootstrap ? {
       samples: ratingsBootstrap.samples,
@@ -165,7 +178,27 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     ? blendWithOdds(oddsProbabilities, dcResult, { competition: fixture.competition, weightProfile: loadSignalWeights() })
     : dcResult
       ? { probabilities: dcResult.probabilities, blendSource: "dixon-coles-only", dcWeight: 1, dcResult }
-      : { probabilities: seededProbabilities(fixture, index), blendSource: "seeded-fallback", dcWeight: 0, dcResult: null };
+      : { probabilities: null, blendSource: "data-missing", dcWeight: 0, dcResult: null };
+  // 2026-05-30 诚实闸门(用户硬规则「缺失数据绝不编造」):既无实时市场赔率、又不在 Dixon-Coles
+  //   训练集 ⇒ 没有任何真实先验。绝不再用队名哈希的 seededProbabilities 编一个假概率
+  //   —— 那会让胜平负 / 比分 / 半全场方向全部伪造、还被自检误标成「纯赔率」放行。
+  //   直接返回「未预测·数据缺失」:不进推荐、不进 14 场;recommendFixtures 单列展示,
+  //   pre-export 自检据 provenance=data-missing 拦截。需要预测就先补抓该场赔率。
+  if (!blendResult.probabilities) {
+    return {
+      fixture,
+      unpredictable: true,
+      provenance: "data-missing",
+      dataMissingReason: "未捕获实时赔率且该队不在 Dixon-Coles 训练集——无真实先验,按规则不预测(不编造)",
+      marketSnapshot: snapshot,
+      probabilities: null,
+      pick: null,
+      secondaryPick: null,
+      scorePicks: null,
+      halfFullPicks: null,
+      handicapPick: null
+    };
+  }
   const baseProbabilities = blendResult.probabilities;
   const probabilityAdjustment = adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
   // V 档:贝叶斯信号融合层 —— 把伤停/H2H/赛季阶段/赛事性质等信号以 LR 证据融进概率。
@@ -302,6 +335,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     : null;
   const prediction = {
     fixture,
+    // provenance:本场胜平负先验的真实来源(odds-only / odds(x)+dixon-coles(y) / dixon-coles-only)。
+    // 自检据此核每个方向可追溯到赔率/DC,绝不会是 data-missing 编造。
+    provenance: blendResult.blendSource,
     baseProbabilities,
     probabilities,
     probabilityAdjustment,
@@ -613,14 +649,9 @@ function roundedProbabilitySet(values) {
   return { home, draw, away: round(1 - home - draw) };
 }
 
-function seededProbabilities(fixture, index) {
-  const seed = hash(`${fixture.homeTeam}-${fixture.awayTeam}-${index}`);
-  const home = 0.35 + (seed % 21) / 100;
-  const draw = 0.24 + ((seed >> 3) % 10) / 100;
-  const away = Math.max(0.12, 1 - home - draw);
-  const total = home + draw + away;
-  return { home: round(home / total), draw: round(draw / total), away: round(away / total) };
-}
+// 2026-05-30 已删除 seededProbabilities:它按 `队名-index` 哈希编造 home 0.35~0.55 的假概率,
+//   是「胜平负/比分/半全场方向假数据」的根源(违反硬规则「缺失数据绝不编造」)。
+//   现无真实先验的场一律走 predictFixture 的 data-missing 早返回,不再有任何伪造概率。
 
 // 比分预测优先级(2026-05-30 用户硬要求"不许兜底",已删 if-else 死表):
 //   1. snapshot.scoreOdds.top  ── sporttery 官方比分赔率(市场共识,准确度最高)

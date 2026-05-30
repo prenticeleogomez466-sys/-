@@ -83,11 +83,16 @@ export function runPreExportSelfCheck(recommendations) {
     if (consErrs.length) { checks["方向一致"] = "✗"; consErrs.forEach((e) => blockers.push(`[${name}] ${e}`)); }
     else checks["方向一致"] = "✓";
 
-    // 真模型跑出
+    // 真模型跑出 —— 以 provenance(每场胜平负先验真实来源)为准,不再只看可空的 dixonColes.source。
+    //   provenance=data-missing / unpredictable ⇒ 无真实先验、属编造,直接 blocker(2026-05-30 根因修复)。
     const dc = p.dixonColes;
-    const src = dc?.source ?? "";
+    const prov = p.provenance ?? dc?.source ?? "";
+    const src = prov;
     const fired = p.probabilityAdjustment?.fusion?.fired?.length ?? 0;
-    if (/seed|fallback/i.test(src)) { checks["模型"] = "✗"; blockers.push(`[${name}] 非真模型结果(${src} 兜底)`); }
+    if (p.unpredictable || /seed|fallback|data-missing/i.test(prov)) {
+      checks["模型"] = "✗";
+      blockers.push(`[${name}] 非真模型结果(${prov || "数据缺失"})——禁止编造方向,需补抓该场实时赔率`);
+    }
     else if (!dc) { checks["模型"] = "⚠仅赔率"; warnings.push(`[${name}] DC 未覆盖(纯赔率换算,模型核心未参与)`); }
     else checks["模型"] = fired > 0 ? "✓DC+融合" : "✓DC";
 

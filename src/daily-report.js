@@ -56,10 +56,29 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "融合判断", rows: [judgmentHeaders(), ...recommendations.predictions.map(toJudgmentRow)] },
     { name: "大小球·阵容", rows: [totalGoalsLineupHeaders(), ...recommendations.predictions.map(toTotalGoalsLineupRow)] },
     { name: "复盘对比", rows: [recapHeaders(), ...recapRows.map(Object.values)] },
-    { name: "模型健康", rows: modelHealthRows(sourceGate, audit) }
+    { name: "模型健康", rows: modelHealthRows(sourceGate, audit) },
+    { name: "数据缺失·未预测", rows: unpredictableRows(recommendations.unpredictable) }
   ]);
   writeXlsxWorkbook(masterPath, [{ name: "复盘总表", rows: [recapHeaders(), ...ledger.map(Object.values)] }]);
   return { date, dailyPath, masterPath, recommendations, audit, auditPath, selfCheck, sourceGate, health: { ok: true }, ledgerRows: ledger.length };
+}
+
+// 2026-05-30 诚实披露:无真实先验被剔除的场(未捕获赔率且不在 DC 训练集),
+//   如实列出+原因,不静默消失、更不用 seeded 假方向凑数。空则给一行说明。
+function unpredictableRows(unpredictable = []) {
+  const header = ["序号", "对阵", "玩法类型", "未预测原因"];
+  if (!Array.isArray(unpredictable) || !unpredictable.length) {
+    return [header, ["—", "（无）", "", "本期所有场次均有真实先验(赔率/DC),无剔除场。"]];
+  }
+  return [
+    header,
+    ...unpredictable.map((u) => [
+      u.sequence ?? "—",
+      `${u.homeTeam} vs ${u.awayTeam}`,
+      u.marketType === "shengfucai" ? "14场胜负彩" : (u.marketType === "jingcai" ? "竞彩" : (u.marketType ?? "")),
+      u.reason ?? "数据缺失·未预测"
+    ])
+  ];
 }
 
 function toJingcaiRow(prediction) {
