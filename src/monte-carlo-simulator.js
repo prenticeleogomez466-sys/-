@@ -2,7 +2,7 @@ export function buildMonteCarloSimulation(fixture, probabilities, options = {}) 
   const iterations = wholeNumber(options.iterations, 20000);
   const seed = hash(`${fixture.id}-${fixture.kickoff}-${fixture.homeTeam}-${fixture.awayTeam}`);
   const rng = mulberry32(seed);
-  const lambdas = estimateGoalLambdas(probabilities, options.xg);
+  const lambdas = estimateGoalLambdas(probabilities, options.xg, options.experienceBaseline);
   const outcomes = { home: 0, draw: 0, away: 0 };
   const scores = new Map();
   for (let index = 0; index < iterations; index += 1) {
@@ -32,7 +32,7 @@ export function buildMonteCarloSimulation(fixture, probabilities, options = {}) 
   };
 }
 
-function estimateGoalLambdas(probabilities, xg) {
+function estimateGoalLambdas(probabilities, xg, experienceBaseline = null) {
   const homeXg = finiteNumber(xg?.home?.xg ?? xg?.homeXg, null);
   const awayXg = finiteNumber(xg?.away?.xg ?? xg?.awayXg, null);
   if (homeXg !== null && awayXg !== null && homeXg >= 0 && awayXg >= 0) {
@@ -40,6 +40,24 @@ function estimateGoalLambdas(probabilities, xg) {
   }
   const homeEdge = (probabilities.home ?? 0.33) - (probabilities.away ?? 0.33);
   const drawPressure = probabilities.draw ?? 0.27;
+  // 经验库基线(2026-05-30 修"比分像模仿"):用该联赛该热门档历史真实场均进球当 λ 总量,
+  // 替代"只看概率差"的通用公式 —— 芬超(高进球)与欧冠(低进球)不再因 wld 相同而 λ 相同。
+  // 总量取自经验库(联赛真实进球水平),主客分配仍按本场概率差(同档内不同赔率仍有区分)。
+  const expHome = finiteNumber(experienceBaseline?.avgGoals?.home, null);
+  const expAway = finiteNumber(experienceBaseline?.avgGoals?.away, null);
+  if (expHome !== null && expAway !== null && expHome + expAway > 0.5) {
+    const expTotal = clamp(expHome + expAway, 1.4, 4.2);
+    // 经验桶自带方向(side+favProb 档),其 home/away 已含主场倾向;再按本场精确概率差微调分配,
+    // 避免同桶不同赔率完全雷同。基准分配 = 经验桶分配,叠加本场 edge 偏移(阻尼)。
+    const expShare = expHome / (expHome + expAway);
+    const homeShare = clamp(expShare + homeEdge * 0.25, 0.2, 0.8);
+    return {
+      home: round(expTotal * homeShare),
+      away: round(expTotal * (1 - homeShare)),
+      source: `experience-library:${experienceBaseline.source ?? "?"}`,
+      experienceN: experienceBaseline.n ?? null
+    };
+  }
   const totalGoals = clamp(2.65 - Math.max(0, drawPressure - 0.25) * 1.2 + Math.abs(homeEdge) * 0.55, 1.7, 3.6);
   const homeShare = clamp(0.5 + homeEdge * 0.75, 0.25, 0.75);
   return {

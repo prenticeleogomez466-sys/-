@@ -21,7 +21,8 @@ export const LEAGUE_LABELS = {
   SP1: "西甲", SP2: "西乙", D1: "德甲", D2: "德乙", I1: "意甲", I2: "意乙",
   F1: "法甲", F2: "法乙", N1: "荷甲", B1: "比甲", P1: "葡超", T1: "土超", G1: "希腊超"
 };
-const DEFAULT_SEASONS = ["2425", "2324", "2223"];
+// 近五年(经验库需要):2122/2223/2324/2425/2526。早赛季部分联赛 CSV 列较少,loadOne 容错。
+const DEFAULT_SEASONS = ["2526", "2425", "2324", "2223", "2122"];
 
 function parseCsv(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length);
@@ -92,6 +93,21 @@ async function loadOne(league, season, fetchImpl) {
       impliedProbs(num(cells, idx("B365CH")), num(cells, idx("B365CD")), num(cells, idx("B365CA")));
     const oddsPinnacle = impliedProbs(num(cells, idx("PSH")), num(cells, idx("PSD")), num(cells, idx("PSA")));
     const oddsPinnacleClose = impliedProbs(num(cells, idx("PSCH")), num(cells, idx("PSCD")), num(cells, idx("PSCA")));
+    // 亚盘(经验库需要):AHh=开盘让球线(主队视角,负=主让),AvgAHH/AvgAHA=开盘均值水位;
+    //   AHCh/AvgCAHH/AvgCAHA=收盘线+水位。线 open→close 移动 = 真实盘口异动信号。缺列为 null。
+    const ahLine = num(cells, idx("AHh"));
+    const ahLineClose = num(cells, idx("AHCh"));
+    const asian =
+      ahLine !== null || ahLineClose !== null
+        ? {
+            line: ahLine,
+            homeWater: num(cells, idx("AvgAHH")),
+            awayWater: num(cells, idx("AvgAHA")),
+            lineClose: ahLineClose,
+            homeWaterClose: num(cells, idx("AvgCAHH")),
+            awayWaterClose: num(cells, idx("AvgCAHA")),
+          }
+        : null;
     // 射门 / 射正(HS/AS/HST/AST):pre-xG 时代期望进球代理的原料。
     // football-data.co.uk 五大联赛逐场都有,缺失(部分低级别联赛)则为 null,下游自动忽略。
     const hs = num(cells, idx("HS"));
@@ -115,7 +131,9 @@ async function loadOne(league, season, fetchImpl) {
       odds, // {home,draw,away} 去 vig 后的隐含概率,或 null(开盘均赔)
       oddsClose, // 收盘均赔隐含,或 null
       oddsPinnacle, // Pinnacle 开盘隐含,或 null
-      oddsPinnacleClose // Pinnacle 收盘隐含,或 null
+      oddsPinnacleClose, // Pinnacle 收盘隐含,或 null
+      asian, // {line,homeWater,awayWater,lineClose,homeWaterClose,awayWaterClose} 或 null
+      hasOpening: Boolean(odds)
     });
   }
   return out;
@@ -146,6 +164,7 @@ export async function loadFootballDataMatches(opts = {}) {
     withClosing: all.filter((m) => m.oddsClose).length,
     withPinnacle: all.filter((m) => m.oddsPinnacle).length,
     withShots: all.filter((m) => m.shots && m.sot).length,
+    withAsian: all.filter((m) => m.asian && (m.asian.line !== null || m.asian.lineClose !== null)).length,
     byLeague
   };
 }

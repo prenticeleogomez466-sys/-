@@ -3,6 +3,7 @@ import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js"
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
+import { getExperienceBaseline } from "./experience-library-store.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "./derived-score-model.js";
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
@@ -280,7 +281,13 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   probabilityAdjustment.drawLean = drawLean.applies ? { margin: drawLean.margin, note: "低进球均势·平局为价值选择" } : null;
   const gap = ranked[0].probability - ranked[1].probability;
   const advancedFeatures = buildAdvancedFixtureFeatures(fixture, snapshot, probabilities, options);
-  const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations });
+  // 经验库基线(2026-05-30):查该联赛该热门档/亚盘档的历史真实进球水平 + 平局率。
+  // 用途:① 给无训练 DC 的场(odds-only)提供联赛特异 λ,修"比分跨联赛雷同";
+  //       ② 暴露历史平局率,供平局风险提示。不改 wld argmax(锚定硬规则)。
+  const experienceBaseline = options.experienceBaseline === null
+    ? null
+    : (options.experienceBaseline ?? getExperienceBaseline(fixture, probabilities, snapshot));
+  const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations, experienceBaseline });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
   // 比分/半全场真实来源(2026-05-30 用户硬要求"不许兜底"):
@@ -403,6 +410,21 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     asianWaterAnalysis,
     extendedMarkets,
     expectedValue,
+    // 经验库情境(2026-05-30):历史同联赛同档情境的真实结果分布,供透明展示 + 平局风险提示。
+    experienceContext: experienceBaseline
+      ? {
+          source: experienceBaseline.source,
+          n: experienceBaseline.n,
+          avgGoals: experienceBaseline.avgGoals,
+          historicalDrawRate: experienceBaseline.drawRate,
+          wld: experienceBaseline.wld,
+          // 平局风险:历史平局率高(≥28%)而本次未推平 → 提示(不改方向,遵 wld 锚定+不替用户弃赛)
+          drawAlert:
+            experienceBaseline.drawRate >= 0.28 && ranked[0].code !== "1"
+              ? `⚠️ 历史同情境平局率 ${(experienceBaseline.drawRate * 100).toFixed(0)}%(${experienceBaseline.n}场),平局风险偏高,可考虑兼顾平局`
+              : null,
+        }
+      : null,
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
   };
   prediction.bankroll = buildBankrollRisk(prediction, options.env ?? process.env);
