@@ -320,9 +320,19 @@ export function resolveDcWeight(competition, weightProfile) {
 
 // ───── Dixon-Coles 核心 ─────
 
+// λ 物理上限:单队 90 分钟期望进球极少 > 4.5;小样本/回填国家队(德国打鱼腩)的 attack 会被
+// 严重高估,不 clamp 会算出 λ≈12 → DC 矩阵峰值飙到 8-0 的失真比分(2026-05-30 修,根因来自
+// 用户反馈"比分不准")。下限 0.15 防全 0 概率。clamp 只影响极端值,正常场次 λ∈[0.5,3] 不受影响。
+const LAMBDA_MIN = 0.15;
+const LAMBDA_MAX = 4.5;
+function clampLambda(value) {
+  if (!Number.isFinite(value)) return 1.3;
+  return Math.min(LAMBDA_MAX, Math.max(LAMBDA_MIN, value));
+}
+
 export function scoreMatrix(p) {
-  const lambda = p.baseRate * p.attackHome * p.defenseAway * p.homeAdv;
-  const mu = p.baseRate * p.attackAway * p.defenseHome;
+  const lambda = clampLambda(p.baseRate * p.attackHome * p.defenseAway * p.homeAdv);
+  const mu = clampLambda(p.baseRate * p.attackAway * p.defenseHome);
   const rho = p.rho ?? -0.08;
   const tauFn = p.tauModel === "extended" ? extendedTau : tau;
   const matrix = [];
