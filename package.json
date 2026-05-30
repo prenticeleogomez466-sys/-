@@ -37,6 +37,7 @@
     "backtest:decay": "node scripts/run-decay-tune-backtest.mjs",
     "backtest:asian": "node scripts/run-asian-backtest.mjs",
     "backtest:shrinkage": "node scripts/run-shrinkage-backtest.mjs",
+    "backtest:rho": "node scripts/run-rho-tune-backtest.mjs",
     "sync:injuries": "node scripts/sync-free-injuries.mjs",
     "sync:injuries:sofascore": "node scripts/sync-sofascore-injuries.mjs",
     "sources:probe": "node scripts/probe-free-sources.mjs",
