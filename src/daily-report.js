@@ -6,6 +6,7 @@ import { judgmentFactorColumns, judgmentFactorRow } from "./factor-analysis.js";
 import { recommendFixtures, outcomeCodeToChinese, competitionCategory } from "./prediction-engine.js";
 import { auditRecommendations, writeRecommendationAudit } from "./recommendation-audit.js";
 import { runPreExportSelfCheck, selfCheckRows } from "./pre-export-selfcheck.js";
+import { runComprehensiveAudit, comprehensiveAuditRows } from "./comprehensive-audit.js";
 import { assertLatestRealtimeSourceGate } from "./realtime-source-gate.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 
@@ -31,11 +32,13 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   const recommendations = recommendFixtures(date);
   const audit = auditRecommendations(recommendations);
   const auditPath = writeRecommendationAudit(date, audit);
-  if (!audit.ok) throw new Error(`推荐内容审核未通过：${audit.errors.map((item) => item.message).join("；")}`);
-  // 出表前自检闸门(用户硬规则 2026-05-30):全玩法逐场核验,任一 blocker 不出表。
   const selfCheck = runPreExportSelfCheck(recommendations);
-  if (!selfCheck.ok) {
-    throw new Error(`出表自检未通过(${selfCheck.blockers.length}项,已拦截出表)：${selfCheck.blockers.slice(0, 6).join("；")}${selfCheck.blockers.length > 6 ? " …" : ""}`);
+  // 全面审计总闸门(2026-05-30 用户要求"每道模块运行都设全面审计,最后推荐生成保证质量"):
+  //   一次编排 模块结构/缺陷/能力 + 推荐内容 + 逐场自检 + 真实性 roll-up,任一硬 blocker 不出表。
+  //   复用上面已算好的 audit/selfCheck,避免重复跑;模块审计(结构/缺陷/能力)在此随出表一并跑。
+  const comprehensive = runComprehensiveAudit({ date, recommendations, precomputed: { recAudit: audit, selfCheck } });
+  if (!comprehensive.ok) {
+    throw new Error(`全面审计未通过(${comprehensive.blockers.length}项硬问题,已拦截出表)：${comprehensive.blockers.slice(0, 6).join("；")}${comprehensive.blockers.length > 6 ? " …" : ""}`);
   }
   const jingcai = recommendations.predictions.filter((prediction) => prediction.fixture.marketType !== "shengfucai");
   const fourteen = recommendations.fourteen.selections;
@@ -48,6 +51,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   const dailyPath = join(exportDir, `神选-竞彩推荐-${date}.xlsx`);
   const masterPath = join(exportDir, "神选-复盘总表.xlsx");
   writeXlsxWorkbook(dailyPath, [
+    { name: "全面审计", rows: comprehensiveAuditRows(comprehensive) },
     { name: "出表自检", rows: selfCheckRows(selfCheck) },
     { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
     { name: "神选·14场", rows: fourteenRows },
