@@ -22,6 +22,16 @@ import {
 const SCORE_TOTAL_MAX = 7;
 const SCORE_SIDE_MAX = 5;
 
+// λ(场均进球期望)物理合理区间 —— 比分/半全场/胜负平全从 λ 派生,λ 算错则三者一起错。
+//   单队 90 分钟 λ 极少 >3.5、双方合计极少 >4.5。超出 = 真实先验被数学算错放大
+//   (2026-05-30 市场推断 ratio 被平方,意图 λ=2.27 → 矩阵实际 4.5,比分被灌 4-0/5-0/6-0)。
+//   关键:即便最终比分恰落在 5-0 以内、来源真实(非编造)、方向自洽,只要 λ 量级离谱
+//   也必须拦——这正是旧"只查最终比分/只查 provenance"的盲区(总进球 4.28 才是铁证)。
+const LAMBDA_SIDE_BLOCK = 4.0;   // 单队 λ 超此 = 确属算错(真实极限约 3.5)
+const LAMBDA_TOTAL_BLOCK = 5.5;  // 双方合计超此 = 非物理
+const LAMBDA_SIDE_WARN = 3.3;    // 偏高,人工确认
+const LAMBDA_TOTAL_WARN = 4.6;
+
 export function runPreExportSelfCheck(recommendations) {
   const blockers = [];
   const warnings = [];
@@ -69,6 +79,20 @@ export function runPreExportSelfCheck(recommendations) {
         const a = Number(mm[2]);
         if (h + a > SCORE_TOTAL_MAX || h > SCORE_SIDE_MAX || a > SCORE_SIDE_MAX) fail("比分", `比分 ${score} 进球数异常(总>${SCORE_TOTAL_MAX} 或 单队>${SCORE_SIDE_MAX})— 疑 λ 失真`);
         else pass("比分");
+      }
+    }
+
+    // 进球量级(λ)合理性 —— 比分/半全场/胜负平的共同底座,λ 算错则三者同错。
+    //   读 DC 期望进球(无 DC 时回退 simulation.lambdas);任一侧或合计超物理上限 → blocker。
+    //   抓的是"真实来源 + 数学算错"这类旧闸门盲区(provenance 真、方向自洽、比分≤5-0 但 λ 爆)。
+    const eg = p.dixonColes?.expectedGoals ?? p.simulation?.lambdas;
+    const lh = Number(eg?.home), la = Number(eg?.away);
+    if (Number.isFinite(lh) && Number.isFinite(la)) {
+      const lt = lh + la;
+      if (lh > LAMBDA_SIDE_BLOCK || la > LAMBDA_SIDE_BLOCK || lt > LAMBDA_TOTAL_BLOCK) {
+        fail("比分", `进球期望 λ 异常(主${lh.toFixed(2)}/客${la.toFixed(2)}/合计${lt.toFixed(2)})— 超物理上限,疑 λ 被算错放大,比分/半全场/胜负平连带失真`);
+      } else if (lh > LAMBDA_SIDE_WARN || la > LAMBDA_SIDE_WARN || lt > LAMBDA_TOTAL_WARN) {
+        warnings.push(`[${name}] 进球期望偏高(主${lh.toFixed(2)}/客${la.toFixed(2)}/合计${lt.toFixed(2)})— 请人工确认非 λ 失真`);
       }
     }
 

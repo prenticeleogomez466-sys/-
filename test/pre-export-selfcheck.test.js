@@ -43,6 +43,25 @@ describe("出表自检闸门", () => {
     assert.ok(sc.blockers.some((b) => b.includes("进球数异常")), sc.blockers.join("；"));
   });
 
+  it("λ 量级爆炸(真实来源+方向自洽+比分≤5-0 但场均进球离谱)→ 拦截", () => {
+    // 模拟 2026-05-30 比分 bug:provenance 真、比分 4-0 在 5-0 阈值内、方向与主胜一致,
+    // 旧闸门(只查最终比分/只查 provenance)放行;λ 量级闸门必须拦下。
+    const sc = runPreExportSelfCheck(pkg([goodPrediction({
+      scorePicks: { primary: "4-0", secondary: "3-0" },
+      dixonColes: { source: "dixon-coles", expectedGoals: { home: 4.5, away: 0.4 } },
+    })]));
+    assert.equal(sc.verdict, "blocked");
+    assert.ok(sc.blockers.some((b) => b.includes("λ 异常")), sc.blockers.join("；"));
+  });
+
+  it("λ 偏高但未爆 → 放行但给提示(不拦)", () => {
+    const sc = runPreExportSelfCheck(pkg([goodPrediction({
+      dixonColes: { source: "dixon-coles", expectedGoals: { home: 3.4, away: 0.5 } },
+    })]));
+    assert.equal(sc.verdict, "pass");
+    assert.ok(sc.warnings.some((w) => w.includes("进球期望偏高")), sc.warnings.join("；"));
+  });
+
   it("让球方向不以 wld 为锚 → 拦截", () => {
     const sc = runPreExportSelfCheck(pkg([goodPrediction({ handicapPick: { line: -1, direction: "客胜" } })]));
     assert.equal(sc.verdict, "blocked");

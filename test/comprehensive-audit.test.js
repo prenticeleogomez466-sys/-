@@ -26,6 +26,17 @@ describe("全面审计总闸门(comprehensive-audit)", () => {
     assert.ok(a.blockers.some((b) => /真实性|造假|provenance/i.test(b)), `blocker 应含真实性项:${a.blockers.join("；")}`);
   });
 
+  it("逐玩法核验 roll-up:显式覆盖 胜负平/让球/比分/半全场 且健康集全通过", () => {
+    const recs = recommendFixtures("2026-05-15");
+    const a = runComprehensiveAudit({ date: "2026-05-15", recommendations: recs, runModuleAudits: false });
+    assert.ok(a.playtypes, "审计结果应含 playtypes 逐玩法汇总");
+    const labels = a.playtypes.items.map((i) => i.label);
+    assert.deepEqual(labels, ["胜负平", "让球", "比分", "半全场"], "必须覆盖四大玩法");
+    assert.equal(a.playtypes.allPass, true, `健康集每玩法应全过:${JSON.stringify(a.playtypes.items)}`);
+    // 审计分项 section 里能一眼看到逐玩法核验
+    assert.ok(a.sections.some((s) => s.name === "逐玩法核验" && s.status === "✓"));
+  });
+
   it("comprehensiveAuditRows 产出可写 xlsx 的报告行,含分项与裁决", () => {
     const recs = recommendFixtures("2026-05-15");
     const a = runComprehensiveAudit({ date: "2026-05-15", recommendations: recs, runModuleAudits: false });

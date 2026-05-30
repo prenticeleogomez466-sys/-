@@ -108,14 +108,43 @@ export function runComprehensiveAudit({ date, recommendations, env = process.env
   if (integrity.fabricated > 0) blockers.push(`真实性:${integrity.fabricated} 场进推荐却无真实先验(provenance 造假),不出表`);
   sections.push({ name: "真实性总结", status: integrity.fabricated > 0 ? "✗" : "✓", detail: integrity.summary });
 
+  // ⑦ 逐玩法核验 roll-up(用户要求:全面审计必须显式覆盖 胜负平/让球/比分/半全场)。
+  //   从逐场自检的逐玩法 checks 汇总每个玩法的 通过/失败 场数,任一玩法有失败即在自检 blockers 体现
+  //   (此处只做显式呈现,不重复拦截)。让"三大方向玩法是否逐场过检"在审计表里一眼可见。
+  const playtypes = buildPlaytypeRollup(selfCheck);
+  const ptFail = playtypes.items.filter((i) => i.fail > 0);
+  sections.push({
+    name: "逐玩法核验",
+    status: ptFail.length ? "✗" : "✓",
+    detail: playtypes.items.map((i) => `${i.label} ✓${i.pass}${i.fail ? `/✗${i.fail}` : ""}`).join(" · ")
+  });
+
   return {
     ok: blockers.length === 0,
     date,
     blockers,
     warnings,
     sections,
-    integrity
+    integrity,
+    playtypes
   };
+}
+
+// 逐玩法核验汇总:从逐场自检 perFixture.checks 统计 胜负平/让球/比分/半全场 各自通过/失败场数。
+// 比分/半全场/胜负平 的 ✗ 既含方向冲突,也含 λ 量级失真(新闸门),即"真数据算错"也计入失败。
+function buildPlaytypeRollup(selfCheck) {
+  const KEYS = [["胜负平", "胜负平"], ["让球", "让球"], ["比分", "比分"], ["半全场", "半全场"]];
+  const per = selfCheck?.perFixture ?? [];
+  const items = KEYS.map(([key, label]) => {
+    let pass = 0, fail = 0;
+    for (const f of per) {
+      const v = f.checks?.[key];
+      if (v === "✗") fail++;
+      else if (v === "✓") pass++;
+    }
+    return { key, label, pass, fail };
+  });
+  return { items, allPass: items.every((i) => i.fail === 0) };
 }
 
 // 从推荐 + 逐场自检结果汇总真实性指标(不重复逐场逻辑,只做计数/裁决)。
