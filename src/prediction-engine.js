@@ -786,6 +786,10 @@ function normalizeHalfFull(value) {
 
 export function buildFourteenPlan(predictions) {
   const selected = predictions.filter((prediction) => prediction.fixture.marketType === "shengfucai" || prediction.fixture.tags.includes("14场胜负彩")).slice(0, 14);
+  // 硬规则:14 场只在有真实 14 场胜负彩期(恰好 14 场)时才对外发布。
+  // 串关/任选9 数学仍照常计算(供单元测试与内部分析),但用 available=false 标记,
+  // 由报告层据此决定是否展示,避免把当日竞彩比赛冒充成 14 场。
+  const hasRealFourteen = selected.length === 14;
   const source = selected.length ? selected : predictions.slice(0, 14);
   const rules = fourteenSelectionRules();
   // 冷启动模式:当所有 prediction 都没有真实高级数据(quality.score 一律 D 级 ≤ 62),
@@ -924,6 +928,8 @@ export function buildFourteenPlan(predictions) {
   const renxuan9 = buildRenxuan9(source);
 
   return {
+    available: hasRealFourteen,
+    note: hasRealFourteen ? undefined : "今日无 14 场胜负彩(不足 14 场),按硬规则不发 14 场。",
     count: selections.length,
     singleLine: selections.map((item) => item.single).join(" "),
     compoundLine: selections.map((item) => item.compound).join(" "),

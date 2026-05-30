@@ -38,6 +38,7 @@
     "jingcai:daily": "node scripts/jingcai-daily.mjs",
     "report:html": "node scripts/render-recommendation-html.mjs",
     "daily": "node src/daily-evolution.js",
+    "daily:fallback": "node scripts/daily-with-fallback.mjs",
     "daily:allow-missing": "node src/daily-evolution.js --allow-missing-odds",
     "daily:no-web": "node src/daily-evolution.js --allow-missing-odds",
     "sync:artifacts": "node src/artifact-sync.js",

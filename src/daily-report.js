@@ -33,14 +33,18 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   if (!audit.ok) throw new Error(`推荐内容审核未通过：${audit.errors.map((item) => item.message).join("；")}`);
   const jingcai = recommendations.predictions.filter((prediction) => prediction.fixture.marketType !== "shengfucai");
   const fourteen = recommendations.fourteen.selections;
+  // 硬规则:无真实 14 场时,14 场 sheet 给诚实说明行,不把竞彩比赛冒充成 14 场。
+  const fourteenRows = recommendations.fourteen.available === false || !fourteen.length
+    ? [fourteenHeaders(), ["—", "", recommendations.fourteen.note ?? "今日无 14 场胜负彩,按硬规则不发 14 场。", ...new Array(7).fill("")]]
+    : [fourteenHeaders(), ...fourteen.map(toFourteenRow)];
   const recapRows = recommendations.predictions.map(toLedgerRow);
   const ledger = updateLedger(date, recapRows);
   const dailyPath = join(exportDir, `神选-竞彩推荐-${date}.xlsx`);
   const masterPath = join(exportDir, "神选-复盘总表.xlsx");
   writeXlsxWorkbook(dailyPath, [
     { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
-    { name: "神选·14场", rows: [fourteenHeaders(), ...fourteen.map(toFourteenRow)] },
-    { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.renxuan9) },
+    { name: "神选·14场", rows: fourteenRows },
+    { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.available === false ? { ok: false, reason: recommendations.fourteen.note ?? "今日无 14 场胜负彩,任选9 不适用。" } : recommendations.fourteen.renxuan9) },
     { name: "赔率变化", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
     { name: "融合判断", rows: [judgmentHeaders(), ...recommendations.predictions.map(toJudgmentRow)] },
     { name: "大小球·阵容", rows: [totalGoalsLineupHeaders(), ...recommendations.predictions.map(toTotalGoalsLineupRow)] },
