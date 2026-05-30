@@ -9,10 +9,10 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
 const ledgerPath = join(exportDir, "recommendation-ledger.json");
 
-export // 盘上是否已有「数据驱动训练出的、可用的」校准档(非 ledger 版)。
+// 盘上是否已有「数据驱动训练出的、可用的」校准档(非 ledger 版)。
 // ledger 版 source 为 daily-recap-ledger 且通常 usable:false;训练版 source 为
 // football-data-walkforward 且带 isotonicMap knots。只有后者才算生产权威档。
-function hasUsableTrainedProfile(path) {
+export function hasUsableTrainedProfile(path) {
   if (!existsSync(path)) return false;
   try {
     const existing = JSON.parse(readFileSync(path, "utf8"));
@@ -27,7 +27,7 @@ function hasUsableTrainedProfile(path) {
   }
 }
 
-function runEvolutionBacktest() {
+export function runEvolutionBacktest() {
   const rows = existsSync(ledgerPath) ? JSON.parse(readFileSync(ledgerPath, "utf8")) : [];
   const settled = rows.filter((row) => row.actual);
   const hit = settled.filter((row) => row.hit === true).length;
