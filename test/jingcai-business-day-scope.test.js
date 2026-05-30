@@ -21,11 +21,12 @@ test("sequenceWeekdayPrefix 取竞彩编号 周X 前缀,数字编号返回 null"
 function stubPrediction(seq, home, away, marketType = "jingcai") {
   return {
     fixture: { sequence: seq, homeTeam: home, awayTeam: away, marketType },
-    pick: { code: "3" },
+    pick: { code: "3", label: "主胜" },
     confidence: 50,
     probabilities: { win: 0.4, draw: 0.3, lose: 0.3 },
-    scorePicks: { primary: "1-0" },
-    halfFullPicks: { primary: "胜/胜" },
+    scorePicks: { primary: "1-0", secondary: "2-1", source: "poisson-derived-from-lambda" },
+    halfFullPicks: { primary: "胜/胜", secondary: "平/胜", source: "poisson-half-joint" },
+    handicapPick: { line: 0, direction: "主胜", anchor: "wld", coverProbability: 0.55, expectedGoalDiff: 0.4, modelFairLine: 0 },
     marketSnapshot: { europeanOdds: {} }
   };
 }
@@ -61,6 +62,30 @@ test("自检:14 场存在但腿数非 14 → 报错", () => {
   const audit = auditRecommendations(recommendations);
   assert.equal(audit.ok, false);
   assert.ok(audit.errors.some((e) => e.message.includes("14 场腿数")));
+});
+
+test("自检:比分来源是死表(scoreForOutcome)→ 报错", () => {
+  const p = stubPrediction("周六001", "神户", "鹿岛");
+  p.scorePicks.source = "hardcoded";
+  const audit = auditRecommendations({ date: "2026-05-30", predictions: [p], fourteen: { available: false, count: 0, selections: [] } });
+  assert.equal(audit.ok, false);
+  assert.ok(audit.errors.some((e) => e.message.includes("比分非真实来源")));
+});
+
+test("自检:让球覆盖概率缺失(未真实跑出)→ 报错", () => {
+  const p = stubPrediction("周六001", "神户", "鹿岛");
+  p.handicapPick.coverProbability = null;
+  const audit = auditRecommendations({ date: "2026-05-30", predictions: [p], fourteen: { available: false, count: 0, selections: [] } });
+  assert.equal(audit.ok, false);
+  assert.ok(audit.errors.some((e) => e.message.includes("让球覆盖概率缺失")));
+});
+
+test("自检:比分缺次选 → 报错", () => {
+  const p = stubPrediction("周六001", "神户", "鹿岛");
+  delete p.scorePicks.secondary;
+  const audit = auditRecommendations({ date: "2026-05-30", predictions: [p], fourteen: { available: false, count: 0, selections: [] } });
+  assert.equal(audit.ok, false);
+  assert.ok(audit.errors.some((e) => e.message.includes("缺少比分次选")));
 });
 
 test("自检:干净的当日竞彩单(全周六、无重复、14场=14)不触发竞彩实质错误", () => {

@@ -588,9 +588,13 @@ function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {
   const fromDcSecondary = fromMarketSecondary ? null : scoreFromDcResult(dcResult, secondaryCode, exclusionForSecondary);
   const primary = fromMarket ?? fromDc ?? bestScoreFromMatrix(matrix, code);
   const secondaryExclusion = new Set([primary].filter(Boolean));
+  // 来源标记(供自检判真假):market=官方比分赔率;dcResult.source=训练DC/λ派生真泊松矩阵;
+  // matrix-scan=全矩阵扫描(仍真泊松)。绝不出现死表来源 —— 死表已删。
+  const source = fromMarket ? "market" : (fromDc ? (dcResult?.source ?? "dc-matrix") : (matrix ? (dcResult?.source ?? "poisson-matrix") : "none"));
   return {
     primary,
-    secondary: fromMarketSecondary ?? fromDcSecondary ?? bestScoreFromMatrix(matrix, secondaryCode, secondaryExclusion) ?? bestScoreFromMatrix(matrix, secondaryCode)
+    secondary: fromMarketSecondary ?? fromDcSecondary ?? bestScoreFromMatrix(matrix, secondaryCode, secondaryExclusion) ?? bestScoreFromMatrix(matrix, secondaryCode),
+    source
   };
 }
 
@@ -604,9 +608,11 @@ function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities 
   const exclusion = new Set([primaryFromMarket, primaryFromDc].filter(Boolean));
   const secondaryFromMarket = halfFullFromMarket(snapshot, secondaryCode, exclusion, secondaryScore);
   const secondaryFromDc = secondaryFromMarket ? null : halfFullFromDcResult(dcResult, secondaryCode, exclusion, secondaryScore);
+  const source = primaryFromMarket ? "market" : (dcResult?.expectedGoals ? "poisson-half-joint" : "none");
   return {
     primary: primaryFromMarket ?? primaryFromDc ?? halfFullFromDcResult(dcResult, code, new Set(), primaryScore),
-    secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullFromDcResult(dcResult, secondaryCode, new Set(), secondaryScore)
+    secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullFromDcResult(dcResult, secondaryCode, new Set(), secondaryScore),
+    source
   };
 }
 
