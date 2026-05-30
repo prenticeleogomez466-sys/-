@@ -27,6 +27,7 @@ import { estimateRotationProbability, rotationToLR } from "./rotation-policy-mod
 import { detectStreak, streakToLR } from "./streak-detector.js";
 import { compareFatigue, applyFatigueBias } from "./schedule-fatigue-model.js";
 import { lineMovementToLR, analyzeLineMovement } from "./line-movement-signal.js";
+import { analogToLR } from "./historical-analog-engine.js";
 import { splitStats, homeAwaySplitToLR } from "./home-away-split-stats.js";
 import { timeDecayFormToLR } from "./time-decay-weighting.js";
 import { weatherXgMultiplier } from "./weather-adjusted-xg.js";
@@ -610,6 +611,28 @@ function signalAsianHandicapWater(prior, fixture, advancedData, context) {
   return { name: "asian-handicap-water", source: "context.asianHandicapWater", lr, detail: signal };
 }
 
+// 历史同联赛类比信号:context.historicalAnalog 是上游 analyzeHistoricalAnalogs 的结果
+// (同联赛、相近水位/盘口、相近赔率变化的历史样本聚合),把其 WLD 后验相对先验的
+// 偏移转成 LR。样本不足(effectiveN 太小)时 analogToLR 返回 null → 休眠。
+function signalHistoricalAnalog(prior, fixture, advancedData, context) {
+  const analog = context?.historicalAnalog ?? advancedData?.historicalAnalog;
+  if (!analog || !analog.ok) {
+    return { name: "historical-analog", source: "context.historicalAnalog", dormant: "no-analog-data" };
+  }
+  const lr = analogToLR(analog, prior);
+  if (!lr) {
+    return { name: "historical-analog", source: "context.historicalAnalog", dormant: `insufficient-analogs:${analog.effectiveN ?? 0}` };
+  }
+  const clamped = clampLR(lr);
+  if (!clamped) return { name: "historical-analog", source: "context.historicalAnalog", dormant: "neutral" };
+  return {
+    name: "historical-analog",
+    source: "context.historicalAnalog",
+    lr: clamped,
+    detail: `${analog.analogCount}场类比/有效N=${analog.effectiveN}, 锚=${analog.wld}`
+  };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -634,7 +657,8 @@ const SIGNAL_HANDLERS = [
   signalXgChains,
   signalPADJxG,
   signalSetPiece,
-  signalAsianHandicapWater
+  signalAsianHandicapWater,
+  signalHistoricalAnalog
 ];
 
 /** 所有信号名(供消融回测 / 权重调优枚举)。 */
@@ -644,7 +668,7 @@ export const SIGNAL_NAMES = [
   "weather", "manager", "derby", "standings-pressure", "big-game-form",
   "travel-distance", "tactical-matchup",
   "referee", "opponent-strength-form", "xg-chains", "padj-xg", "set-piece",
-  "asian-handicap-water"
+  "asian-handicap-water", "historical-analog"
 ];
 
 /**
