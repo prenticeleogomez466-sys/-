@@ -37,14 +37,14 @@ const OUTCOMES = ["home", "draw", "away"];
  *   opts.maxDates  最多回溯多少个比赛日（默认 120）
  *   opts.minMatches 最少需要多少场有赛果的比赛（默认 60）
  *   opts.iterations 迭代次数（默认 80）
- *   opts.homeAdvantage 主场优势初始值（默认 1.28）
+ *   opts.homeAdvantage 主场优势初始值（默认 1.24，2026-05-31 由 1.28 下调:backtest:homeadv 实证主场优势下降、1.28高估主胜+1.6pp）
  *   opts.decayDays 时间衰减半衰期天数（默认 180）
  * @returns {Object} fitted 对象，传给 predictFromFitted
  */
 export function fitFromFixtureStore(opts = {}) {
   const maxDates = opts.maxDates ?? 120;
   const minMatches = opts.minMatches ?? 60;
-  const homeAdvantage = opts.homeAdvantage ?? 1.28;
+  const homeAdvantage = opts.homeAdvantage ?? 1.24;
   // beforeDate(可选):只用严格早于该日期的赛果拟合 —— 给 walk-forward 回测防数据泄漏用。
   const beforeDate = opts.beforeDate ?? null;
   const allDates = listFixtureDates();
@@ -93,7 +93,7 @@ export function fitFromFixtureStore(opts = {}) {
  */
 export function fitFromMatches(rawMatches = [], opts = {}) {
   const minMatches = opts.minMatches ?? 60;
-  const homeAdvantage = opts.homeAdvantage ?? 1.28;
+  const homeAdvantage = opts.homeAdvantage ?? 1.24;
   const referenceDate = opts.referenceDate ?? rawMatches.reduce((mx, m) => (m.date > mx ? m.date : mx), "0000-00-00");
   // shot-regressed(分析师 P0):有 shots/SOT 时,把高方差的实际进球向射门期望回归去噪后再拟合,
   // 攻防强度更接近"潜在实力"而非"运气实现值"。转化率从训练切片自校准(walk-forward 不泄漏)。
@@ -141,7 +141,7 @@ export function fitFromMatches(rawMatches = [], opts = {}) {
 
 /**
  * 冷启动模式拟合:
- *   - 样本 0 场:完全用联赛先验(baseRate=1.35, 主场=1.28, 球队全部中性 1.0)
+ *   - 样本 0 场:完全用联赛先验(baseRate=1.35, 主场=1.24, 球队全部中性 1.0)
  *   - 样本 1~minMatches-1 场:用 Bayesian shrinkage 把观测进球率与先验混合,
  *     主场优势保留默认值;不学习球队个体强度(避免少样本过拟合)。
  * predictFromFitted 在 fitted.teams[name] 缺失时会退回中性 1.0,
