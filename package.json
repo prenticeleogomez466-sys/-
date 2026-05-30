@@ -39,6 +39,7 @@
     "backtest:shrinkage": "node scripts/run-shrinkage-backtest.mjs",
     "backtest:rho": "node scripts/run-rho-tune-backtest.mjs",
     "backtest:homeadv": "node scripts/run-homeadv-tune-backtest.mjs",
+    "analyze:league-homeadv": "node scripts/run-league-homeadv-analysis.mjs",
     "sync:injuries": "node scripts/sync-free-injuries.mjs",
     "sync:injuries:sofascore": "node scripts/sync-sofascore-injuries.mjs",
     "sources:probe": "node scripts/probe-free-sources.mjs",
