@@ -25,7 +25,11 @@ describe("FF 档 — consistency-derivation 接入 validatePredictionConsistency
     assert.equal(errors.length, 0, `应无 error,得到: ${errors.join("; ")}`);
   });
 
-  it("score 1-0 + handicapPick=客胜(让 -1 → 0-0 平,不该客胜) → 报错", () => {
+  // 2026-05-29 wld 锚改动后:handicap 是独立赔种,direction 直接 = wld,
+  // 不再从 score 反推。即便 "score 1-0 让 -1 → 0-0 平" 与 handicap 标的方向不同,
+  // 也不算内部矛盾(玩 wld 与玩让球是两个独立投注),validatePredictionConsistency
+  // 不应再因此报错。校验只盯 比分/半全场 vs wld。
+  it("score 1-0 + handicapPick 方向独立于 score 让球后结果 → 不报错(wld 锚)", () => {
     const prediction = {
       scorePicks: { primary: "1-0", secondary: "0-0" },
       halfFullPicks: { primary: "主胜-主胜", secondary: "平局-平局" },
@@ -34,7 +38,7 @@ describe("FF 档 — consistency-derivation 接入 validatePredictionConsistency
       handicapPick: { line: -1, direction: "客胜" }
     };
     const errors = validatePredictionConsistency(prediction);
-    assert.ok(errors.some((e) => e.includes("让球方向") || e.includes("派生冲突")), `应捕获让球矛盾,得到: ${errors.join("; ")}`);
+    assert.equal(errors.length, 0, `让球为独立赔种,不应报矛盾,得到: ${errors.join("; ")}`);
   });
 
   it("score 0-0 + handicapPick=客胜(让 -1 → -1,客胜)→ 一致", () => {
@@ -65,9 +69,10 @@ describe("FF 档 — dc matrix 暴露 + extended-markets 端到端", () => {
   it("predictFromFitted 返回结果包含 matrix 字段", () => {
     const fitted = {
       usable: true,
+      // canonicalName 把队名小写化;测试桩键须用 canonical 形式才匹配(删冷启动 fallback 后不再容错)
       teams: {
-        "A": { attack: 1.2, defense: 0.9 },
-        "B": { attack: 0.8, defense: 1.1 }
+        "a": { attack: 1.2, defense: 0.9 },
+        "b": { attack: 0.8, defense: 1.1 }
       },
       homeAdvantage: 0.25,
       baseRate: 1.3,
@@ -83,9 +88,10 @@ describe("FF 档 — dc matrix 暴露 + extended-markets 端到端", () => {
   it("buildExtendedMarkets 从 matrix 派生 7 大玩法", () => {
     const fitted = {
       usable: true,
+      // canonicalName 把队名小写化;测试桩键须用 canonical 形式才匹配(删冷启动 fallback 后不再容错)
       teams: {
-        "A": { attack: 1.2, defense: 0.9 },
-        "B": { attack: 0.8, defense: 1.1 }
+        "a": { attack: 1.2, defense: 0.9 },
+        "b": { attack: 0.8, defense: 1.1 }
       },
       homeAdvantage: 0.25,
       baseRate: 1.3,
@@ -106,7 +112,7 @@ describe("FF 档 — dc matrix 暴露 + extended-markets 端到端", () => {
   it("各玩法概率内部归一(over+under≈1, odd+even≈1)", () => {
     const fitted = {
       usable: true,
-      teams: { "A": { attack: 1.1, defense: 0.95 }, "B": { attack: 0.9, defense: 1.05 } },
+      teams: { "a": { attack: 1.1, defense: 0.95 }, "b": { attack: 0.9, defense: 1.05 } },
       homeAdvantage: 0.25, baseRate: 1.3, rho: -0.08
     };
     const dc = predictFromFitted(fitted, { homeTeam: "A", awayTeam: "B" });
