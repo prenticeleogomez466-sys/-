@@ -244,11 +244,19 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   probabilityAdjustment.fusion = fusion;
   // 温度校准(回测拟合,治过度自信):单调软化,不改 argmax/命中,只把虚高的强热门拉回。
   // 放在 cold-start favorite 收缩之前,软化后多数 favorite 已 <0.65,二者互补不重复收缩。
+  //
+  // 2026-05-30 修 bug:温度在 favBias=-0.37/Brier=0.70 的**无赔率冷启动样本**上拟合出 T≈1.975,
+  //   但原先无差别套到**已被市场校准的混合路径**(favBias≈0/Brier≈0.57),把 0.764 砸到 0.568、
+  //   favBias 反转成 +0.29(过度不自信),信心被系统性压低。校准步早有 hasMarketPrior 闸门跳过
+  //   二次收缩,温度步却漏了同一闸门。修复:温度只软化**无市场先验**路径(那里模型确实过度自信);
+  //   有市场先验时市场价已校准好,跳过温度,交给下游 isotonic-market 近恒等微调。
   let fusedProbs = fusion.probabilities;
   const fusionTemperature = weightProfile?.temperature;
-  if (Number.isFinite(fusionTemperature) && fusionTemperature > 0 && fusionTemperature !== 1) {
+  if (!hasMarketPrior && Number.isFinite(fusionTemperature) && fusionTemperature > 0 && fusionTemperature !== 1) {
     fusedProbs = applyTemperature(fusedProbs, fusionTemperature);
     probabilityAdjustment.temperature = fusionTemperature;
+  } else if (hasMarketPrior && Number.isFinite(fusionTemperature) && fusionTemperature !== 1) {
+    probabilityAdjustment.temperatureSkipped = { value: fusionTemperature, reason: "market-prior-already-calibrated" };
   }
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
   const calibrated = calibrateProbabilities(fusedProbs, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
