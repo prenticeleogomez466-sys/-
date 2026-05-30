@@ -72,13 +72,18 @@ function halfFullKey(m) {
 }
 
 function emptyBucket() {
-  return { n: 0, sumH: 0, sumA: 0, wld: { home: 0, draw: 0, away: 0 }, scores: new Map(), htN: 0, hf: new Map() };
+  return { n: 0, sumH: 0, sumA: 0, wld: { home: 0, draw: 0, away: 0 }, scores: new Map(), htN: 0, hf: new Map(), ou: { o15: 0, o25: 0, o35: 0 } };
 }
 
 function addToBucket(b, m) {
   b.n += 1;
   b.sumH += m.homeGoals;
   b.sumA += m.awayGoals;
+  // 大小球(总进球)经验:学"该情境历史进多少球"——over1.5/2.5/3.5 真实命中
+  const total = m.homeGoals + m.awayGoals;
+  if (total >= 2) b.ou.o15 += 1;
+  if (total >= 3) b.ou.o25 += 1;
+  if (total >= 4) b.ou.o35 += 1;
   const r = m.homeGoals > m.awayGoals ? "home" : m.homeGoals < m.awayGoals ? "away" : "draw";
   b.wld[r] += 1;
   const sk = scoreKey(m.homeGoals, m.awayGoals);
@@ -99,6 +104,13 @@ function finalizeBucket(b) {
     avgGoals: { home: b.sumH / b.n, away: b.sumA / b.n },
     wld: { home: b.wld.home / b.n, draw: b.wld.draw / b.n, away: b.wld.away / b.n },
     drawRate: b.wld.draw / b.n,
+    // 大小球经验频率(总进球 over X.5 = total ≥ X+1):avgTotal 与三条主流盘口的真实命中率
+    overUnder: {
+      avgTotal: (b.sumH + b.sumA) / b.n,
+      over15: b.ou.o15 / b.n,
+      over25: b.ou.o25 / b.n,
+      over35: b.ou.o35 / b.n,
+    },
     scoreDist: dist(b.scores, b.n).slice(0, 12),
     halfFull: { n: b.htN, dist: b.htN ? dist(b.hf, b.htN).slice(0, 9) : [] },
   };
@@ -141,6 +153,7 @@ export function buildExperienceLibrary(matches) {
     global.sumH += L.all.sumH;
     global.sumA += L.all.sumA;
     for (const k of ["home", "draw", "away"]) global.wld[k] += L.all.wld[k];
+    for (const k of ["o15", "o25", "o35"]) global.ou[k] += L.all.ou[k];
     for (const [k, c] of L.all.scores) global.scores.set(k, (global.scores.get(k) ?? 0) + c);
     global.htN += L.all.htN;
     for (const [k, c] of L.all.hf) global.hf.set(k, (global.hf.get(k) ?? 0) + c);

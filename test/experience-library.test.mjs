@@ -66,3 +66,45 @@ test("drawRate 正确反映高平局情境", () => {
   const lib = buildExperienceLibrary(matches);
   assert.ok(lib.leagues["闷平联赛"].drawRate > 0.2);
 });
+
+test("overUnder 经验:高进球联赛偏大球、低进球联赛偏小球", () => {
+  const matches = [];
+  // 高进球:3-2(总5,over1.5/2.5/3.5 全中)
+  for (let i = 0; i < 50; i++) matches.push(synthMatch("大球联赛", 3, 2, { home: 0.5, draw: 0.27, away: 0.23 }));
+  // 低进球:1-0(总1,三条全不中)
+  for (let i = 0; i < 50; i++) matches.push(synthMatch("小球联赛", 1, 0, { home: 0.5, draw: 0.27, away: 0.23 }));
+  const lib = buildExperienceLibrary(matches);
+  const hi = lib.leagues["大球联赛"].overUnder;
+  const lo = lib.leagues["小球联赛"].overUnder;
+  assert.equal(hi.avgTotal, 5);
+  assert.equal(hi.over25, 1); // 全大球
+  assert.equal(hi.over35, 1);
+  assert.equal(lo.avgTotal, 1);
+  assert.equal(lo.over15, 0); // 全小球(总1<2)
+  assert.equal(lo.over25, 0);
+  assert.ok(hi.over25 > lo.over25);
+});
+
+test("overUnder 阈值与全局累积:over15>over25>over35 单调,global 正确汇总", () => {
+  const matches = [];
+  // 一组总进球递增的真实场:1-0,1-1,2-1,2-2,3-1(总1,2,3,4,4)
+  const scores = [[1, 0], [1, 1], [2, 1], [2, 2], [3, 1]];
+  for (let k = 0; k < 30; k++) for (const [h, a] of scores) matches.push(synthMatch("混合联赛", h, a, { home: 0.45, draw: 0.3, away: 0.25 }));
+  const lib = buildExperienceLibrary(matches);
+  const ou = lib.leagues["混合联赛"].overUnder;
+  // 单调:over1.5 ≥ over2.5 ≥ over3.5(更高门槛命中率更低)
+  assert.ok(ou.over15 >= ou.over25 && ou.over25 >= ou.over35);
+  // global 汇总应等于唯一联赛的 overUnder(同一批数据)
+  assert.ok(Math.abs(lib.global.overUnder.over25 - ou.over25) < 1e-9);
+  assert.ok(Math.abs(lib.global.overUnder.avgTotal - ou.avgTotal) < 1e-9);
+});
+
+test("queryExperience 返回结果带 overUnder 字段", () => {
+  const matches = [];
+  for (let i = 0; i < 60; i++) matches.push(synthMatch("挪威超级联赛", 2, 2, { home: 0.5, draw: 0.27, away: 0.23 }));
+  const lib = buildExperienceLibrary(matches);
+  const q = queryExperience(lib, { league: "挪威超级联赛", opening: { home: 0.5, draw: 0.27, away: 0.23 } });
+  assert.ok(q.overUnder);
+  assert.equal(q.overUnder.avgTotal, 4);
+  assert.equal(q.overUnder.over25, 1);
+});

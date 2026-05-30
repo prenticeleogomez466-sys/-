@@ -423,6 +423,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
             experienceBaseline.drawRate >= 0.28 && ranked[0].code !== "1"
               ? `⚠️ 历史同情境平局率 ${(experienceBaseline.drawRate * 100).toFixed(0)}%(${experienceBaseline.n}场),平局风险偏高,可考虑兼顾平局`
               : null,
+          // 大小球经验(2026-05-30):历史同情境真实总进球分布 → 大小球倾向(只提示,不替用户弃赛/不改 wld 锚)
+          overUnder: experienceBaseline.overUnder ?? null,
+          overUnderHint: buildOverUnderHint(experienceBaseline.overUnder, experienceBaseline.n),
         }
       : null,
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
@@ -1285,6 +1288,19 @@ function finiteNumber(value, fallback) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+// 大小球经验提示:历史同情境真实总进球分布 → 给 2.5 球盘口的大/小球倾向(只提示,不替用户决策)。
+// 阈值留缓冲(≥58% 才标方向),样本不足(<30)只给均值不下结论。
+function buildOverUnderHint(ou, n) {
+  if (!ou || !Number.isFinite(ou.over25) || !Number.isFinite(n)) return null;
+  const o25 = Math.round(ou.over25 * 100);
+  const u25 = 100 - o25;
+  const avg = ou.avgTotal != null ? ou.avgTotal.toFixed(2) : "?";
+  if (n < 30) return `📊 历史同情境均总进球 ${avg}(样本${n}场偏少,大小球仅供参考)`;
+  if (ou.over25 >= 0.58) return `📈 历史同情境大球(>2.5)${o25}%、均${avg}球(${n}场),偏大球`;
+  if (ou.over25 <= 0.42) return `📉 历史同情境小球(<2.5)${u25}%、均${avg}球(${n}场),偏小球`;
+  return `📊 历史同情境大球(>2.5)${o25}%、均${avg}球(${n}场),大小球均衡`;
 }
 
 function buildReason(fixture, snapshot, primary, secondary, risk) {
