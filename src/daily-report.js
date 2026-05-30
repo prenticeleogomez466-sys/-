@@ -5,6 +5,7 @@ import { getExportDir } from "./paths.js";
 import { judgmentFactorColumns, judgmentFactorRow } from "./factor-analysis.js";
 import { recommendFixtures, outcomeCodeToChinese, competitionCategory } from "./prediction-engine.js";
 import { auditRecommendations, writeRecommendationAudit } from "./recommendation-audit.js";
+import { runPreExportSelfCheck, selfCheckRows } from "./pre-export-selfcheck.js";
 import { assertLatestRealtimeSourceGate } from "./realtime-source-gate.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 
@@ -31,6 +32,11 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   const audit = auditRecommendations(recommendations);
   const auditPath = writeRecommendationAudit(date, audit);
   if (!audit.ok) throw new Error(`推荐内容审核未通过：${audit.errors.map((item) => item.message).join("；")}`);
+  // 出表前自检闸门(用户硬规则 2026-05-30):全玩法逐场核验,任一 blocker 不出表。
+  const selfCheck = runPreExportSelfCheck(recommendations);
+  if (!selfCheck.ok) {
+    throw new Error(`出表自检未通过(${selfCheck.blockers.length}项,已拦截出表)：${selfCheck.blockers.slice(0, 6).join("；")}${selfCheck.blockers.length > 6 ? " …" : ""}`);
+  }
   const jingcai = recommendations.predictions.filter((prediction) => prediction.fixture.marketType !== "shengfucai");
   const fourteen = recommendations.fourteen.selections;
   // 硬规则:无真实 14 场时,14 场 sheet 给诚实说明行,不把竞彩比赛冒充成 14 场。
@@ -42,6 +48,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   const dailyPath = join(exportDir, `神选-竞彩推荐-${date}.xlsx`);
   const masterPath = join(exportDir, "神选-复盘总表.xlsx");
   writeXlsxWorkbook(dailyPath, [
+    { name: "出表自检", rows: selfCheckRows(selfCheck) },
     { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
     { name: "神选·14场", rows: fourteenRows },
     { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.available === false ? { ok: false, reason: recommendations.fourteen.note ?? "今日无 14 场胜负彩,任选9 不适用。" } : recommendations.fourteen.renxuan9) },
@@ -52,7 +59,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "模型健康", rows: modelHealthRows(sourceGate, audit) }
   ]);
   writeXlsxWorkbook(masterPath, [{ name: "复盘总表", rows: [recapHeaders(), ...ledger.map(Object.values)] }]);
-  return { date, dailyPath, masterPath, recommendations, audit, auditPath, sourceGate, health: { ok: true }, ledgerRows: ledger.length };
+  return { date, dailyPath, masterPath, recommendations, audit, auditPath, selfCheck, sourceGate, health: { ok: true }, ledgerRows: ledger.length };
 }
 
 function toJingcaiRow(prediction) {
