@@ -97,7 +97,9 @@ const dc = fitFromFixtureStore();
 const r = recommendFixtures(date);
 const preds = r.predictions;
 const jingcai = preds.filter((p) => p.fixture.marketType === "jingcai");
-const fourteen = r.fourteen.selections;
+// 尊重 available 闸门:14 场未达"今日可发"条件(无当日比赛/不足14场)时,不渲染选票,显示提示。
+const fourteen = r.fourteen.available === false ? [] : r.fourteen.selections;
+const fourteenNote = r.fourteen.note ?? "当天无 14 场胜负彩期次,本次不发 14 场。";
 
 // 推荐内容审计
 let auditOk = false;
@@ -316,7 +318,7 @@ ${tonight.map(matchCard).join("")}
 ${future.length ? `<h3>未来场次（${future.length} 场,同期在售)</h3>${future.map(matchCard).join("")}` : ""}
 
 <h2>14 场胜负彩${fourteen.length ? `（共 ${fourteen.length} 场,胆码 ${fourteen.filter((s) => String(s.type).includes("胆")).map((s) => s.index).join("、") || "无"}）` : ""}</h2>
-${fourteen.length ? fourteenTable() : "<p>当天无 14 场胜负彩期次,本次不发 14 场。</p>"}
+${fourteen.length ? fourteenTable() : `<p>${esc(fourteenNote)}</p>`}
 
 <h2>预测 ↔ 实际赛果复盘</h2>
 ${recapTable()}
