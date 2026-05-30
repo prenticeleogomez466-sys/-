@@ -100,6 +100,8 @@ export function normalizeMarketSnapshot(snapshot = {}, fallbackDate, index = 0) 
     collectedAt: snapshot.collectedAt ?? snapshot.updatedAt ?? new Date().toISOString(),
     europeanOdds: normalizeOutcomeSet(snapshot.europeanOdds ?? snapshot.euro ?? snapshot.europe),
     asianHandicap: normalizeAsianSet(snapshot.asianHandicap ?? snapshot.asian ?? snapshot.handicap),
+    // 竞彩官方让球线(整数,主队视角):保留 500.com 抓到的真实盘口,供让球玩法用真实线而非默认 0。
+    jingcaiHandicap: normalizeJingcaiHandicap(snapshot.jingcaiHandicap),
     handicapOdds: normalizeOutcomeSet(snapshot.handicapOdds ?? snapshot.rangqiu ?? snapshot.letBall),
     scoreOdds: normalizeScoreSet(snapshot.scoreOdds ?? snapshot.scoreTop ?? snapshot.correctScoreOdds),
     halfFullOdds: normalizeHalfFullSet(snapshot.halfFullOdds ?? snapshot.halfFullTop ?? snapshot.hafuOdds),
@@ -140,6 +142,12 @@ export function assessSnapshotFreshness(snapshot) {
     maxAgeMinutes,
     collectedAt: snapshot.collectedAt,
   };
+}
+
+function normalizeJingcaiHandicap(value) {
+  const line = Number(value?.line);
+  if (!Number.isFinite(line)) return null;
+  return { line, source: value?.source ?? "500.com-jczq" };
 }
 
 function normalizeOutcomeSet(value = {}) {

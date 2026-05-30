@@ -217,10 +217,15 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // score 选满足该 wld 的最高概率比分(已在 buildScorePicks 里做),半全场再跟 score 同步。
   // wld + score 可能不严格"几球领先"对齐 line(例 wld=主胜 + score=1-0 + 让 -1 实际让球后平),
   // 但这是诚实模型的局限,不掩盖。让球玩法的方向 = wld 主推荐方向,跟比分独立解读。
-  const handicapLine = Number(snapshot?.asianHandicap?.current?.line
+  // 让球线优先级:竞彩官方让球线(500.com 抓的整数线,让球玩法的真实盘口)> 亚盘线 > 0。
+  const handicapLine = Number(snapshot?.jingcaiHandicap?.line
+    ?? snapshot?.asianHandicap?.current?.line
     ?? snapshot?.asianHandicap?.initial?.line
     ?? snapshot?.asianHandicap?.final?.line
     ?? 0);
+  const handicapLineSource = Number.isFinite(snapshot?.jingcaiHandicap?.line)
+    ? "500.com-jczq"
+    : (Number.isFinite(Number(snapshot?.asianHandicap?.current?.line ?? snapshot?.asianHandicap?.initial?.line)) ? "asian" : "default-0");
   // 让球方向以胜负平(wld)为锚(用户硬规则 2026-05-30):让球 direction 直接 = wld 主推方向,
   // 不再用 expectedGoals 独立反推。所有派生字段(让球/比分/半全场)统一从 wld 派生,保持口径一致。
   // 注:盘口线 line 仍来自市场,只是方向锚定 wld;netExpected 仅作内部参考量保留在 debug。
@@ -238,6 +243,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       : null;
     return {
       line: handicapLine,
+      lineSource: handicapLineSource,
       direction: ranked[0].label,
       anchor: "wld",
       netExpected: goalDiff !== null ? round(goalDiff + handicapLine) : null,

@@ -115,18 +115,30 @@ export function parseFiveHundredCaptures(captures, date, asianBySeq = null) {
     // 装亚盘 (asian 由调用方注入,seq → { iniHome,iniLine,iniAway,curHome,curLine,curAway,book })
     const asianRaw = asianBySeq?.[f.seq];
     const asianHandicap = buildAsianHandicapSnapshot(asianRaw);
+    // 竞彩官方让球线:从 handicapCell("0 -1" / "单关 0 -2" / "0 +1")解析整数让球数(主队视角,负=让、正=受让)。
+    const jingcaiLine = parseJingcaiHandicapLine(f.handicapCell);
     snapshots.push({
       date, fixtureId: id, sequence: f.seq, marketType: "jingcai",
       competition: f.league, homeTeam: f.homeTeam, awayTeam: f.awayTeam,
       collectedAt: sorted[sorted.length - 1].collectedAt,
       europeanOdds: euroIni || euroCur ? { initial: euroIni ?? euroCur, current: euroCur ?? euroIni } : null,
       asianHandicap,
+      jingcaiHandicap: jingcaiLine !== null ? { line: jingcaiLine, source: "500.com-jczq" } : null,
       handicapOdds: hcpIni || hcpCur ? { initial: hcpIni ?? hcpCur, current: hcpCur ?? hcpIni } : null,
       capturedTimes: sorted.map((c) => c.collectedAt),
       source: SCRAPE_SOURCE,
     });
   }
   return { fixtures, snapshots };
+}
+
+// 从竞彩让球单元格解析整数让球线(主队视角)。格式:"0 -1" / "单关 0 -2" / "0 +1" / "0"。
+// "0" 是让0档标记,其后带符号的整数才是竞彩让球数;无带符号整数(纯让0)返回 null。
+export function parseJingcaiHandicapLine(cell) {
+  const m = String(cell ?? "").match(/[+-]\d+/);
+  if (!m) return null;
+  const line = Number(m[0]);
+  return Number.isFinite(line) ? line : null;
 }
 
 /**
