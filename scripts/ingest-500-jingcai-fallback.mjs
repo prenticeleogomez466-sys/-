@@ -33,11 +33,18 @@ async function main() {
   const spf = parseMatches(spfXml);
   const nspf = parseMatches(nspfXml);
 
-  const todays = spf.filter((m) => m.date === date);
-  if (!todays.length) {
+  // 业务批次 = 竞彩编号系列(6xxx=本批/周六单,7xxx=下一批),与 kickoff 日期无关:
+  //   同一张竞彩单里晚场会跨到次日凌晨开球(如 6014 欧冠决赛/6015 国际赛 kickoff 在 date+1),
+  //   旧逻辑 `m.date === date` 把它们漏掉(15 场只抓到 13)。改为:先取当日场次定位本批系列,
+  //   再纳入该系列全部场次(含次日凌晨开球的同批场)。修复 2026-05-30。
+  const seriesOf = (m) => String(m.matchnum ?? "").slice(0, -3);
+  const datedToday = spf.filter((m) => m.date === date);
+  if (!datedToday.length) {
     console.log(JSON.stringify({ ok: false, date, reason: "500 源当日无竞彩场次", spfTotal: spf.length }, null, 2));
     return;
   }
+  const todaySeries = new Set(datedToday.map(seriesOf).filter(Boolean));
+  const todays = spf.filter((m) => todaySeries.has(seriesOf(m)));
 
   const nspfByNum = new Map(nspf.map((m) => [m.matchnum, m]));
   const collectedAt = new Date().toISOString();
