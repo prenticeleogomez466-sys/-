@@ -25,11 +25,10 @@ describe("FF 档 — consistency-derivation 接入 validatePredictionConsistency
     assert.equal(errors.length, 0, `应无 error,得到: ${errors.join("; ")}`);
   });
 
-  // 2026-05-29 wld 锚改动后:handicap 是独立赔种,direction 直接 = wld,
-  // 不再从 score 反推。即便 "score 1-0 让 -1 → 0-0 平" 与 handicap 标的方向不同,
-  // 也不算内部矛盾(玩 wld 与玩让球是两个独立投注),validatePredictionConsistency
-  // 不应再因此报错。校验只盯 比分/半全场 vs wld。
-  it("score 1-0 + handicapPick 方向独立于 score 让球后结果 → 不报错(wld 锚)", () => {
+  // handicapPick.direction 用 expectedGoals 净期望(λH−μA+line)真算,独立于 wld 与 score。
+  // score=DC 矩阵众数 / handicap=λ 净期望离散化,是同一模型的不同投影,偏态分布下可指向不同
+  // 方向(例 score 最可能 1-0 主胜,handicap 标客胜)。两者都诚实,强制一致会误报,故不校验。
+  it("score 1-0 + handicapPick 方向独立于 score 让球后结果 → 不报错(λ 真算独立投影)", () => {
     const prediction = {
       scorePicks: { primary: "1-0", secondary: "0-0" },
       halfFullPicks: { primary: "主胜-主胜", secondary: "平局-平局" },

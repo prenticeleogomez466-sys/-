@@ -315,10 +315,13 @@ export function validatePredictionConsistency(prediction) {
   for (const [label, score, halfFull] of pathChecks) {
     if (score && halfFull && !scoreHalfFullConsistent(score, halfFull)) errors.push(`${label} ${score} 与 ${halfFull} 路径冲突`);
   }
-  // 2026-05-29:wld 锚改动后,handicap direction = wld 直接,不再从 score 反推。
-  // handicap vs wld 必然一致(直接等);score vs wld 已由上面 checks 校验。
-  // 让球玩法跟比分玩法对用户来说是独立赔种,内部"score 让球后方向 ≠ wld" 不是矛盾,
-  // 只是模型的一个 transparency:同一比分,玩 wld 买主胜、玩让球也买主胜方向。
+  // 2026-05-29:不校验 handicap 方向,是有意为之 —— 但理由不是"handicap = wld 直接"。
+  // 实际上 handicapPick.direction 用 expectedGoals 净期望(λH − μA + line)真算(见上方
+  // handicapPick 生成逻辑),独立于 wld,可以 ≠ wld 也 ≠ score 让球后结果。
+  // 三者是同一模型的不同投影:wld=概率排序 / score=DC 矩阵众数 / handicap=λ 净期望离散化。
+  // 众数与期望在偏态分布下本就可指向不同方向(例:最可能 1-0 主胜,但 λ 净期望偏客),
+  // 两者都诚实、无谁对谁错,强制一致会拿众数否定期望、频繁误报。故只校验
+  // score/半全场 vs wld(checks)与 score vs 半全场路径(pathChecks),不校验 handicap。
   return errors;
 }
 
