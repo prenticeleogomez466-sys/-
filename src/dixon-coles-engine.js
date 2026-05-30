@@ -205,8 +205,14 @@ export function predictFromFitted(fitted, fixture, marketHints = null) {
     if (Number.isFinite(asianLine) && Number.isFinite(totalGoals) && totalGoals > 0.5) {
       const lambdaH = Math.max(0.3, (totalGoals - asianLine) / 2);
       const muA = Math.max(0.3, (totalGoals + asianLine) / 2);
-      const ratio = Math.sqrt(lambdaH / Math.max(0.01, muA));
-      baseRate = (lambdaH + muA) / 2;
+      // 2026-05-30 修复严重 bug:scoreMatrix 里 lambda = baseRate·attackHome·defenseAway,
+      //   而 attackHome=defenseAway=ratio ⇒ lambda = baseRate·ratio²(ratio 被平方)。
+      //   旧式 baseRate=(lambdaH+muA)/2、ratio=√(lambdaH/muA) 会让 lambda 远大于意图的 lambdaH
+      //   (赫尔辛基 意图 2.27 → 实际 4.5),比分被灌成 4-0/5-0 全程领先。
+      //   正确分解:baseRate=√(lambdaH·muA)、ratio=(lambdaH/muA)^¼,使
+      //   lambda = baseRate·ratio² = lambdaH、mu = baseRate/ratio² = muA(数学严格还原)。
+      const ratio = Math.pow(lambdaH / Math.max(0.01, muA), 0.25);
+      baseRate = Math.sqrt(lambdaH * muA);
       attackHome = ratio;       defenseAway = ratio;
       attackAway = 1 / ratio;   defenseHome = 1 / ratio;
       homeAdv = 1;
