@@ -16,7 +16,7 @@ import { fuseSignals, loadFusionWeightProfile, SIGNAL_NAMES } from "./signal-fus
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
 import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
-import { jingcaiWeekdayLabel, sequenceWeekdayPrefix } from "./jingcai-business-day.js";
+import { scopeJingcaiFixtures } from "./jingcai-business-day.js";
 import { buildExtendedMarkets } from "./extended-markets.js";
 import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
 
@@ -65,7 +65,7 @@ export function recommendFixtures(date) {
   const history = loadHistoricalResults({ beforeDate: fixtureSet.date });
   // 限业务日 + 跨源去重(2026-05-30):兜底/多源抓取会把次日(周日)与重复场次(XML 6001 与 Playwright 周六001 同场)
   // 灌进当日,产生 34 场假象;此处收敛到目标业务日的去重竞彩单 + 原样保留 14 场/其它。
-  const scopedFixtures = scopeAndDedupeJingcai(fixtureSet.date, fixtureSet.fixtures);
+  const scopedFixtures = scopeJingcaiFixtures(fixtureSet.date, fixtureSet.fixtures);
   const predictions = harmonizeDuplicatePredictions(scopedFixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history) })));
   return {
     date: fixtureSet.date,
@@ -82,44 +82,13 @@ export function recommendFixtures(date) {
         hierarchical: ratingsBootstrap.hierarchical?.ok ?? false
       }
     } : null,
-    fourteen: buildFourteenPlan(predictions)
+    fourteen: buildFourteenPlan(predictions, fixtureSet.date)
   };
 }
 
-// 把当日 fixture 收敛成"目标业务日的去重竞彩单"。
-//   1. 限业务日:丢掉竞彩编号 周X 前缀与目标日不符的场次(次日漏入);
-//   2. 跨源去重:同一场(canonical 队名相同)只保留一条,优先官方 周X 编号(Playwright)over 数字编号(XML 兜底)
-//      并优先带让球盘/更全的源;
-//   3. 14 场胜负彩(shengfucai)与其它一律原样保留。
-function scopeAndDedupeJingcai(date, fixtures) {
-  const targetLabel = jingcaiWeekdayLabel(date);
-  const jingcai = fixtures.filter((f) => f.marketType === "jingcai");
-  const others = fixtures.filter((f) => f.marketType !== "jingcai");
-  let scoped = jingcai.filter((f) => {
-    const prefix = sequenceWeekdayPrefix(f.sequence);
-    // 有 周X 前缀且与目标日不符 → 丢(次日场次);无前缀(数字编号兜底)留待下一步裁决
-    return !targetLabel || !prefix || prefix === targetLabel;
-  });
-  // 官方 周X 编号存在时,数字编号(XML 兜底,如 6001)只是同一竞彩单的重复源 → 整批丢弃,
-  // 不依赖队名别名匹配(别名表对"神户胜利/神户胜利船"等变体可能未归一,纯靠 identityKey 去重会漏)。
-  // 仅当官方 周X 抓取失败(无任何 周X 场次)时,才退回数字编号兜底。
-  if (scoped.some((f) => sequenceWeekdayPrefix(f.sequence))) {
-    scoped = scoped.filter((f) => sequenceWeekdayPrefix(f.sequence));
-  }
-  const byKey = new Map();
-  for (const f of scoped) {
-    const key = fixtureIdentityKey(f);
-    const existing = byKey.get(key);
-    if (!existing || jingcaiFixturePreference(f) > jingcaiFixturePreference(existing)) byKey.set(key, f);
-  }
-  return [...others, ...byKey.values()];
-}
-
-function jingcaiFixturePreference(fixture) {
-  // 官方 周X 编号(2)优于数字兜底编号(1);带 handicap 标记再 +0.5(信息更全)
-  let score = sequenceWeekdayPrefix(fixture.sequence) ? 2 : 1;
-  if (String(fixture.source ?? "").includes("Playwright")) score += 0.25;
-  return score;
+// 取比赛真实开球日(YYYY-MM-DD)。kickoff 形如 "2026-05-31 21:00";退回 fixture.date。
+function fixtureKickoffDate(fixture) {
+  return String(fixture?.kickoff ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? String(fixture?.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
 }
 
 function harmonizeDuplicatePredictions(predictions) {
@@ -816,12 +785,17 @@ function normalizeHalfFull(value) {
   return raw;
 }
 
-export function buildFourteenPlan(predictions) {
+export function buildFourteenPlan(predictions, date = null) {
   const selected = predictions.filter((prediction) => prediction.fixture.marketType === "shengfucai" || prediction.fixture.tags.includes("14场胜负彩")).slice(0, 14);
   // 硬规则:14 场只在有真实 14 场胜负彩期(恰好 14 场)时才对外发布。
   // 串关/任选9 数学仍照常计算(供单元测试与内部分析),但用 available=false 标记,
   // 由报告层据此决定是否展示,避免把当日竞彩比赛冒充成 14 场。
-  const hasRealFourteen = selected.length === 14;
+  // 2026-05-30 追加:胜负彩整期提前数日开售,但比赛在未来(如第 26083 期 05-27 开售、赛在 05-31~06-02)。
+  // 若传入推荐日,则还要求本期至少有一场比赛落在当天,否则不算"今日 14 场",不发(避免把未来期混进今天的单)。
+  const matchOnDate = !date || selected.some((p) => fixtureKickoffDate(p.fixture) === date);
+  const fourteenFull = selected.length === 14;
+  const hasRealFourteen = fourteenFull && matchOnDate;
+  const periodLabel = (selected[0]?.fixture?.notes ?? "").match(/第\d+期/)?.[0] ?? "本期";
   const source = selected.length ? selected : predictions.slice(0, 14);
   const rules = fourteenSelectionRules();
   // 冷启动模式:当所有 prediction 都没有真实高级数据(quality.score 一律 D 级 ≤ 62),
@@ -961,7 +935,11 @@ export function buildFourteenPlan(predictions) {
 
   return {
     available: hasRealFourteen,
-    note: hasRealFourteen ? undefined : "今日无 14 场胜负彩(不足 14 场),按硬规则不发 14 场。",
+    note: hasRealFourteen
+      ? undefined
+      : fourteenFull && !matchOnDate
+        ? `14 场胜负彩${periodLabel}比赛日不在 ${date}(本期赛在未来),按规则今日不发 14 场。`
+        : "今日无 14 场胜负彩(不足 14 场),按硬规则不发 14 场。",
     count: selections.length,
     singleLine: selections.map((item) => item.single).join(" "),
     compoundLine: selections.map((item) => item.compound).join(" "),

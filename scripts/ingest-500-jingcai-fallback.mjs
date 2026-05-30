@@ -16,6 +16,7 @@
 import "../src/env.js";
 import { saveFixtures, loadFixtures } from "../src/fixture-store.js";
 import { saveMarketSnapshots, loadMarketSnapshots } from "../src/market-data-store.js";
+import { scopeJingcaiFixtures } from "../src/jingcai-business-day.js";
 
 const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
 const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml";
@@ -88,7 +89,10 @@ async function main() {
   const mergedSource = keepFixtures.length
     ? `merged:${[...new Set(keepFixtures.map((f) => f.source).filter(Boolean))].join("+")}+500.com-jczq-fallback`
     : "500.com-jczq-fallback";
-  const fixturesSaved = saveFixtures(date, [...keepFixtures, ...fixtures], { source: mergedSource });
+  // 按业务日覆盖式落盘:对合并后的竞彩限当日 + 跨源去重(周六 vs 6001 重复 / 周日次日),
+  // 避免反复兜底把场次越叠越多(17→35→48)。14 场/其它源原样保留。
+  const scopedFixtures = scopeJingcaiFixtures(date, [...keepFixtures, ...fixtures]);
+  const fixturesSaved = saveFixtures(date, scopedFixtures, { source: mergedSource });
   // 合并既有快照(不破坏其它源),再保存
   const previous = loadMarketSnapshots(date).snapshots.filter((s) => s.source !== "500.com-jczq-fallback");
   const marketSaved = saveMarketSnapshots(date, [...previous, ...snapshots], { source: mergedSource });

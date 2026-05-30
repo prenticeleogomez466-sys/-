@@ -14,6 +14,7 @@
  * 这是兜底数据源,失败容忍度高:单行字段缺失则跳过该行,不抛错。
  */
 import { loadFixtures, saveFixtures } from "./fixture-store.js";
+import { scopeJingcaiFixtures } from "./jingcai-business-day.js";
 import { loadMarketSnapshots, saveMarketSnapshots } from "./market-data-store.js";
 import { getDataSubdir } from "./paths.js";
 import { existsSync, readFileSync } from "node:fs";
@@ -208,7 +209,9 @@ export function stageJingcaiIntoStore(date, captures, asianBySeq = null) {
 
   const existing = loadFixtures(date);
   const kept = existing.fixtures.filter((f) => f.marketType === "shengfucai");
-  saveFixtures(date, [...kept, ...fixtures], {
+  // 按业务日覆盖式落盘:限当日 + 跨源去重,杜绝次日(周日)场次/重复源累加进当日文件。
+  const scoped = scopeJingcaiFixtures(date, [...kept, ...fixtures]);
+  saveFixtures(date, scoped, {
     source: `${existing.source} + 500.com-jingcai-fallback`,
   });
 

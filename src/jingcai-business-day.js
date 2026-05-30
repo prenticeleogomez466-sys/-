@@ -6,6 +6,8 @@
 //     - sequenceWeekdayPrefix(sequence):从竞彩编号取 周X 前缀(无前缀返回 null)
 //   供 prediction-engine 限业务日+去重、recommendation-audit 实质校验共用。
 
+import { canonicalTeamName } from "./team-aliases.js";
+
 const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 export function jingcaiWeekdayLabel(date) {
@@ -21,4 +23,37 @@ export function jingcaiWeekdayLabel(date) {
 export function sequenceWeekdayPrefix(sequence) {
   const m = String(sequence ?? "").match(/^周[一二三四五六日]/);
   return m ? m[0] : null;
+}
+
+// 把一批 fixture 收敛成"目标业务日的去重竞彩单":
+//   1. 限业务日:丢掉竞彩编号 周X 前缀与目标日不符的场次(次日漏入当日);
+//   2. 跨源去重:同一场(canonical 队名相同)只留一条,优先官方 周X 编号 over 数字兜底编号(如 6001),
+//      Playwright 源再加权(信息更全);存在官方 周X 编号时整批丢数字编号(别名表对队名变体可能未归一,
+//      纯 identityKey 去重会漏);
+//   3. 14 场胜负彩(shengfucai)及其它一律原样保留。
+// 落盘路径与预测读取路径共用此函数,保证"按业务日覆盖式落盘"与读取一致。
+export function scopeJingcaiFixtures(date, fixtures) {
+  const targetLabel = jingcaiWeekdayLabel(date);
+  const jingcai = (fixtures ?? []).filter((f) => f.marketType === "jingcai");
+  const others = (fixtures ?? []).filter((f) => f.marketType !== "jingcai");
+  let scoped = jingcai.filter((f) => {
+    const prefix = sequenceWeekdayPrefix(f.sequence);
+    return !targetLabel || !prefix || prefix === targetLabel;
+  });
+  if (scoped.some((f) => sequenceWeekdayPrefix(f.sequence))) {
+    scoped = scoped.filter((f) => sequenceWeekdayPrefix(f.sequence));
+  }
+  const byKey = new Map();
+  for (const f of scoped) {
+    const key = `${canonicalTeamName(f.homeTeam)}__${canonicalTeamName(f.awayTeam)}`;
+    const existing = byKey.get(key);
+    if (!existing || jingcaiFixturePreference(f) > jingcaiFixturePreference(existing)) byKey.set(key, f);
+  }
+  return [...others, ...byKey.values()];
+}
+
+function jingcaiFixturePreference(fixture) {
+  let score = sequenceWeekdayPrefix(fixture.sequence) ? 2 : 1;
+  if (String(fixture.source ?? "").includes("Playwright")) score += 0.25;
+  return score;
 }
