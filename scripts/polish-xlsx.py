@@ -7,7 +7,7 @@
 - 胜平负列条件染色:主胜 浅绿 / 平局 金黄 / 客胜 浅红(配合神选金色调)
 - 胆码列:深金色高亮加粗(神级推荐)
 - 信心列:🟢 加粗深紫,🔴 加粗深红
-- 底部加签名行"⚡ Claude 神选 · 独立推断 · 不依赖 Codex"
+- 底部加签名行"⚡ Claude 神选 · 独立大模型 · 自主推断"
 """
 import sys, re
 from openpyxl import load_workbook
@@ -161,7 +161,7 @@ for sheet_name in wb.sheetnames:
 
     # === 底部签名 ===
     sign_row = ws.max_row + 2
-    ws.cell(sign_row, 1, value=f"⚡ Claude 神选 · 独立推断 · {DATE_STR} · 不依赖 Codex")
+    ws.cell(sign_row, 1, value=f"⚡ Claude 神选 · 独立大模型 · 自主推断 · {DATE_STR}")
     ws.merge_cells(start_row=sign_row, start_column=1, end_row=sign_row, end_column=max_col)
     sc = ws.cell(sign_row, 1)
     sc.font = SIGN_FONT
