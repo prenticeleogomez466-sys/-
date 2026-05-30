@@ -97,6 +97,34 @@ function hasFile(name) {
   return srcFiles().includes(name);
 }
 
+// isWired(name):该模块是否**真接进生产预测/复盘路径**(而非仅文件存在)。
+// 修"你审计是干嘛的":文件在 ≠ 在跑。能力分只认真跑的模块,杜绝把死技能算成能力欺骗用户。
+let _wiredCache = null;
+function wiredModules() {
+  if (_wiredCache) return _wiredCache;
+  const prodEntries = ["prediction-engine.js", "daily-evolution.js", "daily-recap.js"];
+  const localDeps = (file) => {
+    let code = "";
+    try { code = readFileSync(join(srcDir(), file), "utf8"); } catch { return []; }
+    const out = new Set();
+    const pats = [
+      /(?:import|export)[\s\S]*?from\s*["']\.\/([\w./-]+?)(?:\.js)?["']/g,
+      /import\s*["']\.\/([\w./-]+?)(?:\.js)?["']/g,
+      /import\(\s*["']\.\/([\w./-]+?)(?:\.js)?["']\s*\)/g,
+    ];
+    for (const re of pats) { let m; while ((m = re.exec(code))) out.add(m[1].split("/").pop() + ".js"); }
+    return [...out];
+  };
+  const seen = new Set(), q = [...prodEntries];
+  while (q.length) { const f = q.shift(); if (seen.has(f)) continue; seen.add(f);
+    for (const d of localDeps(f)) if (!seen.has(d)) q.push(d); }
+  _wiredCache = seen;
+  return seen;
+}
+function isWired(name) {
+  return wiredModules().has(name);
+}
+
 // ───── 检查函数 ─────
 
 function countDataSources() {
@@ -154,17 +182,19 @@ function countTeamRatings() {
 }
 
 function hasStackerAndEnsemble() {
-  // GG 档:linear-stacker 删除,bb 档 weights:search + signal-fusion-layer 替代
-  const sfl = hasFile("signal-fusion-layer.js");
-  const re = hasFile("ratings-ensemble.js");
-  const idp = hasFile("integrated-deep-pipeline.js");
-  const aw = hasFile("auto-weight-optimizer.js");
+  // 诚实修正(2026-05-30):能力分只认**真接进生产路径**的模块(isWired),不再"文件在就给分"。
+  //   integrated-deep-pipeline 长期没接进 predictFixture(死技能),不能再白给 2 分欺骗自评。
+  const sfl = isWired("signal-fusion-layer.js");
+  const re = isWired("ratings-ensemble.js");
+  const idp = isWired("integrated-deep-pipeline.js");
+  const aw = isWired("auto-weight-optimizer.js");
   return { score: (sfl ? 1 : 0) + (re ? 2 : 0) + (idp ? 2 : 0) + (aw ? 1 : 0), max: 6 };
 }
 
 function countCalibrationModules() {
+  // 诚实修正:conformal-prediction 文件在但没接进生产校准 → 不算校准能力分(isWired 把关)。
   const mods = ["model-calibration", "temperature-calibration", "conformal-prediction"];
-  const count = mods.filter((m) => hasFile(`${m}.js`)).length;
+  const count = mods.filter((m) => isWired(`${m}.js`)).length;
   return { score: Math.min(5, count * 1.7), found: count, max: 5 };
 }
 
