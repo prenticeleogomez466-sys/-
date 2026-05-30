@@ -41,7 +41,7 @@ export function resetExperienceLibraryCache() {
  * @param {Object} [snapshot]  用于取亚盘线细化
  * @returns {Object|null} queryExperience 结果(含 avgGoals/wld/drawRate/scoreDist/halfFull/source)
  */
-export function getExperienceBaseline(fixture, probabilities, snapshot = null) {
+export function getExperienceBaseline(fixture, probabilities, snapshot = null, marketProbs = null) {
   const lib = loadExperienceLibrary();
   if (!lib || !fixture?.competition || !probabilities) return null;
   const asianLine = Number(
@@ -50,9 +50,14 @@ export function getExperienceBaseline(fixture, probabilities, snapshot = null) {
       snapshot?.jingcaiHandicap?.line ??
       NaN
   );
+  // opening 用市场开盘隐含概率(若有)定档/算漂移;否则退回模型概率。
+  // closing 用市场当前(收盘)隐含概率——开盘+收盘双价齐全才出"赔率漂移"经验。
+  const opening = marketProbs?.opening ?? probabilities;
+  const closing = marketProbs?.closing ?? null;
   return queryExperience(lib, {
     league: fixture.competition,
-    opening: probabilities,
+    opening,
+    closing,
     asianLine: Number.isFinite(asianLine) ? asianLine : undefined,
   });
 }

@@ -9,8 +9,8 @@ function synthMatch(league, h, a, prob, opts = {}) {
     awayGoals: a,
     halfHome: opts.halfHome ?? null,
     halfAway: opts.halfAway ?? null,
-    odds: prob,
-    oddsClose: prob,
+    odds: opts.openProb ?? prob, // 开盘(默认 = 收盘,除非显式给 openProb)
+    oddsClose: prob, // 收盘(用于定档)
     asian: opts.asian ?? null,
   };
 }
@@ -107,4 +107,39 @@ test("queryExperience 返回结果带 overUnder 字段", () => {
   assert.ok(q.overUnder);
   assert.equal(q.overUnder.avgTotal, 4);
   assert.equal(q.overUnder.over25, 1);
+});
+
+test("赔率漂移分档:开→收位移分热门走强/走弱,聚合各档真实 WLD", () => {
+  const matches = [];
+  // 热门走强(开0.45→收0.58,被加注):主队多赢
+  for (let i = 0; i < 40; i++)
+    matches.push(synthMatch("漂移联赛", i < 30 ? 2 : 0, i < 30 ? 0 : 1, { home: 0.58, draw: 0.24, away: 0.18 }, { openProb: { home: 0.45, draw: 0.3, away: 0.25 } }));
+  // 热门走弱(开0.58→收0.45,被抛):主队赢得少
+  for (let i = 0; i < 40; i++)
+    matches.push(synthMatch("漂移联赛", i < 15 ? 1 : 0, i < 15 ? 0 : 1, { home: 0.45, draw: 0.3, away: 0.25 }, { openProb: { home: 0.58, draw: 0.24, away: 0.18 } }));
+  const lib = buildExperienceLibrary(matches);
+  const L = lib.leagues["漂移联赛"];
+  assert.ok(L.driftTiers["home|热门走强"]);
+  assert.ok(L.driftTiers["home|热门走弱"]);
+  // 走强档主胜率应高于走弱档(steam 效应)
+  assert.ok(L.driftTiers["home|热门走强"].wld.home > L.driftTiers["home|热门走弱"].wld.home);
+});
+
+test("queryExperience 开盘+收盘双价齐 → 结果带 drift;缺收盘则无 drift", () => {
+  const matches = [];
+  for (let i = 0; i < 40; i++)
+    matches.push(synthMatch("漂移测试联赛", 2, 0, { home: 0.6, draw: 0.23, away: 0.17 }, { openProb: { home: 0.48, draw: 0.3, away: 0.22 } }));
+  const lib = buildExperienceLibrary(matches);
+  // 双价:有 drift
+  const withDrift = queryExperience(lib, {
+    league: "漂移测试联赛",
+    opening: { home: 0.48, draw: 0.3, away: 0.22 },
+    closing: { home: 0.6, draw: 0.23, away: 0.17 },
+  });
+  assert.ok(withDrift.drift);
+  assert.equal(withDrift.drift.driftBand, "热门走强");
+  assert.equal(withDrift.drift.side, "home");
+  // 只有开盘:无 drift(优雅降级)
+  const noDrift = queryExperience(lib, { league: "漂移测试联赛", opening: { home: 0.6, draw: 0.23, away: 0.17 } });
+  assert.equal(noDrift.drift, undefined);
 });

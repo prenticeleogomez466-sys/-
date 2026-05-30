@@ -59,6 +59,23 @@ function asianBand(line) {
   return `${sign}两半+`;
 }
 
+// 赔率开→收漂移分档:学"赔率变化方向→结果"。以收盘(最锐价)定热门方,量该方
+// 开→收隐含概率位移:走强=被加注(steam in)、走弱=被抛(drift out)。
+// 仅主源同时有开盘(odds)+收盘(oddsClose)才分档;只有单边价的场返回 null,优雅降级。
+function driftBand(opening, closing) {
+  if (!opening || !closing) return null;
+  const cf = frameOf(closing);
+  if (!cf || cf.side === "draw") return null;
+  const side = cf.side; // home/away
+  const openP = side === "home" ? opening.home : opening.away;
+  const closeP = side === "home" ? closing.home : closing.away;
+  if (!Number.isFinite(openP) || !Number.isFinite(closeP)) return null;
+  const shift = closeP - openP;
+  if (shift >= 0.03) return "热门走强"; // 收盘比开盘更看好热门(被加注)
+  if (shift <= -0.03) return "热门走弱"; // 收盘转冷(被抛/冷门加注)
+  return "盘口平稳";
+}
+
 function scoreKey(h, a) {
   // 比分封顶,避免长尾(>=4 归到 4)
   const cap = (x) => Math.min(x, 4);
@@ -130,12 +147,19 @@ export function buildExperienceLibrary(matches) {
     if (!frame) continue;
     used += 1;
     const lg = m.league;
-    if (!leagues.has(lg)) leagues.set(lg, { all: emptyBucket(), tiers: new Map(), asianTiers: new Map() });
+    if (!leagues.has(lg)) leagues.set(lg, { all: emptyBucket(), tiers: new Map(), asianTiers: new Map(), driftTiers: new Map() });
     const L = leagues.get(lg);
     addToBucket(L.all, m);
     const tierKey = `${frame.side}|${favBand(frame.favProb)}`;
     if (!L.tiers.has(tierKey)) L.tiers.set(tierKey, emptyBucket());
     addToBucket(L.tiers.get(tierKey), m);
+    // 赔率漂移细化(需开盘+收盘双价):学该联赛"赔率变化方向→结果"
+    const db = driftBand(m.odds, m.oddsClose);
+    if (db) {
+      const dKey = `${frame.side}|${db}`;
+      if (!L.driftTiers.has(dKey)) L.driftTiers.set(dKey, emptyBucket());
+      addToBucket(L.driftTiers.get(dKey), m);
+    }
     // 亚盘细化(仅主源有 asian.line)
     const ab = asianBand(m.asian?.lineClose ?? m.asian?.line ?? null);
     if (ab) {
@@ -162,7 +186,9 @@ export function buildExperienceLibrary(matches) {
     for (const [k, b] of L.tiers) tiers[k] = finalizeBucket(b);
     const asianTiers = {};
     for (const [k, b] of L.asianTiers) asianTiers[k] = finalizeBucket(b);
-    leaguesOut[lg] = { ...finalizeBucket(L.all), tiers, asianTiers, hasHalfTime: L.all.htN > 0 };
+    const driftTiers = {};
+    for (const [k, b] of L.driftTiers) driftTiers[k] = finalizeBucket(b);
+    leaguesOut[lg] = { ...finalizeBucket(L.all), tiers, asianTiers, driftTiers, hasHalfTime: L.all.htN > 0 };
   }
 
   return {
@@ -182,10 +208,26 @@ const MIN_TIER_N = 30; // 档样本下限,不足退回联赛级
 const MIN_LEAGUE_N = 40; // 联赛样本下限,不足退回 global
 
 /**
+ * 给一场比赛查"赔率开→收漂移"经验:同联赛同热门方+漂移方向的历史 WLD/大小球。
+ * 需 opening + closing 双价才能定漂移方向;只有单价或样本不足返回 null。
+ * @returns {Object|null} { driftBand, side, n, wld, drawRate, overUnder }
+ */
+function queryDriftContext(L, q) {
+  if (!L || !q.opening || !q.closing) return null;
+  const db = driftBand(q.opening, q.closing);
+  if (!db) return null;
+  const cf = frameOf(q.closing);
+  if (!cf) return null;
+  const b = L.driftTiers?.[`${cf.side}|${db}`];
+  if (!b || b.n < MIN_TIER_N) return null;
+  return { driftBand: db, side: cf.side, n: b.n, wld: b.wld, drawRate: b.drawRate, overUnder: b.overUnder };
+}
+
+/**
  * 查询经验库:给新比赛找最相似历史情境。
  * @param {Object} lib  buildExperienceLibrary 产物
  * @param {Object} q    { league, opening:{home,draw,away}, closing?, asianLine? }
- * @returns {Object|null} { source, n, avgGoals, wld, drawRate, scoreDist, halfFull, matchedKey }
+ * @returns {Object|null} { source, n, avgGoals, wld, drawRate, scoreDist, halfFull, overUnder, matchedKey, drift? }
  */
 export function queryExperience(lib, q) {
   if (!lib?.leagues) return null;
@@ -193,22 +235,25 @@ export function queryExperience(lib, q) {
   const frame = frameOf(prob);
   if (!frame) return null;
   const L = lib.leagues[q.league];
+  // 赔率漂移情境(独立于主基线档,附加在结果上供透明展示)
+  const drift = queryDriftContext(L, q);
+  const withDrift = (r) => (drift ? { ...r, drift } : r);
   // 1) 亚盘细化档(主源,最精确)
   if (L && q.asianLine !== null && q.asianLine !== undefined) {
     const ab = asianBand(q.asianLine);
     const k = `${frame.side}|${ab}`;
     const b = L.asianTiers?.[k];
-    if (b && b.n >= MIN_TIER_N) return { ...b, source: `联赛+亚盘档(${q.league}/${k})`, matchedKey: k };
+    if (b && b.n >= MIN_TIER_N) return withDrift({ ...b, source: `联赛+亚盘档(${q.league}/${k})`, matchedKey: k });
   }
   // 2) 联赛 + 热门强度档
   if (L) {
     const k = `${frame.side}|${favBand(frame.favProb)}`;
     const b = L.tiers?.[k];
-    if (b && b.n >= MIN_TIER_N) return { ...b, source: `联赛+热门档(${q.league}/${k})`, matchedKey: k };
+    if (b && b.n >= MIN_TIER_N) return withDrift({ ...b, source: `联赛+热门档(${q.league}/${k})`, matchedKey: k });
     // 3) 联赛级
-    if (L.n >= MIN_LEAGUE_N) return { ...L, tiers: undefined, asianTiers: undefined, source: `联赛级(${q.league})`, matchedKey: "league" };
+    if (L.n >= MIN_LEAGUE_N) return withDrift({ ...L, tiers: undefined, asianTiers: undefined, driftTiers: undefined, source: `联赛级(${q.league})`, matchedKey: "league" });
   }
   // 4) 全局兜底
-  if (lib.global) return { ...lib.global, source: "全局经验", matchedKey: "global" };
+  if (lib.global) return withDrift({ ...lib.global, source: "全局经验", matchedKey: "global" });
   return null;
 }

@@ -286,7 +286,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //       ② 暴露历史平局率,供平局风险提示。不改 wld argmax(锚定硬规则)。
   const experienceBaseline = options.experienceBaseline === null
     ? null
-    : (options.experienceBaseline ?? getExperienceBaseline(fixture, probabilities, snapshot));
+    : (options.experienceBaseline ?? getExperienceBaseline(fixture, probabilities, snapshot, {
+        opening: fusionContext.openingOdds ?? null,
+        closing: fusionContext.currentOdds ?? oddsProbabilities ?? null,
+      }));
   const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations, experienceBaseline });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
@@ -426,6 +429,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
           // 大小球经验(2026-05-30):历史同情境真实总进球分布 → 大小球倾向(只提示,不替用户弃赛/不改 wld 锚)
           overUnder: experienceBaseline.overUnder ?? null,
           overUnderHint: buildOverUnderHint(experienceBaseline.overUnder, experienceBaseline.n),
+          // 赔率漂移经验(2026-05-30):历史"同联赛+热门方+开→收漂移方向"的真实 WLD,
+          // 学"赔率变化→结果"。只在开盘+收盘双价齐全时出;纯透明展示,不改 wld 锚。
+          drift: experienceBaseline.drift ?? null,
+          driftHint: buildDriftHint(experienceBaseline.drift),
         }
       : null,
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
@@ -1301,6 +1308,21 @@ function buildOverUnderHint(ou, n) {
   if (ou.over25 >= 0.58) return `📈 历史同情境大球(>2.5)${o25}%、均${avg}球(${n}场),偏大球`;
   if (ou.over25 <= 0.42) return `📉 历史同情境小球(<2.5)${u25}%、均${avg}球(${n}场),偏小球`;
   return `📊 历史同情境大球(>2.5)${o25}%、均${avg}球(${n}场),大小球均衡`;
+}
+
+// 赔率漂移经验提示:历史"该联赛+热门方+开→收漂移方向"的真实 WLD → 给"赔率变化→结果"的透明读数。
+// side=home 时 wld.home 即热门(主队)兑现率;side=away 时热门兑现率 = wld.away。只提示不改方向。
+function buildDriftHint(drift) {
+  if (!drift || !drift.wld || !Number.isFinite(drift.n)) return null;
+  const favRate = Math.round((drift.side === "away" ? drift.wld.away : drift.wld.home) * 100);
+  const favLabel = drift.side === "away" ? "客队(热门)" : "主队(热门)";
+  const move =
+    drift.driftBand === "热门走强"
+      ? "赔率收盘比开盘更看好热门(被加注)"
+      : drift.driftBand === "热门走弱"
+      ? "赔率收盘转冷、热门被抛"
+      : "开→收盘口平稳";
+  return `🔀 历史同情境(${move}):${favLabel}兑现 ${favRate}%(${drift.n}场)`;
 }
 
 function buildReason(fixture, snapshot, primary, secondary, risk) {
