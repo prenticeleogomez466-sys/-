@@ -37,6 +37,7 @@
     "sources:probe": "node scripts/probe-free-sources.mjs",
     "analyze:deep": "node scripts/run-analyze-deep.mjs",
     "jingcai:daily": "node scripts/jingcai-daily.mjs",
+    "analog:report": "node scripts/analog-report.mjs",
     "report:html": "node scripts/render-recommendation-html.mjs",
     "daily": "node src/daily-evolution.js",
     "daily:fallback": "node scripts/daily-with-fallback.mjs",
