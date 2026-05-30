@@ -38,6 +38,7 @@
     "backtest:asian": "node scripts/run-asian-backtest.mjs",
     "backtest:halffull": "node scripts/run-halffull-backtest.mjs",
     "sim:kelly": "node scripts/run-kelly-sensitivity.mjs",
+    "backtest:vennabers": "node scripts/run-vennabers-backtest.mjs",
     "backtest:shrinkage": "node scripts/run-shrinkage-backtest.mjs",
     "backtest:rho": "node scripts/run-rho-tune-backtest.mjs",
     "backtest:homeadv": "node scripts/run-homeadv-tune-backtest.mjs",
