@@ -76,6 +76,7 @@ export function fitFromFixtureStore(opts = {}) {
     iterations: opts.iterations ?? 80,
     homeAdvantage,
     decayHalfLife: opts.decayDays ?? 180,
+    shrinkageK: opts.shrinkageK ?? 2, // 经验贝叶斯收缩默认 K=2(backtest:shrinkage 实证:赛季初小样本 LogLoss +0.71%、全样本/命中率不劣化、只动低出场队)
   });
   fitted.usable = true;
   fitted.coldStart = false;
@@ -126,6 +127,7 @@ export function fitFromMatches(rawMatches = [], opts = {}) {
     iterations: opts.iterations ?? 80,
     homeAdvantage,
     decayHalfLife: opts.decayDays ?? 180,
+    shrinkageK: opts.shrinkageK ?? 2, // 经验贝叶斯收缩默认 K=2(backtest:shrinkage 实证:赛季初小样本 LogLoss +0.71%、全样本/命中率不劣化、只动低出场队)
   });
   fitted.usable = true;
   fitted.coldStart = false;
@@ -410,10 +412,13 @@ function fit(matches, opts) {
   matches.forEach((m) => { ensure(m.home); ensure(m.away); });
 
   let totalGoals = 0, totalWeightedMatches = 0;
+  const appear = {}; // 每队加权出场数(= 有效样本量),供经验贝叶斯收缩用
   for (const m of matches) {
     const w = timeWeight(m.daysAgo, halfLife);
     totalGoals += (m.homeGoals + m.awayGoals) * w;
     totalWeightedMatches += w;
+    appear[m.home] = (appear[m.home] ?? 0) + w;
+    appear[m.away] = (appear[m.away] ?? 0) + w;
   }
   const baseRate = totalWeightedMatches > 0 ? totalGoals / (2 * totalWeightedMatches) : 1.35;
 
@@ -436,6 +441,19 @@ function fit(matches, opts) {
     for (const name of Object.keys(teams)) {
       if (adjA[name].expected > 0) teams[name].attack *= damp(adjA[name].actual / adjA[name].expected);
       if (adjD[name].expected > 0) teams[name].defense *= damp(adjD[name].actual / adjD[name].expected);
+    }
+  }
+
+  // 经验贝叶斯收缩(可选,opts.shrinkageK):低出场数球队的 attack/defense 向联赛均值 1.0
+  // 收缩,强度随有效样本数 n 递减(shrink = n/(n+K))。升班马/赛季初样本少 → 估计噪声大,
+  // 收缩防过拟合。K=0 关闭(默认,向后兼容)。2503.19095 警示收缩非灵丹 → 由 backtest:shrinkage 定 K。
+  const K = opts.shrinkageK ?? 0;
+  if (K > 0) {
+    for (const name of Object.keys(teams)) {
+      const n = appear[name] ?? 0;
+      const shrink = n / (n + K);
+      teams[name].attack = 1 + (teams[name].attack - 1) * shrink;
+      teams[name].defense = 1 + (teams[name].defense - 1) * shrink;
     }
   }
 
