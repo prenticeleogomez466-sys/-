@@ -26,7 +26,7 @@ function stubPrediction(seq, home, away, marketType = "jingcai") {
     probabilities: { win: 0.4, draw: 0.3, lose: 0.3 },
     scorePicks: { primary: "1-0", secondary: "2-1", source: "poisson-derived-from-lambda" },
     halfFullPicks: { primary: "胜/胜", secondary: "平/胜", source: "poisson-half-joint" },
-    handicapPick: { line: 0, direction: "主胜", anchor: "wld", coverProbability: 0.55, expectedGoalDiff: 0.4, modelFairLine: 0 },
+    handicapPick: { line: 0, lineSource: "500.com-jczq", direction: "主胜", anchor: "wld", coverProbability: 0.55, expectedGoalDiff: 0.4, modelFairLine: 0, coverBreakdown: { home: 0.55, push: 0.2, away: 0.25 } },
     marketSnapshot: { europeanOdds: {} }
   };
 }

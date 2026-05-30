@@ -13,6 +13,8 @@ const exportDir = getExportDir();
 // 任何不在白名单的来源(尤其历史死表 scoreForOutcome)都视为未真实跑出 → 自检报错。
 const REAL_SCORE_SOURCES = new Set(["market", "dixon-coles", "dixon-coles:market-derived", "poisson-derived-from-lambda", "poisson-matrix", "dc-matrix"]);
 const REAL_HALFFULL_SOURCES = new Set(["market", "poisson-half-joint"]);
+// 让球线允许的可追溯来源:竞彩官方(500.com)/ 亚盘 / 无盘口时的诚实默认 0。
+const HANDICAP_LINE_SOURCES = new Set(["500.com-jczq", "asian", "default-0"]);
 
 export function auditRecommendations(recommendations) {
   const checks = [];
@@ -53,6 +55,13 @@ export function auditRecommendations(recommendations) {
         if (!Number.isFinite(h.coverProbability)) checks.push({ level: "error", message: `${label} 让球覆盖概率缺失——未真实跑出` });
         if (!Number.isFinite(h.expectedGoalDiff)) checks.push({ level: "error", message: `${label} 让球净期望缺失——未真实跑出` });
         if (!Number.isFinite(h.modelFairLine)) checks.push({ level: "error", message: `${label} 让球模型公平线缺失——未真实跑出` });
+        // 让球线来源必须可追溯(竞彩官方/亚盘/默认0),不得无来源
+        if (!HANDICAP_LINE_SOURCES.has(h.lineSource)) checks.push({ level: "error", message: `${label} 让球线来源不可追溯(${h.lineSource ?? "缺失"})` });
+        // 让球后覆盖三态(主/走盘/客)必须真泊松归一,验证覆盖概率非编造
+        const cb = h.coverBreakdown;
+        if (!cb || Math.abs(Number(cb.home || 0) + Number(cb.push || 0) + Number(cb.away || 0) - 1) > 0.02) {
+          checks.push({ level: "error", message: `${label} 让球覆盖三态未归一——疑似非真实矩阵` });
+        }
       }
     }
   }
