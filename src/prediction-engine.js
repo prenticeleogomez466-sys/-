@@ -203,23 +203,16 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     ?? snapshot?.asianHandicap?.initial?.line
     ?? snapshot?.asianHandicap?.final?.line
     ?? 0);
-  // 让球方向真算:用 expectedGoals λ_home - μ_away 加 line,得到让球后净期望
-  // λH - μA + line > 0.3 → 主胜让球;< -0.3 → 客胜让球;否则平局
-  // 这样让球方向独立于 wld(不只是复制),反映"主队让球后还有多大优势"的真预测
+  // 让球方向以胜负平(wld)为锚(用户硬规则 2026-05-30):让球 direction 直接 = wld 主推方向,
+  // 不再用 expectedGoals 独立反推。所有派生字段(让球/比分/半全场)统一从 wld 派生,保持口径一致。
+  // 注:盘口线 line 仍来自市场,只是方向锚定 wld;netExpected 仅作内部参考量保留在 debug。
   const handicapPick = (() => {
     if (!ranked[0]?.label) return null;
     const eg = blendResult.dcResult?.expectedGoals;
-    let direction;
-    if (eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)) {
-      const netExpected = Number(eg.home) - Number(eg.away) + handicapLine;
-      if (netExpected > 0.3) direction = "主胜";
-      else if (netExpected < -0.3) direction = "客胜";
-      else direction = "平局";
-    } else {
-      // fallback:λ 缺时退回 wld(诚实降级)
-      direction = ranked[0].label;
-    }
-    return { line: handicapLine, direction };
+    const netExpected = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)
+      ? Number(eg.home) - Number(eg.away) + handicapLine
+      : null;
+    return { line: handicapLine, direction: ranked[0].label, anchor: "wld", netExpected };
   })();
   const expectedValue = computeExpectedValueLabels(ranked, snapshot);
   // D 档接入(2026-05-28):用 bootstrap 传入的多评级算 ensembleView 作为 supplementary.
@@ -315,13 +308,12 @@ export function validatePredictionConsistency(prediction) {
   for (const [label, score, halfFull] of pathChecks) {
     if (score && halfFull && !scoreHalfFullConsistent(score, halfFull)) errors.push(`${label} ${score} 与 ${halfFull} 路径冲突`);
   }
-  // 2026-05-29:不校验 handicap 方向,是有意为之 —— 但理由不是"handicap = wld 直接"。
-  // 实际上 handicapPick.direction 用 expectedGoals 净期望(λH − μA + line)真算(见上方
-  // handicapPick 生成逻辑),独立于 wld,可以 ≠ wld 也 ≠ score 让球后结果。
-  // 三者是同一模型的不同投影:wld=概率排序 / score=DC 矩阵众数 / handicap=λ 净期望离散化。
-  // 众数与期望在偏态分布下本就可指向不同方向(例:最可能 1-0 主胜,但 λ 净期望偏客),
-  // 两者都诚实、无谁对谁错,强制一致会拿众数否定期望、频繁误报。故只校验
-  // score/半全场 vs wld(checks)与 score vs 半全场路径(pathChecks),不校验 handicap。
+  // 2026-05-30(用户硬规则):让球方向以 wld 为锚 —— handicapPick.direction 直接 = wld 主推方向
+  // (见上方 handicapPick 生成逻辑)。所有派生字段(让球/比分/半全场)统一从 wld 派生,口径一致,
+  // 不再让 handicap 用 λ 净期望独立反推而 ≠ wld。这里不单独校验 handicap 方向,因为它按定义恒等于 wld。
+  if (prediction.handicapPick && prediction.handicapPick.direction !== prediction.pick?.label) {
+    errors.push(`让球方向 ${prediction.handicapPick.direction} 未以 wld(${prediction.pick?.label})为锚`);
+  }
   return errors;
 }
 

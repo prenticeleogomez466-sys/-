@@ -25,10 +25,9 @@ describe("FF 档 — consistency-derivation 接入 validatePredictionConsistency
     assert.equal(errors.length, 0, `应无 error,得到: ${errors.join("; ")}`);
   });
 
-  // handicapPick.direction 用 expectedGoals 净期望(λH−μA+line)真算,独立于 wld 与 score。
-  // score=DC 矩阵众数 / handicap=λ 净期望离散化,是同一模型的不同投影,偏态分布下可指向不同
-  // 方向(例 score 最可能 1-0 主胜,handicap 标客胜)。两者都诚实,强制一致会误报,故不校验。
-  it("score 1-0 + handicapPick 方向独立于 score 让球后结果 → 不报错(λ 真算独立投影)", () => {
+  // 2026-05-30 用户硬规则:让球方向以 wld 为锚,handicapPick.direction 必须 = wld 主推方向。
+  // 方向 ≠ wld(旧的"λ 净期望独立投影")现在视为口径不一致,必须报错。
+  it("handicapPick.direction ≠ wld(主胜 vs 客胜)→ 报错(让球须以 wld 为锚)", () => {
     const prediction = {
       scorePicks: { primary: "1-0", secondary: "0-0" },
       halfFullPicks: { primary: "主胜-主胜", secondary: "平局-平局" },
@@ -37,19 +36,19 @@ describe("FF 档 — consistency-derivation 接入 validatePredictionConsistency
       handicapPick: { line: -1, direction: "客胜" }
     };
     const errors = validatePredictionConsistency(prediction);
-    assert.equal(errors.length, 0, `让球为独立赔种,不应报矛盾,得到: ${errors.join("; ")}`);
+    assert.ok(errors.some((e) => e.includes("让球方向")), `方向偏离 wld 应报错,得到: ${errors.join("; ")}`);
   });
 
-  it("score 0-0 + handicapPick=客胜(让 -1 → -1,客胜)→ 一致", () => {
+  it("handicapPick.direction = wld(让 -1,方向锚定主胜)→ 一致,无 error", () => {
     const prediction = {
-      scorePicks: { primary: "0-0", secondary: "0-1" },
-      halfFullPicks: { primary: "平局-平局", secondary: "平局-客胜" },
-      pick: { code: "1", label: "平局" },
-      secondaryPick: { code: "0", label: "客胜" },
-      handicapPick: { line: -1, direction: "客胜" }
+      scorePicks: { primary: "1-0", secondary: "0-0" },
+      halfFullPicks: { primary: "主胜-主胜", secondary: "平局-平局" },
+      pick: { code: "3", label: "主胜" },
+      secondaryPick: { code: "1", label: "平局" },
+      handicapPick: { line: -1, direction: "主胜" }
     };
     const errors = validatePredictionConsistency(prediction);
-    assert.equal(errors.length, 0, `应无 error,得到: ${errors.join("; ")}`);
+    assert.equal(errors.length, 0, `方向锚定 wld 应无 error,得到: ${errors.join("; ")}`);
   });
 
   it("缺 handicapPick 不会报错(backward-compat)", () => {

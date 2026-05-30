@@ -108,7 +108,9 @@ function Run-Daily {
   if ($AllowMissingOdds) {
     Invoke-Step "build offline daily xlsx" "npm run daily:no-web -- --date $Date"
   } else {
-    Invoke-Step "build official daily xlsx and wechat outbox" "npm run daily -- --date $Date"
+    # 官方优先 + 500 兜底:官方源间歇反爬(竞彩 567 / 14场 TLS 拒)时不再空跑,
+    # 自动降级 500 兜底竞彩;官方14场成功但竞彩被封时补抓竞彩。见 scripts/daily-with-fallback.mjs。
+    Invoke-Step "build daily xlsx (official-first + 500 fallback) and wechat outbox" "npm run daily:fallback -- --date $Date"
   }
 }
 
