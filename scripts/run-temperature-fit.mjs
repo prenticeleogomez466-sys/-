@@ -66,10 +66,19 @@ console.log(`  →温度后       n=${cal.favN} 预测${cal.favPred} 实际${cal
 
 const brierImproves = cal.brier < base.brier - 1e-9;
 const hitNotWorse = cal.hit >= base.hit - 1e-9;
-console.log(`\n裁决:Brier ${brierImproves ? "改善✅" : "未改善"} / 命中 ${hitNotWorse ? "未掉✅" : "下降⚠️"}`);
+// 防过头护栏(2026-05-30):旧逻辑只看 Brier 改善 + 命中不掉,放行了把 favBias 从 -0.37
+//   甩到 +0.29 的 T=1.975(过度软化、反转成过度不自信)。新增:温度后 |favBias| 必须比温度前更小,
+//   且不得反向超过温度前幅度的一半(避免"治好过度自信、又造出过度不自信")。
+const fb0 = Math.abs(base.favBias ?? 0);
+const fb1 = Math.abs(cal.favBias ?? 0);
+const signFlip = (base.favBias ?? 0) * (cal.favBias ?? 0) < 0;
+const biasNotWorse = fb1 <= fb0 + 1e-9;
+const noOvershoot = !(signFlip && fb1 > fb0 * 0.5);
+console.log(`\n裁决:Brier ${brierImproves ? "改善✅" : "未改善"} / 命中 ${hitNotWorse ? "未掉✅" : "下降⚠️"} / favBias ${biasNotWorse ? "未变差✅" : "变差⚠️"} ${noOvershoot ? "" : "(⚠️反向过头overshoot)"}`);
 
 if (apply) {
   if (!(brierImproves && hitNotWorse)) { console.log("\n⚠️ 未同时满足(Brier改善且命中不掉),不写 T(保持现状)。"); process.exit(0); }
+  if (!(biasNotWorse && noOvershoot)) { console.log("\n⚠️ favBias 变差或反向过头(温度过度软化造成过度不自信),不写 T(保持现状)。"); process.exit(0); }
   let profile = {};
   if (existsSync(profPath)) { try { profile = JSON.parse(readFileSync(profPath, "utf8")); } catch {} }
   profile.temperature = T;
