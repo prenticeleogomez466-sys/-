@@ -62,7 +62,7 @@ function asianBand(line) {
 // 赔率开→收漂移分档:学"赔率变化方向→结果"。以收盘(最锐价)定热门方,量该方
 // 开→收隐含概率位移:走强=被加注(steam in)、走弱=被抛(drift out)。
 // 仅主源同时有开盘(odds)+收盘(oddsClose)才分档;只有单边价的场返回 null,优雅降级。
-function driftBand(opening, closing) {
+export function driftBand(opening, closing) {
   if (!opening || !closing) return null;
   const cf = frameOf(closing);
   if (!cf || cf.side === "draw") return null;

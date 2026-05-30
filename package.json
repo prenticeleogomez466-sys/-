@@ -32,6 +32,7 @@
     "backtest:odds": "node scripts/run-walkforward-odds.mjs",
     "calibration:train": "node scripts/run-calibration-train.mjs",
     "backtest:linemove": "node scripts/run-line-movement-backtest.mjs",
+    "backtest:drift": "node scripts/run-drift-backtest.mjs",
     "sync:injuries": "node scripts/sync-free-injuries.mjs",
     "sync:injuries:sofascore": "node scripts/sync-sofascore-injuries.mjs",
     "sources:probe": "node scripts/probe-free-sources.mjs",
