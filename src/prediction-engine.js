@@ -4,6 +4,7 @@ import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "./derived-score-model.js";
+import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
 import { applyTemperature } from "./temperature-calibration.js";
@@ -174,11 +175,21 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // ⚠️ 诚实标注:baseProbabilities 已用 current 赔率 blend,current 信息大部分已计入 prior;
   // 本信号是"近期盘口移动显著时、略偏向更 sharp 的当前价"的二阶修正(LR 夹 [0.5,2]、
   // 融合总位移每 outcome 封顶 ±12%,且其后 market-prior isotonic 校准会再纠一次),不重复放大。
+  // 亚盘水位(皇冠等风向标,初→即)装进 fusion context,激活 asian-handicap-water 信号 + 供展示判读。
+  const _ah = snapshot?.asianHandicap;
+  const asianHandicapWater = (_ah?.initial || _ah?.current) ? {
+    earlyHome: _ah?.initial?.homeWater ?? null,
+    earlyAway: _ah?.initial?.awayWater ?? null,
+    lateHome: _ah?.current?.homeWater ?? _ah?.initial?.homeWater ?? null,
+    lateAway: _ah?.current?.awayWater ?? _ah?.initial?.awayWater ?? null,
+    line: Number(_ah?.current?.line ?? _ah?.initial?.line ?? 0)
+  } : null;
   const fusionContext = {
     ...(options.fusionContext ?? {}),
     ...(oddsProbabilities && snapshot?.europeanOdds?.initial
       ? { openingOdds: probabilitiesFromOdds(snapshot.europeanOdds.initial), currentOdds: oddsProbabilities }
-      : {})
+      : {}),
+    ...(asianHandicapWater ? { asianHandicapWater } : {})
   };
   // 回测学到的信号权重 profile(剔除/弱化害校准的融合信号);options 可覆盖。
   const weightProfile = loadFusionWeightProfile();
@@ -279,6 +290,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       modelFairLine: coverInfo?.modelFairLine ?? null
     };
   })();
+  // 亚盘水位判读(展示用):真实皇冠初→即水位 + 盘口,按"升盘/降水"惯例给方向暗示(可追溯,不盲改概率)
+  const asianWaterAnalysis = asianHandicapWater && Number.isFinite(asianHandicapWater.lateHome)
+    ? analyzeAsianHandicapWater(asianHandicapWater)
+    : null;
   const expectedValue = computeExpectedValueLabels(ranked, snapshot);
   // D 档接入(2026-05-28):用 bootstrap 传入的多评级算 ensembleView 作为 supplementary.
   // 不替换 main 路径 — 主推荐仍走 calibrated probabilities;ensembleView 用于 backtest 对比和未来切主.
@@ -308,6 +323,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     scorePicks,
     halfFullPicks,
     handicapPick,
+    asianWaterAnalysis,
     extendedMarkets,
     expectedValue,
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
