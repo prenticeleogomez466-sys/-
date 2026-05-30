@@ -80,3 +80,33 @@ export function eloWinProb(homeElo, awayElo, homeBonus = 65) {
   const d = homeElo + homeBonus - awayElo;
   return 1 / (1 + Math.pow(10, -d / 400));
 }
+
+/**
+ * Elo → DC 强度先验 {attack, defense}(供 fit 收缩锚)。
+ * 强队 attack>1、defense<1(进得多、丢得少);相对训练集均值 Elo 偏移,经 scale 映射,夹 [0.7,1.4]。
+ * scale 默认 0.0009(≈每 +100 Elo → 强度 ×1.095,温和;由 backtest 调)。无效输入退回中性。
+ */
+export function eloToStrengthPrior(teamElo, meanElo, scale = 0.0009) {
+  if (!Number.isFinite(teamElo) || !Number.isFinite(meanElo)) return { attack: 1, defense: 1 };
+  const s = Math.max(0.7, Math.min(1.4, Math.exp(scale * (teamElo - meanElo))));
+  return { attack: round(s), defense: round(1 / s) };
+}
+
+/**
+ * 队名桥:给一组 fit 用的 {fitKey, rawName}(rawName=football-data 英文队名),用 snapshot 的 Elo
+ * 构造 eloPriors = {fitKey → {attack,defense}}。meanElo 取匹配到的队的均值。返回 {priors, matched, total}。
+ */
+export function buildEloPriors(byClub, teamList, opts = {}) {
+  const found = [];
+  for (const t of teamList) {
+    const row = byClub.get(normalizeClubKey(t.rawName ?? t.fitKey));
+    if (row && Number.isFinite(row.elo)) found.push({ fitKey: t.fitKey, elo: row.elo });
+  }
+  if (!found.length) return { priors: {}, matched: 0, total: teamList.length, meanElo: null };
+  const meanElo = found.reduce((s, x) => s + x.elo, 0) / found.length;
+  const priors = {};
+  for (const f of found) priors[f.fitKey] = eloToStrengthPrior(f.elo, meanElo, opts.scale);
+  return { priors, matched: found.length, total: teamList.length, meanElo: round(meanElo) };
+}
+
+function round(v) { return Math.round(v * 10000) / 10000; }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseClubEloCsv, normalizeClubKey, eloWinProb } from "../src/clubelo-loader.js";
+import { parseClubEloCsv, normalizeClubKey, eloWinProb, eloToStrengthPrior, buildEloPriors } from "../src/clubelo-loader.js";
 
 const SAMPLE = `Rank,Club,Country,Level,Elo,From,To
 1,Arsenal,ENG,1,2065.75805664,2026-05-25,2026-05-30
@@ -39,4 +39,33 @@ test("eloWinProb 标准 Elo + 主场加成", () => {
   // 弱队客场对强队 → 低
   assert.ok(eloWinProb(1500, 2000) < 0.1);
   assert.equal(eloWinProb(NaN, 1500), null);
+});
+
+test("eloToStrengthPrior 强队 attack>1/defense<1,均值队中性,夹 [0.7,1.4]", () => {
+  const strong = eloToStrengthPrior(2000, 1600);
+  assert.ok(strong.attack > 1 && strong.defense < 1);
+  const neutral = eloToStrengthPrior(1600, 1600);
+  assert.equal(neutral.attack, 1);
+  // 极端 Elo 差被夹住
+  assert.ok(eloToStrengthPrior(3000, 1000).attack <= 1.4);
+  assert.equal(eloToStrengthPrior(NaN, 1600).attack, 1);
+});
+
+test("buildEloPriors 队名桥:匹配到的队建 priors,匹配数/均值正确", () => {
+  const byClub = new Map([
+    [normalizeClubKey("Arsenal"), { club: "Arsenal", elo: 2000 }],
+    [normalizeClubKey("Burnley"), { club: "Burnley", elo: 1500 }],
+  ]);
+  const r = buildEloPriors(byClub, [
+    { fitKey: "arsenal", rawName: "Arsenal" },
+    { fitKey: "burnley", rawName: "Burnley" },
+    { fitKey: "unknownfc", rawName: "Unknown FC" },
+  ]);
+  assert.equal(r.matched, 2);
+  assert.equal(r.total, 3);
+  assert.equal(r.meanElo, 1750);
+  // Arsenal Elo 高于均值 → attack>1;Burnley 低于均值 → attack<1
+  assert.ok(r.priors["arsenal"].attack > 1);
+  assert.ok(r.priors["burnley"].attack < 1);
+  assert.equal(r.priors["unknownfc"], undefined); // 对不上名不建先验
 });

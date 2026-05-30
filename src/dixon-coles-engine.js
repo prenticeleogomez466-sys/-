@@ -77,6 +77,7 @@ export function fitFromFixtureStore(opts = {}) {
     homeAdvantage,
     decayHalfLife: opts.decayDays ?? 180,
     shrinkageK: opts.shrinkageK ?? 2, // 经验贝叶斯收缩默认 K=2(backtest:shrinkage 实证:赛季初小样本 LogLoss +0.71%、全样本/命中率不劣化、只动低出场队)
+    eloPriors: opts.eloPriors ?? null, // 可选 ClubElo 跨联赛先验作收缩锚(轮15-17,默认 null=收缩向 1.0)
   });
   fitted.usable = true;
   fitted.coldStart = false;
@@ -128,6 +129,7 @@ export function fitFromMatches(rawMatches = [], opts = {}) {
     homeAdvantage,
     decayHalfLife: opts.decayDays ?? 180,
     shrinkageK: opts.shrinkageK ?? 2, // 经验贝叶斯收缩默认 K=2(backtest:shrinkage 实证:赛季初小样本 LogLoss +0.71%、全样本/命中率不劣化、只动低出场队)
+    eloPriors: opts.eloPriors ?? null, // 可选 ClubElo 跨联赛先验作收缩锚(轮15-17,默认 null=收缩向 1.0)
   });
   fitted.usable = true;
   fitted.coldStart = false;
@@ -449,11 +451,18 @@ function fit(matches, opts) {
   // 收缩防过拟合。K=0 关闭(默认,向后兼容)。2503.19095 警示收缩非灵丹 → 由 backtest:shrinkage 定 K。
   const K = opts.shrinkageK ?? 0;
   if (K > 0) {
+    // 收缩锚:默认中性 1.0;若提供 opts.eloPriors[name]={attack,defense}(ClubElo 跨联赛先验,
+    // 轮15-16),低出场队收缩向 Elo 先验而非 1.0 —— 升班马按真实弱实力而非平均队(轮8+Elo 协同)。
+    // 无该队 Elo 先验(亚洲队/对不上名)则退回 1.0,向后兼容。eloPriors 缺省 → 全部 1.0=轮8 行为。
+    const priors = opts.eloPriors ?? null;
     for (const name of Object.keys(teams)) {
       const n = appear[name] ?? 0;
       const shrink = n / (n + K);
-      teams[name].attack = 1 + (teams[name].attack - 1) * shrink;
-      teams[name].defense = 1 + (teams[name].defense - 1) * shrink;
+      const prior = priors?.[name];
+      const aAnchor = Number.isFinite(prior?.attack) ? prior.attack : 1;
+      const dAnchor = Number.isFinite(prior?.defense) ? prior.defense : 1;
+      teams[name].attack = aAnchor + (teams[name].attack - aAnchor) * shrink;
+      teams[name].defense = dAnchor + (teams[name].defense - dAnchor) * shrink;
     }
   }
 

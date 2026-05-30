@@ -59,3 +59,14 @@ test("默认 shrinkageK=2:不传也启用温和收缩(生产默认)", () => {
   // 默认应已收缩(RARE 比关闭时更接近 1.0)
   assert.ok(Math.abs(fDefault.teams["rare"].attack - 1) < Math.abs(f0.teams["rare"].attack - 1));
 });
+
+test("eloPriors:低出场队收缩向 Elo 先验而非 1.0", () => {
+  const { matches, ref } = buildMatches();
+  // RARE 给一个"强队"Elo 先验 attack=1.3:收缩应把它拉向 1.3 而非 1.0
+  const fElo = fitFromMatches(matches, { referenceDate: ref, shrinkageK: 4, decayDays: 100000, eloPriors: { rare: { attack: 1.3, defense: 0.77 } } });
+  const f10 = fitFromMatches(matches, { referenceDate: ref, shrinkageK: 4, decayDays: 100000 });
+  // 向 1.3 收缩 → RARE attack 应高于向 1.0 收缩的版本
+  assert.ok(fElo.teams["rare"].attack > f10.teams["rare"].attack, `elo=${fElo.teams["rare"].attack} neutral=${f10.teams["rare"].attack}`);
+  // 仍在 RARE 原始值与先验 1.3 之间(收缩不越界)
+  assert.ok(fElo.teams["rare"].attack <= Math.max(1.3, f10.teams["rare"].attack) + 0.5);
+});
