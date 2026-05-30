@@ -21,6 +21,7 @@ import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.
 import { scopeJingcaiFixtures } from "./jingcai-business-day.js";
 import { buildExtendedMarkets } from "./extended-markets.js";
 import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
+import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -308,8 +309,31 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       ? round(Number(eg.home) - Number(eg.away))
       : null;
     const coverInfo = scoreModel?.matrix ? handicapCoverFromMatrix(scoreModel.matrix, handicapLine) : null;
-    const coverProbability = coverInfo
-      ? (ranked[0].code === "3" ? coverInfo.cover.home : ranked[0].code === "0" ? coverInfo.cover.away : coverInfo.cover.push)
+    const pickCover = (c) => c
+      ? (ranked[0].code === "3" ? c.home : ranked[0].code === "0" ? c.away : (c.push ?? c.draw))
+      : null;
+    const coverProbability = pickCover(coverInfo?.cover);
+    // Skellam 独立交叉校验(2026-05-30):用同一组 λ 经 Skellam 进球差分布算让球覆盖,
+    //   与全场比分矩阵的覆盖概率比对。两条独立路径(一维 Skellam vs 二维 DC 矩阵)一致 ⇒ 让球高信心;
+    //   分歧大 ⇒ 打「低信心」风险提示。**只提示、不改方向、不弃赛**(用户硬规则:弃赛由用户决定)。
+    const skellamCover = (eg && Number.isFinite(eg.home) && Number.isFinite(eg.away))
+      ? asianHandicapFromSkellam(eg.home, eg.away, handicapLine)
+      : null;
+    const skellamCoverProbability = pickCover(skellamCover);
+    const skellamCheck = (coverProbability != null && skellamCoverProbability != null)
+      ? (() => {
+          const gap = round(Math.abs(coverProbability - skellamCoverProbability));
+          const agree = gap <= 0.08;
+          return {
+            coverProbability: skellamCoverProbability,
+            cover: skellamCover,
+            gap,
+            agree,
+            note: agree
+              ? `✓ 让球一致(矩阵 ${pctOrEmpty(coverProbability)} ≈ Skellam ${pctOrEmpty(skellamCoverProbability)})`
+              : `⚠️ 让球低信心:矩阵 ${pctOrEmpty(coverProbability)} vs Skellam ${pctOrEmpty(skellamCoverProbability)} 分歧 ${pctOrEmpty(gap)},两模型不一致,谨慎`
+          };
+        })()
       : null;
     return {
       line: handicapLine,
@@ -320,7 +344,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       expectedGoalDiff: goalDiff,
       coverProbability,
       coverBreakdown: coverInfo?.cover ?? null,
-      modelFairLine: coverInfo?.modelFairLine ?? null
+      modelFairLine: coverInfo?.modelFairLine ?? null,
+      skellamCheck
     };
   })();
   // 亚盘水位判读(展示用):真实皇冠初→即水位 + 盘口,按"升盘/降水"惯例给方向暗示(可追溯,不盲改概率)

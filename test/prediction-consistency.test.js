@@ -46,6 +46,17 @@ describe("prediction derived market consistency", () => {
     assert.ok(prediction.dataMissingReason.includes("不预测"));
   });
 
+  it("让球带 Skellam 独立交叉校验:同 λ 两路径覆盖概率应接近且给一致性提示(2026-05-30)", () => {
+    const prediction = predictFixture(baseFixture, [{ fixtureId: baseFixture.id, date: baseFixture.date, europeanOdds: { current: { home: 1.5, draw: 4.2, away: 6.5 } } }]);
+    const sk = prediction.handicapPick.skellamCheck;
+    assert.ok(sk, "应产出 skellamCheck");
+    assert.ok(Number.isFinite(sk.coverProbability), "Skellam 覆盖概率应为数值");
+    assert.ok(Number.isFinite(sk.gap), "应给矩阵与 Skellam 的分歧 gap");
+    // 同一组 λ 的两条独立路径(二维矩阵 vs 一维 Skellam)应高度一致。
+    assert.ok(sk.gap <= 0.08 && sk.agree === true, `两模型应一致,gap=${sk.gap}`);
+    assert.ok(typeof sk.note === "string" && sk.note.length > 0);
+  });
+
   it("fails audit when score or half-full conflicts with WDL outcome", () => {
     const prediction = predictFixture(baseFixture, [{ fixtureId: baseFixture.id, date: baseFixture.date, europeanOdds: { current: { home: 1.5, draw: 4.2, away: 6.5 } } }]);
     prediction.scorePicks.primary = "0-1";

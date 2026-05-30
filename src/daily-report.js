@@ -175,7 +175,11 @@ function handicapRecommendText(prediction) {
   const h = prediction.handicapPick;
   if (!h) return "—";
   const lineStr = h.line === 0 ? "平盘" : (h.line > 0 ? `+${h.line}` : `${h.line}`);
-  return `让 ${lineStr} → ${h.direction}`;
+  const cover = Number.isFinite(h.coverProbability) ? ` 覆盖${pct(h.coverProbability)}` : "";
+  // Skellam 独立交叉校验(2026-05-30):矩阵与 Skellam 让球分歧大时附「低信心」提示,
+  // 让用户自己判断下不下——只提示、不抑制玩法(用户硬规则)。
+  const sk = h.skellamCheck && !h.skellamCheck.agree ? ` ｜${h.skellamCheck.note}` : "";
+  return `让 ${lineStr} → ${h.direction}${cover}${sk}`;
 }
 
 // 信心从裸数字变成"等级(数字)"对用户更友好
