@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { getExportDir } from "./paths.js";
 import { judgmentFactorColumns, judgmentFactorRow } from "./factor-analysis.js";
 import { recommendFixtures, outcomeCodeToChinese, competitionCategory } from "./prediction-engine.js";
+import { deepFusionAnalysis } from "./deep-fusion-analysis.js";
 import { auditRecommendations, writeRecommendationAudit } from "./recommendation-audit.js";
 import { runPreExportSelfCheck, selfCheckRows } from "./pre-export-selfcheck.js";
 import { runComprehensiveAudit, comprehensiveAuditRows } from "./comprehensive-audit.js";
@@ -54,6 +55,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "全面审计", rows: comprehensiveAuditRows(comprehensive) },
     { name: "出表自检", rows: selfCheckRows(selfCheck) },
     { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
+    { name: "神选·深度分析", rows: deepAnalysisRows(recommendations.predictions) },
     { name: "神选·14场", rows: fourteenRows },
     { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.available === false ? { ok: false, reason: recommendations.fourteen.note ?? "今日无 14 场胜负彩,任选9 不适用。" } : recommendations.fourteen.renxuan9) },
     { name: "赔率变化", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
@@ -464,6 +466,18 @@ function updateLedger(date, rows) {
   const next = [...existing, ...rows];
   writeFileSync(ledgerPath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   return next;
+}
+
+// 大融合·每场深度分析(2026-05-31):多因素融合叙述(联赛特点+球队强度+选择分层+让球+历史+复盘裁决)。
+function deepAnalysisRows(predictions) {
+  const rows = [["⚡ 神选 · 大融合每场深度分析", "", "", ""], ["对阵", "主推", "深度分析(多因素融合)", "裁决"]];
+  for (const p of predictions ?? []) {
+    if (p.unpredictable) continue;
+    const a = deepFusionAnalysis(p);
+    if (!a) continue;
+    rows.push([`${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`, p.pick?.label ?? "", a.factors.join("\n"), a.verdict]);
+  }
+  return rows;
 }
 
 function jingcaiHeaders() {
