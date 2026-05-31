@@ -2,7 +2,7 @@ import { loadFixtures } from "./fixture-store.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
-import { buildMonteCarloSimulation } from "./monte-carlo-simulator.js";
+import { buildMonteCarloSimulation, lambdaTotalFromMarket } from "./monte-carlo-simulator.js";
 import { getExperienceBaseline } from "./experience-library-store.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "./derived-score-model.js";
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
@@ -290,7 +290,18 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
         opening: fusionContext.openingOdds ?? null,
         closing: fusionContext.currentOdds ?? oddsProbabilities ?? null,
       }));
-  const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations, experienceBaseline });
+  // 大小球(O/U)盘口校准 λ 总量(2026-05-31 回测证实:比分命中+0.84pp/半全场LogLoss-0.46%/大小球校准更准)。
+  //   从快照取 line + 两路 over/under 赔率(去vig→P(over)),解出市场预期进球总量,传给 λ 估计;
+  //   缺盘口则为 null,estimateGoalLambdas 自动降级到联赛经验均值(无回退风险)。
+  const tg = snapshot?.totalGoals ?? snapshot?.totalGoalsOdds ?? snapshot?.overUnderOdds ?? null;
+  const tgNode = tg?.current ?? tg?.final ?? tg?.initial ?? tg ?? null;
+  const ouLine = Number(tgNode?.line ?? snapshot?.totalGoals?.current?.line ?? snapshot?.totalGoals?.initial?.line);
+  const ouOver = Number(tgNode?.over ?? tgNode?.overOdds ?? tgNode?.o);
+  const ouUnder = Number(tgNode?.under ?? tgNode?.underOdds ?? tgNode?.u);
+  const ouOverProb = (Number.isFinite(ouOver) && Number.isFinite(ouUnder) && ouOver > 1 && ouUnder > 1)
+    ? (1 / ouOver) / (1 / ouOver + 1 / ouUnder) : null;
+  const marketTotal = lambdaTotalFromMarket({ line: Number.isFinite(ouLine) ? ouLine : null, overProb: ouOverProb });
+  const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations, experienceBaseline, marketTotal });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
   // 比分/半全场真实来源(2026-05-30 用户硬要求"不许兜底"):

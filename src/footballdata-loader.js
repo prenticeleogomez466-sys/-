@@ -60,6 +60,13 @@ function impliedProbs(oh, od, oa) {
   return { home: raw.home / total, draw: raw.draw / total, away: raw.away / total };
 }
 
+// 大小球 2.5 两路赔率 → 去 vig 后的 P(总进球 > 2.5)。两路缺一即 null。
+function impliedOver(over, under) {
+  if (!over || !under || over <= 1 || under <= 1) return null;
+  const o = 1 / over, u = 1 / under;
+  return o / (o + u);
+}
+
 async function loadOne(league, season, fetchImpl) {
   const url = `${BASE}/${season}/${league}.csv`;
   let text;
@@ -125,6 +132,14 @@ async function loadOne(league, season, fetchImpl) {
       awayGoals: ftag,
       halfHome: num(cells, idx("HTHG")),
       halfAway: num(cells, idx("HTAG")),
+      // 大小球 2.5 隐含 P(over):用于按 O/U 赔率校准 λ 总量。Avg→BbAv→B365 三级回退,缺为 null。
+      overProb:
+        impliedOver(num(cells, idx("Avg>2.5")), num(cells, idx("Avg<2.5"))) ??
+        impliedOver(num(cells, idx("BbAv>2.5")), num(cells, idx("BbAv<2.5"))) ??
+        impliedOver(num(cells, idx("B365>2.5")), num(cells, idx("B365<2.5"))),
+      overProbClose:
+        impliedOver(num(cells, idx("AvgC>2.5")), num(cells, idx("AvgC<2.5"))) ??
+        impliedOver(num(cells, idx("B365C>2.5")), num(cells, idx("B365C<2.5"))),
       referee: (cells[idx("Referee")] || "").trim() || null,
       shots, // {home,away} 总射门数,或 null
       sot, // {home,away} 射正数,或 null
