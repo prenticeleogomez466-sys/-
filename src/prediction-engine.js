@@ -23,6 +23,7 @@ import { scopeJingcaiFixtures } from "./jingcai-business-day.js";
 import { buildExtendedMarkets } from "./extended-markets.js";
 import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
 import { asianHandicapFromSkellam } from "./skellam-distribution.js";
+import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -269,9 +270,25 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   }
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
   const calibrated = calibrateProbabilities(fusedProbs, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
-  const probabilities = calibrated.probabilities;
+  let probabilities = calibrated.probabilities;
   probabilityAdjustment.calibration = calibrated.calibration;
   const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);
+  // 经验库基线(2026-05-30):查该联赛该热门档/亚盘档的历史真实进球水平 + 平局率。
+  // 用途:① 给无训练 DC 的场(odds-only)提供联赛特异 λ,修"比分跨联赛雷同";
+  //       ② 历史平局率:既供平局风险提示,也作软赛事平局重校准的实证目标(见下)。
+  //   先于 ranked 计算:用 pre-recal 概率定"同情境"热门档,避免循环依赖。
+  const experienceBaseline = options.experienceBaseline === null
+    ? null
+    : (options.experienceBaseline ?? getExperienceBaseline(fixture, probabilities, snapshot, {
+        opening: fusionContext.openingOdds ?? null,
+        closing: fusionContext.currentOdds ?? oddsProbabilities ?? null,
+      }));
+  // 软赛事(友谊/国家队/国际赛)平局重校准(2026-05-31):五大联赛 isotonic 校准把强热门压到
+  //   ~0.807、平局机械钉 ~13%,但国际赛/友谊赛真实平局率 28-30%。仅命中软赛事时,把平局有界地
+  //   朝"赛事性质先验 + 历史同情境平局率"移动(改 wld 锚本身,下游派生一致)。**俱乐部路径零改动**。
+  const softRecal = recalibrateSoftCompetition(probabilities, fixture?.competition, experienceBaseline);
+  if (softRecal.applied) probabilities = softRecal.probabilities;
+  probabilityAdjustment.softCompetitionRecal = softRecal.applied ? softRecal.detail : null;
   let ranked = OUTCOMES.map((outcome) => ({ ...outcome, probability: probabilities[outcome.key] })).sort((a, b) => b.probability - a.probability);
   // 平局倾向修正(2026-05-30 用户要求强化):纯 argmax 结构性永不推平(平局概率上限~30%,常低于热门胜率)。
   // 真实足球知识:平局概率高(≥30%)本身只在"低进球+均势"profile 出现(高进球均势场平局概率反而低),
@@ -281,15 +298,6 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   probabilityAdjustment.drawLean = drawLean.applies ? { margin: drawLean.margin, note: "低进球均势·平局为价值选择" } : null;
   const gap = ranked[0].probability - ranked[1].probability;
   const advancedFeatures = buildAdvancedFixtureFeatures(fixture, snapshot, probabilities, options);
-  // 经验库基线(2026-05-30):查该联赛该热门档/亚盘档的历史真实进球水平 + 平局率。
-  // 用途:① 给无训练 DC 的场(odds-only)提供联赛特异 λ,修"比分跨联赛雷同";
-  //       ② 暴露历史平局率,供平局风险提示。不改 wld argmax(锚定硬规则)。
-  const experienceBaseline = options.experienceBaseline === null
-    ? null
-    : (options.experienceBaseline ?? getExperienceBaseline(fixture, probabilities, snapshot, {
-        opening: fusionContext.openingOdds ?? null,
-        closing: fusionContext.currentOdds ?? oddsProbabilities ?? null,
-      }));
   // 大小球(O/U)盘口校准 λ 总量(2026-05-31 回测证实:比分命中+0.84pp/半全场LogLoss-0.46%/大小球校准更准)。
   //   从快照取 line + 两路 over/under 赔率(去vig→P(over)),解出市场预期进球总量,传给 λ 估计;
   //   缺盘口则为 null,estimateGoalLambdas 自动降级到联赛经验均值(无回退风险)。
@@ -308,8 +316,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   优先用训练 DC 矩阵;无训练 DC(冷门/友谊)时,用本场 λ(赔率/xG 推得)构造真 Dixon-Coles τ 泊松矩阵。
   //   两者同形状({topScores, expectedGoals, matrix}),喂给现成 scoreFromDcResult / halfFullFromDcResult,
   //   使比分/半全场恒由真矩阵派生,scoreForOutcome/halfFullForOutcome 死表不再触达。
+  // 软赛事 λ 强度衰减(2026-05-31):友谊/国际赛进球偏低,competition intensityMultiplier 半强度缩放
+  //   (避免与市场赔率已隐含信息重复打折)。非软赛事 scale=1,俱乐部/有训练 DC 的场不受影响。
+  const _lamScale = softCompetitionLambdaScale(fixture?.competition);
   const scoreModel = blendResult.dcResult
-    ?? buildDerivedScoreModel(simulation.lambdas?.home, simulation.lambdas?.away);
+    ?? buildDerivedScoreModel((simulation.lambdas?.home ?? 0) * _lamScale, (simulation.lambdas?.away ?? 0) * _lamScale);
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scoreModel);
   const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, scoreModel);
   // 深度强化(2026-05-30 用户要求):给比分/半全场附真实概率 + 主方向内反超备选 + 完整分布,

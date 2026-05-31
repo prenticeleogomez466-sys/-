@@ -81,6 +81,17 @@ const COMPETITION_PROFILES = {
     drawProbBoost: 1.30,
     upsetProbBoost: 1.60,
     randomnessFactor: 2.00
+  },
+  // 竞彩把国家队友谊/热身/小型杯赛/洲际赛笼统标为"国际赛"(既非纯友谊也非世预)。
+  // 实测这类比赛进球偏低、平局率偏高(战意/磨合不稳),给中性偏软 profile:
+  // 比纯友谊保守(不 1.30 那么激进),比五大联赛明显软。2026-05-31 修——根因:
+  // "国际赛"此前漏过所有模糊匹配,落默认"联赛"profile,平局被俱乐部校准压到 ~13%。
+  "国家队-国际赛": {
+    intensityMultiplier: 0.85,
+    homeBoost: 1.05,
+    drawProbBoost: 1.15,
+    upsetProbBoost: 1.30,
+    randomnessFactor: 1.40
   }
 };
 
@@ -91,8 +102,11 @@ export function competitionProfile(competition) {
   // 模糊匹配
   if (/(欧冠|Champions)/i.test(competition)) return COMPETITION_PROFILES["欧冠"];
   if (/(欧联|Europa)/i.test(competition)) return COMPETITION_PROFILES["欧联"];
-  if (/(国家|World Cup|世预)/i.test(competition)) return COMPETITION_PROFILES["国家队-世预赛"];
-  if (/友谊|Friendly/i.test(competition)) return COMPETITION_PROFILES["友谊赛"];
+  if (/(世预|World Cup Qual|World Cup Q|世界杯预选)/i.test(competition)) return COMPETITION_PROFILES["国家队-世预赛"];
+  if (/友谊|Friendly|热身/i.test(competition)) return COMPETITION_PROFILES["友谊赛"];
+  // "国际赛" / 国家队 / Nations League / 洲际赛 等笼统国际比赛 → 中性偏软 profile。
+  // 注意:放在"友谊/世预"之后,优先匹配更具体的类型。
+  if (/(国际|国家队|国家|Nations|International|Intercontinental|洲际)/i.test(competition)) return COMPETITION_PROFILES["国家队-国际赛"];
   if (/杯|Cup/i.test(competition)) return COMPETITION_PROFILES["杯赛-单场淘汰"];
   return COMPETITION_PROFILES["联赛"];
 }
