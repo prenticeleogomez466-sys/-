@@ -17,6 +17,7 @@ const SUITE = [
   { key: "score-hf", script: "scripts/run-score-halffull-quality-backtest.mjs", proves: "比分/半全场模型质量(真实HT)", verified: "半全场31.4%(+5.1pp胜naive·真价值)·比分top3 32.9%" },
   { key: "btts", script: "scripts/run-btts-quality-backtest.mjs", proves: "BTTS校准质量", verified: "命中54.8%≈naive54.4%(近抛硬币)·校准好ECE3.14pp" },
   { key: "handicap", script: "scripts/run-handicap-quality-backtest.mjs", proves: "让球玩法(亚盘)可测性", verified: "INCONCLUSIVE·亚盘line符号↔水位约定不一致(护栏拦假edge)·让球以wld为锚" },
+  { key: "oddeven", script: "scripts/run-oddeven-quality-backtest.mjs", proves: "单双进球可预测性", verified: "命中50.7%=naive50.7%(抛硬币)·模型不编造区分度·ECE1.31pp" },
   { key: "ou-league", script: "scripts/run-overunder-backtest.mjs", proves: "联赛级O/U率维度是否加分", verified: "联赛Brier 0.2472<全局0.2494(微加)·热门档无关" },
 ];
 
