@@ -474,7 +474,7 @@ function updateLedger(date, rows) {
 function multiPlayRows(predictions) {
   const rows = [
     ["⚡ 神选 · 竞彩多玩法(每场全玩法)", "", "", "", "", "", "", ""],
-    ["对阵", "胜平负", "让球胜平负", "大小球2.5", "上半场(弱信号·多平)", "单双(无信号·参考)", "半全场", "比分"],
+    ["对阵", "胜平负", "让球胜平负", "大小球2.5", "上半场(弱信号·多平)", "单双(无信号·参考)", "半全场", "比分top3(覆盖~32%)"],
   ];
   for (const p of predictions ?? []) {
     if (p.unpredictable || p.fixture?.marketType === "shengfucai") continue;
@@ -502,7 +502,10 @@ function multiPlayRows(predictions) {
       fhText,
       oeText,
       p.halfFullPicks?.primary ?? "—",
-      p.scorePicks?.primary ?? "—",
+      // 比分:回测 top-1 仅12.4%(物理天花板),top-3 覆盖31.8% → 给 top-3 覆盖才实用(治"单一")。
+      (Array.isArray(p.scorePicks?.distribution) && p.scorePicks.distribution.length
+        ? p.scorePicks.distribution.slice(0, 3).map((s) => `${s.score}(${pct(s.probability)})`).join(" / ")
+        : (p.scorePicks?.primary ?? "—")),
     ]);
   }
   return rows;
