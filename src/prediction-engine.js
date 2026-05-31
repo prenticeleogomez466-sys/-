@@ -25,6 +25,7 @@ import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./cons
 import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";
+import { selectionTier } from "./selection-tier.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -430,6 +431,13 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     secondaryPick: ranked[1],
     risk,
     confidence,
+    // 纯市场隐含概率(去vig)—— 选择分层的 sharp 信号(回测证明优于模型信心)。
+    marketImpliedProbabilities: oddsProbabilities ?? null,
+    // 选择分层(2026-05-31):按市场隐含热门概率定档 + 回测实测命中率。用市场隐含;缺则退最终融合概率。
+    selectionTier: selectionTier(Math.max(
+      ...[(oddsProbabilities ?? probabilities)?.home, (oddsProbabilities ?? probabilities)?.draw, (oddsProbabilities ?? probabilities)?.away]
+        .map(Number).filter(Number.isFinite)
+    )),
     scorePicks,
     halfFullPicks,
     handicapPick,
@@ -1193,7 +1201,12 @@ export function buildRenxuan9(source) {
       prediction,
       gap: prediction.pick.probability - prediction.secondaryPick.probability
     }))
-    .sort((a, b) => b.prediction.confidence - a.prediction.confidence || b.gap - a.gap)
+    // 2026-05-31:排序主键改用**市场隐含热门概率**(回测证明是 sharp 的选择信号,优于模型信心),
+    //   模型信心/gap 作次级。让任选9 优先纳入市场最有把握的 9 场。
+    .sort((a, b) =>
+      (b.prediction.selectionTier?.marketFavProb ?? 0) - (a.prediction.selectionTier?.marketFavProb ?? 0)
+      || b.prediction.confidence - a.prediction.confidence
+      || b.gap - a.gap)
     .slice(0, 9);
   const picks = ranked.map(({ prediction, gap }, i) => {
     const probs = prediction.probabilities ?? {};
@@ -1213,9 +1226,11 @@ export function buildRenxuan9(source) {
       singleNote = "平局倾向";
     }
 
-    // 任选 9 胆门槛恢复:置信 ≥50 + 概率差 ≥22%,不靠市场降级
+    // 任选 9 胆门槛:置信 ≥50 + 概率差 ≥22% + **市场隐含热门概率 ≥0.65**(bankerEligible,
+    //   回测档内命中≥73% 才够格单选搏胆);避免把市场 coin-flip 场当胆。
     const isBanker = gap >= 0.22 && prediction.confidence >= 50
-                     && prediction.risk !== "高" && singleCode !== "1";
+                     && prediction.risk !== "高" && singleCode !== "1"
+                     && prediction.selectionTier?.bankerEligible === true;
     let codes, coverageReason;
     if (isBanker) {
       codes = [singleCode];
@@ -1253,7 +1268,11 @@ export function buildRenxuan9(source) {
       confidence: prediction.confidence,
       risk: prediction.risk,
       gap: Math.round(gap * 100) / 100,
-      reason: `${singleNote ? singleNote + "；" : ""}${coverageReason}；${prediction.rationale ?? ""}`
+      // 选择分层(市场隐含概率定档 + 回测实测命中率),供集中胆码/单选用
+      tier: prediction.selectionTier?.label ?? null,
+      tierBacktestHit: prediction.selectionTier?.backtestHit ?? null,
+      marketFavProb: prediction.selectionTier?.marketFavProb ?? null,
+      reason: `${prediction.selectionTier ? `${prediction.selectionTier.label}(市场热门${Math.round((prediction.selectionTier.marketFavProb ?? 0) * 100)}%·回测命中~${Math.round((prediction.selectionTier.backtestHit ?? 0) * 100)}%)；` : ""}${singleNote ? singleNote + "；" : ""}${coverageReason}；${prediction.rationale ?? ""}`
     };
   });
   const legs = ranked.map(({ prediction }) => ({
