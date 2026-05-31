@@ -1,0 +1,346 @@
+{
+  "generatedAt": "2026-05-31",
+  "source": "fixture-store",
+  "leagues": {
+    "挪超": {
+      "n": 544,
+      "avgGoals": 2.98,
+      "homeGoalsAvg": 1.662,
+      "awayGoalsAvg": 1.318,
+      "homeAdvantage": 1.261,
+      "drawRate": 0.221,
+      "homeWinRate": 0.458,
+      "overRate": 0.572
+    },
+    "日职": {
+      "n": 928,
+      "avgGoals": 2.543,
+      "homeGoalsAvg": 1.371,
+      "awayGoalsAvg": 1.172,
+      "homeAdvantage": 1.169,
+      "drawRate": 0.27,
+      "homeWinRate": 0.412,
+      "overRate": 0.47
+    },
+    "墨超": {
+      "n": 843,
+      "avgGoals": 2.834,
+      "homeGoalsAvg": 1.629,
+      "awayGoalsAvg": 1.205,
+      "homeAdvantage": 1.351,
+      "drawRate": 0.251,
+      "homeWinRate": 0.471,
+      "overRate": 0.549
+    },
+    "瑞超": {
+      "n": 541,
+      "avgGoals": 2.856,
+      "homeGoalsAvg": 1.542,
+      "awayGoalsAvg": 1.314,
+      "homeAdvantage": 1.173,
+      "drawRate": 0.224,
+      "homeWinRate": 0.425,
+      "overRate": 0.536
+    },
+    "奥地利": {
+      "n": 478,
+      "avgGoals": 2.697,
+      "homeGoalsAvg": 1.475,
+      "awayGoalsAvg": 1.222,
+      "homeAdvantage": 1.207,
+      "drawRate": 0.274,
+      "homeWinRate": 0.41,
+      "overRate": 0.513
+    },
+    "美职": {
+      "n": 1252,
+      "avgGoals": 3.097,
+      "homeGoalsAvg": 1.725,
+      "awayGoalsAvg": 1.371,
+      "homeAdvantage": 1.258,
+      "drawRate": 0.244,
+      "homeWinRate": 0.45,
+      "overRate": 0.605
+    },
+    "巴甲": {
+      "n": 914,
+      "avgGoals": 2.511,
+      "homeGoalsAvg": 1.479,
+      "awayGoalsAvg": 1.032,
+      "homeAdvantage": 1.434,
+      "drawRate": 0.268,
+      "homeWinRate": 0.484,
+      "overRate": 0.47
+    },
+    "沙特联": {
+      "n": 731,
+      "avgGoals": 2.963,
+      "homeGoalsAvg": 1.561,
+      "awayGoalsAvg": 1.402,
+      "homeAdvantage": 1.113,
+      "drawRate": 0.224,
+      "homeWinRate": 0.424,
+      "overRate": 0.565
+    },
+    "阿甲": {
+      "n": 1140,
+      "avgGoals": 2.004,
+      "homeGoalsAvg": 1.152,
+      "awayGoalsAvg": 0.853,
+      "homeAdvantage": 1.351,
+      "drawRate": 0.322,
+      "homeWinRate": 0.423,
+      "overRate": 0.319
+    },
+    "丹超": {
+      "n": 476,
+      "avgGoals": 3.086,
+      "homeGoalsAvg": 1.662,
+      "awayGoalsAvg": 1.424,
+      "homeAdvantage": 1.167,
+      "drawRate": 0.252,
+      "homeWinRate": 0.431,
+      "overRate": 0.603
+    },
+    "俄超": {
+      "n": 576,
+      "avgGoals": 2.646,
+      "homeGoalsAvg": 1.476,
+      "awayGoalsAvg": 1.17,
+      "homeAdvantage": 1.261,
+      "drawRate": 0.276,
+      "homeWinRate": 0.438,
+      "overRate": 0.479
+    },
+    "中超": {
+      "n": 568,
+      "avgGoals": 3.134,
+      "homeGoalsAvg": 1.796,
+      "awayGoalsAvg": 1.338,
+      "homeAdvantage": 1.342,
+      "drawRate": 0.245,
+      "homeWinRate": 0.467,
+      "overRate": 0.599
+    },
+    "澳超": {
+      "n": 446,
+      "avgGoals": 3.096,
+      "homeGoalsAvg": 1.617,
+      "awayGoalsAvg": 1.48,
+      "homeAdvantage": 1.092,
+      "drawRate": 0.267,
+      "homeWinRate": 0.368,
+      "overRate": 0.594
+    },
+    "瑞士": {
+      "n": 390,
+      "avgGoals": 2.879,
+      "homeGoalsAvg": 1.631,
+      "awayGoalsAvg": 1.249,
+      "homeAdvantage": 1.306,
+      "drawRate": 0.251,
+      "homeWinRate": 0.462,
+      "overRate": 0.549
+    },
+    "西乙": {
+      "n": 712,
+      "avgGoals": 2.152,
+      "homeGoalsAvg": 1.257,
+      "awayGoalsAvg": 0.895,
+      "homeAdvantage": 1.405,
+      "drawRate": 0.322,
+      "homeWinRate": 0.445,
+      "overRate": 0.36
+    },
+    "土超": {
+      "n": 535,
+      "avgGoals": 2.935,
+      "homeGoalsAvg": 1.617,
+      "awayGoalsAvg": 1.318,
+      "homeAdvantage": 1.227,
+      "drawRate": 0.234,
+      "homeWinRate": 0.45,
+      "overRate": 0.576
+    },
+    "英乙": {
+      "n": 913,
+      "avgGoals": 2.887,
+      "homeGoalsAvg": 1.591,
+      "awayGoalsAvg": 1.296,
+      "homeAdvantage": 1.228,
+      "drawRate": 0.256,
+      "homeWinRate": 0.435,
+      "overRate": 0.539
+    },
+    "en.1": {
+      "n": 212,
+      "avgGoals": 3.08,
+      "homeGoalsAvg": 1.722,
+      "awayGoalsAvg": 1.358,
+      "homeAdvantage": 1.267,
+      "drawRate": 0.198,
+      "homeWinRate": 0.472,
+      "overRate": 0.618
+    },
+    "it.1": {
+      "n": 189,
+      "avgGoals": 2.466,
+      "homeGoalsAvg": 1.413,
+      "awayGoalsAvg": 1.053,
+      "homeAdvantage": 1.342,
+      "drawRate": 0.27,
+      "homeWinRate": 0.46,
+      "overRate": 0.45
+    },
+    "fr.1": {
+      "n": 158,
+      "avgGoals": 2.538,
+      "homeGoalsAvg": 1.481,
+      "awayGoalsAvg": 1.057,
+      "homeAdvantage": 1.401,
+      "drawRate": 0.291,
+      "homeWinRate": 0.43,
+      "overRate": 0.487
+    },
+    "英冠": {
+      "n": 894,
+      "avgGoals": 2.539,
+      "homeGoalsAvg": 1.398,
+      "awayGoalsAvg": 1.141,
+      "homeAdvantage": 1.225,
+      "drawRate": 0.255,
+      "homeWinRate": 0.436,
+      "overRate": 0.472
+    },
+    "苏超": {
+      "n": 375,
+      "avgGoals": 2.789,
+      "homeGoalsAvg": 1.579,
+      "awayGoalsAvg": 1.211,
+      "homeAdvantage": 1.304,
+      "drawRate": 0.208,
+      "homeWinRate": 0.477,
+      "overRate": 0.544
+    },
+    "葡超": {
+      "n": 448,
+      "avgGoals": 2.621,
+      "homeGoalsAvg": 1.471,
+      "awayGoalsAvg": 1.15,
+      "homeAdvantage": 1.28,
+      "drawRate": 0.194,
+      "homeWinRate": 0.471,
+      "overRate": 0.496
+    },
+    "希腊超": {
+      "n": 355,
+      "avgGoals": 2.518,
+      "homeGoalsAvg": 1.411,
+      "awayGoalsAvg": 1.107,
+      "homeAdvantage": 1.275,
+      "drawRate": 0.287,
+      "homeWinRate": 0.428,
+      "overRate": 0.456
+    },
+    "英甲": {
+      "n": 871,
+      "avgGoals": 2.571,
+      "homeGoalsAvg": 1.431,
+      "awayGoalsAvg": 1.14,
+      "homeAdvantage": 1.255,
+      "drawRate": 0.247,
+      "homeWinRate": 0.444,
+      "overRate": 0.483
+    },
+    "意乙": {
+      "n": 587,
+      "avgGoals": 2.385,
+      "homeGoalsAvg": 1.291,
+      "awayGoalsAvg": 1.094,
+      "homeAdvantage": 1.181,
+      "drawRate": 0.32,
+      "homeWinRate": 0.388,
+      "overRate": 0.433
+    },
+    "比甲": {
+      "n": 472,
+      "avgGoals": 2.964,
+      "homeGoalsAvg": 1.633,
+      "awayGoalsAvg": 1.331,
+      "homeAdvantage": 1.228,
+      "drawRate": 0.244,
+      "homeWinRate": 0.441,
+      "overRate": 0.564
+    },
+    "es.1": {
+      "n": 192,
+      "avgGoals": 2.651,
+      "homeGoalsAvg": 1.484,
+      "awayGoalsAvg": 1.167,
+      "homeAdvantage": 1.272,
+      "drawRate": 0.328,
+      "homeWinRate": 0.438,
+      "overRate": 0.453
+    },
+    "德乙": {
+      "n": 460,
+      "avgGoals": 3.028,
+      "homeGoalsAvg": 1.683,
+      "awayGoalsAvg": 1.346,
+      "homeAdvantage": 1.25,
+      "drawRate": 0.237,
+      "homeWinRate": 0.459,
+      "overRate": 0.593
+    },
+    "法乙": {
+      "n": 571,
+      "avgGoals": 2.422,
+      "homeGoalsAvg": 1.324,
+      "awayGoalsAvg": 1.098,
+      "homeAdvantage": 1.206,
+      "drawRate": 0.28,
+      "homeWinRate": 0.424,
+      "overRate": 0.447
+    },
+    "de.1": {
+      "n": 144,
+      "avgGoals": 3.34,
+      "homeGoalsAvg": 1.979,
+      "awayGoalsAvg": 1.361,
+      "homeAdvantage": 1.454,
+      "drawRate": 0.236,
+      "homeWinRate": 0.486,
+      "overRate": 0.674
+    },
+    "荷甲": {
+      "n": 451,
+      "avgGoals": 3.133,
+      "homeGoalsAvg": 1.747,
+      "awayGoalsAvg": 1.386,
+      "homeAdvantage": 1.261,
+      "drawRate": 0.233,
+      "homeWinRate": 0.446,
+      "overRate": 0.625
+    },
+    "FIFA World Cup": {
+      "n": 128,
+      "avgGoals": 2.664,
+      "homeGoalsAvg": 1.5,
+      "awayGoalsAvg": 1.164,
+      "homeAdvantage": 1.289,
+      "drawRate": 0.219,
+      "homeWinRate": 0.43,
+      "overRate": 0.477
+    },
+    "__global__": {
+      "n": 18500,
+      "avgGoals": 2.721,
+      "homeGoalsAvg": 1.515,
+      "awayGoalsAvg": 1.206,
+      "homeAdvantage": 1.256,
+      "drawRate": 0.259,
+      "homeWinRate": 0.44,
+      "overRate": 0.511
+    }
+  }
+}

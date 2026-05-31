@@ -10,6 +10,7 @@ import { syncAuthorizedFixturesAndResults } from "./authorized-fixtures.js";
 import { syncFootballArtifacts } from "./artifact-sync.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 import { appendDailyMetrics, recapTrendRows } from "./daily-metrics-trend.js";
+import { attributeRecap } from "./recap-attribution.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -38,19 +39,41 @@ export async function runDailyRecap(date, options = {}) {
   writeFileSync(ledgerPath, `${JSON.stringify(nextLedger, null, 2)}\n`, "utf8");
   const targetRows = nextLedger.filter((row) => row.date === targetDate);
   const summary = buildRecapSummary(targetDate, targetRows, syncResults);
+  // 自动归因(2026-05-31,feedback_deep_analysis_postmortem):对**全历史已结算**做根因归类 +
+  //   提炼改进项,实现"为什么对/错"的累计反思,而非只统计命中率。
+  const attribution = attributeRecap(nextLedger);
   const detailRows = targetRows.map(toRecapDetailRow);
   const summaryPath = join(exportDir, `daily-recap-${targetDate}.json`);
   const masterPath = join(exportDir, "football-recap-master.xlsx");
-  writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, rows: targetRows }, null, 2)}\n`, "utf8");
+  writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, attribution, rows: targetRows }, null, 2)}\n`, "utf8");
   const dailyMetrics = appendDailyMetrics(targetDate, targetRows);
   writeXlsxWorkbook(masterPath, [
     { name: "复盘汇总", rows: [...recapSummaryRows(summary), ...recapTrendRows()] },
+    { name: "复盘归因", rows: recapAttributionRows(attribution) },
     { name: "复盘明细", rows: [recapDetailHeaders(), ...detailRows] },
     { name: "历史总表", rows: [recapDetailHeaders(), ...nextLedger.map(toRecapDetailRow)] }
   ]);
   const dDrivePaths = mirrorRecapExports(targetDate, summaryPath, masterPath);
   const sync = options.syncArtifacts === false ? null : syncFootballArtifacts(targetDate);
-  return { ok: true, date: targetDate, summary, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+  return { ok: true, date: targetDate, summary, attribution, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+}
+
+// 复盘归因 → xlsx 行(累计根因分类 + 逐场为什么对/错 + 提炼改进项)。
+export function recapAttributionRows(attr) {
+  if (!attr || !attr.settled) return [["复盘归因", "暂无已结算场次(等赛果回填)", "", ""]];
+  const rows = [
+    ["⚡ 复盘归因 · 累计", `结算 ${attr.settled} · 命中 ${attr.hit}(${attr.accuracy}%)`, "", ""],
+    [],
+    ["类别分布", ...Object.entries(attr.byCategory).map(([k, v]) => `${k}:${v}`)],
+    [],
+    ["逐场归因", "对错", "类别", "原因"],
+    ...attr.items.map((it) => [it.match ?? "", it.hit ? "✓" : "✗", it.category, it.why]),
+    [],
+    ["🎯 提炼改进项", ...(attr.topImprovements.length ? attr.topImprovements : ["暂无(样本不足)"])],
+    [],
+    ["分联赛命中", ...Object.entries(attr.byLeague).map(([lg, v]) => `${lg}:${v.hit}/${v.n}`)],
+  ];
+  return rows;
 }
 
 function mirrorRecapExports(date, summaryPath, masterPath) {
