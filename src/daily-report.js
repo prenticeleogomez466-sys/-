@@ -55,6 +55,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "全面审计", rows: comprehensiveAuditRows(comprehensive) },
     { name: "出表自检", rows: selfCheckRows(selfCheck) },
     { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
+    { name: "神选·多玩法", rows: multiPlayRows(recommendations.predictions) },
     { name: "神选·深度分析", rows: deepAnalysisRows(recommendations.predictions) },
     { name: "神选·14场", rows: fourteenRows },
     { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.available === false ? { ok: false, reason: recommendations.fourteen.note ?? "今日无 14 场胜负彩,任选9 不适用。" } : recommendations.fourteen.renxuan9) },
@@ -466,6 +467,37 @@ function updateLedger(date, rows) {
   const next = [...existing, ...rows];
   writeFileSync(ledgerPath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   return next;
+}
+
+// 神选·多玩法(2026-05-31 通宵进化):每场一站式覆盖竞彩各玩法推荐
+//   (让球胜平负 + 大小球2.5 + 单双 + 半全场 + 比分),满足"竞彩多玩法/要全"。
+function multiPlayRows(predictions) {
+  const rows = [
+    ["⚡ 神选 · 竞彩多玩法(每场全玩法)", "", "", "", "", "", ""],
+    ["对阵", "胜平负", "让球胜平负", "大小球2.5", "单双", "半全场", "比分"],
+  ];
+  for (const p of predictions ?? []) {
+    if (p.unpredictable || p.fixture?.marketType === "shengfucai") continue;
+    const lq = p.jingcaiLetqiu;
+    const ln = Number(lq?.line);
+    const lqText = lq?.pick ? `[${ln > 0 ? "受让+" + ln : ln < 0 ? "让" + ln : "平手"}] ${lq.pick.label} ${pct(lq.pick.probability)}` : "—";
+    const sfc = lq && lq.sfcSold === false ? "⛔未开售" : outcomeCodeToChinese(p.pick?.code);
+    // 大小球:用深度分析融合结论(联赛大球率+模型),deepFusionAnalysis 已写 p._ouFusion
+    const ou = p._ouFusion ?? (() => { deepFusionAnalysis(p); return p._ouFusion; })();
+    const ouText = ou ? `${ou.pick}(${pct(ou.blendOver)})` : "—";
+    const oe = p.extendedMarkets?.totalGoalsOddEven;
+    const oeText = oe ? (oe.odd >= oe.even ? `单(${pct(oe.odd)})` : `双(${pct(oe.even)})`) : "—";
+    rows.push([
+      `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
+      sfc,
+      lqText,
+      ouText,
+      oeText,
+      p.halfFullPicks?.primary ?? "—",
+      p.scorePicks?.primary ?? "—",
+    ]);
+  }
+  return rows;
 }
 
 // 大融合·每场深度分析(2026-05-31):多因素融合叙述(联赛特点+球队强度+选择分层+让球+历史+复盘裁决)。

@@ -171,6 +171,13 @@ function harmonizeDuplicatePredictions(predictions) {
       confidence: source.confidence,
       scorePicks,
       halfFullPicks,
+      // 让球方向也必须跟着 wld 锚走(2026-05-31 修):同场次强制对齐竞彩 wld 后,pick.label 变了,
+      //   但原 handicapPick 仍是 shengfucai 自己旧 wld 的方向 → 近平局盘(如瑞士vs约旦 2.32/2.30
+      //   两源各判主/客胜)会触发"让球方向未以 wld 为锚"自检。采用竞彩源的 handicapPick(同一场比赛、
+      //   竞彩持官方让球线,direction 恒等于 source.pick.label),无则按新 wld 兜底改向。
+      handicapPick: source.handicapPick
+        ? { ...source.handicapPick }
+        : (prediction.handicapPick ? { ...prediction.handicapPick, direction: source.pick.label, anchor: "wld" } : null),
       rationale: `${prediction.rationale}；同场次已与竞彩足球 ${source.fixture.sequence} 胜平负方向强制一致`
     };
     const consistencyErrors = validatePredictionConsistency(next);
@@ -352,9 +359,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, ranked[0].code);
   // FF 档:从 dc matrix 派生扩展玩法(大小球/单双/上半场/亚盘/双胜彩/比分组/总进球)。
   // 缺 matrix 时 buildExtendedMarkets 自动返回 null,daily-report 据此决定是否输出该列。
-  const extendedMarkets = blendResult.dcResult?.matrix
-    ? buildExtendedMarkets(blendResult.dcResult.matrix)
-    : null;
+  // 2026-05-31:训练 DC matrix 缺失(冷启动/借用/国际赛)时,退回 scoreModel.matrix(由本场 λ 构造,
+  //   与比分/半全场同源),让大小球/单双/上半场等扩展玩法对**所有场**可用,而非只俱乐部赛有。
+  const _extMatrix = blendResult.dcResult?.matrix ?? scoreModel?.matrix ?? null;
+  const extendedMarkets = _extMatrix ? buildExtendedMarkets(_extMatrix) : null;
   // 2026-05-29 用户指令:**所有推荐以胜负平方向为锚**,handicap direction 直接 = wld,
   // 不再从 score 反推。原因:模型先决定 wld(pick.label),用户玩让球时买的就是这个方向;
   // score 选满足该 wld 的最高概率比分(已在 buildScorePicks 里做),半全场再跟 score 同步。
