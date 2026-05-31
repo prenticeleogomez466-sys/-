@@ -28,6 +28,7 @@ import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { selectionTier } from "./selection-tier.js";
 import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
+import { analyzeMatch } from "./match-archetype-analyzer.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -585,6 +586,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   逆市场押独门=陷阱。此处把 clv-confidence-gate 接进每场预测,**只附加**背离标签 + 建议降档系数,
   //   遵 [[feedback_confidence_not_autosuppress]]:不改 pick、不覆盖 confidence、不抑制玩法,买不买由用户定。
   prediction.marketDivergence = computeMarketDivergence(prediction);
+  // 逐场差异化分析(2026-05-31):按 联赛性质×实力差×盘口深度 归原型,挑本场主导逻辑,
+  //   替代旧固定模板 buildReason/generateExplanation。挂已算字段,零假编。
+  prediction.differentialAnalysis = analyzeMatch(prediction);
+  if (prediction.differentialAnalysis?.narrative) prediction.rationale = prediction.differentialAnalysis.narrative;
   const consistencyErrors = validatePredictionConsistency(prediction);
   if (consistencyErrors.length) throw new Error(`推荐派生市场冲突：${fixture.homeTeam} 对 ${fixture.awayTeam}；${consistencyErrors.join("；")}`);
   return prediction;
