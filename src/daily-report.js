@@ -115,10 +115,70 @@ function toJingcaiRow(prediction) {
     buildHalfFullCandidates(prediction),                         // 8 半全场(首选 + 备选)
     probSummary,                                                 // 9 三概率(主/平/客 合一列)
     upset,                                                       // 10 爆冷
-    experienceCell(prediction),                                  // 11 历史经验(同情境:平局/大小球/赔率漂移)
-    confDetail,                                                  // 12 信心+分级+EV+注码
-    enrichedRationale(prediction)                                // 13 选择理由
+    marketFlowCell(prediction),                                  // 11 盘口资金流向(欧赔漂移+亚盘水位变化+独立解读)
+    experienceCell(prediction),                                  // 12 历史经验(同情境:平局/大小球/赔率漂移)
+    confDetail,                                                  // 13 信心+分级+EV+注码
+    enrichedRationale(prediction)                                // 14 选择理由
   ];
+}
+
+// 盘口资金流向 / 数据变化(2026-05-31)—— 用户要"深度分析数据的变化,不要只全押市场热门"。
+// 欧赔 开盘→当前 漂移(谁升温/降温)+ 亚盘水位 早→晚 变化(sharp money 方向)+ 独立解读。
+// 这是模型给出"≠跟市场买热门"的真观点处:大热让球盘水位异动常预示"赢球不过盘"→ 影响让球/比分。
+// 纯透明展示+提示,不替用户弃赛(遵 feedback_confidence_not_autosuppress)。
+export function marketFlowCell(prediction) {
+  const lines = [];
+  // ① 欧赔开→现漂移
+  const eo = prediction.marketSnapshot?.europeanOdds;
+  if (eo?.initial && eo?.current) {
+    const drift = europeanDrift(eo.initial, eo.current);
+    lines.push(drift ? `欧赔:${drift}` : "欧赔:开盘→当前未动");
+  }
+  // ② 亚盘水位变化(真·sharp 信号)+ 独立解读
+  const a = prediction.asianWaterAnalysis;
+  if (a?.movement) {
+    const sig = a.signal ? `[${asianSignalLabel(a.signal)}]` : "";
+    lines.push(`亚盘(让${a.line}):${a.movement}${sig}`);
+    if (a.implication) lines.push(a.implication.replace(/\*\*/g, ""));
+    // 大热让球盘的独立观点:升水/反向警告 → 比分倾向小分差,而非跟着市场吃大分让球
+    const indep = asianIndependentView(a, prediction.pick?.code);
+    if (indep) lines.push(`独立观点:${indep}`);
+  }
+  return lines.length ? lines.join("\n") : "盘口无变化数据";
+}
+
+// 欧赔开→现漂移:哪一方赔率下降(=升温/资金进)、上升(=降温)。变化<3% 视为未动。
+function europeanDrift(init, cur) {
+  const seg = [];
+  for (const [k, label] of [["home", "主"], ["draw", "平"], ["away", "客"]]) {
+    const i = Number(init[k]), c = Number(cur[k]);
+    if (!(i > 1 && c > 1)) continue;
+    const pct = (c - i) / i;
+    if (Math.abs(pct) < 0.03) continue;
+    seg.push(`${label}${c < i ? "↓升温" : "↑降温"}${(Math.abs(pct) * 100).toFixed(0)}%`);
+  }
+  return seg.length ? seg.join("/") : null;
+}
+
+function asianSignalLabel(signal) {
+  return {
+    "warn-home": "警惕主队反向", "warn-away": "警惕客队反向",
+    "danger-home": "主让球危险", "danger-away": "客让球危险",
+    "favorite-strongly-backed": "热门强力支撑", "favorite-suspicious": "热门可疑",
+    "slight-up": "轻度升水", "slight-down": "轻度降水", "neutral": "中性",
+  }[signal] ?? signal;
+}
+
+// 把水位信号翻译成对让球/比分的独立可执行观点(不改 wld 锚,只提示玩法层)。
+function asianIndependentView(a, wldCode) {
+  const heavyFav = Math.abs(Number(a.line)) >= 1.5; // 大热让 1.5 球以上
+  if ((a.signal === "warn-home" || a.signal === "warn-away") && heavyFav) {
+    return `大热让${a.line}但资金不敢跟 → 警惕赢球不过盘,比分倾向小分差(1-0/2-1),让球盘谨慎`;
+  }
+  if (a.signal === "danger-home" || a.signal === "danger-away") {
+    return `受让方被大量加注 → 让球方危险,可考虑受让/平本身,别盲跟让球`;
+  }
+  return null;
 }
 
 // 市场背离标签(2026-05-31):clv-confidence-gate 接生产后的展示。实证=逆市押独门是陷阱。
@@ -182,7 +242,7 @@ function buildScoreCandidates(prediction) {
     if (!clean || seen.has(clean) || !matchesWld(clean)) continue;
     seen.add(clean);
     candidates.push(`${clean}${pct(probOf.get(clean))}`);
-    if (candidates.length >= 3) break;
+    if (candidates.length >= 4) break; // 2026-05-31 用户要"多给几个比分":3→4 个 wld 一致候选
   }
   if (!candidates.length) return primary ?? "—";
   if (candidates.length === 1) return candidates[0];
@@ -196,8 +256,26 @@ function buildHalfFullCandidates(prediction) {
   const primary = hp.primary;
   if (!primary) return "—";
   const pct = (v) => (Number.isFinite(v) ? ` (${Math.round(v * 100)}%)` : "");
+  // 2026-05-31 用户要"多给几个半全场":从真实联合分布里取**终场方向 = wld 锚**的 top 路径(不只 1 备)。
+  const wld = prediction.pick?.code; // 3主/1平/0客
+  const ftLabel = wld === "3" ? "主胜" : wld === "1" ? "平局" : wld === "0" ? "客胜" : null;
+  const dist = Array.isArray(hp.distribution) ? hp.distribution.slice() : [];
+  if (ftLabel && dist.length) {
+    const consistent = dist
+      .filter((d) => String(d.halfFull).split("-")[1] === ftLabel) // 终场半场=wld 方向
+      .sort((a, b) => b.probability - a.probability);
+    const picks = [];
+    const seen = new Set();
+    for (const d of [{ halfFull: primary, probability: hp.primaryProbability }, ...consistent]) {
+      const hf = String(d.halfFull);
+      if (!hf || seen.has(hf) || hf.split("-")[1] !== ftLabel) continue;
+      seen.add(hf);
+      picks.push(`${hf}${pct(d.probability)}`);
+      if (picks.length >= 3) break;
+    }
+    if (picks.length) return picks.length === 1 ? picks[0] : `${picks[0]} | 备 ${picks.slice(1).join(", ")}`;
+  }
   const main = `${primary}${pct(hp.primaryProbability)}`;
-  // 深度强化:备选用真实"同终场方向、不同首半场"的最高概率路径(如主胜场的"平局-主胜"慢热反超),带概率。
   if (hp.primaryAlt?.halfFull) return `${main} | 另 ${hp.primaryAlt.halfFull}${pct(hp.primaryAlt.probability)}`;
   return main;
 }
@@ -446,6 +524,10 @@ function toLedgerRow(prediction) {
     scoreSecondary: prediction.scorePicks.secondary,
     halfFullPrimary: prediction.halfFullPicks.primary,
     halfFullSecondary: prediction.halfFullPicks.secondary,
+    // 让球胜平负(2026-05-31 复盘需求):记下让球玩法预测 + 让球线,结算时按比分算实际让球结果对比。
+    handicapLine: prediction.handicapPick?.line ?? "",
+    handicapWld: prediction.handicapPick?.handicapWld?.pick ?? "",
+    handicapWldCode: prediction.handicapPick?.handicapWld?.pickCode ?? "",
     probabilityHome: prediction.probabilities.home,
     probabilityDraw: prediction.probabilities.draw,
     probabilityAway: prediction.probabilities.away,
@@ -544,6 +626,7 @@ function jingcaiHeaders() {
     "序", "赛事类型", "对阵", "开赛",
     "胜平负(不让球)", "让球胜平负(竞彩主玩法)", "比分", "半全场",
     "概率分布(主/平/客)", "爆冷",
+    "盘口资金流向(数据变化)",
     "历史经验(同情境)",
     "信心 · 分级 · EV", "选择理由"
   ];
