@@ -27,7 +27,15 @@ if (!four.available || !Array.isArray(four.selections) || four.selections.length
   process.exit(1);
 }
 
-const issue = four.issue ?? four.period ?? four.note ?? null; // 官方期号/说明(今日多为空)
+// 官方期号在 fixture.notes(「官方期号=第NNNNN期」)/ officialFixtureId,fourteen 对象不冒出来,从 predictions 取
+const issue = four.issue ?? four.period ?? (() => {
+  for (const p of rec.predictions || []) {
+    const m = (p.fixture?.notes || "").match(/官方期号=([^;]+)/);
+    if (m) return m[1].trim();
+    if (p.fixture?.officialFixtureId) return String(p.fixture.officialFixtureId).split("-")[0];
+  }
+  return null;
+})();
 const KIND_CLASS = { "胆": "dan", "双选": "shuang", "全选": "quan" };
 const sels = four.selections;
 const dan = sels.filter((s) => s.type === "胆");
