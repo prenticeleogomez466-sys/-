@@ -15,6 +15,7 @@ const SUITE = [
   { key: "ou", script: "scripts/run-overunder-vs-market-backtest.mjs", proves: "大小球模型vs收盘线", verified: "市场59%>模型57%·分歧无edge" },
   { key: "ou-ext", script: "scripts/run-overunder-vs-market-backtest.mjs --leagues=extended", proves: "冷门O/U速度/CLV", verified: "次级53%朝模型(big-5 49%)·+0.24pp极微不可套利" },
   { key: "score-hf", script: "scripts/run-score-halffull-quality-backtest.mjs", proves: "比分/半全场模型质量(真实HT)", verified: "半全场31.4%(+5.1pp胜naive·真价值)·比分top3 32.9%" },
+  { key: "btts", script: "scripts/run-btts-quality-backtest.mjs", proves: "BTTS校准质量", verified: "命中54.8%≈naive54.4%(近抛硬币)·校准好ECE3.14pp" },
   { key: "ou-league", script: "scripts/run-overunder-backtest.mjs", proves: "联赛级O/U率维度是否加分", verified: "联赛Brier 0.2472<全局0.2494(微加)·热门档无关" },
 ];
 
