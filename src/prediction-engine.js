@@ -420,18 +420,40 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     //   套进真泊松比分矩阵的覆盖分布,argmax 即让球玩法推荐。**独立于比赛原始 wld**——胜平负玩法仍锚
     //   wld(不反推),这条只服务"让球"玩法本身,不改 pick/比分/半全场的 wld 派生。
     const hc = coverInfo?.cover;
+    // 市场亚盘水位融合(2026-05-31 矫正,leak-safe 回测 15008 场 +1.49pp):亚盘是足球最 sharp
+    //   的盘口,两路收盘水位去 vig → 市场隐含主/客覆盖比例,优于纯 DC-τ 矩阵覆盖(42.98%→44.47%)。
+    //   保留模型的 push(走盘)质量(让球胜平负的真实可投注结果),仅把"非 push 内主客比例"换成市场。
+    //   **守护:仅当亚盘水位对应的线 == 本次覆盖用的 handicapLine 时才融合**(否则市场比例对的是另一条
+    //   线的覆盖问题,不可叠加)→ 官方竞彩整数线 ≠ 亚盘线 / 无两路水位时降级纯 DC-τ(零回归)。
     const handicapWld = hc ? (() => {
+      const lh = Number(asianHandicapWater?.lateHome);
+      const la = Number(asianHandicapWater?.lateAway);
+      const waterLine = Number(asianHandicapWater?.line);
+      const marketUsable = lh > 1 && la > 1
+        && Number.isFinite(waterLine) && Math.abs(waterLine - handicapLine) < 1e-9;
+      let dist = { home: Number(hc.home) || 0, push: Number(hc.push) || 0, away: Number(hc.away) || 0 };
+      let wldSource = "dc-tau";
+      if (marketUsable) {
+        const rh = 1 / lh, ra = 1 / la;
+        const mktHome = rh / (rh + ra);
+        const push = dist.push;
+        const nonPush = Math.max(0, 1 - push);
+        dist = { home: nonPush * mktHome, push, away: nonPush * (1 - mktHome) };
+        wldSource = "market-asian-water";
+      }
       const opts = [
-        { code: "3", label: "让球主胜", prob: Number(hc.home) || 0 },
-        { code: "1", label: "走盘", prob: Number(hc.push) || 0 },
-        { code: "0", label: "让球客胜", prob: Number(hc.away) || 0 },
+        { code: "3", label: "让球主胜", prob: dist.home },
+        { code: "1", label: "走盘", prob: dist.push },
+        { code: "0", label: "让球客胜", prob: dist.away },
       ].sort((a, b) => b.prob - a.prob);
       return {
         pick: opts[0].label,
         pickCode: opts[0].code,
         probability: round(opts[0].prob),
-        probabilities: { home: round(Number(hc.home) || 0), push: round(Number(hc.push) || 0), away: round(Number(hc.away) || 0) },
+        probabilities: { home: round(dist.home), push: round(dist.push), away: round(dist.away) },
         ranked: opts.map((o) => ({ label: o.label, code: o.code, probability: round(o.prob) })),
+        source: wldSource,
+        modelCover: { home: round(Number(hc.home) || 0), push: round(Number(hc.push) || 0), away: round(Number(hc.away) || 0) },
       };
     })() : null;
     // Skellam 独立交叉校验(2026-05-30):用同一组 λ 经 Skellam 进球差分布算让球覆盖,

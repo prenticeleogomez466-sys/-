@@ -57,6 +57,38 @@ describe("prediction derived market consistency", () => {
     assert.ok(typeof sk.note === "string" && sk.note.length > 0);
   });
 
+  it("让球胜平负融合市场亚盘水位:线一致时用市场主客比例(2026-05-31 矫正,回测 +1.49pp)", () => {
+    // 亚盘线 -1 与让球线一致;主水低(1.5,被看好覆盖)、客水高(2.5)⇒ 市场隐含主覆盖 ≈0.625。
+    const prediction = predictFixture(baseFixture, [{
+      fixtureId: baseFixture.id,
+      date: baseFixture.date,
+      europeanOdds: { current: { home: 1.9, draw: 3.3, away: 3.9 } },
+      asianHandicap: { current: { line: -1, homeWater: 1.5, awayWater: 2.5 } }
+    }]);
+    const hw = prediction.handicapPick.handicapWld;
+    assert.equal(hw.source, "market-asian-water", "线一致+两路水位 ⇒ 融合市场");
+    const mktHome = (1 / 1.5) / (1 / 1.5 + 1 / 2.5); // ≈0.625
+    const splitHome = hw.probabilities.home / (hw.probabilities.home + hw.probabilities.away);
+    assert.ok(Math.abs(splitHome - mktHome) < 0.02, `非push主客比例应≈市场 ${mktHome.toFixed(3)},实际 ${splitHome.toFixed(3)}`);
+    // 仍保留模型 push(走盘)质量 + 模型原始覆盖供追溯。
+    assert.ok(Number.isFinite(hw.probabilities.push));
+    assert.ok(hw.modelCover && Number.isFinite(hw.modelCover.home));
+  });
+
+  it("让球胜平负无两路亚盘水位 ⇒ 降级纯 DC-τ 覆盖(零回归)", () => {
+    const prediction = predictFixture(baseFixture, [{
+      fixtureId: baseFixture.id,
+      date: baseFixture.date,
+      europeanOdds: { current: { home: 1.9, draw: 3.3, away: 3.9 } },
+      asianHandicap: { current: { line: -1 } } // 只有线、无两路水位
+    }]);
+    const hw = prediction.handicapPick.handicapWld;
+    assert.equal(hw.source, "dc-tau", "无水位应降级纯模型");
+    // 降级时输出概率应等于模型覆盖(未被市场改写)。
+    assert.equal(hw.probabilities.home, hw.modelCover.home);
+    assert.equal(hw.probabilities.away, hw.modelCover.away);
+  });
+
   it("fails audit when score or half-full conflicts with WDL outcome", () => {
     const prediction = predictFixture(baseFixture, [{ fixtureId: baseFixture.id, date: baseFixture.date, europeanOdds: { current: { home: 1.5, draw: 4.2, away: 6.5 } } }]);
     prediction.scorePicks.primary = "0-1";
