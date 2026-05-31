@@ -58,7 +58,8 @@ test("buildXgLayerFromUnderstat 装 xg 层(只覆盖匹配上的场)", () => {
   const { byFixtureId, matched } = buildXgLayerFromUnderstat(fixtures, TEAMS);
   assert.equal(matched, 1);
   assert.ok(byFixtureId.f1);
-  assert.equal(byFixtureId.f1.source, "understat");
+  assert.equal(byFixtureId.f1.source, "understat-form-estimate");
+  assert.equal(byFixtureId.f1.home.source, "understat-form-estimate");
   assert.equal(byFixtureId.f1.proxy, false);
   assert.equal(byFixtureId.f2, undefined);
 });

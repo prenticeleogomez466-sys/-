@@ -1,5 +1,5 @@
-param(
-  [ValidateSet("health", "daily", "recap", "weekly", "lineup-watch", "all")]
+﻿param(
+  [ValidateSet("health", "daily", "recap", "weekly", "lineup-watch", "market-refresh", "all")]
   [string]$Mode = "all",
   [string]$Date,
   [switch]$AllowMissingOdds
@@ -151,6 +151,14 @@ function Run-LineupWatch {
   }
 }
 
+# Near-kickoff odds refresh (CLV loop, 2026-05-31): refresh `current` toward closing late at
+# night, independent of lineups. Free soft path (market:crawl:soft + china:sources, non-fatal).
+# Scheduled FootballModel-MarketRefresh at 23:50 / 03:30; CaptureClosing freezes final at 06:30.
+function Run-MarketRefresh {
+  Invoke-Step "refresh free odds (current->near-closing)" "npm run market:crawl:soft -- --date=$Date" $true
+  Invoke-Step "china official+500 fallback odds sync" "npm run china:sources -- --date=$Date --no-history" $true
+}
+
 Write-Log "Football automation started: Mode=$Mode Date=$Date AllowMissingOdds=$AllowMissingOdds"
 
 switch ($Mode) {
@@ -159,6 +167,7 @@ switch ($Mode) {
   "recap" { Run-Recap }
   "weekly" { Run-Weekly }
   "lineup-watch" { Run-LineupWatch }
+  "market-refresh" { Run-MarketRefresh }
   "all" { Run-Health; Run-Daily; Run-Recap; Run-Weekly }
 }
 

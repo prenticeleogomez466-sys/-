@@ -40,7 +40,9 @@ function estimateGoalLambdas(probabilities, xg, experienceBaseline = null, marke
   const homeXg = finiteNumber(xg?.home?.xg ?? xg?.homeXg, null);
   const awayXg = finiteNumber(xg?.away?.xg ?? xg?.awayXg, null);
   const xgSrc = `${xg?.home?.source ?? ""}${xg?.away?.source ?? ""}`;
-  if (homeXg !== null && awayXg !== null && homeXg >= 0 && awayXg >= 0 && !/proxy/i.test(xgSrc)) {
+  //    Understat「赛前 xG 形态估计」(form-estimate)同样不是该场真值,回测证比市场 O/U 差(EPL 比分
+  //    10.5% < O/U 12.28%)→ 也跳过本分支,排到 O/U 之下(见下方独立分支)。
+  if (homeXg !== null && awayXg !== null && homeXg >= 0 && awayXg >= 0 && !/proxy|form-estimate/i.test(xgSrc)) {
     return { home: round(clamp(homeXg, 0.2, 4.2)), away: round(clamp(awayXg, 0.2, 4.2)), source: "xg" };
   }
   // 2) 大小球(O/U)校准 λ 总量(2026-05-31,回测证实优于联赛均值:比分命中 +0.84pp、半全场 LogLoss -0.46%)。
@@ -53,6 +55,11 @@ function estimateGoalLambdas(probabilities, xg, experienceBaseline = null, marke
       away: round(clamp(ouTotal * (1 - homeShare), 0.15, 5)),
       source: `over-under-calibrated:${marketTotal.source ?? "ou"}`
     };
+  }
+  // 3) Understat 赛前 xG 形态估计(免费真 xG,2026-05-31):回测证比 O/U 差(故排其下)、比纯联赛均值好
+  //    (EPL 比分 +0.5pp,故排经验库之上)。竞彩快照常无大小球盘口 → 这里给五大联赛兜个真 xG 派生 λ。
+  if (homeXg !== null && awayXg !== null && homeXg >= 0 && awayXg >= 0 && /form-estimate/i.test(xgSrc)) {
+    return { home: round(clamp(homeXg, 0.2, 4.2)), away: round(clamp(awayXg, 0.2, 4.2)), source: "understat-form-estimate" };
   }
   // 经验库基线(2026-05-30 修"比分像模仿"):用该联赛该热门档历史真实场均进球当 λ 总量,
   // 替代"只看概率差"的通用公式 —— 芬超(高进球)与欧冠(低进球)不再因 wld 相同而 λ 相同。

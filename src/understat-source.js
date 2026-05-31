@@ -96,10 +96,12 @@ export function buildXgLayerFromUnderstat(fixtures, teamsData, opts = {}) {
     const est = fixtureXgEstimate(teamsData, fx.homeTeam, fx.awayTeam, opts);
     if (!est) continue;
     byFixtureId[fx.id] = {
-      home: { team: fx.homeTeam, xg: est.home },
-      away: { team: fx.awayTeam, xg: est.away },
-      source: "understat",
-      proxy: false, // 真 xG 派生(非射门代理)
+      // source 含 "form-estimate":这是**赛前近期 xG 形态均值**(非该场真值),回测证比市场 O/U 差
+      //   → estimateGoalLambdas 据此把它排在 O/U 之下、经验库之上(只在无盘口时兜底)。
+      home: { team: fx.homeTeam, xg: est.home, source: "understat-form-estimate" },
+      away: { team: fx.awayTeam, xg: est.away, source: "understat-form-estimate" },
+      source: "understat-form-estimate",
+      proxy: false, // 真 xG 派生(非射门代理),但为赛前形态估计、不顶替 O/U
       samples: est.samples,
     };
     matched++;
