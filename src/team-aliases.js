@@ -157,16 +157,25 @@ const RAW_ALIASES = {
   "桑纳菲": "桑纳菲", "sandefjord": "桑纳菲",
   "腓特烈": "腓特烈", "腓特烈斯塔": "腓特烈", "fredrikstad": "腓特烈",
 
-  // ───── 瑞超 ─────
-  "马尔默": "马尔默", "malmoff": "马尔默", "malmofotbolltlsforening": "马尔默",
+  // ───── 瑞超 ─────(2026-05-31 补 ESPN 全名变体:ESPN 队名带 IF/BK/FF/AIF 后缀,
+  //   规范化后与 football-data/竞彩 的裸名/中文名不一致,补齐才能让回填的瑞超赛果接上 DC 训练)
+  "马尔默": "马尔默", "malmoff": "马尔默", "malmofotbolltlsforening": "马尔默", "malmo": "马尔默",
   "哥德堡": "哥德堡", "ifkgoteborg": "哥德堡", "goteborg": "哥德堡",
-  "djurgardens": "尤尔加登", "尤尔加登": "尤尔加登",
+  "djurgardens": "尤尔加登", "djurgarden": "尤尔加登", "尤尔加登": "尤尔加登",
   "aikstockholm": "aik", "aik": "aik",
-  "哈马比": "哈马比", "hammarby": "哈马比",
-  "埃尔夫斯堡": "埃夫斯堡", "埃夫斯堡": "埃夫斯堡", "elfsborg": "埃夫斯堡",
+  "哈马比": "哈马比", "hammarby": "哈马比", "hammarbyif": "哈马比",
+  "埃尔夫斯堡": "埃夫斯堡", "埃夫斯堡": "埃夫斯堡", "elfsborg": "埃夫斯堡", "ifelfsborg": "埃夫斯堡",
   "赫根": "赫根", "hacken": "赫根", "bkhacken": "赫根",
-  "米亚尔比": "米亚尔比", "mjallby": "米亚尔比",
-  "诺尔切平": "诺尔切平", "norrkoping": "诺尔切平",
+  "米亚尔比": "米亚尔比", "mjallby": "米亚尔比", "mjallbyaif": "米亚尔比",
+  "诺尔切平": "诺尔切平", "norrkoping": "诺尔切平", "ifknorrkoping": "诺尔切平",
+  "代格福什": "代格福什", "degerfors": "代格福什", "degerforsif": "代格福什",
+  "布鲁马波卡纳": "布鲁马波卡纳", "布鲁马波": "布鲁马波卡纳", "brommapojkarna": "布鲁马波卡纳", "ifbrommapojkarna": "布鲁马波卡纳",
+  "西里乌斯": "西里乌斯", "sirius": "西里乌斯", "iksirius": "西里乌斯",
+  "哈尔姆斯塔德": "哈尔姆斯塔德", "halmstad": "哈尔姆斯塔德", "halmstads": "哈尔姆斯塔德", "halmstadsbk": "哈尔姆斯塔德",
+  "厄斯特": "厄斯特", "osters": "厄斯特", "ostersif": "厄斯特",
+  "韦纳默": "韦纳默", "varnamo": "韦纳默", "ifkvarnamo": "韦纳默",
+  "gais": "gais", "gaisgoteborg": "gais",
+  "韦斯特罗斯": "韦斯特罗斯", "vasteras": "韦斯特罗斯", "vasterassk": "韦斯特罗斯",
 
   // ───── 中超 ─────
   "上海海港": "海港", "海港": "海港", "shanghaiport": "海港",

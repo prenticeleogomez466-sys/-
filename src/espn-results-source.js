@@ -16,7 +16,12 @@ const UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 // 默认抓的洲际联赛(已排除被 football-data 覆盖的荷甲 N1/葡超 P1,避免重复)
 export const ESPN_LEAGUES = {
   "usa.1": "美职", "bra.1": "巴甲", "jpn.1": "日职",
-  "ksa.1": "沙特联", "chn.1": "中超", "arg.1": "阿甲", "mex.1": "墨超", "kor.1": "韩K"
+  "ksa.1": "沙特联", "chn.1": "中超", "arg.1": "阿甲", "mex.1": "墨超", "kor.1": "韩K",
+  // 2026-05-31 扩覆盖:竞彩常见但 football-data 不含的联赛(已实测 ESPN 有真实赛果,
+  //   单月 20-35 场;剔除与 football-data 重复的荷甲/葡超/比甲/土超/苏超/希腊)。
+  //   直接补今天"仅赔率"的瑞超等场次的 DC 训练数据。芬超(fin.1)ESPN 无赛果,未加。
+  "swe.1": "瑞超", "nor.1": "挪超", "den.1": "丹超",
+  "aut.1": "奥地利", "sui.1": "瑞士", "rus.1": "俄超", "aus.1": "澳超"
 };
 
 function pad(n) { return String(n).padStart(2, "0"); }
