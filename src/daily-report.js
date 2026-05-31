@@ -485,8 +485,9 @@ function multiPlayRows(predictions) {
     // 大小球:用深度分析融合结论(联赛大球率+模型),deepFusionAnalysis 已写 p._ouFusion
     const ou = p._ouFusion ?? (() => { deepFusionAnalysis(p); return p._ouFusion; })();
     const ouText = ou ? `${ou.pick}(${pct(ou.blendOver)})` : "—";
+    // 单双:回测证零信号(命中50.2% vs 基线50%、Brier 0.2504≈瞎猜)→ 诚实标注仅参考,勿单押。
     const oe = p.extendedMarkets?.totalGoalsOddEven;
-    const oeText = oe ? (oe.odd >= oe.even ? `单(${pct(oe.odd)})` : `双(${pct(oe.even)})`) : "—";
+    const oeText = oe ? `${oe.odd >= oe.even ? "单" : "双"} ≈掷硬币·参考` : "—";
     rows.push([
       `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
       sfc,
