@@ -118,6 +118,9 @@ function Run-Recap {
   Invoke-Step "sync previous-day results" "npm run fixtures:sync:soft -- --date=$Date"
   Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
+  # 神选复盘:把全部历史复盘汇成桌面单一总表(每日命中率+逐场明细),用户每天就看这一张。
+  # 放在 recap:daily 之后 → 前一日赛果已回填,桌面表立即刷新到最新。
+  Invoke-Step "build desktop 神选复盘 master table" "npm run recap:desktop" $true
   Invoke-Step "recap automation health" "npm run recap:health -- --date=$Date"
 }
 
@@ -126,6 +129,9 @@ function Run-Weekly {
   # 每联赛历史经验库刷新(含 ESPN 薄联赛纯赛果)+ 重出每联赛深度档,作为分析依据持续更新。
   Invoke-Step "rebuild per-league experience library" "npm run experience:build" $true
   Invoke-Step "rebuild league experience digest xlsx" "npm run experience:digest" $true
+  # 近五年数据变化框架基础刷新(2026-05-31):全局经验 + 每联赛市场行为指纹(向全局收缩),不驱动主概率(回测裁决)。
+  Invoke-Step "refresh 5yr data-change study" "npm run study:datachange" $true
+  Invoke-Step "rebuild per-league data-change profile" "npm run profile:league-datachange" $true
   Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free source matrix review" "npm run freeodds:audit"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
