@@ -473,8 +473,8 @@ function updateLedger(date, rows) {
 //   (让球胜平负 + 大小球2.5 + 单双 + 半全场 + 比分),满足"竞彩多玩法/要全"。
 function multiPlayRows(predictions) {
   const rows = [
-    ["⚡ 神选 · 竞彩多玩法(每场全玩法)", "", "", "", "", "", ""],
-    ["对阵", "胜平负", "让球胜平负", "大小球2.5", "单双", "半全场", "比分"],
+    ["⚡ 神选 · 竞彩多玩法(每场全玩法)", "", "", "", "", "", "", ""],
+    ["对阵", "胜平负", "让球胜平负", "大小球2.5", "上半场(弱信号·多平)", "单双(无信号·参考)", "半全场", "比分"],
   ];
   for (const p of predictions ?? []) {
     if (p.unpredictable || p.fixture?.marketType === "shengfucai") continue;
@@ -487,12 +487,19 @@ function multiPlayRows(predictions) {
     const ouText = ou ? `${ou.pick}(${pct(ou.blendOver)})` : "—";
     // 单双:回测证零信号(命中50.2% vs 基线50%、Brier 0.2504≈瞎猜)→ 诚实标注仅参考,勿单押。
     const oe = p.extendedMarkets?.totalGoalsOddEven;
-    const oeText = oe ? `${oe.odd >= oe.even ? "单" : "双"} ≈掷硬币·参考` : "—";
+    const oeText = oe ? `${oe.odd >= oe.even ? "单" : "双"} ≈掷硬币` : "—";
+    // 上半场胜平负:回测弱信号(命中43.6% vs 基线40.9%,半场多平),诚实标注。
+    const fh = p.extendedMarkets?.firstHalf;
+    const fhText = fh ? (() => {
+      const o = [["主胜", fh.home], ["平局", fh.draw], ["客胜", fh.away]].sort((a, b) => b[1] - a[1])[0];
+      return `${o[0]} ${pct(o[1])}`;
+    })() : "—";
     rows.push([
       `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
       sfc,
       lqText,
       ouText,
+      fhText,
       oeText,
       p.halfFullPicks?.primary ?? "—",
       p.scorePicks?.primary ?? "—",
