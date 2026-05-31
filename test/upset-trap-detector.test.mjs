@@ -51,6 +51,21 @@ describe("爆冷风险 + 诱盘识别(upset-trap-detector)", () => {
     assert.equal(r.priceReflectsStrength, true);
   });
 
+  it("诱盘类判定带诚实 caveat(回测证市场更准·非弃注依据)", () => {
+    const opening = { home: 0.5, draw: 0.27, away: 0.23 };
+    const closing = { home: 0.6, draw: 0.23, away: 0.17 };
+    const model = { home: 0.5, draw: 0.27, away: 0.23 }; // 模型明显更低 → 诱盘嫌疑
+    const r = analyzeUpsetTrap({ opening, closing, model });
+    assert.match(r.trapVerdict, /诱盘/);
+    assert.ok(r.caveat && /市场通常更准|非弃注/.test(r.caveat), "诱盘类判定必须带诚实 caveat");
+    assert.match(r.reason, /⚠/);
+  });
+
+  it("价实相符(无模型分歧)不加 caveat", () => {
+    const r = analyzeUpsetTrap({ opening: { home: 0.55, draw: 0.25, away: 0.2 }, closing: { home: 0.56, draw: 0.25, away: 0.19 } });
+    assert.equal(r.caveat, null);
+  });
+
   it("favoriteUpset 正确判定热门是否翻车", () => {
     const closing = { home: 0.62, draw: 0.22, away: 0.16 };
     assert.equal(favoriteUpset(closing, { home: 2, away: 0 }).won, true);

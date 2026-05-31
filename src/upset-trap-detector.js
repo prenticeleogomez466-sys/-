@@ -8,6 +8,11 @@
 //     不作下注触发器;给用户判断材料,下不下注用户定。
 //   · 实证锚(reference-data-change-5yr-empirics,33278 场):被加注热门 56.4% 胜 vs 退烧热门 45.5% 胜;
 //     大热让球过盘率全程 <50%。本模块用这些经验频率给爆冷风险定档。
+//   · ⚠诱盘判定真实性回测(2026-06-01 轮9,run-trap-verdict-backtest.mjs,8266 场,leak-safe DC):
+//     **所谓"诱盘"无下注 edge** —— "诱盘嫌疑·公众追高热门"桶热门实际胜率 58.6% vs 收盘隐含 55.6%
+//     (+2.9pp,热门反跑赢);无任一桶热门显著跑输隐含。即市场高效、模型↔市场分歧时市场更准
+//     (印证 reference-signal-backtest-findings)。故 trapVerdict 的"诱盘/低估/看淡"类带诚实 caveat,
+//     仅作分歧诊断、**不构成弃热门依据**;真有方向性的只有 movement(加注 vs 退烧)与 favoriteTier。
 //
 // 复用已有 analyzeLineMovement(line-movement-signal.js),不重复造轮子;本层叠"热门视角 + 模型对照"。
 
@@ -97,7 +102,15 @@ export function analyzeUpsetTrap({ opening = null, closing = null, model = null 
     }
   }
 
-  const reason = buildReason({ tier, favLabel: LABEL[fav], favImplied, moveTag, upsetRisk, upsetLevel, trapVerdict, gap });
+  // 诚实 caveat(2026-06-01 轮9 回测,8266 场):模型与市场分歧时(gap≠0 的诱盘/低估/看淡类判定),
+  //   热门**实际胜率≈或高于收盘隐含**("诱盘嫌疑"桶实际 58.6% vs 隐含 55.6%,+2.9pp)——即市场高效、
+  //   分歧时市场更准,所谓"诱盘"无下注 edge。故这些判定仅作分歧诊断,**不构成弃热门依据**。
+  const isModelDisagreement = gap != null && Math.abs(gap) >= 0.03 && /诱盘|低估|看淡/.test(trapVerdict);
+  const caveat = isModelDisagreement
+    ? "模型与市场分歧;回测证市场通常更准(分歧时热门仍达隐含),仅作诊断、非弃注依据"
+    : null;
+
+  const reason = buildReason({ tier, favLabel: LABEL[fav], favImplied, moveTag, upsetRisk, upsetLevel, trapVerdict, gap, caveat });
 
   return {
     favorite: fav,
@@ -111,11 +124,12 @@ export function analyzeUpsetTrap({ opening = null, closing = null, model = null 
     trapConfidence: round(trapConfidence, 2),
     priceReflectsStrength,
     modelGap: gap,
+    caveat,
     reason,
   };
 }
 
-function buildReason({ tier, favLabel, favImplied, moveTag, upsetRisk, upsetLevel, trapVerdict, gap }) {
+function buildReason({ tier, favLabel, favImplied, moveTag, upsetRisk, upsetLevel, trapVerdict, gap, caveat }) {
   const pct = (x) => `${Math.round(x * 100)}%`;
   const parts = [
     `${tier}(${favLabel}隐含胜率${pct(favImplied)})`,
@@ -124,6 +138,7 @@ function buildReason({ tier, favLabel, favImplied, moveTag, upsetRisk, upsetLeve
     trapVerdict,
   ];
   if (gap != null) parts.push(`模型−市场${gap >= 0 ? "+" : ""}${pct(gap)}`);
+  if (caveat) parts.push(`⚠${caveat}`);
   return parts.join(" · ");
 }
 
