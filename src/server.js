@@ -6,6 +6,7 @@ import "./env.js";
 import { getDataSubdir, getExportDir } from "./paths.js";
 import { buildCredentialStatus } from "./source-credentials.js";
 import { recommendFixtures } from "./prediction-engine.js";
+import { renderTodayMobileHtml } from "./today-mobile-view.js";
 import { getWechatConfig, handleWechatQuery } from "./wechat-channel.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -20,6 +21,10 @@ export function createFootballServer() {
       if (request.method === "OPTIONS") return send(response, "", 204);
       if (request.method === "GET" && url.pathname === "/") return send(response, renderDashboard(), 200, "text/html; charset=utf-8");
       if (request.method === "GET" && url.pathname === "/framework") return send(response, renderFramework(), 200, "text/html; charset=utf-8");
+      if (request.method === "GET" && url.pathname === "/today") {
+        const date = url.searchParams.get("date") ?? todayInShanghai();
+        return send(response, renderTodayMobileHtml(recommendFixtures(date), date), 200, "text/html; charset=utf-8");
+      }
       if (url.pathname === "/api/health") return send(response, { status: "ok", service: "football-ai-copilot" });
       if (url.pathname === "/api/credentials") return send(response, await buildCredentialStatus());
       if (url.pathname === "/api/model-view") return send(response, buildModelView(url.searchParams.get("date") ?? todayInShanghai()));
