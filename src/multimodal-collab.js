@@ -177,9 +177,12 @@ export function extractLenses(prediction) {
   const hw = prediction?.handicapPick?.handicapWld;
   if (hw?.probabilities) {
     const p = hw.probabilities;
+    // 让球覆盖是「主胜/走盘push/客胜」覆盖分布,whole-line 无真"平"→ 缺项不塞 NaN(无脏数据),
+    //   只保留有限值;它是 kind:"handicap"、不进 wld 投票、不按 wld 归一审计。
+    const fin = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
     lenses.push({
       key: "handicap", label: "让球盘口覆盖", kind: "handicap",
-      probs: { home: Number(p.home), draw: Number(p.draw), away: Number(p.away) },
+      probs: { home: fin(p.home), draw: fin(p.draw), away: fin(p.away) },
       pick: argmax(p),
       available: true,
       note: `让球线 ${hw.line ?? prediction?.handicapPick?.line ?? "—"}·${hw.source ?? "DC-τ覆盖"}`,
@@ -292,27 +295,310 @@ export function dispatchVerdict(regime, compare) {
   return { lead, why, confidenceNote };
 }
 
-/** 单场完整多模态分析(对比 + 分流 + 裁决)。 */
+// 胜平负码 → 中文(本地映射,避免 import prediction-engine 造成循环依赖)。
+const CODE_LABEL = { "3": "主胜", "1": "平局", "0": "客胜" };
+function codeToLabel(code) { return CODE_LABEL[String(code)] ?? "—"; }
+
+// "2-1" 比分串 → 胜平负码(distribution 缺该项时的兜底,纯算术不编造)。
+function outcomeFromScoreString(score) {
+  const m = /^(\d+)\s*[-:]\s*(\d+)$/.exec(String(score ?? "").trim());
+  if (!m) return null;
+  const h = Number(m[1]), a = Number(m[2]);
+  return h > a ? "3" : h < a ? "0" : "1";
+}
+
+/**
+ * 比分小模型(2026-05-31):各路对"本场比分"的处理并排 + 与 wld 锚一致性 + 模态裁决。
+ * 只读已算好的真实中间量:DC 真泊松矩阵(scorePicks)、市场比分赔率(scoreOdds,无则 available:false)。
+ * 严守 [[feedback_wld_anchor_inference]]:比分首选方向必须落在 wld 锚方向内,不反推 wld。
+ */
+export function analyzeScorePlay(prediction, regime = classifyRegime(prediction)) {
+  const sp = prediction?.scorePicks;
+  const anchorCode = prediction?.pick?.code ?? null;
+  const sources = [];
+  // ① DC 真泊松矩阵(本模型核心比分源)
+  const dcAvail = Boolean(sp?.primary) && Number.isFinite(Number(sp?.primaryProbability));
+  sources.push({
+    key: "dc-matrix", label: "DC真泊松矩阵",
+    available: dcAvail,
+    pick: dcAvail ? sp.primary : null,
+    prob: dcAvail ? Number(sp.primaryProbability) : null,
+    note: dcAvail ? (sp.source ?? "dixon-coles") : "无比分分布",
+  });
+  // ② 市场比分赔率(竞彩单场详情页;今日多无→诚实 available:false)
+  const so = prediction?.marketSnapshot?.scoreOdds;
+  const marketAvail = Boolean(so) && typeof so === "object" && Object.keys(so).length > 0;
+  sources.push({
+    key: "market-score", label: "市场比分赔率",
+    available: marketAvail,
+    pick: marketAvail ? topKeyByMinOdds(so) : null,
+    prob: null,
+    note: marketAvail ? "竞彩比分盘去赔率反推" : "本场未抓到比分赔率(不编造)",
+  });
+  // 与 wld 锚一致性:比对**推荐比分 primary**(已按 wld 方向约束)所属 outcome,而非全局最可能比分。
+  //   注意:足球里全局最可能"比分"常是 1-1/0-0 平,但最可能"结果"可为主胜——那是正常,不算不一致。
+  const primaryEntry = dcAvail ? (sp.distribution ?? []).find((d) => d.score === sp.primary) : null;
+  const primaryOutcome = primaryEntry?.outcome ?? outcomeFromScoreString(sp?.primary);
+  const wldConsistent = !dcAvail || primaryOutcome == null || anchorCode == null || primaryOutcome === anchorCode;
+  const flags = [];
+  if (dcAvail && !wldConsistent) {
+    flags.push({ level: "warn", text: `⚠️ 比分首选 ${sp.primary}(属${codeToLabel(primaryOutcome)})与胜平负锚(${codeToLabel(anchorCode)})不一致` });
+  }
+  // 模态裁决:低进球联赛/软赛事比分倾向小分差。
+  const lowScoring = ["east-asia", "soft-international"].includes(regime?.leagueMode);
+  const regimeVerdict = lowScoring
+    ? "低进球/软赛事 → 比分以小分差(1-0/0-0/1-1)为主,大比分谨慎"
+    : "常规联赛 → DC 矩阵首选为主,备选覆盖近邻比分";
+  return {
+    playtype: "比分", available: dcAvail,
+    anchor: dcAvail ? { label: sp.primary, prob: Number(sp.primaryProbability), alt: sp.secondary ?? null } : null,
+    sources, wldConsistent, regimeVerdict, flags,
+  };
+}
+
+/**
+ * 半全场小模型(2026-05-31):泊松半全场联合分布 vs 市场半全场赔率,+ FT 段与 wld 锚一致性。
+ */
+export function analyzeHalfFullPlay(prediction, regime = classifyRegime(prediction)) {
+  const hf = prediction?.halfFullPicks;
+  const anchorCode = prediction?.pick?.code ?? null;
+  const sources = [];
+  const modelAvail = Boolean(hf?.primary) && Number.isFinite(Number(hf?.primaryProbability));
+  sources.push({
+    key: "poisson-joint", label: "泊松半全场联合分布",
+    available: modelAvail,
+    pick: modelAvail ? hf.primary : null,
+    prob: modelAvail ? Number(hf.primaryProbability) : null,
+    note: modelAvail ? (hf.source ?? "poisson-half-joint") : "无半全场分布",
+  });
+  const hfo = prediction?.marketSnapshot?.halfFullOdds;
+  const marketAvail = Boolean(hfo) && typeof hfo === "object" && Object.keys(hfo).length > 0;
+  sources.push({
+    key: "market-hf", label: "市场半全场赔率",
+    available: marketAvail,
+    pick: marketAvail ? topKeyByMinOdds(hfo) : null,
+    prob: null,
+    note: marketAvail ? "半全场盘去赔率反推" : "本场未抓到半全场赔率(不编造)",
+  });
+  // FT 段(全场结果)必须与 wld 锚一致:"主胜-主胜" → FT="主胜"。
+  const ftLabel = modelAvail ? String(hf.primary).split("-")[1] : null;
+  const wldConsistent = !modelAvail || ftLabel == null || anchorCode == null || ftLabel === codeToLabel(anchorCode);
+  const flags = [];
+  if (modelAvail && !wldConsistent) {
+    flags.push({ level: "warn", text: `⚠️ 半全场首选 ${hf.primary} 的全场段(${ftLabel})与胜负平锚(${codeToLabel(anchorCode)})不一致` });
+  }
+  const highDraw = regime?.leagueMode === "east-asia" || regime?.leagueMode === "soft-international";
+  const regimeVerdict = highDraw
+    ? "高平局模态 → 关注 平-主/平-客(慢热反超)与 平-平 路径"
+    : "常规 → 联合分布首选为主,备选取同向次高频路径";
+  return {
+    playtype: "半全场", available: modelAvail,
+    anchor: modelAvail ? { label: hf.primary, prob: Number(hf.primaryProbability), alt: hf.secondary ?? null } : null,
+    sources, wldConsistent, regimeVerdict, flags,
+  };
+}
+
+/**
+ * 数据变化小模型(2026-05-31,用户重点要求):盘口资金流向 = 欧赔开→现漂移 + 亚盘水位早→晚 + 历史漂移经验 + 市场背离。
+ * 全部读已算好的真实快照,无真实赔率则 available:false,绝不编造漂移。
+ * 这是模型给"≠跟市场买热门"独立观点的正位(让球/比分的二阶 alpha,见 AS 档)。
+ */
+export function analyzeDataChangePlay(prediction) {
+  const euro = prediction?.marketSnapshot?.europeanOdds;
+  const init = euro?.initial, cur = euro?.current ?? euro?.final;
+  const moves = [];
+  let euroMoved = false;
+  if (init && cur) {
+    for (const k of KEYS) {
+      const i = Number(init[k]), c = Number(cur[k]);
+      if (Number.isFinite(i) && Number.isFinite(c) && i > 0) {
+        const rel = (c - i) / i;
+        if (Math.abs(rel) >= 0.03) { // <3% 视为未动
+          euroMoved = true;
+          moves.push({ outcome: CODE_LABEL[CODE[k][0]] ?? CODE[k][1], dir: rel < 0 ? "升温(降赔)" : "降温(升赔)", pct: Math.round(Math.abs(rel) * 100) });
+        }
+      }
+    }
+  }
+  // 亚盘水位早→晚
+  const aw = prediction?.asianWaterAnalysis;
+  let waterNote = null, waterMoved = false;
+  if (aw?.early && aw?.late) {
+    const eh = Number(aw.early?.homeOdds), lh = Number(aw.late?.homeOdds);
+    const ea = Number(aw.early?.awayOdds), la = Number(aw.late?.awayOdds);
+    if ([eh, lh].every(Number.isFinite) && Math.abs(lh - eh) >= 0.03) {
+      waterMoved = true;
+      waterNote = `上盘水位 ${eh.toFixed(2)}→${lh.toFixed(2)}(${lh > eh ? "升水=资金不敢买上盘,警惕大热不过盘" : "降水=上盘被加注"})`;
+    } else if ([ea, la].every(Number.isFinite) && Math.abs(la - ea) >= 0.03) {
+      waterMoved = true;
+      waterNote = `下盘水位 ${ea.toFixed(2)}→${la.toFixed(2)}(${la < ea ? "降水=受让方被加注,让球方危险" : "升水"})`;
+    }
+  }
+  const md = prediction?.marketDivergence;
+  const drift = prediction?.experienceContext?.drift;
+  const available = Boolean((init && cur) || (aw?.early && aw?.late));
+  const flags = [];
+  if (md && md.aligned === false) flags.push({ level: "warn", text: `⚠️ ${md.tag ?? "逆市:模型方向非市场热门"}(逆市押独门是陷阱)` });
+  if (waterMoved && waterNote) flags.push({ level: "warn", text: `💧 ${waterNote}` });
+  const readingParts = [];
+  if (euroMoved) readingParts.push("欧赔:" + moves.map((m) => `${m.outcome}${m.dir}${m.pct}%`).join("、"));
+  else if (init && cur) readingParts.push("欧赔纹丝不动(无温差)");
+  if (waterNote) readingParts.push("亚盘:" + waterNote);
+  if (drift?.driftBand) readingParts.push(`历史漂移档「${drift.driftBand}」`);
+  if (md) readingParts.push(md.aligned === false ? "⛔逆市" : "✓与市场同向");
+  return {
+    playtype: "数据变化", available,
+    euroMoved, waterMoved,
+    moves, waterNote,
+    aligned: md ? md.aligned : null,
+    reading: available ? readingParts.join(" | ") : "本场无开/收盘双价或亚盘双时点 → 无数据变化可读(不编造)",
+    flags,
+  };
+}
+
+// 从赔率对象取最低赔(=最被看好)的键,作市场首选。不编造:空对象返回 null。
+function topKeyByMinOdds(odds) {
+  let best = null;
+  for (const [k, v] of Object.entries(odds ?? {})) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 1 && (!best || n < best.odds)) best = { key: k, odds: n };
+  }
+  return best ? best.key : null;
+}
+
+/**
+ * 四玩法小模型汇总:方向(胜平负) + 比分 + 半全场 + 数据变化。
+ * 每路只读真实中间量、各带模态裁决与 available 诚实标注。
+ */
+export function analyzePlaytypes(prediction, regime = classifyRegime(prediction), compare = compareLenses(prediction)) {
+  return {
+    wld: {
+      playtype: "方向(胜平负)",
+      available: compare.voterCount > 0,
+      anchor: compare.anchorOutcome ? { label: codeToLabel(CODE[compare.anchorOutcome]?.[0]), key: compare.anchorOutcome } : null,
+      voters: compare.voters,
+      consensus: compare.consensusOutcome,
+      unanimous: compare.unanimous,
+      split: compare.split,
+      anchorVsConsensus: compare.anchorVsConsensus,
+      flags: compare.flags,
+    },
+    score: analyzeScorePlay(prediction, regime),
+    halfFull: analyzeHalfFullPlay(prediction, regime),
+    dataChange: analyzeDataChangePlay(prediction),
+  };
+}
+
+/** 单场完整多模态分析(分流 + 四玩法小模型对比 + 裁决)。 */
 export function multimodalAnalysis(prediction) {
   if (!prediction?.fixture || prediction?.unpredictable) return null;
   const regime = classifyRegime(prediction);
   const lenses = extractLenses(prediction);
   const compare = compareLenses(prediction, lenses);
   const dispatch = dispatchVerdict(regime, compare);
+  const playtypes = analyzePlaytypes(prediction, regime, compare);
   const fx = prediction.fixture;
-  // 一段可读叙述:模态画像 → 各路对比 → 裁决。
+  // 一段可读叙述:模态画像 → 方向各路对比 → 比分/半全场/数据变化 → 裁决。
   const lensLine = lenses
     .filter((l) => l.available)
     .map((l) => `${l.label}=${l.pick.label}(${pct(l.pick.prob)})`)
     .join(" | ");
+  const scoreLine = playtypes.score.available ? `${playtypes.score.anchor.label}(${pct(playtypes.score.anchor.prob)})` : "—";
+  const hfLine = playtypes.halfFull.available ? `${playtypes.halfFull.anchor.label}(${pct(playtypes.halfFull.anchor.prob)})` : "—";
   const text = [
     `【模态】${regime.label}`,
-    `【对比】${lensLine}`,
+    `【方向·各路对比】${lensLine}`,
+    `【比分】${scoreLine} —— ${playtypes.score.regimeVerdict}`,
+    `【半全场】${hfLine} —— ${playtypes.halfFull.regimeVerdict}`,
+    `【数据变化】${playtypes.dataChange.reading}`,
     `【主导处理】${dispatch.lead} —— ${dispatch.why}`,
     ...compare.flags.map((f) => `【${f.level === "ok" ? "一致" : "提示"}】${f.text}`),
+    ...playtypes.score.flags.map((f) => `【提示】${f.text}`),
+    ...playtypes.halfFull.flags.map((f) => `【提示】${f.text}`),
+    ...playtypes.dataChange.flags.map((f) => `【提示】${f.text}`),
     `【信心】${dispatch.confidenceNote}`,
   ].join("\n");
-  return { fixture: { homeTeam: fx.homeTeam, awayTeam: fx.awayTeam, competition: fx.competition }, regime, lenses, compare, dispatch, text };
+  return { fixture: { homeTeam: fx.homeTeam, awayTeam: fx.awayTeam, competition: fx.competition }, regime, lenses, compare, playtypes, dispatch, text };
+}
+
+/**
+ * 每层全面审计(2026-05-31 用户要求"每层加一道全面审计,避免孤儿/假数据/降质量")。
+ * 多模态是**纯读取层**,不改 pick/probabilities → 质量零影响;审计只验证本层是否如实:
+ *   硬 blocker(让展示变假/变错):
+ *     - 某路标 available:true 但概率非有限/不归一(展示了不存在的数);
+ *     - compare 的锚 ≠ prediction.pick(本层误读了锚方向);
+ *     - 比分/半全场标 available 却无支撑分布(凭空给路径)。
+ *   warning(质量提示,不拦):锚偏离独立共识、方向不一致、逆市、数据变化分歧。
+ * @returns {{ok, blockers:string[], warnings:string[], layers:object}}
+ */
+export function auditMultimodalLayer(prediction) {
+  const blockers = [];
+  const warnings = [];
+  const a = multimodalAnalysis(prediction);
+  const tag = `${prediction?.fixture?.homeTeam ?? "?"} vs ${prediction?.fixture?.awayTeam ?? "?"}`;
+  if (!a) return { ok: true, blockers, warnings, layers: { note: "unpredictable/无fixture → 本层正确跳过(不编造)" } };
+
+  // wld 层:真胜平负分布(kind:"wld")展示的每路概率必须有限且归一;锚必须 == prediction.pick。
+  //   让球覆盖路(kind:"handicap")是「主胜/走盘/客胜」覆盖分布,不按 wld 归一,只查 pick 存在。
+  for (const l of a.lenses) {
+    if (l.kind === "wld") {
+      if (l.available) {
+        const s = (l.probs?.home ?? 0) + (l.probs?.draw ?? 0) + (l.probs?.away ?? 0);
+        if (!Number.isFinite(s) || Math.abs(s - 1) > 0.02) blockers.push(`[${tag}] 方向路「${l.label}」标 available 但概率不归一(${Number.isFinite(s) ? s.toFixed(3) : "NaN"})=假数据`);
+      } else if (l.probs) {
+        blockers.push(`[${tag}] 方向路「${l.label}」available=false 却带概率值=自相矛盾`);
+      }
+    } else if (l.available && !l.pick) {
+      blockers.push(`[${tag}] 「${l.label}」标 available 却无首选=假`);
+    }
+  }
+  if (a.compare.anchorOutcome && prediction?.pick?.key && a.compare.anchorOutcome !== prediction.pick.key) {
+    blockers.push(`[${tag}] 多模态锚(${a.compare.anchorOutcome})≠ 模型 pick(${prediction.pick.key})=本层误读方向`);
+  }
+  if (a.compare.anchorVsConsensus === false) warnings.push(`[${tag}] 方向锚偏离独立共识(${a.compare.consensusOutcome})`);
+
+  // 比分层:标 available 必须有 anchor.label;wld 不一致只 warn(已由 selfcheck 硬拦,避免双拦)。
+  if (a.playtypes.score.available && !a.playtypes.score.anchor?.label) blockers.push(`[${tag}] 比分标 available 却无首选=假`);
+  if (a.playtypes.score.available && !a.playtypes.score.wldConsistent) warnings.push(`[${tag}] 比分方向与 wld 锚不一致`);
+
+  // 半全场层:同上。
+  if (a.playtypes.halfFull.available && !a.playtypes.halfFull.anchor?.label) blockers.push(`[${tag}] 半全场标 available 却无首选=假`);
+  if (a.playtypes.halfFull.available && !a.playtypes.halfFull.wldConsistent) warnings.push(`[${tag}] 半全场全场段与 wld 锚不一致`);
+
+  // 数据变化层:标 available 必须有 reading;不可编造(available=false 时 reading 必须是"无…不编造"语)。
+  const dc = a.playtypes.dataChange;
+  if (!dc.available && (dc.euroMoved || dc.waterMoved)) blockers.push(`[${tag}] 数据变化 available=false 却报告了漂移=编造`);
+  // 去掉开头的提示符号(emoji 含代理对,用"非中英数字"前缀剥除,避免 char class 拆坏代理对)。
+  dc.flags.forEach((f) => warnings.push(`[${tag}] 数据变化:${String(f.text).replace(/^[^一-龥A-Za-z]+/, "")}`));
+
+  return { ok: blockers.length === 0, blockers, warnings, layers: { regime: a.regime.label } };
+}
+
+/**
+ * 批量多模态层审计(供 comprehensive-audit 第⑧道闸门)。
+ * @returns {{ok, analyzed, blockers:string[], warnings:string[], byPlaytype:object}}
+ */
+export function auditMultimodalBatch(predictions) {
+  const blockers = [];
+  const warnings = [];
+  let analyzed = 0;
+  const byPlaytype = { 方向: { ok: 0, warn: 0 }, 比分: { ok: 0, warn: 0, na: 0 }, 半全场: { ok: 0, warn: 0, na: 0 }, 数据变化: { ok: 0, warn: 0, na: 0 } };
+  for (const p of predictions ?? []) {
+    if (p?.unpredictable || !p?.fixture) continue;
+    analyzed += 1;
+    const r = auditMultimodalLayer(p);
+    blockers.push(...r.blockers);
+    warnings.push(...r.warnings);
+    const a = p.multimodal ?? multimodalAnalysis(p);
+    if (!a) continue;
+    byPlaytype.方向[a.compare.anchorVsConsensus === false ? "warn" : "ok"] += 1;
+    for (const [pt, key] of [["比分", "score"], ["半全场", "halfFull"], ["数据变化", "dataChange"]]) {
+      const sec = a.playtypes[key];
+      if (!sec.available) byPlaytype[pt].na += 1;
+      else byPlaytype[pt][sec.flags?.length ? "warn" : "ok"] += 1;
+    }
+  }
+  return { ok: blockers.length === 0, analyzed, blockers, warnings, byPlaytype };
 }
 
 /**
@@ -346,13 +632,13 @@ export function summarizeMultimodal(predictions) {
 
 /**
  * 批量:产出竞彩/14场 多模态对比表(xlsx 行),供 daily-report 接入。
- * 列:对阵 | 模态画像 | 市场 | DC | 融合 | 经验 | 让球 | 最终锚 | 一致性 | 主导处理
+ * 小模型按不同情况分析 → 汇总到大模型的最终表格:
+ *   对阵 | 模态画像 | 方向各路(市场/DC/融合/经验/让球) | 一致性 | 比分 | 半全场 | 数据变化 | 主导处理裁决
  */
 export function multimodalComparisonRows(predictions) {
-  const header = [
-    "⚡ 多模态协作 · 分联赛分情况对比分析", "", "", "", "", "", "", "", "", "",
-  ];
-  const cols = ["对阵", "模态画像", "市场赔率", "DC模型", "信号融合", "历史经验", "让球盘口", "最终锚", "一致性/分歧", "主导处理 + 裁决"];
+  const cols = ["对阵", "模态画像", "市场赔率", "DC模型", "信号融合", "历史经验", "让球盘口",
+    "最终锚", "一致性/分歧", "比分(小模型)", "半全场(小模型)", "数据变化(资金流向)", "主导处理 + 裁决"];
+  const header = ["⚡ 多模态协作 · 四玩法小模型分情况分析 → 汇总", ...new Array(cols.length - 1).fill("")];
   const rows = [header, cols];
   const cell = (l) => (l && l.available ? `${l.pick.label} ${pct(l.pick.prob)}` : "—");
   for (const p of predictions ?? []) {
@@ -365,6 +651,14 @@ export function multimodalComparisonRows(predictions) {
       : a.compare.split
         ? `🟡 分歧(${a.compare.agree}/${a.compare.voterCount}·极差${pct(a.compare.maxSpread)})`
         : `⚪ 投票路不足`;
+    const sc = a.playtypes.score;
+    const hf = a.playtypes.halfFull;
+    const scoreCell = sc.available
+      ? `${sc.anchor.label} ${pct(sc.anchor.prob)}${sc.wldConsistent ? "" : " ⚠向"}`
+      : "—";
+    const hfCell = hf.available
+      ? `${hf.anchor.label} ${pct(hf.anchor.prob)}${hf.wldConsistent ? "" : " ⚠向"}`
+      : "—";
     rows.push([
       `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
       a.regime.label,
@@ -375,6 +669,9 @@ export function multimodalComparisonRows(predictions) {
       cell(byKey.handicap),
       cell(byKey.final),
       consensus,
+      scoreCell,
+      hfCell,
+      a.playtypes.dataChange.reading,
       `${a.dispatch.lead}`,
     ]);
   }

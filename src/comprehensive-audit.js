@@ -22,6 +22,7 @@ import { auditModelDefects } from "./model-defect-audit.js";
 import { auditModelCapabilities } from "./model-capability-registry.js";
 import { auditRecommendations } from "./recommendation-audit.js";
 import { runPreExportSelfCheck } from "./pre-export-selfcheck.js";
+import { auditMultimodalBatch } from "./multimodal-collab.js";
 
 function safe(fn, label) {
   try { return { ok: true, value: fn() }; }
@@ -119,6 +120,25 @@ export function runComprehensiveAudit({ date, recommendations, env = process.env
     detail: playtypes.items.map((i) => `${i.label} ✓${i.pass}${i.fail ? `/✗${i.fail}` : ""}`).join(" · ")
   });
 
+  // ⑧ 多模态层审计(2026-05-31 用户要求"每层加一道全面审计,避免孤儿/假数据/降质量")。
+  //   多模态是纯读取层(不改 pick/probabilities→质量零影响);本道验证它如实:
+  //   硬 blocker = 展示了不存在/不归一的概率、误读锚方向(=假数据);warning = 锚偏离共识/水位异动/逆市。
+  const mm = safe(() => auditMultimodalBatch(recommendations?.predictions ?? []), "多模态层");
+  let mmAudit = null;
+  if (!mm.ok) { warnings.push(mm.error); sections.push({ name: "多模态层", status: "⚠跳过", detail: mm.error }); }
+  else {
+    mmAudit = mm.value;
+    mmAudit.blockers.forEach((b) => blockers.push(`多模态层:${b}`));
+    mmAudit.warnings.forEach((w) => warnings.push(`多模态层:${w}`));
+    const bp = mmAudit.byPlaytype ?? {};
+    sections.push({
+      name: "多模态层(四玩法小模型)",
+      status: mmAudit.blockers.length ? "✗" : "✓",
+      detail: `分析 ${mmAudit.analyzed} 场 · ` + ["方向", "比分", "半全场", "数据变化"]
+        .map((k) => `${k} ✓${bp[k]?.ok ?? 0}${bp[k]?.warn ? `/⚠${bp[k].warn}` : ""}${bp[k]?.na ? `/—${bp[k].na}` : ""}`).join(" · ")
+    });
+  }
+
   return {
     ok: blockers.length === 0,
     date,
@@ -126,7 +146,8 @@ export function runComprehensiveAudit({ date, recommendations, env = process.env
     warnings,
     sections,
     integrity,
-    playtypes
+    playtypes,
+    multimodal: mmAudit
   };
 }
 
