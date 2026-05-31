@@ -77,12 +77,16 @@ export function deepFusionAnalysis(prediction) {
     factors.push(`🎯 选择分层:${tier.label}(市场隐含热门${pct(tier.marketFavProb)}·回测档内命中~${pct(tier.backtestHit)})${tier.bankerEligible ? "·够格胆码" : "·不宜单选搏胆"}`);
   }
 
-  // ④ 让球胜平负
+  // ④ 让球胜平负(点名到队,方向直白:买哪支队/走盘)
   const lq = prediction.jingcaiLetqiu;
   if (lq?.pick) {
     const ln = Number(lq.line);
-    const lineLabel = ln > 0 ? `受让+${ln}` : ln < 0 ? `让${ln}` : "平手";
-    factors.push(`🀄 让球胜平负[${lineLabel}]:推 ${lq.pick.label} ${pct(lq.pick.probability)}${lq.sfcSold ? "" : "(本场胜平负未开售,只此盘可投)"}`);
+    const lineLabel = ln > 0 ? `主队受让+${ln}` : ln < 0 ? `主队让${ln}` : "平手盘";
+    // 让球后方向 → 点名:主胜=主队(让/受让后)赢盘,客胜=客队赢盘,平局=走盘
+    const dirTeam = lq.pick.code === "3" ? `买 ${fx.homeTeam}(${ln < 0 ? "让" + ln + "过盘" : "受让+" + ln})`
+      : lq.pick.code === "0" ? `买 ${fx.awayTeam}(${ln < 0 ? "受让+" + (-ln) : "让" + (-ln)})`
+      : "走盘(让球后打平)";
+    factors.push(`🀄 让球胜平负[${lineLabel}]:方向 → ${dirTeam} ${pct(lq.pick.probability)}${lq.sfcSold ? "" : "(本场胜平负未开售,只让球盘可投)"}`);
   }
 
   // ④b 大小球(总进球2.5):联赛历史大球率(回测证明联赛维度 Brier 优于全局:0.2494→0.2472)为主信号,
