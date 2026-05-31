@@ -178,11 +178,13 @@ test("analyzeDataChangePlay:无赔率变化诚实标注不编造;水位移动被
   assert.ok(/不编造/.test(none.reading));
 });
 
-test("analyzePlaytypes 汇总四玩法", () => {
+test("analyzePlaytypes 汇总四玩法 + 历史", () => {
   const pt = analyzePlaytypes(makePrediction());
-  assert.deepEqual(Object.keys(pt), ["wld", "score", "halfFull", "dataChange"]);
+  assert.deepEqual(Object.keys(pt), ["wld", "score", "halfFull", "dataChange", "historical"]);
   assert.equal(pt.score.playtype, "比分");
   assert.equal(pt.halfFull.playtype, "半全场");
+  // 无 history → 历史 available:false(不编造)
+  assert.equal(pt.historical.available, false);
 });
 
 // ───────────── 每层全面审计 ─────────────
@@ -212,6 +214,41 @@ test("auditMultimodalBatch:roll-up + unpredictable 跳过", () => {
   assert.equal(b.analyzed, 2);
   assert.equal(b.ok, true);
   assert.ok(b.byPlaytype.比分.ok >= 1);
+});
+
+// ───────────── 历史比赛数据小模型集成 ─────────────
+import { canonicalTeamName } from "../src/team-aliases.js";
+function histRec(date, home, away, hg, ag) {
+  return { date, homeTeam: home, awayTeam: away, homeCanon: canonicalTeamName(home), awayCanon: canonicalTeamName(away), homeGoals: hg, awayGoals: ag };
+}
+
+test("analyzePlaytypes 带 history → 附 H2H/近期 历史小模型 + 比分加历史子源", () => {
+  const p = makePrediction({ fixture: { homeTeam: "甲队ZZ", awayTeam: "乙队ZZ", competition: "英超", id: "h1" } });
+  const hist = [
+    histRec("2025-01-01", "甲队ZZ", "乙队ZZ", 2, 0), histRec("2025-02-01", "乙队ZZ", "甲队ZZ", 0, 1), histRec("2025-03-01", "甲队ZZ", "乙队ZZ", 1, 1),
+    histRec("2025-05-01", "甲队ZZ", "丙队ZZ", 2, 0), histRec("2025-05-08", "甲队ZZ", "丙队ZZ", 1, 0), histRec("2025-05-15", "丙队ZZ", "甲队ZZ", 0, 3),
+    histRec("2025-05-02", "乙队ZZ", "丙队ZZ", 0, 1), histRec("2025-05-09", "丙队ZZ", "乙队ZZ", 1, 1), histRec("2025-05-16", "乙队ZZ", "丙队ZZ", 0, 2),
+  ];
+  const pt = analyzePlaytypes(p, undefined, undefined, hist);
+  assert.equal(pt.historical.available, true);
+  assert.equal(pt.historical.h2h.available, true);
+  assert.equal(pt.wld.historical.h2h.available, true);
+  // 比分小模型应含历史交锋常见比分子源
+  assert.ok(pt.score.sources.some((s) => s.key === "h2h-score" && s.available));
+});
+
+test("multimodalAnalysis(options.history) → 文案含【历史比赛数据】且不编造", () => {
+  const p = makePrediction();
+  const aNo = multimodalAnalysis(p); // 不传 history
+  assert.ok(aNo.text.includes("【历史比赛数据】"));
+  assert.ok(/不编造/.test(aNo.playtypes.historical.h2h.note + aNo.playtypes.historical.recentForm.note) || aNo.playtypes.historical.available === false);
+});
+
+test("auditMultimodalLayer:稀疏历史 available:false 不误判为假(不拦)", () => {
+  const p = makePrediction(); // 无 history → 历史 available:false
+  p.multimodal = multimodalAnalysis(p);
+  const r = auditMultimodalLayer(p);
+  assert.equal(r.ok, true, JSON.stringify(r.blockers));
 });
 
 test("质量不变式:多模态层是纯读取,不改 pick/probabilities", () => {

@@ -18,6 +18,7 @@
  */
 import { canonicalLeague, leagueProfile } from "./league-profile.js";
 import { isSoftCompetition } from "./competition-soft-recalibration.js";
+import { buildHistoricalLenses } from "./historical-lens.js";
 
 const TOP5 = new Set(["英超", "西甲", "德甲", "意甲", "法甲"]);
 // football-data 扩展集 + /new/ 覆盖的欧洲次级联赛(有开/收盘赔率,历史类比可用)。
@@ -312,7 +313,7 @@ function outcomeFromScoreString(score) {
  * 只读已算好的真实中间量:DC 真泊松矩阵(scorePicks)、市场比分赔率(scoreOdds,无则 available:false)。
  * 严守 [[feedback_wld_anchor_inference]]:比分首选方向必须落在 wld 锚方向内,不反推 wld。
  */
-export function analyzeScorePlay(prediction, regime = classifyRegime(prediction)) {
+export function analyzeScorePlay(prediction, regime = classifyRegime(prediction), h2hHist = null) {
   const sp = prediction?.scorePicks;
   const anchorCode = prediction?.pick?.code ?? null;
   const sources = [];
@@ -334,6 +335,17 @@ export function analyzeScorePlay(prediction, regime = classifyRegime(prediction)
     pick: marketAvail ? topKeyByMinOdds(so) : null,
     prob: null,
     note: marketAvail ? "竞彩比分盘去赔率反推" : "本场未抓到比分赔率(不编造)",
+  });
+  // ③ 历史交锋常见比分(当前主队视角;数据稀疏则 available:false 不编造)
+  const histScoreAvail = Boolean(h2hHist?.available && h2hHist.topScores?.length);
+  sources.push({
+    key: "h2h-score", label: "历史交锋常见比分",
+    available: histScoreAvail,
+    pick: histScoreAvail ? h2hHist.topScores[0].score : null,
+    prob: null,
+    note: histScoreAvail
+      ? `交锋${h2hHist.n}场 Top: ${h2hHist.topScores.map((s) => `${s.score}×${s.count}`).join(" ")}`
+      : (h2hHist?.note ?? "无交锋史(不编造)"),
   });
   // 与 wld 锚一致性:比对**推荐比分 primary**(已按 wld 方向约束)所属 outcome,而非全局最可能比分。
   //   注意:足球里全局最可能"比分"常是 1-1/0-0 平,但最可能"结果"可为主胜——那是正常,不算不一致。
@@ -467,10 +479,12 @@ function topKeyByMinOdds(odds) {
 }
 
 /**
- * 四玩法小模型汇总:方向(胜平负) + 比分 + 半全场 + 数据变化。
+ * 四玩法小模型汇总:方向(胜平负) + 比分 + 半全场 + 数据变化 + 历史比赛数据。
  * 每路只读真实中间量、各带模态裁决与 available 诚实标注。
+ * @param {object} [history] 历史比赛库(loadHistoricalResults 结果);传入则附历史小模型,缺则历史 available:false。
  */
-export function analyzePlaytypes(prediction, regime = classifyRegime(prediction), compare = compareLenses(prediction)) {
+export function analyzePlaytypes(prediction, regime = classifyRegime(prediction), compare = compareLenses(prediction), history = null) {
+  const historical = buildHistoricalLenses(prediction?.fixture, history);
   return {
     wld: {
       playtype: "方向(胜平负)",
@@ -482,35 +496,48 @@ export function analyzePlaytypes(prediction, regime = classifyRegime(prediction)
       split: compare.split,
       anchorVsConsensus: compare.anchorVsConsensus,
       flags: compare.flags,
+      // 历史比赛数据小模型(独立证据:H2H 胜平负 + 近期状态;并排展示不反推 wld 锚)。
+      historical: { h2h: historical.h2h, recentForm: historical.recentForm },
     },
-    score: analyzeScorePlay(prediction, regime),
+    score: analyzeScorePlay(prediction, regime, historical.h2h),
     halfFull: analyzeHalfFullPlay(prediction, regime),
     dataChange: analyzeDataChangePlay(prediction),
+    historical,
   };
 }
 
-/** 单场完整多模态分析(分流 + 四玩法小模型对比 + 裁决)。 */
-export function multimodalAnalysis(prediction) {
+/**
+ * 单场完整多模态分析(分流 + 四玩法小模型 + 历史比赛数据 + 裁决)。
+ * @param {object} prediction
+ * @param {{history?:Array}} [options] history=历史比赛库(loadHistoricalResults),传入则附 H2H/近期 历史小模型。
+ */
+export function multimodalAnalysis(prediction, options = {}) {
   if (!prediction?.fixture || prediction?.unpredictable) return null;
+  const history = options?.history ?? null;
   const regime = classifyRegime(prediction);
   const lenses = extractLenses(prediction);
   const compare = compareLenses(prediction, lenses);
   const dispatch = dispatchVerdict(regime, compare);
-  const playtypes = analyzePlaytypes(prediction, regime, compare);
+  const playtypes = analyzePlaytypes(prediction, regime, compare, history);
   const fx = prediction.fixture;
-  // 一段可读叙述:模态画像 → 方向各路对比 → 比分/半全场/数据变化 → 裁决。
+  // 一段可读叙述:模态画像 → 方向各路对比 → 比分/半全场/数据变化/历史 → 裁决。
   const lensLine = lenses
     .filter((l) => l.available)
     .map((l) => `${l.label}=${l.pick.label}(${pct(l.pick.prob)})`)
     .join(" | ");
   const scoreLine = playtypes.score.available ? `${playtypes.score.anchor.label}(${pct(playtypes.score.anchor.prob)})` : "—";
   const hfLine = playtypes.halfFull.available ? `${playtypes.halfFull.anchor.label}(${pct(playtypes.halfFull.anchor.prob)})` : "—";
+  const hist = playtypes.historical;
+  const histLine = hist.available
+    ? [hist.h2h.available ? hist.h2h.note : null, hist.recentForm.available ? hist.recentForm.note : null].filter(Boolean).join(" | ")
+    : "无足量历史交锋/近期数据(不编造)";
   const text = [
     `【模态】${regime.label}`,
     `【方向·各路对比】${lensLine}`,
     `【比分】${scoreLine} —— ${playtypes.score.regimeVerdict}`,
     `【半全场】${hfLine} —— ${playtypes.halfFull.regimeVerdict}`,
     `【数据变化】${playtypes.dataChange.reading}`,
+    `【历史比赛数据】${histLine}`,
     `【主导处理】${dispatch.lead} —— ${dispatch.why}`,
     ...compare.flags.map((f) => `【${f.level === "ok" ? "一致" : "提示"}】${f.text}`),
     ...playtypes.score.flags.map((f) => `【提示】${f.text}`),
@@ -534,7 +561,8 @@ export function multimodalAnalysis(prediction) {
 export function auditMultimodalLayer(prediction) {
   const blockers = [];
   const warnings = [];
-  const a = multimodalAnalysis(prediction);
+  // 复用 prediction.multimodal(若已附,含 prediction-engine 传入的历史库结果),否则现算。
+  const a = prediction?.multimodal ?? multimodalAnalysis(prediction);
   const tag = `${prediction?.fixture?.homeTeam ?? "?"} vs ${prediction?.fixture?.awayTeam ?? "?"}`;
   if (!a) return { ok: true, blockers, warnings, layers: { note: "unpredictable/无fixture → 本层正确跳过(不编造)" } };
 
@@ -571,6 +599,23 @@ export function auditMultimodalLayer(prediction) {
   // 去掉开头的提示符号(emoji 含代理对,用"非中英数字"前缀剥除,避免 char class 拆坏代理对)。
   dc.flags.forEach((f) => warnings.push(`[${tag}] 数据变化:${String(f.text).replace(/^[^一-龥A-Za-z]+/, "")}`));
 
+  // 历史比赛数据层:H2H 标 available 必须样本≥3且 wld 归一;available:false 不得带 wld/比分(防编造历史)。
+  const hist = a.playtypes.historical;
+  if (hist?.h2h) {
+    const h = hist.h2h;
+    if (h.available) {
+      const s = (h.wld?.home ?? 0) + (h.wld?.draw ?? 0) + (h.wld?.away ?? 0);
+      if (!(h.n >= 3) || !Number.isFinite(s) || Math.abs(s - 1) > 0.02) {
+        blockers.push(`[${tag}] H2H 历史标 available 但样本不足/wld 不归一(n=${h.n},Σ=${Number.isFinite(s) ? s.toFixed(3) : "NaN"})=假历史`);
+      }
+    } else if (h.wld) {
+      blockers.push(`[${tag}] H2H available=false 却带 wld=编造历史`);
+    }
+  }
+  if (hist?.recentForm && !hist.recentForm.available && hist.recentForm.lean) {
+    blockers.push(`[${tag}] 近期战绩 available=false 却给倾向=编造历史`);
+  }
+
   return { ok: blockers.length === 0, blockers, warnings, layers: { regime: a.regime.label } };
 }
 
@@ -582,7 +627,7 @@ export function auditMultimodalBatch(predictions) {
   const blockers = [];
   const warnings = [];
   let analyzed = 0;
-  const byPlaytype = { 方向: { ok: 0, warn: 0 }, 比分: { ok: 0, warn: 0, na: 0 }, 半全场: { ok: 0, warn: 0, na: 0 }, 数据变化: { ok: 0, warn: 0, na: 0 } };
+  const byPlaytype = { 方向: { ok: 0, warn: 0 }, 比分: { ok: 0, warn: 0, na: 0 }, 半全场: { ok: 0, warn: 0, na: 0 }, 数据变化: { ok: 0, warn: 0, na: 0 }, 历史: { ok: 0, na: 0 } };
   for (const p of predictions ?? []) {
     if (p?.unpredictable || !p?.fixture) continue;
     analyzed += 1;
@@ -597,6 +642,7 @@ export function auditMultimodalBatch(predictions) {
       if (!sec.available) byPlaytype[pt].na += 1;
       else byPlaytype[pt][sec.flags?.length ? "warn" : "ok"] += 1;
     }
+    byPlaytype.历史[a.playtypes.historical?.available ? "ok" : "na"] += 1;
   }
   return { ok: blockers.length === 0, analyzed, blockers, warnings, byPlaytype };
 }
@@ -637,13 +683,14 @@ export function summarizeMultimodal(predictions) {
  */
 export function multimodalComparisonRows(predictions) {
   const cols = ["对阵", "模态画像", "市场赔率", "DC模型", "信号融合", "历史经验", "让球盘口",
-    "最终锚", "一致性/分歧", "比分(小模型)", "半全场(小模型)", "数据变化(资金流向)", "主导处理 + 裁决"];
-  const header = ["⚡ 多模态协作 · 四玩法小模型分情况分析 → 汇总", ...new Array(cols.length - 1).fill("")];
+    "最终锚", "一致性/分歧", "比分(小模型)", "半全场(小模型)", "数据变化(资金流向)", "历史比赛(H2H/近期)", "主导处理 + 裁决"];
+  const header = ["⚡ 多模态协作 · 四玩法小模型 + 历史比赛数据 分情况分析 → 汇总", ...new Array(cols.length - 1).fill("")];
   const rows = [header, cols];
   const cell = (l) => (l && l.available ? `${l.pick.label} ${pct(l.pick.prob)}` : "—");
   for (const p of predictions ?? []) {
     if (p.unpredictable) continue;
-    const a = multimodalAnalysis(p);
+    // 复用已附 history 的 p.multimodal(prediction-engine 传入历史库),无则现算(历史 available:false)。
+    const a = p.multimodal ?? multimodalAnalysis(p);
     if (!a) continue;
     const byKey = Object.fromEntries(a.lenses.map((l) => [l.key, l]));
     const consensus = a.compare.unanimous
@@ -659,6 +706,10 @@ export function multimodalComparisonRows(predictions) {
     const hfCell = hf.available
       ? `${hf.anchor.label} ${pct(hf.anchor.prob)}${hf.wldConsistent ? "" : " ⚠向"}`
       : "—";
+    const hist = a.playtypes.historical;
+    const histCell = hist?.available
+      ? [hist.h2h?.available ? hist.h2h.note : null, hist.recentForm?.available ? `近期净差${hist.recentForm.ppgDiff > 0 ? "+" : ""}${hist.recentForm.ppgDiff}` : null].filter(Boolean).join("；")
+      : "—(无足量历史)";
     rows.push([
       `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
       a.regime.label,
@@ -672,6 +723,7 @@ export function multimodalComparisonRows(predictions) {
       scoreCell,
       hfCell,
       a.playtypes.dataChange.reading,
+      histCell,
       `${a.dispatch.lead}`,
     ]);
   }

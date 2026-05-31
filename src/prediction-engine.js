@@ -113,7 +113,8 @@ export function recommendFixtures(date) {
   //   各自给胜平负判断 → 本层做 分流×对比×裁决,挂到每场 prediction.multimodal。
   //   严守硬规则:只读已算好的真实中间量、以 wld 为锚不改方向、分歧只下调信心不弃赛、缺数据 available:false。
   for (const p of predictions) {
-    try { p.multimodal = multimodalAnalysis(p); } catch { p.multimodal = null; }
+    // 传入已加载的历史比赛库(上方 loadHistoricalResults)→ 附 H2H/近期 历史小模型(稀疏则 available:false)。
+    try { p.multimodal = multimodalAnalysis(p, { history }); } catch { p.multimodal = null; }
   }
   const multimodalSummary = summarizeMultimodal(predictions);
   return {
