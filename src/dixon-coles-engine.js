@@ -49,36 +49,52 @@ export function fitFromFixtureStore(opts = {}) {
   const beforeDate = opts.beforeDate ?? null;
   const allDates = listFixtureDates();
   const dates = (beforeDate ? allDates.filter((d) => d < beforeDate) : allDates).slice(0, maxDates);
-  // 时间衰减参考点:walk-forward 时以预测日为参考,否则用最新日期。
-  const referenceDate = beforeDate ?? dates[0];
-  const matches = [];
+  const rawMatches = [];
   for (const date of dates) {
     const { fixtures } = loadFixtures(date);
     for (const f of fixtures) {
       if (!f.result || !Number.isFinite(f.result.home) || !Number.isFinite(f.result.away)) continue;
-      matches.push({
+      rawMatches.push({
         home: canonicalName(f.homeTeam),
         away: canonicalName(f.awayTeam),
         homeGoals: f.result.home,
         awayGoals: f.result.away,
         date: f.date,
-        daysAgo: daysBetween(f.date, referenceDate),
+        league: f.competition ?? f.league ?? null, // per-league fit 路由用
       });
     }
   }
+  // 时间衰减参考点:walk-forward 用预测日;否则用**最新有赛果**的日期。
+  // 2026-05-31 修生产级 bug:旧式 referenceDate=dates[0](store 最新日期),而 store 含未来赛程
+  //   (上市待赛的竞彩/14场,甚至 2099-12-31 占位)→ 基准被顶到未来 → 全部真实比赛 daysAgo 巨大、
+  //   时间权重衰减≈0 → fit 不更新 → 球队系数全退回中性 1.0 → 生产 DC 球队层长期空转。
+  //   prediction-engine 裸调 fitFromFixtureStore()(无 beforeDate)正中此坑;回测传 beforeDate 故未暴露。
+  const referenceDate = beforeDate ?? rawMatches.reduce((mx, m) => (m.date > mx ? m.date : mx), "0000-00-00");
+  const matches = rawMatches.map((m) => ({ ...m, daysAgo: daysBetween(m.date, referenceDate) }));
   // 冷启动兜底:样本不足时退回联赛先验,而不是直接 unusable
   // 这样 predictFromFitted 仍能输出合理的"中性主场略优"概率,
   // blendWithOdds 会按联赛权重把它与赔率融合,而不是完全跳过 DC 贡献。
   if (matches.length < minMatches) {
     return coldStartFit(matches, minMatches, homeAdvantage);
   }
-  const fitted = fit(matches, {
+  const fitOpts = {
     iterations: opts.iterations ?? 80,
     homeAdvantage,
-    decayHalfLife: opts.decayDays ?? 180,
+    decayDays: opts.decayDays ?? 180,
     shrinkageK: opts.shrinkageK ?? 2, // 经验贝叶斯收缩默认 K=2(backtest:shrinkage 实证:赛季初小样本 LogLoss +0.71%、全样本/命中率不劣化、只动低出场队)
     eloPriors: opts.eloPriors ?? null, // 可选 ClubElo 跨联赛先验作收缩锚(轮15-17,默认 null=收缩向 1.0)
-  });
+    minLeagueMatches: opts.minLeagueMatches ?? 80,
+    minMatches,
+  };
+  // per-league fit:walk-forward 回测(ALL_LEAGUES 32719场)证明与全局**无差异**
+  //   (命中 48.48%↔48.51%、RPS 0.4244↔0.4245),全局拟合里球队 attack/defense 已吸收联赛进球差异。
+  //   故默认走全局(简单);opts.perLeague===true 才用分联赛(函数 fitPerLeague 保留备用)。
+  if (opts.perLeague === true) {
+    const pl = fitPerLeague(matches, fitOpts);
+    pl.fittedAt = new Date().toISOString();
+    return pl;
+  }
+  const fitted = fit(matches, { ...fitOpts, decayHalfLife: fitOpts.decayDays });
   fitted.usable = true;
   fitted.coldStart = false;
   fitted.matches = matches.length;
@@ -182,6 +198,13 @@ function coldStartFit(matches, minMatches, homeAdvantage) {
  */
 export function predictFromFitted(fitted, fixture, marketHints = null) {
   if (!fitted?.usable) return null;
+  // per-league 路由(2026-05-31):按联赛分开拟合时,把该场路由到所属联赛的子模型
+  //   (子模型与普通 fitted 同形 → 递归复用下面全部预测逻辑)。解决"20+异质联赛混在
+  //   单一全局DC+强收缩→同联赛内队伍系数被冲平、各场预测雷同"的根因。
+  if (fitted.perLeague) {
+    const sub = resolvePerLeagueModel(fitted, fixture);
+    return sub ? predictFromFitted(sub, fixture, marketHints) : null;
+  }
   const home = canonicalName(fixture.homeTeam);
   const away = canonicalName(fixture.awayTeam);
   const th = fitted.teams[home];
@@ -467,6 +490,91 @@ function fit(matches, opts) {
   }
 
   return { teams, baseRate, homeAdvantage, rho: -0.08 };
+}
+
+/**
+ * 按联赛分开拟合 DC(2026-05-31,per-league fit)。
+ * 根因:单一全局 DC 把 20+ 异质联赛混拟合 + 跨联赛归一化 → 同联赛内队伍强弱被冲平
+ *   (瑞超各场 DC 恒出主44/平25/客30)。每联赛独立拟合:① 各自 baseRate(联赛进球水平),
+ *   ② attack/defense 相对**本联赛均值**归一(强弱浮现),③ 各自主场优势。
+ * 样本不足联赛(< minLeagueMatches)不单独建模,其球队走全局兜底模型。
+ * 返回对象带 perLeague:true,predictFromFitted 自动路由到所属联赛子模型。
+ *
+ * @param {Array<{home,away,homeGoals,awayGoals,daysAgo,league}>} matches  需含 league 字段
+ */
+export function fitPerLeague(matches, opts = {}) {
+  const minLeagueMatches = opts.minLeagueMatches ?? 80;
+  const minMatches = opts.minMatches ?? 60;
+  const homeAdvantage = opts.homeAdvantage ?? 1.24;
+  const fitOpts = {
+    iterations: opts.iterations ?? 80,
+    homeAdvantage,
+    decayHalfLife: opts.decayDays ?? 180,
+    shrinkageK: opts.shrinkageK ?? 2,
+    eloPriors: opts.eloPriors ?? null,
+  };
+
+  // 规范化队名(与 fitFromMatches 一致;fit() 不自带规范化,漏了会导致子模型按原名建键、
+  //   而 predictFromFitted 按 canonicalName 查 → 对不上恒 null)。
+  const canon = matches.map((m) => ({ ...m, home: canonicalName(m.home), away: canonicalName(m.away) }));
+
+  const byLeague = new Map();
+  for (const m of canon) {
+    const lg = m.league || "unknown";
+    if (!byLeague.has(lg)) byLeague.set(lg, []);
+    byLeague.get(lg).push(m);
+  }
+
+  const leagues = {};
+  const teamLeague = {};
+  for (const [lg, ms] of byLeague) {
+    if (ms.length < minLeagueMatches) continue;
+    const sub = fit(ms, fitOpts);
+    sub.usable = true;
+    sub.coldStart = false;
+    sub.league = lg;
+    sub.matches = ms.length;
+    leagues[lg] = sub;
+    for (const m of ms) { teamLeague[m.home] = lg; teamLeague[m.away] = lg; }
+  }
+
+  // 全局兜底:覆盖样本不足联赛 / 跨联赛(国际赛)/ 队名只在某场出现的场。
+  const global = canon.length >= minMatches
+    ? Object.assign(fit(canon, fitOpts), { usable: true, coldStart: false, matches: canon.length })
+    : coldStartFit(canon, minMatches, homeAdvantage);
+
+  return {
+    usable: true,
+    perLeague: true,
+    leagues,
+    teamLeague,
+    global,
+    // 向后兼容的扁平视图(部分调用方直接读 .teams/.baseRate)→ 用全局兜底值
+    teams: global.teams ?? {},
+    baseRate: global.baseRate,
+    homeAdvantage,
+    rho: -0.08,
+    matches: matches.length,
+    leagueCount: Object.keys(leagues).length,
+    fittedAt: new Date().toISOString(),
+  };
+}
+
+// 把一场比赛路由到所属联赛子模型;无法定位则回退全局兜底模型。
+function resolvePerLeagueModel(fitted, fixture) {
+  const home = canonicalName(fixture.homeTeam);
+  const away = canonicalName(fixture.awayTeam);
+  // 1) 优先按 fixture.competition 命中联赛子模型(两队都在该子模型里)
+  const comp = fixture.competition ?? fixture.league;
+  if (comp && fitted.leagues[comp]?.teams?.[home] && fitted.leagues[comp]?.teams?.[away]) {
+    return fitted.leagues[comp];
+  }
+  // 2) 按 team→league 映射:两队同属一个有子模型的联赛
+  const lgH = fitted.teamLeague[home];
+  const lgA = fitted.teamLeague[away];
+  if (lgH && lgH === lgA && fitted.leagues[lgH]) return fitted.leagues[lgH];
+  // 3) 回退全局兜底(国际赛/跨联赛/样本不足联赛)
+  return fitted.global?.usable ? fitted.global : null;
 }
 
 function timeWeight(daysAgo, halfLife) {
