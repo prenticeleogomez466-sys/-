@@ -28,6 +28,13 @@ const ALIASES = [
   [/墨超|Liga\s*MX|墨西哥/i, "墨超"], [/阿甲|阿根廷/i, "阿甲"], [/中超|Chinese|中国/i, "中超"],
 ];
 
+/** 把任意联赛名(中文全称/简称/英文)归一到规范 key,供跨数据源(画像/复盘账本)匹配。 */
+export function canonicalLeague(name) {
+  const s = String(name ?? "").trim();
+  if (!s) return null;
+  return ALIASES.find(([re]) => re.test(s))?.[1] ?? s;
+}
+
 /**
  * 取联赛画像。先精确 key,再模糊别名,最后全局基准兜底。
  * @returns {{avgGoals,drawRate,homeAdvantage,homeWinRate,overRate,n,source,matched:boolean}}

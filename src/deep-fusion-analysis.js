@@ -10,9 +10,36 @@
  *   ⑥ 风险/爆冷 + 复盘教训(硬币局慎单选)。
  * 纯综合解释,不改 wld 锚、不替用户弃赛。诚实标注缺失因子。
  */
-import { leagueProfile } from "./league-profile.js";
+import { leagueProfile, canonicalLeague } from "./league-profile.js";
+import { attributeRecap } from "./recap-attribution.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { getExportDir } from "./paths.js";
 
 const pct = (v) => (Number.isFinite(Number(v)) ? `${Math.round(Number(v) * 100)}%` : "—");
+
+// 复盘反馈联动(2026-05-31):读真实结算账本的逐联赛命中记录,接回每场分析。
+let _leagueRecord;
+export function _resetLeagueRecord() { _leagueRecord = undefined; }
+function leagueRecord() {
+  if (_leagueRecord !== undefined) return _leagueRecord;
+  try {
+    const p = join(getExportDir(), "recommendation-ledger.json");
+    if (!existsSync(p)) { _leagueRecord = {}; return _leagueRecord; }
+    const L = JSON.parse(readFileSync(p, "utf8"));
+    _leagueRecord = attributeRecap(Array.isArray(L) ? L : L.rows)?.byLeague ?? {};
+  } catch { _leagueRecord = {}; }
+  return _leagueRecord;
+}
+// 模糊匹配 fixture.competition ↔ 账本联赛名(日职↔日本职业联赛、瑞超↔瑞典超级联赛)。
+function recordFor(competition) {
+  const canon = canonicalLeague(competition);
+  if (!canon) return null;
+  for (const [k, v] of Object.entries(leagueRecord())) {
+    if (canonicalLeague(k) === canon) return { league: k, ...v };
+  }
+  return null;
+}
 
 /**
  * @param {object} prediction recommendFixtures 的单条预测
@@ -77,6 +104,15 @@ export function deepFusionAnalysis(prediction) {
   const ec = prediction.experienceContext;
   if (ec?.drawAlert) factors.push(`📈 ${ec.drawAlert}`);
   else if (ec?.historicalDrawRate != null) factors.push(`📈 历史同情境平局率 ${pct(ec.historicalDrawRate)}(${ec.n ?? "?"}场)`);
+
+  // ⑤b 复盘反馈联动:本联赛真实结算命中记录(赛果反馈→分析闭环)
+  const rec = recordFor(comp);
+  if (rec && rec.n >= 3) {
+    const hr = rec.hit / rec.n;
+    if (hr <= 0.34) factors.push(`🔁 复盘反馈:本联赛(${rec.league})近期实测命中 ${rec.hit}/${rec.n} 偏弱 → 该联赛模型暂不靠谱,谨慎、优先覆盖`);
+    else if (hr >= 0.66) factors.push(`🔁 复盘反馈:本联赛近期实测命中 ${rec.hit}/${rec.n} 良好,可信度较高`);
+    else factors.push(`🔁 复盘反馈:本联赛近期实测命中 ${rec.hit}/${rec.n}`);
+  }
 
   // ⑥ 风险 + 复盘教训
   const conf = Number(prediction.confidence);
