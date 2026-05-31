@@ -58,6 +58,21 @@ export function deepFusionAnalysis(prediction) {
     factors.push(`🀄 让球胜平负[${lineLabel}]:推 ${lq.pick.label} ${pct(lq.pick.probability)}${lq.sfcSold ? "" : "(本场胜平负未开售,只此盘可投)"}`);
   }
 
+  // ④b 大小球(总进球2.5):联赛历史大球率(回测证明联赛维度 Brier 优于全局:0.2494→0.2472)为主信号,
+  //    模型比分矩阵 P(over) 作交叉验证。直接吃联赛进球特性(德甲大球61%/意甲小球45%)。
+  const lpOver = lp.matched ? lp.overRate : null;
+  const modelOver = prediction.extendedMarkets?.overUnder?.["2.5"]?.over;
+  const ouSignal = lpOver != null ? lpOver : modelOver;
+  if (ouSignal != null) {
+    const blend = (lpOver != null && Number.isFinite(modelOver)) ? 0.6 * lpOver + 0.4 * modelOver : ouSignal;
+    const ouPick = blend >= 0.55 ? "大球(>2.5)" : blend <= 0.45 ? "小球(<2.5)" : "接近2.5·中性";
+    const basis = lpOver != null
+      ? `联赛历史大球率 ${pct(lpOver)}${Number.isFinite(modelOver) ? `·模型矩阵 ${pct(modelOver)}` : ""}(联赛维度已回测加分)`
+      : `${comp}无联赛大球画像,用模型矩阵 ${pct(modelOver)}`;
+    factors.push(`⚽ 大小球[2.5]:${ouPick} — ${basis}`);
+    prediction._ouFusion = { line: 2.5, leagueOverRate: lpOver, modelOver: modelOver ?? null, blendOver: Math.round(blend * 1000) / 1000, pick: ouPick };
+  }
+
   // ⑤ 历史同情境
   const ec = prediction.experienceContext;
   if (ec?.drawAlert) factors.push(`📈 ${ec.drawAlert}`);
