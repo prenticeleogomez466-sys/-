@@ -221,8 +221,14 @@ export function compareLenses(prediction, lenses = extractLenses(prediction)) {
     if (vals.length >= 2) maxSpread = Math.max(maxSpread, Math.max(...vals) - Math.min(...vals));
   }
 
-  // 锚(最终采纳)与多数处理是否同向。
-  const anchor = argmax(prediction?.probabilities);
+  // 锚(最终采纳)= 模型最终 pick,可能因平局倾斜/软赛事重校准 ≠ 裸 argmax(probabilities)。
+  // [[feedback_wld_anchor_inference]]:锚就是 prediction.pick,本层不得自算独立 argmax 当锚,
+  // 否则 pick≠argmax 时(如沙特联 Damac:pick=draw/argmax=home)审计误报"本层误读方向"。
+  // anchorVsConsensus 比较"最终决策 vs 独立各路共识"更有意义:背离时给 warn(校准介入),非 blocker。
+  const argmaxAnchor = argmax(prediction?.probabilities);
+  const anchor = prediction?.pick?.key
+    ? { key: prediction.pick.key, label: prediction.pick.label ?? argmaxAnchor?.label ?? prediction.pick.key }
+    : argmaxAnchor;
   const anchorVsConsensus = top && anchor ? (anchor.key === top[0]) : null;
 
   const flags = [];
