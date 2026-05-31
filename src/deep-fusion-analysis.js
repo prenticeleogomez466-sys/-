@@ -127,6 +127,17 @@ export function deepFusionAnalysis(prediction) {
 
   const pickLabel = prediction.pick?.label ?? "";
   const headline = `${fx.homeTeam} vs ${fx.awayTeam} — 主推 ${pickLabel}(主${pct(probs.home)}/平${pct(probs.draw)}/客${pct(probs.away)})`;
+  // 跨玩法选择(2026-05-31):本场最值得玩法 —— 市场高把握→让球胜平负;联赛大小球信号明确→大小球;
+  //   都无优势→建议跳过。把"选择"从单一胜平负扩到全玩法,只推有验证优势的玩法。
+  const ouf = prediction._ouFusion;
+  const ouStrong = ouf && Number.isFinite(ouf.blendOver) && (ouf.blendOver >= 0.58 || ouf.blendOver <= 0.42);
+  let bestPlay;
+  if (tier?.bankerEligible && gap >= 0.2) bestPlay = `🎲 本场首选玩法:让球胜平负/胜平负 ${pickLabel}(市场高把握档)`;
+  else if (ouStrong) bestPlay = `🎲 本场首选玩法:大小球 ${ouf.pick}(联赛信号明确;胜平负无优势,别在胜平负上搏)`;
+  else if (tier && tier.marketFavProb >= 0.55) bestPlay = `🎲 本场首选玩法:胜平负覆盖(${pickLabel}+平),不宜单选`;
+  else bestPlay = `🎲 本场首选玩法:无明显优势玩法,建议跳过或仅小注覆盖`;
+  factors.push(bestPlay);
+
   // 融合裁决:综合分层 + 风险给一句可执行结论
   let verdict;
   if (tier?.bankerEligible && (gap >= 0.2)) verdict = `裁决:🟢 高把握,可作胆/单选(${tier.label})`;
