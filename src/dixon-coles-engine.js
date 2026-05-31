@@ -38,7 +38,7 @@ const OUTCOMES = ["home", "draw", "away"];
  *   opts.minMatches 最少需要多少场有赛果的比赛（默认 60）
  *   opts.iterations 迭代次数（默认 80）
  *   opts.homeAdvantage 主场优势初始值（默认 1.24，2026-05-31 由 1.28 下调:backtest:homeadv 实证主场优势下降、1.28高估主胜+1.6pp）
- *   opts.decayDays 时间衰减半衰期天数（默认 180）
+ *   opts.decayDays 时间衰减半衰期天数（默认 180。2026-05-31 在 51k 场扫 90/180/365/730:365 纯DC略优 RPS-0.0009但触发冷启动校准过度收缩守护回归,marginal 不值得→保留 180,见 sweep-dc-halflife.mjs）
  * @returns {Object} fitted 对象，传给 predictFromFitted
  */
 export function fitFromFixtureStore(opts = {}) {
@@ -71,11 +71,11 @@ export function fitFromFixtureStore(opts = {}) {
   //   prediction-engine 裸调 fitFromFixtureStore()(无 beforeDate)正中此坑;回测传 beforeDate 故未暴露。
   const referenceDate = beforeDate ?? rawMatches.reduce((mx, m) => (m.date > mx ? m.date : mx), "0000-00-00");
   const matches = rawMatches.map((m) => ({ ...m, daysAgo: daysBetween(m.date, referenceDate) }));
-  // 冷启动兜底:样本不足时退回联赛先验,而不是直接 unusable
-  // 这样 predictFromFitted 仍能输出合理的"中性主场略优"概率,
-  // blendWithOdds 会按联赛权重把它与赔率融合,而不是完全跳过 DC 贡献。
+  // 2026-05-31 用户铁律「删掉所有兜底」:样本不足不再退回联赛先验凑一个"中性主场略优"的温吞 DC。
+  //   直接 usable:false → predictFromFitted 返回 null → 该场无 DC 贡献;若同时无真实赔率,
+  //   prediction-engine 标 unpredictable(不推荐)。要么真实强烈,要么不给,绝不凑数。
   if (matches.length < minMatches) {
-    return coldStartFit(matches, minMatches, homeAdvantage);
+    return { usable: false, coldStart: false, reason: `样本不足(${matches.length}/${minMatches}),不兜底凑数`, teams: {}, matches: matches.length, fittedAt: new Date().toISOString() };
   }
   const fitOpts = {
     iterations: opts.iterations ?? 80,
@@ -138,7 +138,7 @@ export function fitFromMatches(rawMatches = [], opts = {}) {
     });
   }
   if (matches.length < minMatches) {
-    return coldStartFit(matches, minMatches, homeAdvantage);
+    return { usable: false, coldStart: false, reason: `样本不足(${matches.length}/${minMatches}),不兜底凑数`, teams: {}, matches: matches.length, fittedAt: new Date().toISOString() };
   }
   const fitted = fit(matches, {
     iterations: opts.iterations ?? 80,
@@ -157,37 +157,8 @@ export function fitFromMatches(rawMatches = [], opts = {}) {
   return fitted;
 }
 
-/**
- * 冷启动模式拟合:
- *   - 样本 0 场:完全用联赛先验(baseRate=1.35, 主场=1.24, 球队全部中性 1.0)
- *   - 样本 1~minMatches-1 场:用 Bayesian shrinkage 把观测进球率与先验混合,
- *     主场优势保留默认值;不学习球队个体强度(避免少样本过拟合)。
- * predictFromFitted 在 fitted.teams[name] 缺失时会退回中性 1.0,
- * 所以这里只需提供 baseRate / homeAdvantage / rho 三个全局参数。
- */
-function coldStartFit(matches, minMatches, homeAdvantage) {
-  const PRIOR_GOALS_PER_TEAM = 1.35;
-  const PRIOR_WEIGHT_MATCHES = Math.max(0, minMatches - matches.length);
-  let baseRate = PRIOR_GOALS_PER_TEAM;
-  if (matches.length > 0) {
-    const observedGoals = matches.reduce((sum, m) => sum + m.homeGoals + m.awayGoals, 0);
-    const observedHalfWeight = matches.length;
-    baseRate =
-      (PRIOR_GOALS_PER_TEAM * 2 * PRIOR_WEIGHT_MATCHES + observedGoals) /
-      (2 * (PRIOR_WEIGHT_MATCHES + observedHalfWeight));
-  }
-  return {
-    usable: true,
-    coldStart: true,
-    reason: `cold-start: ${matches.length}/${minMatches} 历史样本,使用联赛先验(baseRate=${round(baseRate)}, 主场=${homeAdvantage})`,
-    teams: {},
-    baseRate,
-    homeAdvantage,
-    rho: -0.08,
-    matches: matches.length,
-    fittedAt: new Date().toISOString(),
-  };
-}
+// coldStartFit 已删除(2026-05-31 用户铁律「删掉所有兜底」):样本不足不再凑联赛先验/中性球队系数,
+//   fitFromFixtureStore / fitFromMatches 的调用点改为直接返回 usable:false。
 
 /**
  * 用拟合参数预测一场比赛。
@@ -306,9 +277,7 @@ export function blendWithOdds(oddsProbabilities, dcResult, opts = {}) {
     };
   }
   let w = opts.dcWeight != null ? opts.dcWeight : resolveDcWeight(opts.competition, opts.weightProfile);
-  // 冷启动模式 DC 信号噪声大,把融合权重打三折,让赔率仍占主导。
-  // 一旦样本积累通过 minMatches 门槛,coldStart=false,会自动恢复完整权重。
-  if (dcResult.coldStart) w *= 0.3;
+  // 2026-05-31 删冷启动三折:DC 现在要么是真实拟合(usable)要么 null,不再有 coldStart 噪声档需要打折。
   w = clamp(w, 0, 0.6);
   const dc = dcResult.probabilities;
   const blended = {};
@@ -317,7 +286,7 @@ export function blendWithOdds(oddsProbabilities, dcResult, opts = {}) {
   }
   return {
     probabilities: normalizeProbabilities(blended),
-    blendSource: `odds(${round(1 - w)})+dixon-coles${dcResult.coldStart ? ":cold-start" : ""}(${round(w)})`,
+    blendSource: `odds(${round(1 - w)})+dixon-coles(${round(w)})`,
     dcWeight: round(w),
     dcResult,
   };
@@ -538,10 +507,12 @@ export function fitPerLeague(matches, opts = {}) {
     for (const m of ms) { teamLeague[m.home] = lg; teamLeague[m.away] = lg; }
   }
 
-  // 全局兜底:覆盖样本不足联赛 / 跨联赛(国际赛)/ 队名只在某场出现的场。
+  // 全局层:覆盖样本不足联赛 / 跨联赛(国际赛)/ 队名只在某场出现的场。
+  // 2026-05-31 删兜底:全局样本不足不再凑冷启动联赛先验,直接 usable:false(该 perLeague 拟合整体降级,
+  //   predictFromFitted 对应场返回 null → 无 DC 贡献,无赔率则上游标 unpredictable)。
   const global = canon.length >= minMatches
     ? Object.assign(fit(canon, fitOpts), { usable: true, coldStart: false, matches: canon.length })
-    : coldStartFit(canon, minMatches, homeAdvantage);
+    : { usable: false, coldStart: false, reason: `样本不足(${canon.length}/${minMatches}),不兜底凑数`, teams: {}, baseRate: undefined, matches: canon.length };
 
   return {
     usable: true,
