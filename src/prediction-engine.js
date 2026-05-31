@@ -63,12 +63,15 @@ export function recommendFixtures(date) {
   const marketSnapshots = loadMarketSnapshots(fixtureSet.date).snapshots;
   const advancedData = loadAdvancedData(fixtureSet.date);
   const calibrationProfile = loadCalibrationProfile();
-  const dixonColesFitted = fitFromFixtureStore();
+  // 全量历史拟合(2026-05-31):放开默认 120 天上限,吃满 34k+ 场/37 联赛/762 队语料,
+  //   让所有球队攻防特征都被学到(用户要求"所有队伍特征都吸取";time-decay 自动降权旧赛)。
+  //   全量拟合仅 ~400ms,启动一次,可接受。回测走 fitFromMatches/显式 maxDates 不受影响。
+  const dixonColesFitted = fitFromFixtureStore({ maxDates: 2000 });
   // D 档接入(2026-05-28):一次性加载所有评级,传给 predictFixture 算 ensembleView.
   // 失败时(样本不足等)bootstrap.* 字段为 null,不影响主路径.
   let ratingsBootstrap = null;
   try {
-    ratingsBootstrap = bootstrapRatings();
+    ratingsBootstrap = bootstrapRatings({ maxDates: 2000 });  // 全量语料:37 联赛全覆盖,供联赛专家门控
   } catch {
     // bootstrap 失败 → 跳过,主路径仍工作
   }
