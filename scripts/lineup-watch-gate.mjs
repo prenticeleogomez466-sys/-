@@ -8,7 +8,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { fetchEspnLineupsForFixtures } from "../src/lineup-source.js";
+import { fetchEspnLineupsForFixtures, computeLineupWatch } from "../src/lineup-source.js";
 import { loadFixtures } from "../src/fixture-store.js";
 import { getDataSubdir } from "../src/paths.js";
 
@@ -34,19 +34,18 @@ const dir = getDataSubdir("lineups");
 mkdirSync(dir, { recursive: true });
 const statePath = join(dir, "watch-state.json");
 const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : {};
-const seen = new Set(state[date] ?? []);
 
 const withLineup = Object.keys(espn.fixtureData ?? {});
-const fresh = withLineup.filter((id) => !seen.has(id));
+// 去重决策抽成纯函数 computeLineupWatch(可测,防漏推/刷屏)。
+const { fresh, nextState, shouldTrigger } = computeLineupWatch(state, date, withLineup);
 
-if (!fresh.length) {
+if (!shouldTrigger) {
   console.log(`[${date}] 已挂首发 ${withLineup.length} 场,无新增(已全部上报)→ 跳过`);
   process.exit(3);
 }
 
 // 记录已上报,避免下轮重复触发
-state[date] = [...seen, ...fresh];
-writeFileSync(statePath, JSON.stringify(state, null, 0), "utf8");
+writeFileSync(statePath, JSON.stringify(nextState, null, 0), "utf8");
 for (const id of fresh) {
   const lu = espn.fixtureData[id];
   console.log(`[${date}] 新阵容:${lu.home?.team}(${lu.home?.formation}) vs ${lu.away?.team}(${lu.away?.formation})`);

@@ -253,3 +253,31 @@ export async function fetchEspnLineupsForFixtures(date, fixtures, opts = {}) {
   }
   return { fixtureData, count, source: "ESPN summary (free)" };
 }
+
+/**
+ * 首发轮询去重决策(纯函数,2026-06-01 抽出可测)。
+ * 用户硬规则 [[feedback_lineup_autoreport]]:出阵容自动分析推送一份,且**同一场不重复发**。
+ * 把"哪些是新首发 / 更新已上报状态 / 是否触发"的逻辑从 lineup-watch-gate(混 I/O)抽成纯函数,
+ * 便于回归测试,防去重逻辑被改坏导致漏推或刷屏。
+ *
+ * @param {Object} prevState  watch-state.json 内容:{ "YYYY-MM-DD": [已上报 fixtureId...] }
+ * @param {string} date       当日
+ * @param {string[]} withLineupIds  当前已挂首发的 fixtureId 列表
+ * @returns {{ fresh:string[], nextState:object, shouldTrigger:boolean }}
+ *   fresh=本轮新出现(未上报过)的场;nextState=合并后的状态(去重、保序);shouldTrigger=有新首发。
+ */
+export function computeLineupWatch(prevState, date, withLineupIds) {
+  const state = prevState && typeof prevState === "object" ? prevState : {};
+  const seen = new Set(Array.isArray(state[date]) ? state[date] : []);
+  const fresh = [];
+  const freshSeen = new Set();
+  for (const id of Array.isArray(withLineupIds) ? withLineupIds : []) {
+    if (id == null) continue;
+    const key = String(id);
+    if (seen.has(key) || freshSeen.has(key)) continue; // 已上报 或 本轮内重复 → 跳过
+    freshSeen.add(key);
+    fresh.push(key);
+  }
+  const nextState = { ...state, [date]: [...seen, ...fresh] };
+  return { fresh, nextState, shouldTrigger: fresh.length > 0 };
+}
