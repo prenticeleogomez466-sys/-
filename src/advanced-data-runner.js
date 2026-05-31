@@ -10,6 +10,9 @@ import { fetchAuthorizedFixtureLayer } from "./authorized-source-fetcher.js";
 import { syncFotmobAllLayers } from "./public-football-data.js";
 import { fetchFplInjuries, injuriesForFixture } from "./free-injury-source.js";
 import { fetchEspnLineupsForFixtures } from "./lineup-source.js";
+import { buildXgLayerFromUnderstat } from "./understat-source.js";
+import { existsSync as _existsSync, readFileSync as _readFileSync } from "node:fs";
+import { getDataSubdir } from "./paths.js";
 
 // 三个 sync* 内共享同一份 fotmob 兜底结果 — 避免每层都各自发 day-index + matchDetails。
 // syncFotmobAllLayers 内部已经有文件+内存级缓存,这里再加一层是为了避免重复的 extract 工作。
@@ -234,6 +237,13 @@ async function syncXg(date, fixtures, fetchImpl, env, apiFootballFixtures, formL
     }));
     if (count > 0) return { ok: true, source: "API-Football fixture statistics xG", count, fixtureData };
   }
+  // Understat 免费真 xG(2026-05-31,遵"只要免费"硬规则):浏览器抓的 teamsData dump 缓存若存在,
+  //   按双方近期 xG 形态(防泄漏 beforeDate)估前瞻 λ。覆盖五大联赛+俄超,优于射门代理。
+  //   dump 路径:env UNDERSTAT_DUMP 或默认 <data>/crawler/understat-<season>.json(浏览器层 sync 写)。
+  if (env.UNDERSTAT_XG_ENABLED !== "0") {
+    const understat = readUnderstatXgLayer(date, fixtures, env);
+    if (understat.count > 0) return understat;
+  }
   // 顺序:fotmob 公开 xG > football-data.co.uk 射门质量代理
   // fotmob 通常是赛后真实统计或赛前 averageXg,精度高于纯射门代理。
   if (env.FOTMOB_PUBLIC_ENABLED !== "0") {
@@ -247,6 +257,21 @@ async function fetchApiFootballPath(fetchImpl, path, apiKey, params = {}) {
   const url = new URL(`https://v3.football.api-sports.io/${path}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return await fetchJson(fetchImpl, url, { "x-apisports-key": apiKey });
+}
+
+// Understat 免费真 xG:读浏览器抓的 teamsData dump,按近期 xG 形态估前瞻 λ(防泄漏)。
+function readUnderstatXgLayer(date, fixtures, env) {
+  try {
+    const season = (() => { const [y, m] = String(date).split("-").map(Number); return (m >= 7 ? y : y - 1); })();
+    const path = env.UNDERSTAT_DUMP || join(getDataSubdir("crawler"), `understat-${season}.json`);
+    if (!_existsSync(path)) return { ok: false, count: 0, fixtureData: {}, source: "understat", warning: `无 Understat dump(${path}),浏览器层未抓` };
+    const dump = JSON.parse(_readFileSync(path, "utf8"));
+    const teamsData = dump.teamsData ?? dump;
+    const { byFixtureId, matched } = buildXgLayerFromUnderstat(fixtures, teamsData, { beforeDate: date, n: 6 });
+    return { ok: matched > 0, count: matched, fixtureData: byFixtureId, source: "understat (free real xG)" };
+  } catch (error) {
+    return { ok: false, count: 0, fixtureData: {}, source: "understat", warning: error.message };
+  }
 }
 
 function buildShotQualityXgLayer(fixtures, formLayer, fallback = {}) {

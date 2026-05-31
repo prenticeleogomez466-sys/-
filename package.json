@@ -97,7 +97,8 @@
     "metrics:trend": "node -e \"import('./src/daily-metrics-trend.js').then(m => console.log(JSON.stringify({ rolling7: m.rollingMetrics(7), rolling14: m.rollingMetrics(14), rolling30: m.rollingMetrics(30), drift: m.detectDrift() }, null, 2)))\"",
     "signal:weights": "node -e \"import('./src/signal-weight-tuner.js').then(m => console.log(JSON.stringify(m.buildSignalWeightsProfile(), null, 2)))\"",
     "backtest:handicap-method": "node scripts/run-handicap-method-backtest.mjs",
-    "backtest:lowgoals-value": "node scripts/run-lowgoals-value-backtest.mjs"
+    "backtest:lowgoals-value": "node scripts/run-lowgoals-value-backtest.mjs",
+    "sync:understat": "node scripts/sync-understat-xg.mjs"
   },
   "engines": {
     "node": ">=20"
