@@ -23,6 +23,7 @@ import { auditModelCapabilities } from "./model-capability-registry.js";
 import { auditRecommendations } from "./recommendation-audit.js";
 import { runPreExportSelfCheck } from "./pre-export-selfcheck.js";
 import { auditMultimodalBatch } from "./multimodal-collab.js";
+import { loadModelMemory } from "./model-memory.js";
 
 function safe(fn, label) {
   try { return { ok: true, value: fn() }; }
@@ -34,7 +35,7 @@ function safe(fn, label) {
  *   runModuleAudits=false 可只跑输出层审计(单测/轻量调用用);默认 true 跑全量。
  * @returns {{ ok, date, blockers:string[], warnings:string[], sections:object[], integrity:object }}
  */
-export function runComprehensiveAudit({ date, recommendations, env = process.env, runModuleAudits = true, precomputed = null } = {}) {
+export function runComprehensiveAudit({ date, recommendations, env = process.env, runModuleAudits = true, precomputed = null, modelMemory = undefined } = {}) {
   const blockers = [];
   const warnings = [];
   const sections = [];
@@ -157,6 +158,23 @@ export function runComprehensiveAudit({ date, recommendations, env = process.env
     });
   }
 
+  // ⑩ 模型自知 + 信心校准漂移(2026-06-01,永久记忆纳入总闸门)。
+  //   从 model-memory 读模型分段真实战绩(总体/信心带),作"自知"读数 + 检测"信心档↔真实命中"是否背离
+  //   (高信心档历史命中反低于低信心档=校准漂移,提示重训校准)。纯读数+提示,不拦出表。
+  const memory = modelMemory !== undefined ? modelMemory : safe(() => loadModelMemory(), "模型记忆").value;
+  let selfKnowledge = null;
+  if (memory && memory.global) {
+    selfKnowledge = buildSelfKnowledgeRollup(memory);
+    selfKnowledge.driftWarnings.forEach((w) => warnings.push(`信心校准漂移:${w}`));
+    sections.push({
+      name: "模型自知(永久记忆)",
+      status: selfKnowledge.driftWarnings.length ? "⚠" : "✓",
+      detail: selfKnowledge.detail
+    });
+  } else {
+    sections.push({ name: "模型自知(永久记忆)", status: "—", detail: "无 model-memory(未结算/未 build),跳过自知读数" });
+  }
+
   return {
     ok: blockers.length === 0,
     date,
@@ -166,8 +184,30 @@ export function runComprehensiveAudit({ date, recommendations, env = process.env
     integrity,
     playtypes,
     multimodal: mmAudit,
-    upsetTrap
+    upsetTrap,
+    selfKnowledge
   };
+}
+
+// 模型自知汇总:把 model-memory 的总体+信心带战绩转成读数,并检测信心校准漂移
+//   (按信心档从低到高,真实命中率应单调不降;有足够样本的高档反低于低档 → 漂移告警)。
+function buildSelfKnowledgeRollup(memory) {
+  const pct = (x) => (x == null ? "—" : `${Math.round(x * 100)}%`);
+  const g = memory.global;
+  const bandsOrder = ["低(<55)", "中(55-65)", "高(65-75)", "极高(≥75)"];
+  const bands = memory.byConfidenceBand ?? {};
+  const driftWarnings = [];
+  // 单调性检查(仅在两档都 n>=10 时比较,避免小样本噪声)。
+  const present = bandsOrder.map((b) => ({ b, cell: bands[b] })).filter((x) => x.cell && x.cell.n >= 10);
+  for (let i = 1; i < present.length; i++) {
+    const lo = present[i - 1], hi = present[i];
+    if (lo.cell.wldHit != null && hi.cell.wldHit != null && hi.cell.wldHit < lo.cell.wldHit - 0.05) {
+      driftWarnings.push(`${hi.b}档命中 ${pct(hi.cell.wldHit)}(n=${hi.cell.n}) < ${lo.b}档 ${pct(lo.cell.wldHit)}(n=${lo.cell.n}),信心未转化为命中,建议重训校准`);
+    }
+  }
+  const bandStr = bandsOrder.filter((b) => bands[b]).map((b) => `${b} ${pct(bands[b].wldHit)}(n=${bands[b].n})`).join(" · ");
+  const detail = `已结算 ${memory.settledTotal} 场 · 总体胜平负 ${pct(g.wldHit)}(n=${g.wldN}) · 比分 ${pct(g.scoreHit)}(n=${g.scoreN}) · 半全场 ${pct(g.halfFullHit)}(n=${g.halfFullN}) | 信心带:${bandStr || "—"}`;
+  return { detail, driftWarnings, settledTotal: memory.settledTotal, global: g };
 }
 
 // 爆冷/诱盘核验汇总:从 prediction.upsetTrap 统计 高爆冷/诱盘嫌疑/爆冷价值/真实确认 场数,

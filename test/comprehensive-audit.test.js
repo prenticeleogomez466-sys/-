@@ -56,6 +56,29 @@ describe("全面审计总闸门(comprehensive-audit)", () => {
     assert.ok(!a.blockers.some((b) => /爆冷提示/.test(b)));
   });
 
+  it("⑩ 模型自知(永久记忆):分项出现且不拦出表", () => {
+    const recs = recommendFixtures("2026-05-15");
+    const memory = { settledTotal: 30, global: { wldHit: 0.45, wldN: 30, scoreHit: 0.1, scoreN: 30, halfFullHit: null, halfFullN: 0 }, byConfidenceBand: {} };
+    const a = runComprehensiveAudit({ date: "2026-05-15", recommendations: recs, runModuleAudits: false, modelMemory: memory });
+    assert.ok(a.sections.some((s) => s.name === "模型自知(永久记忆)"));
+    assert.ok(a.selfKnowledge, "应含 selfKnowledge 汇总");
+    assert.equal(a.ok, true, "自知是读数,不拦出表");
+  });
+
+  it("⑩ 信心校准漂移:高信心档命中反低于低档 → 漂移 warning(不拦)", () => {
+    const recs = recommendFixtures("2026-05-15");
+    const drifted = {
+      settledTotal: 60, global: { wldHit: 0.45, wldN: 60, scoreHit: 0.1, scoreN: 60, halfFullHit: null, halfFullN: 0 },
+      byConfidenceBand: {
+        "低(<55)": { wldHit: 0.6, n: 20 },
+        "极高(≥75)": { wldHit: 0.4, n: 20 }, // 高信心反而更低 = 漂移
+      },
+    };
+    const a = runComprehensiveAudit({ date: "2026-05-15", recommendations: recs, runModuleAudits: false, modelMemory: drifted });
+    assert.ok(a.warnings.some((w) => /信心校准漂移/.test(w)), `应有漂移 warning:${a.warnings.join("；")}`);
+    assert.equal(a.ok, true, "漂移是提示,不拦出表");
+  });
+
   it("upsetTrap 字段畸形(概率越界)→ 真实性 blocker 拦出表", () => {
     const recs = recommendFixtures("2026-05-15");
     const real = recs.predictions.find((p) => p.upsetTrap) ?? recs.predictions[0];
