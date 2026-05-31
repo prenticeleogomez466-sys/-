@@ -139,17 +139,21 @@ function finalizeBucket(b) {
  */
 export function buildExperienceLibrary(matches) {
   const leagues = new Map(); // league → { all:bucket, tiers:Map(tierKey→bucket), asianTiers:Map }
-  let used = 0;
+  let used = 0;        // 进库的场(只要有赛果)
+  let usedWithOdds = 0; // 其中带赔率、能做热门档/漂移细分的场
   for (const m of matches) {
-    const prob = m.oddsClose || m.odds; // 收盘优先(最有效价),无则开盘
-    if (!prob || m.homeGoals === null || m.awayGoals === null) continue;
-    const frame = frameOf(prob);
-    if (!frame) continue;
-    used += 1;
+    // 2026-05-31:联赛级经验只需**赛果**(ESPN 日韩/澳超/中超/沙特/MLS/巴甲/阿甲/墨超无赔率也能进库)。
+    //   赔率细分档(热门强度/开收漂移/亚盘)仍仅在有赔率时加 —— 优雅降级,无赔率联赛只少这几档细化。
+    if (m.homeGoals === null || m.awayGoals === null || m.homeGoals === undefined || m.awayGoals === undefined) continue;
     const lg = m.league;
     if (!leagues.has(lg)) leagues.set(lg, { all: emptyBucket(), tiers: new Map(), asianTiers: new Map(), driftTiers: new Map() });
     const L = leagues.get(lg);
-    addToBucket(L.all, m);
+    addToBucket(L.all, m);   // 联赛级 + 全局:所有带赛果的场都计入
+    used += 1;
+    const prob = m.oddsClose || m.odds; // 收盘优先(最有效价),无则开盘
+    const frame = prob ? frameOf(prob) : null;
+    if (!frame) continue;   // 无赔率 → 只进联赛级,不做赔率细分档
+    usedWithOdds += 1;
     const tierKey = `${frame.side}|${favBand(frame.favProb)}`;
     if (!L.tiers.has(tierKey)) L.tiers.set(tierKey, emptyBucket());
     addToBucket(L.tiers.get(tierKey), m);
@@ -188,13 +192,14 @@ export function buildExperienceLibrary(matches) {
     for (const [k, b] of L.asianTiers) asianTiers[k] = finalizeBucket(b);
     const driftTiers = {};
     for (const [k, b] of L.driftTiers) driftTiers[k] = finalizeBucket(b);
-    leaguesOut[lg] = { ...finalizeBucket(L.all), tiers, asianTiers, driftTiers, hasHalfTime: L.all.htN > 0 };
+    leaguesOut[lg] = { ...finalizeBucket(L.all), tiers, asianTiers, driftTiers, hasHalfTime: L.all.htN > 0, hasOdds: L.tiers.size > 0 };
   }
 
   return {
     meta: {
       totalMatches: matches.length,
       usedMatches: used,
+      usedWithOdds,
       leagues: Object.keys(leaguesOut).length,
       favBands: FAV_BANDS.map((b) => b[2]),
       builtAt: null, // 由调用方写入(脚本里 Date 不可用,落盘后戳)

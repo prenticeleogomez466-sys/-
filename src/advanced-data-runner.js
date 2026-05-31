@@ -9,6 +9,7 @@ import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js"
 import { fetchAuthorizedFixtureLayer } from "./authorized-source-fetcher.js";
 import { syncFotmobAllLayers } from "./public-football-data.js";
 import { fetchFplInjuries, injuriesForFixture } from "./free-injury-source.js";
+import { fetchEspnLineupsForFixtures } from "./lineup-source.js";
 
 // 三个 sync* 内共享同一份 fotmob 兜底结果 — 避免每层都各自发 day-index + matchDetails。
 // syncFotmobAllLayers 内部已经有文件+内存级缓存,这里再加一层是为了避免重复的 extract 工作。
@@ -201,7 +202,14 @@ async function syncLineups(date, fixtures, fetchImpl, env, apiFootballFixtures) 
     const fotmob = await getFotmobLayersMemoized(date, fixtures, fetchImpl, env);
     if (fotmob.lineups.ok) return fotmob.lineups;
   }
-  return { ok: false, source: generic.source ?? "LINEUP_SOURCE_URL", count: 0, fixtureData: {}, warning: generic.warning ?? "未配置 LINEUP_SOURCE_URL/API_FOOTBALL_KEY 且 fotmob 无匹配" };
+  // 首发免授权兜底(2026-05-31):ESPN summary 零授权、Node 直连,覆盖日职/K联/MLS/巴甲/中超/沙特/北欧等
+  //   "薄数据"联赛——正是模型推理最弱、最缺赛前结构化信号的一批。formation + 首发名单赛前约 1 小时挂出。
+  //   只对匹配上且已挂首发的场返回;非 ESPN 联赛/赛前过早自动跳过。env ESPN_LINEUPS_ENABLED=0 可关。
+  if (env.ESPN_LINEUPS_ENABLED !== "0") {
+    const espn = await fetchEspnLineupsForFixtures(date, fixtures, { fetch: fetchImpl });
+    if (espn.count > 0) return { ok: true, source: espn.source, count: espn.count, fixtureData: espn.fixtureData };
+  }
+  return { ok: false, source: generic.source ?? "LINEUP_SOURCE_URL", count: 0, fixtureData: {}, warning: generic.warning ?? "未配置 LINEUP_SOURCE_URL/API_FOOTBALL_KEY,fotmob/ESPN 亦无匹配" };
 }
 
 async function syncXg(date, fixtures, fetchImpl, env, apiFootballFixtures, formLayer = null) {

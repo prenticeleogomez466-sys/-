@@ -37,6 +37,7 @@ import { computePressureProfile, pressureToFormMultiplier } from "./standings-pr
 import { bigGameReadinessLR } from "./big-game-form.js";
 import { computeTravelImpact } from "./travel-distance-model.js";
 import { getFormationLift } from "./tactical-matchup.js";
+import { lineupPostureLR } from "./lineup-source.js";
 import { computeRefereeLR } from "./referee-bias-model.js";
 import { compareAdjustedForm, adjustedFormSummary } from "./opponent-strength-adjustment.js";
 import { teamChainXgAverage, compareChainXg } from "./xg-chains.js";
@@ -633,6 +634,44 @@ function signalHistoricalAnalog(prior, fixture, advancedData, context) {
   };
 }
 
+/**
+ * 首发阵容布阵姿态(2026-05-31,首发免费源接入)。
+ * ────────────────────────────────────────────────────────────
+ * 数据源:advancedData.lineups 层(ESPN summary 免授权 / Sofascore 浏览器,见 lineup-source.js),
+ *   或 context.lineup。给薄数据联赛(日职/K联/北欧…)补一条赛前结构化信号。
+ *
+ * 只动**平局轴**(有文献支撑、最稳健的部分):
+ *   - 双方都摆防(5 后卫/单前锋)→ 低进球闷局,平局概率上调、主客下调。
+ *   - 双方都压上(≥2 前锋且 ≤4 后卫)→ 对攻高进球,平局概率下调。
+ *   - 其余布阵组合 → dormant(布阵→胜负方向关系弱且双向,不强行推谁赢)。
+ * 严格有界(LR 夹 [0.5,2] + 融合层总位移 ±12% 双封顶)。布阵姿态→胜负平的边际待 walk-forward
+ * 回测验证(需逐场历史 formation 回填),验证前保守、不夸大。有市场先验时被 gateFusionOff 正确关闭。
+ */
+function signalLineup(prior, fixture, advancedData, context) {
+  const lineup = context.lineup ?? fixtureLayer(advancedData, fixture, "lineups");
+  const hF = lineup?.home?.formation;
+  const aF = lineup?.away?.formation;
+  if (!hF || !aF) return { name: "lineup", source: "advancedData.lineups", dormant: "no-lineup-formations" };
+  // 2026-05-31 回测裁决(1871 场 ESPN 历史 leak-safe,干净后卫数判据):
+  //   布阵姿态→平局轴**无可验证增益** —— 双摆防平局 +9.4pp 方向对但 n=22 不显著、
+  //   双压上方向反(+4.3pp)、fire 仅 3.7%、fire 子集 LogLoss +0.0043 不改善。
+  //   遵 [[feedback_hitrate_closed_loop]]「变好才留」**默认休眠**该 LR,不进生产概率。
+  //   首发**数据**(formation/confirmed-XI/首发名单)仍照常采集——供报告展示、出阵容自动推送
+  //   及未来更强的阵容信号(如带身价的核心缺阵);只是这条 posture→wld 的 LR 不激活。
+  //   留 context.enableLineupPosture 显式开关:回测可复现 + 日后换更强逻辑即接。
+  if (!context.enableLineupPosture) {
+    return { name: "lineup", source: "advancedData.lineups", dormant: "disabled-backtest-no-gain-2026-05-31" };
+  }
+  const posture = lineupPostureLR(hF, aF);
+  if (!posture) {
+    const unparseable = !lineup?.home?.formation || !lineup?.away?.formation;
+    return { name: "lineup", source: "advancedData.lineups", dormant: unparseable ? "unparseable-formation" : "neutral-posture" };
+  }
+  const clamped = clampLR(posture.lr);
+  if (!clamped) return { name: "lineup", source: "advancedData.lineups", dormant: "neutral" };
+  return { name: "lineup", source: "advancedData.lineups", lr: clamped, detail: posture.detail };
+}
+
 const SIGNAL_HANDLERS = [
   signalSeasonPhase,
   signalCompetitionType,
@@ -658,7 +697,8 @@ const SIGNAL_HANDLERS = [
   signalPADJxG,
   signalSetPiece,
   signalAsianHandicapWater,
-  signalHistoricalAnalog
+  signalHistoricalAnalog,
+  signalLineup
 ];
 
 /** 所有信号名(供消融回测 / 权重调优枚举)。 */
@@ -668,7 +708,7 @@ export const SIGNAL_NAMES = [
   "weather", "manager", "derby", "standings-pressure", "big-game-form",
   "travel-distance", "tactical-matchup",
   "referee", "opponent-strength-form", "xg-chains", "padj-xg", "set-piece",
-  "asian-handicap-water", "historical-analog"
+  "asian-handicap-water", "historical-analog", "lineup"
 ];
 
 /**

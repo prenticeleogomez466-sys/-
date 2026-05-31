@@ -1,5 +1,5 @@
 param(
-  [ValidateSet("health", "daily", "recap", "weekly", "all")]
+  [ValidateSet("health", "daily", "recap", "weekly", "lineup-watch", "all")]
   [string]$Mode = "all",
   [string]$Date,
   [switch]$AllowMissingOdds
@@ -123,11 +123,32 @@ function Run-Recap {
 
 function Run-Weekly {
   Invoke-Step "full test suite" "npm test"
+  # 每联赛历史经验库刷新(含 ESPN 薄联赛纯赛果)+ 重出每联赛深度档,作为分析依据持续更新。
+  Invoke-Step "rebuild per-league experience library" "npm run experience:build" $true
+  Invoke-Step "rebuild league experience digest xlsx" "npm run experience:digest" $true
   Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free source matrix review" "npm run freeodds:audit"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
   # 自调优闭环:walk-forward 回测驱动信号权重 + 温度校准自动调参(--apply 内置只在变好时才写护栏)
   Invoke-Step "self-tuning optimize loop" "npm run optimize:loop" $true
+}
+
+# 首发轮询(2026-05-31 用户硬规则:出阵容后自动分析发一份)。
+# 闸门检测到「新首发出现」才触发实时分析+推送;无新阵容静默退出,不刷屏。
+# 由 FootballModel-LineupWatch 每 ~30 分钟跑一次,覆盖各场不同的开盘/出阵容时间。
+function Run-LineupWatch {
+  Push-Location $Root
+  $GateOut = & cmd.exe /d /c "npm run lineup:watch-gate -- --date=$Date 2>&1"
+  $GateCode = $LASTEXITCODE
+  Pop-Location
+  foreach ($Line in $GateOut) { Write-Log ([string]$Line) }
+  Write-Log "lineup watch gate exit=$GateCode (0=有新阵容→触发, 3=无新阵容→跳过)"
+  if ($GateCode -eq 0) {
+    Write-Log "新首发到位 → 按当前实时情况+阵容跑分析并推送"
+    Run-Daily
+  } else {
+    Write-Log "无新阵容,跳过本轮(不重复发)"
+  }
 }
 
 Write-Log "Football automation started: Mode=$Mode Date=$Date AllowMissingOdds=$AllowMissingOdds"
@@ -137,6 +158,7 @@ switch ($Mode) {
   "daily" { Run-Health; Run-Daily }
   "recap" { Run-Recap }
   "weekly" { Run-Weekly }
+  "lineup-watch" { Run-LineupWatch }
   "all" { Run-Health; Run-Daily; Run-Recap; Run-Weekly }
 }
 
