@@ -101,6 +101,20 @@ export function deepFusionAnalysis(prediction) {
     prediction._ouFusion = { line: 2.5, leagueOverRate: lpOver, modelOver: modelOver ?? null, blendOver: Math.round(blend * 1000) / 1000, pick: ouPick };
   }
 
+  // ④c 盘口异动/赔率变化(2026-05-31,回测验证强信号:热门被推命中56% vs 被甩45.9%,差10pp):
+  //    推荐方向开盘→当前的隐含概率变化——线路收窄=锐钱在推(信号增强)、走高=被甩(警惕)。
+  const eo = prediction.marketSnapshot?.europeanOdds;
+  if (eo?.initial && eo?.current) {
+    const dv = (o) => { const r = { h: 1 / o.home, d: 1 / o.draw, a: 1 / o.away }; const s = r.h + r.d + r.a; return { home: r.h / s, draw: r.d / s, away: r.a / s }; };
+    const pOpen = dv(eo.initial), pCur = dv(eo.current);
+    const key = prediction.pick?.code === "3" ? "home" : prediction.pick?.code === "0" ? "away" : "draw";
+    if (Number.isFinite(pOpen[key]) && Number.isFinite(pCur[key])) {
+      const move = pCur[key] - pOpen[key];
+      if (move >= 0.02) factors.push(`💹 盘口异动:推荐方向被锐钱推、线路收窄(${pct(pOpen[key])}→${pct(pCur[key])})→ 信号增强(回测此类命中56%)`);
+      else if (move <= -0.02) factors.push(`💹 盘口异动:推荐方向被甩、线路走高(${pct(pOpen[key])}→${pct(pCur[key])})→ ⚠️警惕(回测此类命中仅46%)`);
+    }
+  }
+
   // ⑤ 历史同情境
   const ec = prediction.experienceContext;
   if (ec?.drawAlert) factors.push(`📈 ${ec.drawAlert}`);
