@@ -9,6 +9,7 @@ import { analyzeUpsetTrap } from "./upset-trap-detector.js";
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
+import { loadModelMemory, recallSegmentPerformance } from "./model-memory.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
 import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { loadEnsembleWeightsProfile } from "./ensemble-weights-profile.js";
@@ -64,6 +65,8 @@ export function recommendFixtures(date) {
   const marketSnapshots = loadMarketSnapshots(fixtureSet.date).snapshots;
   const advancedData = loadAdvancedData(fixtureSet.date);
   const calibrationProfile = loadCalibrationProfile();
+  // 永久记忆(2026-06-01):模型分段真实战绩,用时召回给推荐附"本类历史命中率"。盘上无则 null,优雅降级。
+  const modelMemory = loadModelMemory();
   // 全量历史拟合(2026-05-31):放开默认 120 天上限,吃满 34k+ 场/37 联赛/762 队语料,
   //   让所有球队攻防特征都被学到(用户要求"所有队伍特征都吸取";time-decay 自动降权旧赛)。
   //   全量拟合仅 ~400ms,启动一次,可接受。回测走 fitFromMatches/显式 maxDates 不受影响。
@@ -82,7 +85,7 @@ export function recommendFixtures(date) {
   // 限业务日 + 跨源去重(2026-05-30):兜底/多源抓取会把次日(周日)与重复场次(XML 6001 与 Playwright 周六001 同场)
   // 灌进当日,产生 34 场假象;此处收敛到目标业务日的去重竞彩单 + 原样保留 14 场/其它。
   const scopedFixtures = scopeJingcaiFixtures(fixtureSet.date, fixtureSet.fixtures);
-  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history), ...extra });
+  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, modelMemory, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history), ...extra });
   let rawPredictions = scopedFixtures.map((fixture, index) => predictOne(fixture, index));
   // 「竞彩要全」铁律(2026-05-31):竞彩缺欧赔被判 data-missing 的场,若同场在 14 场有真实预测 → 借其 wld 重算补全。
   const shengfucaiByKey = new Map(
@@ -579,6 +582,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       closing: oddsProbabilities ?? null,
       model: probabilities ?? null,
     }),
+    // 永久记忆召回(2026-06-01):本场所属联赛/热门档的模型历史真实命中率(诚实自知,样本不足标 insufficient)。
+    //   只读附注,不改 wld/概率;盘上无记忆则 null。
+    memoryRecall: options.modelMemory
+      ? recallSegmentPerformance(options.modelMemory, { competition: fixture.competition, probabilities, confidence })
+      : null,
     // 让球胜平负(竞彩独立玩法,与14场/任选9的胜负平不同;深盘让球场常**只开此盘、不开胜平负**)。
     //   直接用真实让球赔率去vig → 隐含概率 + 推荐方向。sfcSold=胜平负(让0档)是否开售。
     jingcaiLetqiu: (() => {
