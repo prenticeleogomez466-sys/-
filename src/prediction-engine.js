@@ -26,6 +26,7 @@ import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { selectionTier } from "./selection-tier.js";
+import { optimizeTicket } from "./ticket-optimizer.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -1286,9 +1287,32 @@ export function buildRenxuan9(source) {
   }));
   const parlay = adjustParlayForCorrelation(legs);
   const singleLine = picks.map((p) => p.pick).join(" ");
+  // 最优票(2026-05-31):给定注数预算,在 9 腿上最优分配胆/双/全,最大化整票全中概率。
+  //   回测证同预算下比朴素双弱腿全中率更高且更省(5.44%→5.79%/64注→54注)。预算可由 env 调。
+  const ticketBudget = Number(process.env.RENXUAN9_BUDGET ?? 64);
+  const optTicket = optimizeTicket(
+    ranked.map(({ prediction }) => ({
+      probs: [prediction.probabilities?.home, prediction.probabilities?.draw, prediction.probabilities?.away],
+      codes: ["3", "1", "0"],
+    })),
+    { budget: ticketBudget }
+  );
+  const optimizedTicket = {
+    budget: ticketBudget,
+    cost: optTicket.cost,
+    jointHitProb: optTicket.jointHitProb,
+    allSingleHitProb: optTicket.baselineHitProb,
+    legs: optTicket.legs.map((l, i) => ({
+      match: picks[i]?.match ?? "",
+      type: l.type,
+      cover: l.codes.map(outcomeCodeToChinese).join("/"),
+      coveredProb: l.coveredProb,
+    })),
+  };
   return {
     ok: true,
     needCorrect: 9,
+    optimizedTicket,
     picks,
     singleLine,
     parlay,

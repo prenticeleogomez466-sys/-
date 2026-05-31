@@ -492,11 +492,17 @@ function renxuan9Rows(renxuan9) {
   });
   const ind = renxuan9.parlay?.jointProbabilityIndependent ?? null;
   const adj = renxuan9.parlay?.jointProbabilityCorrelated ?? null;
+  const ot = renxuan9.optimizedTicket;
   const summary = [
     empty(9),
     ["单式串", "", renxuan9.singleLine, ...empty(6)],
     ["9 串联合命中率", "", ind != null ? `独立估计 ${pct(ind)}` : "—", adj != null ? `相关性修正 ${pct(adj)}` : "—", ...empty(5)],
     ["覆盖串", "", renxuan9.picks.map((p) => p.compound ?? p.pick).join(" | "), ...empty(6)],
+    ...(ot ? [
+      empty(9),
+      [`⭐ 最优票(${ot.cost}注·预算${ot.budget})`, "", `整票全中 ${pct(ot.jointHitProb)}(全单选仅 ${pct(ot.allSingleHitProb)})`, ...empty(6)],
+      ["最优覆盖", "", ot.legs.map((l) => `${l.match.split(" 对 ")[0] ?? ""}${l.type === "胆" ? "" : "(" + l.cover + ")"}`).join(" | "), ...empty(6)],
+    ] : []),
     ["说明", "", renxuan9.note, ...empty(6)]
   ];
   return [header, ...rows, ...summary];
