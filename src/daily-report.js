@@ -8,6 +8,7 @@ import { deepFusionAnalysis } from "./deep-fusion-analysis.js";
 import { auditRecommendations, writeRecommendationAudit } from "./recommendation-audit.js";
 import { runPreExportSelfCheck, selfCheckRows } from "./pre-export-selfcheck.js";
 import { runComprehensiveAudit, comprehensiveAuditRows } from "./comprehensive-audit.js";
+import { multimodalComparisonRows } from "./multimodal-collab.js";
 import { assertLatestRealtimeSourceGate } from "./realtime-source-gate.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 
@@ -61,6 +62,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.available === false ? { ok: false, reason: recommendations.fourteen.note ?? "今日无 14 场胜负彩,任选9 不适用。" } : recommendations.fourteen.renxuan9) },
     { name: "赔率变化", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
     { name: "融合判断", rows: [judgmentHeaders(), ...recommendations.predictions.map(toJudgmentRow)] },
+    { name: "多模态协作", rows: multimodalComparisonRows(recommendations.predictions) },
     { name: "大小球·阵容", rows: [totalGoalsLineupHeaders(), ...recommendations.predictions.map(toTotalGoalsLineupRow)] },
     { name: "复盘对比", rows: [recapHeaders(), ...recapRows.map(Object.values)] },
     { name: "模型健康", rows: modelHealthRows(sourceGate, audit) },

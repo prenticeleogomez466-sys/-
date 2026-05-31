@@ -316,6 +316,35 @@ export function multimodalAnalysis(prediction) {
 }
 
 /**
+ * 汇总:把一批预测的多模态对比 roll-up 成总览(供 prediction-engine 返回 + 报告头部)。
+ * 只统计真实可对比的场(有分析、≥1 路独立投票),诚实计数,不编造。
+ * @returns {{analyzed,unanimous,split,insufficient,anchorDivergent,drawRisk,byLeagueMode,byOddsMode}}
+ */
+export function summarizeMultimodal(predictions) {
+  const out = {
+    analyzed: 0, unanimous: 0, split: 0, insufficient: 0,
+    anchorDivergent: 0, drawRisk: 0,
+    byLeagueMode: {}, byOddsMode: {},
+  };
+  for (const p of predictions ?? []) {
+    if (p?.unpredictable) continue;
+    const a = p?.multimodal ?? multimodalAnalysis(p);
+    if (!a) continue;
+    out.analyzed += 1;
+    if (a.compare?.unanimous) out.unanimous += 1;
+    else if (a.compare?.split) out.split += 1;
+    else out.insufficient += 1;
+    if (a.compare?.anchorVsConsensus === false) out.anchorDivergent += 1;
+    if (a.compare?.flags?.some((f) => /平局率/.test(f.text))) out.drawRisk += 1;
+    const lm = a.regime?.leagueModeLabel ?? "未归类";
+    const om = a.regime?.oddsModeLabel ?? "无赔率";
+    out.byLeagueMode[lm] = (out.byLeagueMode[lm] ?? 0) + 1;
+    out.byOddsMode[om] = (out.byOddsMode[om] ?? 0) + 1;
+  }
+  return out;
+}
+
+/**
  * 批量:产出竞彩/14场 多模态对比表(xlsx 行),供 daily-report 接入。
  * 列:对阵 | 模态画像 | 市场 | DC | 融合 | 经验 | 让球 | 最终锚 | 一致性 | 主导处理
  */
