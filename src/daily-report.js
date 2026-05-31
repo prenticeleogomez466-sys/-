@@ -103,8 +103,10 @@ function toJingcaiRow(prediction) {
     competitionCategory(fixture?.competition),                   // 2 赛事类型
     `${fixture.homeTeam} vs ${fixture.awayTeam}`,                // 3 对阵
     fixture.kickoff?.slice(5, 16) ?? "",                         // 4 开赛(月-日 时:分)
-    outcomeCodeToChinese(prediction.pick.code),                  // 5 胜平负
-    handicapRecommendText(prediction),                           // 6 让球
+    prediction.jingcaiLetqiu && prediction.jingcaiLetqiu.sfcSold === false
+      ? "⛔ 未开售(本场只让球)"
+      : outcomeCodeToChinese(prediction.pick.code),               // 5 胜平负(不让球;深盘场常未开售)
+    jingcaiLetqiuText(prediction),                               // 6 让球胜平负(竞彩主玩法,真实让球赔率)
     buildScoreCandidates(prediction),                            // 7 比分(首选 + 备选,不再单一)
     buildHalfFullCandidates(prediction),                         // 8 半全场(首选 + 备选)
     probSummary,                                                 // 9 三概率(主/平/客 合一列)
@@ -190,6 +192,16 @@ function upsetRiskLabel(homeProb, drawProb, awayProb) {
   if (draw >= 0.30) return "🟡 平局可期(≥30%)";
   if (weaker >= 0.15) return "标准";
   return "公认 favorite";
+}
+
+// 让球胜平负(竞彩主玩法):用真实让球赔率去vig的隐含概率 + 方向 + 让球线。深盘场只开此盘。
+function jingcaiLetqiuText(prediction) {
+  const lq = prediction.jingcaiLetqiu;
+  if (!lq?.pick) return handicapRecommendText(prediction); // 兜底:用模型让球派生
+  const ln = Number(lq.line);
+  const lineLabel = ln > 0 ? `受让+${ln}` : ln < 0 ? `让${ln}` : "平手";
+  const p = lq.probabilities ?? {};
+  return `[${lineLabel}] ${lq.pick.label} ${pct(lq.pick.probability)} · 主${pct(p.home)}/平${pct(p.draw)}/客${pct(p.away)}`;
 }
 
 // 让球推荐方向:展示"模型从比分锚点派生"的让球方向,跟胜平负/比分一致
@@ -457,7 +469,7 @@ function updateLedger(date, rows) {
 function jingcaiHeaders() {
   return [
     "序", "赛事类型", "对阵", "开赛",
-    "胜平负", "让球", "比分", "半全场",
+    "胜平负(不让球)", "让球胜平负(竞彩主玩法)", "比分", "半全场",
     "概率分布(主/平/客)", "爆冷",
     "历史经验(同情境)",
     "信心 · 分级 · EV", "选择理由"

@@ -463,6 +463,16 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     scorePicks,
     halfFullPicks,
     handicapPick,
+    // 让球胜平负(竞彩独立玩法,与14场/任选9的胜负平不同;深盘让球场常**只开此盘、不开胜平负**)。
+    //   直接用真实让球赔率去vig → 隐含概率 + 推荐方向。sfcSold=胜平负(让0档)是否开售。
+    jingcaiLetqiu: (() => {
+      const hc = snapshot?.handicapOdds?.current ?? snapshot?.handicapOdds?.initial ?? null;
+      if (!hc || !(Number(hc.home) > 1 && Number(hc.draw) > 1 && Number(hc.away) > 1)) return null;
+      const p = probabilitiesFromOdds(hc);
+      const order = [["home", "主胜", "3"], ["draw", "平局", "1"], ["away", "客胜", "0"]];
+      const best = order.reduce((b, o) => (p[o[0]] > p[b[0]] ? o : b), order[0]);
+      return { line: handicapLine, probabilities: p, pick: { code: best[2], label: best[1], probability: round(p[best[0]]) }, sfcSold: Boolean(oddsProbabilities) };
+    })(),
     asianWaterAnalysis,
     extendedMarkets,
     expectedValue,

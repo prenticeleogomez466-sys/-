@@ -51,9 +51,19 @@ function safeName(value) {
 }
 
 function parseOdds(oddsCell) {
-  const o = String(oddsCell ?? "").trim().split(/\s+/).map(oddsNum);
-  // 让0档欧赔 = o[0..2];让球胜平负(让N档) = o[3..5]
-  return { euro: { home: o[0], draw: o[1], away: o[2] }, hcp: { home: o[3], draw: o[4], away: o[5] } };
+  const s = String(oddsCell ?? "").trim();
+  // 2026-05-31 修关键 bug:深盘让球场(让±2)常**不开胜平负(让0档)**,单元格形如
+  //   "未开售 2.32 3.80 2.30"(4 token:未开售标记 + 3 个让球胜平负赔率)。旧式硬按 6 token
+  //   切分 → 让球赔率错位丢失 → 该场无任何可用赔率 → 误判数据缺失。
+  //   现:含"未开售/未开"时,胜平负=null(未开售),其余数字为让球胜平负赔率(取最后 3 个)。
+  if (/未开/.test(s)) {
+    const nums = s.split(/\s+/).map(oddsNum).filter((x) => x != null);
+    const h = nums.slice(-3);
+    return { euro: { home: null, draw: null, away: null }, hcp: { home: h[0] ?? null, draw: h[1] ?? null, away: h[2] ?? null }, sfcSold: false };
+  }
+  const o = s.split(/\s+/).map(oddsNum);
+  // 让0档欧赔(胜平负) = o[0..2];让球胜平负(让N档) = o[3..5]
+  return { euro: { home: o[0], draw: o[1], away: o[2] }, hcp: { home: o[3], draw: o[4], away: o[5] }, sfcSold: validTriple({ home: o[0], draw: o[1], away: o[2] }) };
 }
 const validTriple = (t) => t && t.home && t.draw && t.away;
 
