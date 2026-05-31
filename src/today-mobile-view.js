@@ -59,12 +59,19 @@ function detailCard(p) {
   const conf = Number(p.confidence);
   const cover = hp.coverProbability != null ? `${(hp.coverProbability * 100).toFixed(0)}%` : null;
   const skellam = hp.skellamCheck?.note ? esc(hp.skellamCheck.note) : "";
+  // 让球玩法按让球分析出胜平负(让球后三态):让主胜/走盘/让客胜,常与原始胜平负相反(大热让球难覆盖)。
+  const hw = hp.handicapWld;
+  const hwStr = hw ? `<b>${esc(hw.pick)}</b> ${(hw.probability * 100).toFixed(0)}% <span class="conf">让主${(hw.probabilities.home * 100).toFixed(0)}/走盘${(hw.probabilities.push * 100).toFixed(0)}/让客${(hw.probabilities.away * 100).toFixed(0)}</span>` : "-";
+  // 双选建议(均势场覆盖平局,单选平命中物理上限~28%)
+  const dc = p.doubleChance ? `<div class="row dc"><span class="k">双选</span> <b>${esc(p.doubleChance.pick)}</b> ${(p.doubleChance.combinedProbability * 100).toFixed(0)}% <span class="conf">${esc(p.doubleChance.note)}</span></div>` : "";
   return `<div class="card">
     <div class="hd"><span class="no">${esc(fx.sequence)}</span> ${esc(fx.homeTeam)} <span class="vs">vs</span> ${esc(fx.awayTeam)} <span class="lg">${esc(fx.competition)}</span></div>
     <div class="row main"><span class="k">胜平负</span> <b>${esc(p.pick?.label)}</b> <span class="prob">${pct(p.pick?.probability)}</span> <span class="conf">信心 ${Number.isFinite(conf) ? conf.toFixed(0) : "-"} · 风险 ${esc(p.risk || "-")}</span></div>
     <div class="row pr">主 ${pct(pr.home)} · 平 ${pct(pr.draw)} · 客 ${pct(pr.away)}</div>
     <div class="row"><span class="k">比分</span> ${esc(p.scorePicks?.primary || "-")} &nbsp; <span class="k">半全场</span> ${esc(p.halfFullPicks?.primary || "-")}</div>
     <div class="row"><span class="k">让球</span> ${esc(hp.direction || "-")}${hp.line != null ? `(${hp.line})` : ""}${cover ? ` 覆盖 ${cover}` : ""} ${skellam ? `<span class="sk">${skellam}</span>` : ""}</div>
+    <div class="row"><span class="k">让球胜平负</span> ${hwStr}</div>
+    ${dc}
     ${ec.overUnderHint ? `<div class="ec">${esc(ec.overUnderHint)}</div>` : ""}
     ${ec.driftHint ? `<div class="ec">${esc(ec.driftHint)}</div>` : ""}
     ${ec.drawAlert ? `<div class="ec warn">${esc(ec.drawAlert)}</div>` : ""}

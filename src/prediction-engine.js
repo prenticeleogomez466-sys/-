@@ -143,6 +143,27 @@ function fixtureKickoffDate(fixture) {
   return String(fixture?.kickoff ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? String(fixture?.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
 }
 
+// 双选(双重机会)建议(2026-05-31)—— 诚实回测结论:单选平局命中率物理上限 ~28%(基线26%),
+// 平局本质不可预测,硬推单平=72%翻车。所以均势场不强行猜平,而是给"主推方向+平"双选覆盖平局风险。
+// 触发:无强热门(领先<55%)且平局有威胁(≥28%)且平不是首推。返回 null 表示该场强热门、无需双选。
+// 不改 pick/比分/半全场(仍锚 wld),只附加一条覆盖平局的双选建议(用户决定买不买,不替弃赛)。
+export function computeDoubleChance(ranked, env = process.env) {
+  const minDraw = Number(env.DOUBLE_CHANCE_MIN_DRAW ?? 0.28);
+  const maxLeader = Number(env.DOUBLE_CHANCE_MAX_LEADER ?? 0.55);
+  const draw = ranked.find((r) => r.code === "1");
+  const leader = ranked[0];
+  if (!draw || !leader || leader.code === "1") return null;
+  if (draw.probability < minDraw || leader.probability >= maxLeader) return null;
+  const combined = round(leader.probability + draw.probability);
+  return {
+    pick: `${leader.label}/平局`,
+    codes: [leader.code, "1"],
+    combinedProbability: combined,
+    drawProbability: round(draw.probability),
+    note: `均势场·平局风险高(平${(draw.probability * 100).toFixed(0)}%),单选命中低 → 建议双选 ${leader.label}/平 覆盖(合计${(combined * 100).toFixed(0)}%)`,
+  };
+}
+
 function harmonizeDuplicatePredictions(predictions) {
   const authoritative = new Map(
     predictions
@@ -167,6 +188,7 @@ function harmonizeDuplicatePredictions(predictions) {
       },
       pick: { ...source.pick },
       secondaryPick: { ...source.secondaryPick },
+      doubleChance: source.doubleChance ? { ...source.doubleChance } : null,
       risk: source.risk,
       confidence: source.confidence,
       scorePicks,
@@ -393,6 +415,25 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       ? (ranked[0].code === "3" ? c.home : ranked[0].code === "0" ? c.away : (c.push ?? c.draw))
       : null;
     const coverProbability = pickCover(coverInfo?.cover);
+    // 让球玩法按"让球分析"出胜平负(2026-05-31 用户硬规则:让球的就根据让球分析胜负平)。
+    //   让球后三态:让主胜(home 覆盖盘口)/走盘(push 退款)/让客胜(away 覆盖),直接把官方让球线
+    //   套进真泊松比分矩阵的覆盖分布,argmax 即让球玩法推荐。**独立于比赛原始 wld**——胜平负玩法仍锚
+    //   wld(不反推),这条只服务"让球"玩法本身,不改 pick/比分/半全场的 wld 派生。
+    const hc = coverInfo?.cover;
+    const handicapWld = hc ? (() => {
+      const opts = [
+        { code: "3", label: "让球主胜", prob: Number(hc.home) || 0 },
+        { code: "1", label: "走盘", prob: Number(hc.push) || 0 },
+        { code: "0", label: "让球客胜", prob: Number(hc.away) || 0 },
+      ].sort((a, b) => b.prob - a.prob);
+      return {
+        pick: opts[0].label,
+        pickCode: opts[0].code,
+        probability: round(opts[0].prob),
+        probabilities: { home: round(Number(hc.home) || 0), push: round(Number(hc.push) || 0), away: round(Number(hc.away) || 0) },
+        ranked: opts.map((o) => ({ label: o.label, code: o.code, probability: round(o.prob) })),
+      };
+    })() : null;
     // Skellam 独立交叉校验(2026-05-30):用同一组 λ 经 Skellam 进球差分布算让球覆盖,
     //   与全场比分矩阵的覆盖概率比对。两条独立路径(一维 Skellam vs 二维 DC 矩阵)一致 ⇒ 让球高信心;
     //   分歧大 ⇒ 打「低信心」风险提示。**只提示、不改方向、不弃赛**(用户硬规则:弃赛由用户决定)。
@@ -423,6 +464,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       netExpected: goalDiff !== null ? round(goalDiff + handicapLine) : null,
       expectedGoalDiff: goalDiff,
       coverProbability,
+      handicapWld,
       coverBreakdown: coverInfo?.cover ?? null,
       modelFairLine: coverInfo?.modelFairLine ?? null,
       skellamCheck
@@ -459,6 +501,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     bankroll: null,
     pick: ranked[0],
     secondaryPick: ranked[1],
+    // 双选(双重机会)建议:均势场覆盖平局风险(单选平命中物理上限~28%,见 computeDoubleChance)。
+    doubleChance: computeDoubleChance(ranked, options.env ?? process.env),
     risk,
     confidence,
     // 纯市场隐含概率(去vig)—— 选择分层的 sharp 信号(回测证明优于模型信心)。
