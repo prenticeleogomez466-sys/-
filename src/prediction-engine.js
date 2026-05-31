@@ -27,6 +27,7 @@ import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./compet
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { selectionTier } from "./selection-tier.js";
 import { optimizeTicket } from "./ticket-optimizer.js";
+import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -191,6 +192,8 @@ function harmonizeDuplicatePredictions(predictions) {
       doubleChance: source.doubleChance ? { ...source.doubleChance } : null,
       risk: source.risk,
       confidence: source.confidence,
+      // 同场次已强制对齐竞彩源的 wld → 市场背离度也直接取竞彩源(其持真实欧赔),避免 14 场缺欧赔时陈旧/不一致。
+      marketDivergence: source.marketDivergence ? { ...source.marketDivergence } : null,
       scorePicks,
       halfFullPicks,
       // 让球方向也必须跟着 wld 锚走(2026-05-31 修):同场次强制对齐竞彩 wld 后,pick.label 变了,
@@ -578,9 +581,30 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
   };
   prediction.bankroll = buildBankrollRisk(prediction, options.env ?? process.env);
+  // 市场背离置信门(2026-05-31 接生产)—— 实证(signal-crossval 回测):模型与市场分歧越大、市场赢越多,
+  //   逆市场押独门=陷阱。此处把 clv-confidence-gate 接进每场预测,**只附加**背离标签 + 建议降档系数,
+  //   遵 [[feedback_confidence_not_autosuppress]]:不改 pick、不覆盖 confidence、不抑制玩法,买不买由用户定。
+  prediction.marketDivergence = computeMarketDivergence(prediction);
   const consistencyErrors = validatePredictionConsistency(prediction);
   if (consistencyErrors.length) throw new Error(`推荐派生市场冲突：${fixture.homeTeam} 对 ${fixture.awayTeam}；${consistencyErrors.join("；")}`);
   return prediction;
+}
+
+// 用本场欧赔(优先收盘 final → 当前 current → 开盘 initial,越接近收盘=市场金标准)算市场背离。
+// 纯附加诚实信息:aligned(同向/次热/逆市)、divergence(模型比市场高几个 pp)、建议降档系数、tag。
+// 无欧赔(深盘只开让球等)→ 返回 null,不臆造。
+export function computeMarketDivergence(prediction) {
+  const eo = prediction?.marketSnapshot?.europeanOdds;
+  const odds = eo?.final ?? eo?.current ?? eo?.initial ?? null;
+  if (!odds || !prediction?.pick?.code) return null;
+  const result = marketDivergenceGate({
+    pickCode: prediction.pick.code,
+    probability: prediction.pick.probability,
+    confidence: prediction.confidence,
+    odds,
+  });
+  // 收盘价齐全时附带 CLV-就绪标记(下注价 vs 收盘价的对比由复盘 daily-recap 落实,这里只标方向)。
+  return { ...result, closingAvailable: Boolean(eo?.final) };
 }
 
 function advancedFixtureData(advancedData, fixture) {

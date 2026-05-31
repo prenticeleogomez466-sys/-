@@ -100,6 +100,7 @@ function toJingcaiRow(prediction) {
   const confDetail = [confidenceLabel(prediction.confidence), tier]
     .concat(Number.isFinite(ev) ? [`EV ${(ev*100).toFixed(1)}%`] : [])
     .concat(Number.isFinite(stake) && stake > 0 ? [`${stake}/100`] : [])
+    .concat(marketDivergenceTag(prediction) ? [marketDivergenceTag(prediction)] : [])
     .join(" · ");
   return [
     fixture.sequence,                                            // 1 序号
@@ -118,6 +119,21 @@ function toJingcaiRow(prediction) {
     confDetail,                                                  // 12 信心+分级+EV+注码
     enrichedRationale(prediction)                                // 13 选择理由
   ];
+}
+
+// 市场背离标签(2026-05-31):clv-confidence-gate 接生产后的展示。实证=逆市押独门是陷阱。
+// 同向不刷屏(只略标✓);次热/逆市给醒目降档建议。纯提示,买不买由用户定(不替弃赛)。
+function marketDivergenceTag(prediction) {
+  const md = prediction.marketDivergence;
+  if (!md || md.fightLevel === "unknown") return "";
+  if (md.fightLevel === "同向") return "✓市场同向";
+  const gc = Number.isFinite(md.gatedConfidence) ? `→建议信心${md.gatedConfidence}` : "";
+  if (md.fightLevel === "次热") return `⚠押市场次热·略降档${gc}`;
+  return `⛔逆市(市场看${outcomeCodeToChinese(marketPickCode(md.marketPick))})·建议降档${gc}`;
+}
+
+function marketPickCode(pick) {
+  return pick === "home" ? "3" : pick === "draw" ? "1" : pick === "away" ? "0" : "";
 }
 
 // 历史经验列(2026-05-30/31):把 experienceContext 学到的"同联赛同情境真实结果"读数
