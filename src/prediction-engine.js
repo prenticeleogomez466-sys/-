@@ -390,8 +390,29 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 软赛事 λ 强度衰减(2026-05-31):友谊/国际赛进球偏低,competition intensityMultiplier 半强度缩放
   //   (避免与市场赔率已隐含信息重复打折)。非软赛事 scale=1,俱乐部/有训练 DC 的场不受影响。
   const _lamScale = softCompetitionLambdaScale(fixture?.competition);
-  const scoreModel = blendResult.dcResult
-    ?? buildDerivedScoreModel((simulation.lambdas?.home ?? 0) * _lamScale, (simulation.lambdas?.away ?? 0) * _lamScale);
+  // 比分 λ 市场校准对齐(2026-05-31 修 DC 强队 λ 高估):训练 DC 评级算的 λ **不含本场大小球盘口**,
+  //   强队对鱼腩(拜仁/曼城等)λ 会冲到 4+ → 4-0/5-0 极端比分且触 λ 物理闸门拦掉全表,而概率
+  //   融合里 DC 仅占 dcWeight、比分却 100% 用这个高估 λ(口径不一致)。修复:有市场校准 λ
+  //   (simulation.lambdas,来自大小球盘口+经验库,已回测证比分+0.84pp)时,把比分 λ 按概率融合
+  //   **同权重(dcWeight)** 向市场 λ 收缩,使比分与胜负平同口径、λ 回物理区间;DC 的 home/away
+  //   形状信息经 buildDerivedScoreModel 用收缩后 λ 重建保留(与无训练 DC 的 fallback 同一构造)。
+  const _dcEg = blendResult.dcResult?.expectedGoals;
+  const _mh = Number(simulation.lambdas?.home);
+  const _ma = Number(simulation.lambdas?.away);
+  const _dcW = Math.min(1, Math.max(0, Number(blendResult.dcWeight) || 0));
+  let scoreModel;
+  if (blendResult.dcResult && Number.isFinite(_mh) && Number.isFinite(_ma)
+      && _dcEg && Number.isFinite(_dcEg.home) && Number.isFinite(_dcEg.away)) {
+    const lamH = ((1 - _dcW) * _mh + _dcW * _dcEg.home) * _lamScale;
+    const lamA = ((1 - _dcW) * _ma + _dcW * _dcEg.away) * _lamScale;
+    scoreModel = buildDerivedScoreModel(lamH, lamA);
+    if (scoreModel && blendResult.dcResult.source) scoreModel.source = blendResult.dcResult.source;
+  } else {
+    scoreModel = blendResult.dcResult
+      ?? buildDerivedScoreModel((simulation.lambdas?.home ?? 0) * _lamScale, (simulation.lambdas?.away ?? 0) * _lamScale);
+  }
+  // 上报给自检/让球/日报的 expectedGoals 与比分用的同一 λ(收缩后),保证 λ 物理闸门核到的就是真用值。
+  const reconciledExpectedGoals = scoreModel?.expectedGoals ?? blendResult.dcResult?.expectedGoals ?? null;
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scoreModel);
   const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, scoreModel);
   // 深度强化(2026-05-30 用户要求):给比分/半全场附真实概率 + 主方向内反超备选 + 完整分布,
@@ -401,7 +422,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 缺 matrix 时 buildExtendedMarkets 自动返回 null,daily-report 据此决定是否输出该列。
   // 2026-05-31:训练 DC matrix 缺失(冷启动/借用/国际赛)时,退回 scoreModel.matrix(由本场 λ 构造,
   //   与比分/半全场同源),让大小球/单双/上半场等扩展玩法对**所有场**可用,而非只俱乐部赛有。
-  const _extMatrix = blendResult.dcResult?.matrix ?? scoreModel?.matrix ?? null;
+  const _extMatrix = scoreModel?.matrix ?? blendResult.dcResult?.matrix ?? null;
   const extendedMarkets = _extMatrix ? buildExtendedMarkets(_extMatrix) : null;
   // 2026-05-29 用户指令:**所有推荐以胜负平方向为锚**,handicap direction 直接 = wld,
   // 不再从 score 反推。原因:模型先决定 wld(pick.label),用户玩让球时买的就是这个方向;
@@ -531,7 +552,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     dixonColes: blendResult.dcResult ? {
       source: blendResult.blendSource,
       independentProbs: blendResult.dcResult?.probabilities,
-      expectedGoals: blendResult.dcResult?.expectedGoals,
+      expectedGoals: reconciledExpectedGoals,
       teamStrength: blendResult.dcResult?.teamStrength,
     } : null,
     ensembleView,
