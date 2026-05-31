@@ -83,6 +83,16 @@ export async function backfillHistorical(opts = {}) {
           away: m.away,
           homeGoals: m.homeGoals,
           awayGoals: m.awayGoals,
+          // 半场比分(HTHG/HTAG)+ 去 vig 赔率隐含(开/收盘)+ 大小球/亚盘 —— loader 早已解析,
+          // 此前 backfill 丢弃,导致 fixture-store 带半场仅 1 场/带赔率 0 场。现一并落盘,
+          // 让半全场/数据变化/大小球 小模型可直接从 fixture-store 自主读取(不再临时走 CSV)。
+          halfHome: m.halfHome ?? null,
+          halfAway: m.halfAway ?? null,
+          oddsOpen: m.odds ?? null,
+          oddsClose: m.oddsClose ?? null,
+          overProb: m.overProb ?? null,
+          overProbClose: m.overProbClose ?? null,
+          asian: m.asian ?? null,
           date: m.date,
           league: LEAGUE_LABELS[m.league] ?? m.league,
           source: "football-data"
@@ -130,7 +140,25 @@ export async function backfillHistorical(opts = {}) {
       competition: m.league,
       marketType: "historical",
       kickoff: `${date}T12:00:00+08:00`,
-      result: { home: m.homeGoals, away: m.awayGoals },
+      result: {
+        home: m.homeGoals,
+        away: m.awayGoals,
+        halfHome: m.halfHome ?? null,
+        halfAway: m.halfAway ?? null
+      },
+      // 历史市场维(去 vig 隐含概率,非实时快照 → 不触发 europeanOdds 实时闸门)。
+      // 缺任一维则整个对象省略,小模型据 available 判定,绝不编造。
+      ...(m.oddsOpen || m.oddsClose || m.overProb != null || m.asian
+        ? {
+            marketHistorical: {
+              openProbs: m.oddsOpen ?? null,
+              closeProbs: m.oddsClose ?? null,
+              overProb: m.overProb ?? null,
+              overProbClose: m.overProbClose ?? null,
+              asian: m.asian ?? null
+            }
+          }
+        : {}),
       source: m.source
     }));
     saveFixtures(date, fixtures, { source: "historical-backfill" });

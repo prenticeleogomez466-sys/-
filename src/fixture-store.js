@@ -73,8 +73,29 @@ export function normalizeFixture(fixture = {}, fallbackDate = todayIso(), index 
     source: fixture.source ?? "",
     officialStatus: fixture.officialStatus ?? "",
     officialFixtureId: fixture.officialFixtureId ?? null,
-    result: normalizeResult(fixture.result)
+    result: normalizeResult(fixture.result),
+    // 历史市场维(去 vig 隐含概率,非实时快照)。一等字段,供半全场/大小球/数据变化
+    // 小模型自主读取。缺失则 null,小模型据此判 available,绝不编造。
+    marketHistorical: normalizeMarketHistorical(fixture.marketHistorical)
   };
+}
+
+function normalizeMarketHistorical(mh) {
+  if (!mh || typeof mh !== "object") return null;
+  const probs = (p) => {
+    if (!p || typeof p !== "object") return null;
+    const h = Number(p.home), d = Number(p.draw), a = Number(p.away);
+    return [h, d, a].every(Number.isFinite) ? { home: h, draw: d, away: a } : null;
+  };
+  const numOrNull = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+  const openProbs = probs(mh.openProbs);
+  const closeProbs = probs(mh.closeProbs);
+  const overProb = numOrNull(mh.overProb);
+  const overProbClose = numOrNull(mh.overProbClose);
+  const asian = mh.asian && typeof mh.asian === "object" ? mh.asian : null;
+  // 全维皆空则不留壳
+  if (!openProbs && !closeProbs && overProb == null && overProbClose == null && !asian) return null;
+  return { openProbs, closeProbs, overProb, overProbClose, asian };
 }
 
 function normalizeResult(result) {
