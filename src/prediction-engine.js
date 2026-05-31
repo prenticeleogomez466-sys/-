@@ -74,7 +74,22 @@ export function recommendFixtures(date) {
   // 限业务日 + 跨源去重(2026-05-30):兜底/多源抓取会把次日(周日)与重复场次(XML 6001 与 Playwright 周六001 同场)
   // 灌进当日,产生 34 场假象;此处收敛到目标业务日的去重竞彩单 + 原样保留 14 场/其它。
   const scopedFixtures = scopeJingcaiFixtures(fixtureSet.date, fixtureSet.fixtures);
-  const rawPredictions = scopedFixtures.map((fixture, index) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history) }));
+  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history), ...extra });
+  let rawPredictions = scopedFixtures.map((fixture, index) => predictOne(fixture, index));
+  // 「竞彩要全」铁律(2026-05-31):竞彩缺欧赔被判 data-missing 的场,若同场在 14 场有真实预测 → 借其 wld 重算补全。
+  const shengfucaiByKey = new Map(
+    rawPredictions.filter((p) => !p.unpredictable && p.fixture.marketType === "shengfucai")
+      .map((p) => [fixtureIdentityKey(p.fixture), p])
+  );
+  rawPredictions = rawPredictions.map((p, index) => {
+    if (!p.unpredictable || p.fixture.marketType !== "jingcai") return p;
+    const src = shengfucaiByKey.get(fixtureIdentityKey(p.fixture));
+    if (!src?.probabilities) return p; // 无可借 → 保持 data-missing(诚实)
+    return predictOne(p.fixture, index, {
+      priorProbabilities: src.probabilities,
+      priorSource: `borrowed-shengfucai:${src.fixture.sequence ?? src.fixture.id}`,
+    });
+  });
   // 2026-05-30 诚实闸门:无真实先验的场(unpredictable=data-missing)绝不进推荐/14 场,
   //   单列在 unpredictable[] 如实标注「未预测·需补抓赔率」,而非用假方向凑数。
   const unpredictable = rawPredictions
@@ -180,11 +195,17 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const _ouLineHint = Number(snapshot?.totalGoals?.current?.line ?? snapshot?.totalGoals?.initial?.line ?? 2.55);
   const _marketHints = Number.isFinite(_asianLineHint) ? { asianLine: _asianLineHint, overUnderLine: _ouLineHint } : null;
   const dcResult = options.dixonColesFitted ? predictFromFitted(options.dixonColesFitted, fixture, _marketHints) : null;
-  const blendResult = oddsProbabilities
+  let blendResult = oddsProbabilities
     ? blendWithOdds(oddsProbabilities, dcResult, { competition: fixture.competition, weightProfile: loadSignalWeights() })
     : dcResult
       ? { probabilities: dcResult.probabilities, blendSource: "dixon-coles-only", dcWeight: 1, dcResult }
       : { probabilities: null, blendSource: "data-missing", dcWeight: 0, dcResult: null };
+  // 借用先验(2026-05-31,「竞彩要全」铁律):竞彩让0档"未开售"→无欧赔、国际队又冷启动 ⇒ 本会 data-missing 被删。
+  //   但同一场比赛常在 14 场胜负彩里有真实预测(同队)。recommendFixtures 二次传入该场 14 场的 wld 作先验,
+  //   让竞彩跑完整机器(让球/比分/半全场/分档),竞彩明细补全。这是借**模型已对同场做出的真实预测**,非编造。
+  if (!blendResult.probabilities && options.priorProbabilities && Number.isFinite(options.priorProbabilities.home)) {
+    blendResult = { probabilities: { ...options.priorProbabilities }, blendSource: options.priorSource ?? "borrowed-prior", dcWeight: 0, dcResult: null };
+  }
   // 2026-05-30 诚实闸门(用户硬规则「缺失数据绝不编造」):既无实时市场赔率、又不在 Dixon-Coles
   //   训练集 ⇒ 没有任何真实先验。绝不再用队名哈希的 seededProbabilities 编一个假概率
   //   —— 那会让胜平负 / 比分 / 半全场方向全部伪造、还被自检误标成「纯赔率」放行。
