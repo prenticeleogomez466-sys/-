@@ -44,4 +44,25 @@ describe("全面审计总闸门(comprehensive-audit)", () => {
     assert.ok(Array.isArray(rows) && rows.length > 1);
     assert.match(String(rows[0][1]), /通过|拦截/);
   });
+
+  it("⑨ 爆冷/诱盘核验 roll-up:健康集出现该分项且不拦出表", () => {
+    const recs = recommendFixtures("2026-05-15");
+    const a = runComprehensiveAudit({ date: "2026-05-15", recommendations: recs, runModuleAudits: false });
+    assert.ok(a.upsetTrap, "审计结果应含 upsetTrap 汇总");
+    assert.ok(a.sections.some((s) => s.name === "爆冷/诱盘核验"), "分项应含爆冷/诱盘核验");
+    assert.ok(a.upsetTrap.analyzed >= 0);
+    assert.equal(a.upsetTrap.malformed.length, 0, "健康集不应有畸形 upsetTrap");
+    // 高爆冷/诱盘是提示(warning),不应进硬 blocker
+    assert.ok(!a.blockers.some((b) => /爆冷提示/.test(b)));
+  });
+
+  it("upsetTrap 字段畸形(概率越界)→ 真实性 blocker 拦出表", () => {
+    const recs = recommendFixtures("2026-05-15");
+    const real = recs.predictions.find((p) => p.upsetTrap) ?? recs.predictions[0];
+    const faked = { ...real, upsetTrap: { ...(real.upsetTrap ?? {}), upsetRisk: 1.8, favoriteImplied: 0.6, reason: "x", upsetLevel: "中", trapVerdict: "中性" } };
+    const tampered = { ...recs, predictions: [...recs.predictions, faked] };
+    const a = runComprehensiveAudit({ date: "2026-05-15", recommendations: tampered, runModuleAudits: false });
+    assert.equal(a.ok, false, "畸形 upsetTrap 必须被拦");
+    assert.ok(a.blockers.some((b) => /爆冷\/诱盘/.test(b)), `blocker 应含爆冷/诱盘畸形项:${a.blockers.join("；")}`);
+  });
 });

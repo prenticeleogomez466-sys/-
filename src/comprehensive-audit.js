@@ -139,6 +139,24 @@ export function runComprehensiveAudit({ date, recommendations, env = process.env
     });
   }
 
+  // ⑨ 爆冷/诱盘核验 roll-up(2026-05-31 用户要求:输出"可能爆冷的场次+原因"+"赔率是诱盘还是真实")。
+  //   从 prediction.upsetTrap 汇总:高爆冷风险场 / 诱盘嫌疑场 / 爆冷价值(聪明钱撤离)场。
+  //   遵 [[feedback-confidence-not-autosuppress]]:只提示不弃赛——故 warning(不 blocker);
+  //   仅"upsetTrap 字段畸形/概率越界"(=假数据)才升 blocker(本层亦不得编造)。
+  const ut = safe(() => buildUpsetTrapRollup(recommendations?.predictions ?? []), "爆冷诱盘核验");
+  let upsetTrap = null;
+  if (!ut.ok) { warnings.push(ut.error); sections.push({ name: "爆冷/诱盘核验", status: "⚠跳过", detail: ut.error }); }
+  else {
+    upsetTrap = ut.value;
+    upsetTrap.malformed.forEach((m) => blockers.push(`爆冷/诱盘:${m}`)); // 字段畸形=假数据,硬拦
+    upsetTrap.highlights.forEach((h) => warnings.push(`爆冷提示:${h}`)); // 高风险/诱盘=提示,不拦
+    sections.push({
+      name: "爆冷/诱盘核验",
+      status: upsetTrap.malformed.length ? "✗" : "✓",
+      detail: `覆盖 ${upsetTrap.analyzed} 场 · 高爆冷 ${upsetTrap.highUpset} · 诱盘嫌疑 ${upsetTrap.trapSuspect} · 爆冷价值 ${upsetTrap.fadeValue} · 真实确认 ${upsetTrap.confirmed}`
+    });
+  }
+
   return {
     ok: blockers.length === 0,
     date,
@@ -147,8 +165,35 @@ export function runComprehensiveAudit({ date, recommendations, env = process.env
     sections,
     integrity,
     playtypes,
-    multimodal: mmAudit
+    multimodal: mmAudit,
+    upsetTrap
   };
+}
+
+// 爆冷/诱盘核验汇总:从 prediction.upsetTrap 统计 高爆冷/诱盘嫌疑/爆冷价值/真实确认 场数,
+//   并校验字段真实性(概率域、reason 非空)——畸形=假数据计入 malformed(硬 blocker)。
+function buildUpsetTrapRollup(predictions) {
+  let analyzed = 0, highUpset = 0, trapSuspect = 0, fadeValue = 0, confirmed = 0;
+  const highlights = [];
+  const malformed = [];
+  for (const p of predictions ?? []) {
+    const u = p?.upsetTrap;
+    if (!u) continue; // 无开收盘赔率的场 upsetTrap=null,正常跳过(不编造)
+    analyzed++;
+    const name = `${p.fixture?.homeTeam ?? p.homeTeam ?? "?"} vs ${p.fixture?.awayTeam ?? p.awayTeam ?? "?"}`;
+    // 真实性校验:概率必须在 (0,1),reason 必须非空字符串。
+    const probOk = Number.isFinite(u.upsetRisk) && u.upsetRisk > 0 && u.upsetRisk < 1
+      && Number.isFinite(u.favoriteImplied) && u.favoriteImplied > 0 && u.favoriteImplied <= 1;
+    if (!probOk || typeof u.reason !== "string" || !u.reason) {
+      malformed.push(`[${name}] upsetTrap 字段畸形(upsetRisk=${u.upsetRisk}/favoriteImplied=${u.favoriteImplied})`);
+      continue;
+    }
+    if (u.upsetLevel === "高") { highUpset++; highlights.push(`[${name}] 高爆冷风险:${u.reason}`); }
+    if (/诱盘/.test(u.trapVerdict)) { trapSuspect++; if (u.upsetLevel !== "高") highlights.push(`[${name}] ${u.trapVerdict}:${u.reason}`); }
+    if (/爆冷价值|撤离/.test(u.trapVerdict)) fadeValue++;
+    if (/真实/.test(u.trapVerdict)) confirmed++;
+  }
+  return { analyzed, highUpset, trapSuspect, fadeValue, confirmed, highlights, malformed };
 }
 
 // 逐玩法核验汇总:从逐场自检 perFixture.checks 统计 胜负平/让球/比分/半全场 各自通过/失败场数。
