@@ -125,6 +125,14 @@ function collectDrivers(prediction, archetype) {
     d.push({ w: 0.7, key: "divergence", text: `模型与市场分歧 ${PP(md.divergence)}（${md.tag}）— 分歧越大越该谨慎` });
   }
 
+  // 联赛专家门控:本联赛历史样本撑度(低样本=结论靠大模型兜底,该降信心)
+  const le = prediction.leagueExpert;
+  if (le && Number.isFinite(le.weight)) {
+    // 样本越少越要提醒(权重低=本场判断更依赖全局先验,差异化空间小)
+    const w = le.samples < 20 ? 0.7 : 0.45;
+    d.push({ w, key: "league-expert", text: le.explain });
+  }
+
   // ensemble 分歧
   const ev = prediction.ensembleView?.probabilities;
   const main = prediction.probabilities;

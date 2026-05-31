@@ -29,6 +29,8 @@ import { selectionTier } from "./selection-tier.js";
 import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
 import { analyzeMatch } from "./match-archetype-analyzer.js";
+import { leagueExpertFromFitted } from "./league-expert-mixture.js";
+import { multimodalAnalysis, summarizeMultimodal } from "./multimodal-collab.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -104,12 +106,20 @@ export function recommendFixtures(date) {
       reason: p.dataMissingReason ?? "数据缺失·未预测"
     }));
   const predictions = harmonizeDuplicatePredictions(rawPredictions.filter((p) => !p.unpredictable));
+  // 多模态协作汇总(2026-05-31):各路独立模型(市场赔率/DC纯泊松/信号融合/历史经验/让球覆盖)
+  //   各自给胜平负判断 → 本层做 分流×对比×裁决,挂到每场 prediction.multimodal。
+  //   严守硬规则:只读已算好的真实中间量、以 wld 为锚不改方向、分歧只下调信心不弃赛、缺数据 available:false。
+  for (const p of predictions) {
+    try { p.multimodal = multimodalAnalysis(p); } catch { p.multimodal = null; }
+  }
+  const multimodalSummary = summarizeMultimodal(predictions);
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
     fixtures: predictions.length,
     unpredictable,
     predictions,
+    multimodalSummary,
     ratingsBootstrap: ratingsBootstrap ? {
       samples: ratingsBootstrap.samples,
       methods: {
@@ -586,6 +596,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   逆市场押独门=陷阱。此处把 clv-confidence-gate 接进每场预测,**只附加**背离标签 + 建议降档系数,
   //   遵 [[feedback_confidence_not_autosuppress]]:不改 pick、不覆盖 confidence、不抑制玩法,买不买由用户定。
   prediction.marketDivergence = computeMarketDivergence(prediction);
+  // 联赛专家门控(2026-05-31):复用 ratingsBootstrap 已拟合的 hierarchical,取本联赛样本量+收缩权重,
+  //   透明告诉用户"这场结论有多少是本联赛数据撑的、多少靠大模型兜底"(回测证分层收缩 -0.0099 LogLoss)。
+  prediction.leagueExpert = options.ratingsBootstrap?.hierarchical
+    ? leagueExpertFromFitted(options.ratingsBootstrap.hierarchical, fixture?.competition)
+    : null;
   // 逐场差异化分析(2026-05-31):按 联赛性质×实力差×盘口深度 归原型,挑本场主导逻辑,
   //   替代旧固定模板 buildReason/generateExplanation。挂已算字段,零假编。
   prediction.differentialAnalysis = analyzeMatch(prediction);
