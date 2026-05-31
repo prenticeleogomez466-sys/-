@@ -24,6 +24,7 @@ import { buildExtendedMarkets } from "./extended-markets.js";
 import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
 import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
+import { halfFullJoint } from "./halftime-fulltime-model.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -800,9 +801,10 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   scorePicks.secondaryProbability = scoreProbFromMatrix(matrix, scorePicks.secondary);
   scorePicks.distribution = topScoresWithProb(matrix, 5);
   const eg = scoreModel?.expectedGoals;
-  const halfRatio = Number(process.env.DC_HALF_RATIO ?? 0.46);
+  // 半全场联合分布(2026-05-31 升级,walk-forward 回测最优:τ低分修正+拟合半场比例+状态依赖 chase=0.18,
+  //   LogLoss 1.9069→1.9039 / Brier 0.8136→0.8129;参数见 halftime-fulltime-model.HF_DEFAULTS)。
   const hfDist = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)
-    ? halfFullProbsFromLambdas(eg.home, eg.away, halfRatio)
+    ? halfFullJoint(eg.home, eg.away)
     : null;
   halfFullPicks.primaryProbability = hfDist?.[halfFullPicks.primary] != null ? round(hfDist[halfFullPicks.primary]) : null;
   halfFullPicks.secondaryProbability = hfDist?.[halfFullPicks.secondary] != null ? round(hfDist[halfFullPicks.secondary]) : null;
@@ -831,8 +833,8 @@ export function scoreFromDcResult(dcResult, code, excluded = new Set()) {
 // "first-half 不同的 prob 最高"— 这样主胜场不会出现 主胜-主胜 备 主胜-主胜 的废话备选。
 export function halfFullFromDcResult(dcResult, code, excluded = new Set(), score = "") {
   if (!dcResult?.expectedGoals) return null;
-  const halfRatio = Number(process.env.DC_HALF_RATIO ?? 0.46);
-  const probs = halfFullProbsFromLambdas(dcResult.expectedGoals.home, dcResult.expectedGoals.away, halfRatio);
+  // 升级版半全场联合分布(τ+拟合比例+状态依赖,回测最优;旧 halfFullProbsFromLambdas 仅留作对照/测试)
+  const probs = halfFullJoint(dcResult.expectedGoals.home, dcResult.expectedGoals.away);
   const candidates = Object.entries(probs)
     .filter(([halfFull]) => halfFullFinalOutcomeCode(halfFull) === code)
     .filter(([halfFull]) => !excluded.has(halfFull))
