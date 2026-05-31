@@ -8,7 +8,6 @@ import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, s
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
-import { applyTemperature } from "./temperature-calibration.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
 import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { loadEnsembleWeightsProfile } from "./ensemble-weights-profile.js";
@@ -21,6 +20,7 @@ import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
 import { scopeJingcaiFixtures } from "./jingcai-business-day.js";
 import { buildExtendedMarkets } from "./extended-markets.js";
+import { calibrateOver25 } from "./overunder-calibration.js";
 import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
 import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
@@ -315,30 +315,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext, fusionOpts);
   probabilityAdjustment.fusionGatedOff = gateFusionOff;
   probabilityAdjustment.fusion = fusion;
-  // 温度校准(回测拟合,治过度自信):单调软化,不改 argmax/命中,只把虚高的强热门拉回。
-  // 放在 cold-start favorite 收缩之前,软化后多数 favorite 已 <0.65,二者互补不重复收缩。
-  //
-  // 2026-05-30 修 bug + 彻底了结:温度曾在 favBias=-0.37/Brier=0.70 的烂样本上拟合出 T≈1.975
-  //   (本身 overshoot 成 favBias +0.29),且无差别套到**已被市场校准的混合路径**,把 0.764 砸到 0.568。
-  //   两道闸门收口:
-  //   ① hasMarketPrior:市场价已校准好,跳过温度(交下游 isotonic-market 近恒等微调)。
-  //   ② 有可用 isotonic 模型映射时:isotonic 是更精确的数据驱动校准(Guo et al. 也认为优于全局温度),
-  //      温度给它让路,避免"isotonic + 温度"二次纠偏。温度只在 **isotonic 缺失的冷启动兜底**才生效。
-  //   W 档 isotonic profile(football-data walk-forward,usable:true)上线后,生产两条路径都不再走温度。
-  const calProfile = options.calibrationProfile;
-  const hasModelIsotonic = Boolean(calProfile?.usable && calProfile?.isotonicMap?.knots?.length);
+  // 温度软化层已删除(2026-05-31 用户铁律「删掉所有兜底」):温度只在 isotonic 缺失的冷启动兜底才生效,
+  //   生产两条路径(市场先验 / 模型 isotonic)本就不走它。校准统一交给下面数据驱动的 isotonic
+  //   (保留——它是用真实历史学出的纠偏,不是凑数)。不再保留温度创可贴。
   let fusedProbs = fusion.probabilities;
-  const fusionTemperature = weightProfile?.temperature;
-  const temperatureUsable = Number.isFinite(fusionTemperature) && fusionTemperature > 0 && fusionTemperature !== 1;
-  if (!hasMarketPrior && !hasModelIsotonic && temperatureUsable) {
-    fusedProbs = applyTemperature(fusedProbs, fusionTemperature);
-    probabilityAdjustment.temperature = fusionTemperature;
-  } else if (temperatureUsable) {
-    probabilityAdjustment.temperatureSkipped = {
-      value: fusionTemperature,
-      reason: hasMarketPrior ? "market-prior-already-calibrated" : "isotonic-calibration-supersedes"
-    };
-  }
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
   const calibrated = calibrateProbabilities(fusedProbs, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
   let probabilities = calibrated.probabilities;
@@ -424,6 +404,21 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   与比分/半全场同源),让大小球/单双/上半场等扩展玩法对**所有场**可用,而非只俱乐部赛有。
   const _extMatrix = scoreModel?.matrix ?? blendResult.dcResult?.matrix ?? null;
   const extendedMarkets = _extMatrix ? buildExtendedMarkets(_extMatrix) : null;
+  // 大小球 isotonic 校准(自主小模型,overunder-calibration):模型 P(over2.5) 校准。
+  // 回测证校准后 Brier 0.2508→0.2494;有市场盘口时市场更优 → 仅标注校准值 + 是否有盘口,
+  // 由 daily-report 决定无盘口冷门场用校准值。profile 缺失则 calibrateOver25 返回 null,优雅降级。
+  if (extendedMarkets?.overUnder?.["2.5"] && Number.isFinite(extendedMarkets.overUnder["2.5"].over)) {
+    const cal = calibrateOver25(extendedMarkets.overUnder["2.5"].over);
+    if (cal != null) {
+      extendedMarkets.overUnder["2.5"].overCalibrated = round(cal);
+      extendedMarkets.overUnder["2.5"].underCalibrated = round(1 - cal);
+      extendedMarkets.overUnder["2.5"].calibration = {
+        source: "overunder-isotonic",
+        hasMarketLine: Boolean(tgNode),
+        note: tgNode ? "有大小球盘口,优先市场" : "无盘口,用校准模型值",
+      };
+    }
+  }
   // 2026-05-29 用户指令:**所有推荐以胜负平方向为锚**,handicap direction 直接 = wld,
   // 不再从 score 反推。原因:模型先决定 wld(pick.label),用户玩让球时买的就是这个方向;
   // score 选满足该 wld 的最高概率比分(已在 buildScorePicks 里做),半全场再跟 score 同步。

@@ -88,6 +88,11 @@ export function collectHistoricalMatches(maxDates = DEFAULT_MAX_DATES) {
         home, away,
         homeGoals: f.result.home,
         awayGoals: f.result.away,
+        // 半场比分 + 历史市场维(2026-05-31 富集后 33k+ 场可用):供半全场/大小球/数据变化
+        // 小模型自主读取,缺则 null/undefined,下游按 available 判定不编造。
+        halfHome: f.result.halfHome ?? null,
+        halfAway: f.result.halfAway ?? null,
+        marketHistorical: f.marketHistorical ?? null,
         date: f.date,
         league: f.competition ?? "unknown"
       });
