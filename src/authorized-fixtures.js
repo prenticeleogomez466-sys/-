@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import "./env.js";
 import { getDataSubdir, getExportDir } from "./paths.js";
 import { loadFixtures, saveFixtures } from "./fixture-store.js";
+import { canonicalTeamName } from "./team-aliases.js";
+import { loadEspnResults, ESPN_LEAGUES } from "./espn-results-source.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -48,9 +50,34 @@ export async function syncAuthorizedFixturesAndResults(date, options = {}) {
 export function buildAuthorizedProviders(env = process.env, options = {}) {
   const providers = [];
   if (env.OPENLIGADB_ENABLED !== "0") providers.push({ name: "OpenLigaDB", fetch: (date, fetchImpl) => fetchOpenLigaDbMatches(date, fetchImpl, options) });
+  // ESPN 赛果(免费、无 key,覆盖日职/瑞超/巴甲/美职/沙特/挪超等竞彩常见联赛)——补 OpenLigaDB(仅德甲)的盲区,
+  // 让复盘真正拿到赛果(2026-05-31 修:此前赛果只有德甲专用源、每天抓 0 条 → 283 预测仅 2 条结算)。
+  if (env.ESPN_RESULTS_ENABLED !== "0") providers.push({ name: "ESPN", fetch: (date, fetchImpl) => fetchEspnResultsForDate(date, fetchImpl) });
   if (env.API_FOOTBALL_KEY) providers.push({ name: "API-Football", fetch: (date, fetchImpl) => fetchApiFootballFixtures(date, fetchImpl, env.API_FOOTBALL_KEY, options) });
   if (env.FOOTBALL_DATA_ORG_TOKEN) providers.push({ name: "football-data.org", fetch: (date, fetchImpl) => fetchFootballDataOrgMatches(date, fetchImpl, env.FOOTBALL_DATA_ORG_TOKEN) });
   return providers;
+}
+
+// ESPN 当日赛果 → 授权 fixture shape(带 result),供 mergeAuthorizedFixtures 按队名匹配回填到预测。
+export async function fetchEspnResultsForDate(date, fetchImpl) {
+  const loaded = await loadEspnResults({ leagues: Object.keys(ESPN_LEAGUES), from: date, to: date, fetch: fetchImpl });
+  if (!loaded?.ok && !(loaded?.matches?.length)) return [];
+  return (loaded.matches ?? [])
+    .filter((m) => m.date === date && Number.isFinite(Number(m.homeGoals)) && Number.isFinite(Number(m.awayGoals)) && m.home && m.away)
+    .map((m, index) => ({
+      id: `espn-${date}-${index + 1}`,
+      date,
+      kickoff: m.kickoff ?? "",
+      competition: m.league ?? "ESPN",
+      homeTeam: m.home,
+      awayTeam: m.away,
+      round: "",
+      sequence: index + 1,
+      source: `espn:${m.league ?? ""}`,
+      officialStatus: "espn-final",
+      officialFixtureId: null,
+      result: { home: Number(m.homeGoals), away: Number(m.awayGoals), halfHome: m.halfHome ?? null, halfAway: m.halfAway ?? null },
+    }));
 }
 
 export async function fetchOpenLigaDbMatches(date, fetchImpl, options = {}) {
@@ -160,7 +187,10 @@ function normalizeResult(fullTime = {}, halfTime = {}) {
 
 function sameFixture(left, right) {
   if (left.officialFixtureId && right.officialFixtureId && String(left.officialFixtureId) === String(right.officialFixtureId)) return true;
-  return normalizeName(left.homeTeam) === normalizeName(right.homeTeam) && normalizeName(left.awayTeam) === normalizeName(right.awayTeam);
+  // 2026-05-31:改用全量别名表 canonicalTeamName(中英互通),让 ESPN 英文赛果能匹配中文预测名。
+  //   旧 normalizeName 只硬编码拜仁/斯图加特两条别名 → 跨语言赛果匹配恒失败 → 复盘拿不到赛果。
+  const cn = (x) => canonicalTeamName(x) || normalizeName(x);
+  return cn(left.homeTeam) === cn(right.homeTeam) && cn(left.awayTeam) === cn(right.awayTeam);
 }
 
 function kickoffTime(value) {
