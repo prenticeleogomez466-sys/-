@@ -17,15 +17,27 @@ import { getDataDir } from "../src/paths.js";
 // ESPN 补**不与 football-data/new 重叠**的热门联赛(日职/北欧已在 /new/,排除避免碎片化)。
 // 纯赛果(无赔率)→ 只进联赛级经验:平局率/主客胜率/场均进球/比分分布/大小球。用户点名:日韩(韩)/澳超 + 其它热门。
 const ESPN_EXPERIENCE_LEAGUES = ["usa.1", "bra.1", "ksa.1", "chn.1", "arg.1", "mex.1", "aus.1"]; // kor.1 ESPN 无数据→走 TheSportsDB
-const ESPN_FROM = process.env.ESPN_EXP_FROM || "2023-01-01";
+const ESPN_FROM = process.env.ESPN_EXP_FROM || "2020-01-01";
 const ESPN_TO = process.env.ESPN_EXP_TO || new Date().toISOString().slice(0, 10);
+
+// football-data 赛季回溯(2026-05-31 扩库:5→16 季,2010-11..2025-26)。big-5 自 1993、扩展联赛各自起始,
+//   results 必有;老季 AvgC 缺则 loader 降级 B365/null。经验库为联赛级统计(平局率/场均球/比分分布),样本越深越稳。
+function seasonCodesBack(n) {
+  const codes = [];
+  for (let i = 0; i < n; i++) {
+    const s = (25 - i + 100) % 100, e = (s + 1) % 100;
+    codes.push(`${String(s).padStart(2, "0")}${String(e).padStart(2, "0")}`);
+  }
+  return codes;
+}
+const FD_SEASONS = (process.env.EXP_FD_SEASONS && process.env.EXP_FD_SEASONS.split(",")) || seasonCodesBack(Number(process.env.EXP_FD_BACK) || 16);
 
 // TheSportsDB 逐轮源:补 ESPN/football-data 都不覆盖的联赛(韩K = K League 1, id 4689)。参数化便于以后加。
 const TSDB_LEAGUES = [{ leagueId: "4689", label: "韩K", seasons: ["2022", "2023", "2024", "2025"] }];
 
 const t0 = Date.now();
-console.log("[1/4] 抓主源 18 联赛 × 5 季 …");
-const main = await loadFootballDataMatches({ leagues: ALL_LEAGUES });
+console.log(`[1/4] 抓主源 18 联赛 × ${FD_SEASONS.length} 季(${FD_SEASONS[FD_SEASONS.length-1]}~${FD_SEASONS[0]})…`);
+const main = await loadFootballDataMatches({ leagues: ALL_LEAGUES, seasons: FD_SEASONS });
 console.log(`  主源:${main.matches.length} 场,带赔率 ${main.withOdds},带亚盘 ${main.withAsian},带半场 ${main.matches.filter(m=>m.halfHome!==null).length}`);
 
 console.log("[2/4] 抓 /new/ 北欧/日职/丹超(2018+)…");
