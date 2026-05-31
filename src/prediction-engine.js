@@ -5,6 +5,7 @@ import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation, lambdaTotalFromMarket } from "./monte-carlo-simulator.js";
 import { getExperienceBaseline } from "./experience-library-store.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "./derived-score-model.js";
+import { analyzeUpsetTrap } from "./upset-trap-detector.js";
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
@@ -571,6 +572,13 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     scorePicks,
     halfFullPicks,
     handicapPick,
+    // 爆冷风险 + 诱盘/真实盘识别(2026-05-31 L2):开盘→收盘隐含概率 + 模型概率对照,
+    //   输出热门翻车概率 + 赔率变化是诱盘还是真实体现 + 人读原因。只读提示,不改 wld 锚、不自动弃赛。
+    upsetTrap: analyzeUpsetTrap({
+      opening: fusionContext.openingOdds ?? null,
+      closing: oddsProbabilities ?? null,
+      model: probabilities ?? null,
+    }),
     // 让球胜平负(竞彩独立玩法,与14场/任选9的胜负平不同;深盘让球场常**只开此盘、不开胜平负**)。
     //   直接用真实让球赔率去vig → 隐含概率 + 推荐方向。sfcSold=胜平负(让0档)是否开售。
     jingcaiLetqiu: (() => {
