@@ -189,6 +189,24 @@ function firedFactorsLine(p) {
   return fired.length ? `本场生效信号:${fired.join("、")}` : "本场无额外信号生效(纯赔率+DC)";
 }
 
+// 爆冷风险 + 诱盘/真实盘(prediction.upsetTrap,缺开收盘赔率时为 null)。
+function upsetTrapCell(p) {
+  const u = p.upsetTrap;
+  if (!u) return `<td colspan="2" class="mute">缺开/收盘赔率,未评估</td><td class="mute">需 europeanOdds 初+即</td>`;
+  const lvlClass = u.upsetLevel === "高" ? "warn" : u.upsetLevel === "中" ? "" : "ok";
+  const trap = /诱盘/.test(u.trapVerdict) ? `<b style="color:#d33">${esc(u.trapVerdict)}</b>` : esc(u.trapVerdict);
+  return `<td class="pick"><span class="tag ${lvlClass}">爆冷${esc(u.upsetLevel)}</span> ≈${pct(u.upsetRisk)}</td>
+          <td>${trap}</td>
+          <td><span class="mute">${esc(u.reason)}</span></td>`;
+}
+
+// 模型自知(prediction.memoryRecall):本场所属联赛/热门档的历史真实命中率。
+function memoryRecallLine(p) {
+  const m = p.memoryRecall;
+  if (!m || !m.note) return "";
+  return `<div class="meta mute">🧠 模型自知:${esc(m.note)}${m.leagueSufficient || m.tierSufficient ? "" : "(样本不足·仅参考)"}</div>`;
+}
+
 function matchCard(p) {
   const f = p.fixture;
   const pr = p.probabilities;
@@ -222,9 +240,11 @@ function matchCard(p) {
           <td>真泊松矩阵·锚①方向</td></tr>
       <tr><td>⑤ 半全场</td><td class="pick">${esc(halfFullCell(p))}</td><td>${esc(halfFullDistCell(p))}</td>
           <td>半场联合分布·锚①方向</td></tr>
+      <tr><td>⑥ 爆冷/诱盘</td>${upsetTrapCell(p)}</tr>
     </table>
     <div class="synth">🧭 综合判读:${synthesize(p, asian)}<br><span class="mute">${firedFactorsLine(p)}</span></div>
     <div class="meta">概率优势 ${esc(p.confidence)}(未校准,非可下注度) · 资金信号 <b>${esc(stake)}</b>${p.bankroll?.ev != null ? ` · EV ${(p.bankroll.ev).toFixed(3)}` : ""}${inHistory ? "" : " · ⚠出历史,队伍专属信号仅欧赔+亚盘+让球"}</div>
+    ${memoryRecallLine(p)}
   </div>`;
 }
 
