@@ -91,7 +91,8 @@ export function deepFusionAnalysis(prediction) {
   const modelOver = prediction.extendedMarkets?.overUnder?.["2.5"]?.over;
   const ouSignal = lpOver != null ? lpOver : modelOver;
   if (ouSignal != null) {
-    const blend = (lpOver != null && Number.isFinite(modelOver)) ? 0.6 * lpOver + 0.4 * modelOver : ouSignal;
+    // 融合权重经回测优化(run:31343场):模型0.3/联赛0.7 Brier 0.2463 最优(联赛率主导,大小球本是联赛驱动)。
+    const blend = (lpOver != null && Number.isFinite(modelOver)) ? 0.7 * lpOver + 0.3 * modelOver : ouSignal;
     const ouPick = blend >= 0.55 ? "大球(>2.5)" : blend <= 0.45 ? "小球(<2.5)" : "接近2.5·中性";
     const basis = lpOver != null
       ? `联赛历史大球率 ${pct(lpOver)}${Number.isFinite(modelOver) ? `·模型矩阵 ${pct(modelOver)}` : ""}(联赛维度已回测加分)`
