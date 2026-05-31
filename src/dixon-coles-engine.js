@@ -42,7 +42,11 @@ const OUTCOMES = ["home", "draw", "away"];
  * @returns {Object} fitted 对象，传给 predictFromFitted
  */
 export function fitFromFixtureStore(opts = {}) {
-  const maxDates = opts.maxDates ?? 120;
+  // maxDates 默认 120→700(2026-06-01 回测调优):13.4 万库下 walk-forward(testDates40/1444场)实测
+  //   窗口 120 命中 45.08%/Brier 0.6401 → 700 命中 48.56%/Brier 0.6217(+3.5pp/−0.018,单调改善);
+  //   700≈1200≈2000(180天衰减令更老数据贡献≈0,故 700 即效率甜点,生产显式 2000 不变且实测等价)。
+  //   修裸调隐患:render-recommendation-html 等裸调原走 120 弱窗 → 现自动享 700。
+  const maxDates = opts.maxDates ?? 700;
   const minMatches = opts.minMatches ?? 60;
   const homeAdvantage = opts.homeAdvantage ?? 1.24;
   // beforeDate(可选):只用严格早于该日期的赛果拟合 —— 给 walk-forward 回测防数据泄漏用。
