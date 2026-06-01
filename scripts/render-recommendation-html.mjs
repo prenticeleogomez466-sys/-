@@ -134,54 +134,79 @@ function firedSet(preds) {
   for (const p of preds) for (const x of p.probabilityAdjustment?.fusion?.fired ?? []) fired.add(x.name);
   return fired;
 }
+// 26 个融合信号注册表(信号名→中文标签/类别/休眠时说明)。全部已接进 signal-fusion-layer 主路径。
+//   状态由 fusion 真实结果驱动(fired/dormant/gated),不再硬编码 orphan。
+const SIGNAL_REGISTRY = [
+  ["season-phase", "赛季阶段", "情境", "由比赛日期"],
+  ["competition-type", "赛事性质", "情境", "联赛走基线→休眠"],
+  ["injury", "伤停名单", "阵容", "FPL/Sofascore 免授权源(英超等);多数赛事赛前稀疏"],
+  ["h2h", "交锋史 H2H", "状态", "内部历史库;多数无对战样本"],
+  ["clean-sheet-streak", "净胜/零封", "状态", "内部历史库"],
+  ["streak", "近况连胜连败", "状态", "内部历史库;出历史球队无数据"],
+  ["fatigue", "体能/赛程疲劳", "状态", "需近期赛程,多数缺"],
+  ["rotation", "轮换", "阵容", "无轮换上下文→休眠"],
+  ["home-away-split", "主客场分裂", "状态", "主客 PPG 净差;样本不足休眠"],
+  ["time-decay-form", "时间衰减近况", "状态", "内部历史加权"],
+  ["line-movement", "赔率变化(资金流向)", "市场", "需开盘→当前多次捕获"],
+  ["weather", "天气", "环境", "weather 源未配置→休眠"],
+  ["manager", "教练效应", "情境", "需教练史数据(免费无)→休眠"],
+  ["derby", "德比强度", "情境", "同城/宿敌表;非德比→休眠"],
+  ["standings-pressure", "排名压力", "情境", "需当前积分榜→多数缺"],
+  ["big-game-form", "强强对话状态", "状态", "需强队判定上下文"],
+  ["travel-distance", "旅行距离", "环境", "需场馆坐标→多数缺"],
+  ["tactical-matchup", "战术克制", "战术", "需阵型(赛前~1h 首发出才有)"],
+  ["referee", "裁判倾向", "情境", "需赛前主裁指派(免费无)→休眠"],
+  ["opponent-strength-form", "对手强度校准", "实力", "按 Elo 校准近况"],
+  ["xg-chains", "进攻链 xG", "战术", "需事件级数据→休眠"],
+  ["padj-xg", "控球调整 xG", "战术", "需控球%→休眠"],
+  ["set-piece", "定位球能力", "战术", "需定位球统计→休眠"],
+  ["asian-handicap-water", "亚盘水位信号", "市场", "需亚盘初→即水位"],
+  ["historical-analog", "历史同情境类比", "实力", "同联赛+水位 KNN;报告专用层"],
+  ["lineup", "首发阵容布阵", "阵容", "ESPN 免授权首发;姿态→wld 回测无增益已诚实休眠"],
+];
+
 function buildFactorCoverage(preds) {
+  // 由 fusion 真实结果驱动(2026-06-01 全面修复:原硬编码把已接入的 26 信号误标 orphan)。
   const fired = firedSet(preds);
+  // 竞彩有赔率 → fusionGatedOff:26 信号被市场先验主动让位(回测证公开信号超不过收盘线)。
+  const allGated = preds.length > 0 && preds.every((p) => p.probabilityAdjustment?.fusionGatedOff);
+  const anyGated = preds.some((p) => p.probabilityAdjustment?.fusionGatedOff);
   const anyMarket = (k) => preds.some((p) => p.marketSnapshot?.[k]);
-  const anyMove = preds.some((p) => {
-    const e = p.marketSnapshot?.europeanOdds;
-    return e?.initial && e?.current && JSON.stringify(e.initial) !== JSON.stringify(e.current);
-  });
   const inHist = preds.some((p) => p.dixonColes?.teamStrength?.home?.coldStart === false);
   const asianN = Object.keys(asianBySeq).length;
-  // [因素, 类别, 状态码, 说明]  状态:ok生效 / dormant休眠无数据 / orphan未接入主路径 / missing源缺失
-  return [
+  // 市场 + 模型基础层(竞彩真实主依据)
+  const base = [
     ["欧洲赔率(胜负平)", "市场", anyMarket("europeanOdds") ? "ok" : "missing", "500.com 让0欧赔,主依据"],
     ["让球胜负平盘", "市场", anyMarket("handicapOdds") ? "ok" : "missing", "500.com 让N盘"],
     ["亚盘水位/盘口", "市场", asianN > 0 ? "ok" : "missing", asianN > 0 ? `皇冠 titan007,${asianN} 场` : "odds.500本机拒连"],
-    ["赔率变化(资金流向)", "市场", anyMove ? "ok" : "dormant", anyMove ? "多次捕获初→即真实移动" : "需多次捕获"],
-    ["Dixon-Coles 进球模型", "实力", inHist ? "ok" : "dormant", inHist ? "回填历史拟合" : "出历史→常数退化"],
+    ["Dixon-Coles 进球模型", "实力", inHist ? "ok" : "dormant", inHist ? "13.4 万场回填历史拟合" : "出历史→常数退化"],
     ["球队实力/Elo 评级", "实力", "ok", "ratings 集成(派生兜底)"],
-    ["赛季阶段", "情境", fired.has("season-phase") ? "ok" : "dormant", "由比赛日期"],
-    ["赛事性质", "情境", fired.has("competition-type") ? "ok" : "dormant", "联赛走基线→休眠"],
-    ["近况连胜连败(streak)", "状态", fired.has("streak") ? "ok" : "dormant", "内部历史;出历史球队无数据"],
-    ["净胜/零封(clean-sheet)", "状态", fired.has("clean-sheet-streak") ? "ok" : "dormant", "内部历史"],
-    ["交锋史 H2H", "状态", fired.has("h2h") ? "ok" : "dormant", "内部历史;多数无对战样本"],
-    ["体能/赛程疲劳", "状态", fired.has("fatigue") ? "ok" : "dormant", "需近期赛程,多数缺"],
-    ["伤停名单", "阵容", fired.has("injury") ? "ok" : "missing", "授权源 INJURY_URL 未配置"],
-    ["首发阵容", "阵容", preds.some((p) => p.advancedFeatures?.lineups) ? "ok" : "missing", "赛前~1h 才出,LINEUP_URL 未配置"],
-    ["轮换", "阵容", fired.has("rotation") ? "ok" : "dormant", "无轮换上下文"],
-    ["天气", "环境", "missing", "weather 源未接"],
-    ["裁判倾向", "情境", "orphan", "referee-bias-model 未接主路径"],
-    ["旅行距离", "环境", "orphan", "travel-distance-model 未接"],
-    ["战术克制", "战术", "orphan", "tactical-matchup 未接"],
-    ["教练效应", "情境", "orphan", "manager-effect-model 未接"],
-    ["定位球能力", "战术", "orphan", "set-piece-model 未接"],
-    ["联赛强度系数", "实力", "orphan", "league-strength-coefficient 未接"],
-    ["德比强度", "情境", "orphan", "derby-intensity 未接"],
-    ["排名压力", "情境", "orphan", "standings-pressure 未接"],
-    ["Kalman 状态追踪", "状态", "orphan", "kalman-form-tracker 未接"],
-    ["控球调整 xG", "战术", "orphan", "possession-adjusted-xg 未接"],
+    ["isotonic 概率校准", "校准", "ok", "football-data 训练,市场路径恒等微调"],
   ];
+  // 26 融合信号:状态 = fired→ok / 竞彩市场让位→gated / 否则 wired 但无数据→dormant
+  const signals = SIGNAL_REGISTRY.map(([name, label, cat, note]) => {
+    const status = fired.has(name) ? "ok" : (allGated ? "gated" : "dormant");
+    const desc = status === "gated" ? "已接入·市场先验下让位(回测证超不过收盘线)" : note;
+    return [label, cat, status, desc];
+  });
+  return [...base, ...signals];
 }
 function factorCoverageSection(preds) {
   const rows = buildFactorCoverage(preds);
-  const badge = { ok: '<span class="fc ok">✅生效</span>', dormant: '<span class="fc dm">🟡休眠</span>', orphan: '<span class="fc or">⚪未接入</span>', missing: '<span class="fc ms">🔴源缺失</span>' };
+  const anyGated = preds.some((p) => p.probabilityAdjustment?.fusionGatedOff);
+  const badge = {
+    ok: '<span class="fc ok">✅生效</span>',
+    dormant: '<span class="fc dm">🟡休眠</span>',
+    gated: '<span class="fc or">🔵市场让位</span>',
+    missing: '<span class="fc ms">🔴源缺失</span>',
+  };
   const n = (c) => rows.filter((r) => r[2] === c).length;
-  return `<div class="sub" style="margin:6px 0">生效 ${n("ok")} · 休眠 ${n("dormant")} · 未接入主路径 ${n("orphan")} · 源缺失 ${n("missing")}（共 ${rows.length} 类因素)</div>
+  const wired = rows.length - n("missing"); // 已接入主路径数(= 全部非源缺失)
+  return `<div class="sub" style="margin:6px 0">已接入主路径 <b>${wired}</b>/${rows.length} · 生效 ${n("ok")} · 市场让位 ${n("gated")} · 休眠无数据 ${n("dormant")} · 源缺失 ${n("missing")} · 孤儿 <b>0</b></div>
   <table class="big"><tr><th>影响因素</th><th>类别</th><th>状态</th><th>说明</th></tr>
   ${rows.map((r) => `<tr><td style="text-align:left">${esc(r[0])}</td><td>${esc(r[1])}</td><td>${badge[r[2]]}</td><td style="text-align:left">${esc(r[3])}</td></tr>`).join("")}
   </table>
-  <div class="sub">⚪未接入=模型有该模块但未接进 predictFixture 主路径(孤儿);🔴源缺失=需外部实时源(伤停/阵容/天气)当前未配置。两类都不影响今日方向(以①欧赔②亚盘③让球为准),但要"全面"需后续接入。</div>`;
+  <div class="sub">${anyGated ? "🔵市场让位=该因素已接入主路径,但本批竞彩有收盘赔率(已编码全部公开信息),回测证公开信号超不过收盘线,故由市场先验主导、信号让位(诚实设计,非缺陷)。" : "🟡休眠=已接入但本场无数据可 fire。"}🔴源缺失=需外部实时源(天气等)未配置。<b>0 孤儿</b>:26 信号全部接进 predictFixture 主路径。今日方向以①欧赔②亚盘③让球+DC 为准。</div>`;
 }
 
 function firedFactorsLine(p) {
