@@ -37,6 +37,8 @@
     "audit:autonomous": "node scripts/audit-autonomous-models.mjs",
     "models:registry": "node scripts/models-registry.mjs",
     "backtest:ensemble-1x2": "node scripts/backtest-ensemble-1x2.mjs",
+    "backtest:ensemble-score": "node scripts/backtest-ensemble-score.mjs",
+    "backtest:ensemble-halffull": "node scripts/backtest-ensemble-halffull.mjs",
     "showcase:framework": "node scripts/build-framework-showcase.mjs",
     "backtest:clv": "node scripts/backtest-clv.mjs",
     "sweep:halflife": "node scripts/sweep-dc-halflife.mjs",
