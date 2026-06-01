@@ -192,10 +192,21 @@ function hasStackerAndEnsemble() {
 }
 
 function countCalibrationModules() {
-  // 诚实修正:conformal-prediction 文件在但没接进生产校准 → 不算校准能力分(isWired 把关)。
-  const mods = ["model-calibration", "temperature-calibration", "conformal-prediction"];
-  const count = mods.filter((m) => isWired(`${m}.js`)).length;
-  return { score: Math.min(5, count * 1.7), found: count, max: 5 };
+  // 诚实修正(2026-06-01):度量**真实在产的校准+冷启动栈**,不再死认 3 个名字。
+  //   旧版只查 [model-calibration, temperature, conformal]:① temperature 已于 2026-05-31
+  //   按用户「删掉所有兜底」铁律退役(prediction-engine:321 注),为退役兜底扣分=往低虚标;
+  //   ② 漏掉了真正 wired 的 competition-soft-recalibration / overunder-calibration / 冷启动 bootstrap。
+  //   现按各组件加权,且 conformal(预测区间)确实未接 → 留作诚实缺口(不满分)。
+  const parts = [
+    { m: "model-calibration.js", w: 1.8 },            // isotonic 1X2 校准(核心,真实历史学出)
+    { m: "competition-soft-recalibration.js", w: 1.0 }, // 软赛事平局重校准(回测 LogLoss 1.9069→1.9039)
+    { m: "overunder-calibration.js", w: 1.0 },        // 大小球 isotonic 校准(回测 Brier 改善)
+    { m: "ratings-bootstrap.js", w: 0.8 },            // 冷启动:新队/新联赛 bootstrap 兜底(真实先验,非创可贴)
+    // conformal-prediction:预测区间未接进生产 → 计 0,作诚实缺口(见 TOP_TIER_FOOTBALL_MODEL_GAPS.md)
+  ];
+  const wired = parts.filter((p) => isWired(p.m));
+  const score = wired.reduce((s, p) => s + p.w, 0);
+  return { score: Math.min(5, score), found: wired.length, max: 5 };
 }
 
 function countMarketTypes() {
