@@ -52,6 +52,12 @@ export function fitMasseyRatings(matches, opts = {}) {
     b[j] -= diff;
   }
 
+  // Ridge 正则化(2026-06-01):跨联赛不连通数据(本库 30+ 互不交手联赛)→ Massey 进球差矩阵
+  // 块对角 + sum=0 约束 仍奇异 → gaussianSolve 失败、整路休眠。对角加小 λ 把每队向 0(平均)收缩,
+  // 矩阵满秩可解,弱连通分量得正则化解(标准 ridge-Massey)。λ 小,不改强连通联赛内部排名。
+  const ridge = opts.ridge ?? 0.5;
+  for (let i = 0; i < n; i++) M[i][i] += ridge;
+
   // 加约束 sum(r) = 0:把最后一行替换成 [1,1,...,1],b[n-1] = 0
   M[n - 1] = new Array(n).fill(1);
   b[n - 1] = 0;
