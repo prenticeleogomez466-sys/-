@@ -1,0 +1,32 @@
+{
+  "startedAt": "2026-06-01T23:15:00+08:00",
+  "endsAtLocal": "2026-06-02 09:00 +0800",
+  "cadenceSeconds": 600,
+  "mission": "过夜自主提升 胜平负/比分/半全场 命中率 + 增加板块。每轮:跑一个回测实验→只有回测验证真变好(命中升或LL/Brier改善且命中不掉)才apply→npm test全过→提交。诚实:不变好就如实记no-change,绝不硬改。俱乐部路径改动需谨慎、国际赛改动零碰俱乐部。",
+  "baselines": {
+    "wld_fusion_hit": 0.4608,
+    "wld_big5_hit": 0.520,
+    "score_exact_hit": 0.1373,
+    "halffull_hit_before": 0.2701,
+    "halffull_hit_after": 0.2729
+  },
+  "done": [
+    "R0 半全场集成 model_notau80%+empirical20% 命中27.01→27.29% LL1.9624→1.9488 ✓apply+commit e654b06",
+    "R0 rho=-0.08 已最优(LL差<0.3%)→no-change",
+    "R0 homeAdv 引擎已1.24(5-31调),回测最优1.22差0.01%噪声→no-change",
+    "R0 scoredist 联赛维度仅微弱加分,比分近诚实上限~13.7%→no-change"
+  ],
+  "backlog": [
+    "optimize:loop 刷新1X2权重+温度(看fusionHit/Brier是否再改善)",
+    "backtest:vennabers (Venn-Abers校准 vs 现温度,看1X2可靠性)",
+    "backtest:knn (kNN类比信号边际)",
+    "backtest:decay (时间衰减天数调参)",
+    "backtest:shrinkage / elo-shrink / clubelo (评级收缩+ClubElo融合)",
+    "backtest:overunder / lowgoals-value (大小球/低分价值,可作新板块)",
+    "backtest:handicap-method (让球方法)",
+    "backtest:reliability (置信可靠性桶,选择性推荐曲线)",
+    "ablation 复跑(看新信号 helps/HURTS)",
+    "增加板块: 若某回测稳定加分,接成生产ensemble成员或新市场输出"
+  ],
+  "rules": "每轮提交前 npm test 必全过;改完写回本文件 done;到09:00停。免费源only。"
+}
