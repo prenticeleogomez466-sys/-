@@ -621,11 +621,16 @@ function multiPlayRows(predictions) {
       ouText,
       fhText,
       oeText,
-      p.halfFullPicks?.primary ?? "—",
-      // 比分:回测 top-1 仅12.4%(物理天花板),top-3 覆盖31.8% → 给 top-3 覆盖才实用(治"单一")。
-      (Array.isArray(p.scorePicks?.distribution) && p.scorePicks.distribution.length
-        ? p.scorePicks.distribution.slice(0, 3).map((s) => `${s.score}(${pct(s.probability)})`).join(" / ")
-        : (p.scorePicks?.primary ?? "—")),
+      // 半全场 + 信心档(cycle10 回测:高信心档命中显著更高,≥40%档→43.2% vs 均27%)。只贴档不弃赛。
+      (() => { const hf = p.halfFullPicks; const t = hf?.confidenceTier; return hf?.primary ? `${hf.primary}${pct(hf.primaryProbability)}${t ? ` ${t.label}档${Math.round(t.backtestHit * 100)}%` : ""}` : "—"; })(),
+      // 比分:回测 top-1 仅12.4%(物理天花板),top-3 覆盖31.8% → 给 top-3 覆盖才实用(治"单一");附首选信心档。
+      (() => {
+        const t = p.scorePicks?.confidenceTier;
+        const tops = (Array.isArray(p.scorePicks?.distribution) && p.scorePicks.distribution.length
+          ? p.scorePicks.distribution.slice(0, 3).map((s) => `${s.score}(${pct(s.probability)})`).join(" / ")
+          : (p.scorePicks?.primary ?? "—"));
+        return t ? `${tops} ${t.label}档${Math.round(t.backtestHit * 100)}%` : tops;
+      })(),
     ]);
   }
   return rows;
