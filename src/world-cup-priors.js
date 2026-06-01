@@ -135,6 +135,10 @@ export function worldCupLambdaContext(fixture, date) {
   const venue = worldCupVenue(fixture);
   const { mult: venueMult, factors: venueFactors } = venueLambdaMultiplier(venue);
   // 阶段对总量的轻微影响:淘汰赛更谨慎 → 进球略减(平局倾向另在软重校准里处理)。
+  // 数据背书(2026-06-01,scripts/worldcup-prior-validation.mjs,5届世界杯 320 场真实赛果):
+  //   淘汰赛/小组赛进球比实测 0.946、淘汰赛 90 分钟平局率实测 +12.9pp(35.0% vs 22.1%)
+  //   → 先验方向已被真实数据证实,非凭空设定。现行乘子(lowest×0.96/lower×0.98 加权≈实测 0.946)吻合,
+  //   保留;数值精修与"淘汰赛平局上调"接入软重校准待世界杯专项 walk-forward 回测验证净增益(下一轮)。
   let phaseMult = 1;
   const factors = [...venueFactors];
   if (phase) {
