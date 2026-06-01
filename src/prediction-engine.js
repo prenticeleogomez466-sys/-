@@ -11,6 +11,7 @@ import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
 import { loadModelMemory, recallSegmentPerformance } from "./model-memory.js";
+import { loadNationalElo, nationalEloFor, eloToLambdas } from "./national-elo-source.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
 import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { loadEnsembleWeightsProfile } from "./ensemble-weights-profile.js";
@@ -74,6 +75,8 @@ export function recommendFixtures(date) {
   const calibrationProfile = loadCalibrationProfile();
   // 永久记忆(2026-06-01):模型分段真实战绩,用时召回给推荐附"本类历史命中率"。盘上无则 null,优雅降级。
   const modelMemory = loadModelMemory();
+  // 国家队 Elo(2026-06-01):历史库无国家队时的模型先验源,盘上无则 null(优雅降级)。
+  const nationalElo = loadNationalElo();
   // 全量历史拟合(2026-05-31):放开默认 120 天上限,吃满 34k+ 场/37 联赛/762 队语料,
   //   让所有球队攻防特征都被学到(用户要求"所有队伍特征都吸取";time-decay 自动降权旧赛)。
   //   全量拟合仅 ~400ms,启动一次,可接受。回测走 fitFromMatches/显式 maxDates 不受影响。
@@ -92,7 +95,7 @@ export function recommendFixtures(date) {
   // 限业务日 + 跨源去重(2026-05-30):兜底/多源抓取会把次日(周日)与重复场次(XML 6001 与 Playwright 周六001 同场)
   // 灌进当日,产生 34 场假象;此处收敛到目标业务日的去重竞彩单 + 原样保留 14 场/其它。
   const scopedFixtures = scopeJingcaiFixtures(fixtureSet.date, fixtureSet.fixtures);
-  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, modelMemory, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history), ...extra });
+  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, modelMemory, nationalElo, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history), ...extra });
   let rawPredictions = scopedFixtures.map((fixture, index) => predictOne(fixture, index));
   // 「竞彩要全」铁律(2026-05-31):竞彩缺欧赔被判 data-missing 的场,若同场在 14 场有真实预测 → 借其 wld 重算补全。
   const shengfucaiByKey = new Map(
@@ -260,12 +263,38 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const _asianLineHint = Number(snapshot?.asianHandicap?.current?.line ?? snapshot?.asianHandicap?.initial?.line ?? snapshot?.asianHandicap?.final?.line);
   const _ouLineHint = Number(snapshot?.totalGoals?.current?.line ?? snapshot?.totalGoals?.initial?.line ?? 2.55);
   const _marketHints = Number.isFinite(_asianLineHint) ? { asianLine: _asianLineHint, overUnderLine: _ouLineHint } : null;
-  const dcResult = options.dixonColesFitted ? predictFromFitted(options.dixonColesFitted, fixture, _marketHints) : null;
+  let dcResult = options.dixonColesFitted ? predictFromFitted(options.dixonColesFitted, fixture, _marketHints) : null;
+  // 国家队 Elo 兜底(2026-06-01):历史库无该国家队(俱乐部源不含国家队友谊/资格赛)→ dcResult=null
+  //   → 原退回纯 odds-only(无模型视角、无比分/半全场真矩阵)。改:两队都有国家队 Elo 时,用 Elo 差转
+  //   期望进球 λ 建同款 DC-τ 矩阵作模型先验,使国家队也有 胜平负+比分+半全场。友谊赛信心不夸大(homeAdv 取小)。
+  let nationalEloUsed = null;
+  if (!dcResult?.probabilities && options.nationalElo) {
+    const eh = nationalEloFor(options.nationalElo, fixture.homeTeam);
+    const ea = nationalEloFor(options.nationalElo, fixture.awayTeam);
+    const lam = (Number.isFinite(eh) && Number.isFinite(ea))
+      ? eloToLambdas(eh, ea, { totalGoals: Number.isFinite(_ouLineHint) ? _ouLineHint : undefined })
+      : null;
+    if (lam) {
+      const eloModel = buildDerivedScoreModel(lam.home, lam.away);
+      if (eloModel) {
+        eloModel.source = "national-elo";
+        dcResult = eloModel;
+        nationalEloUsed = { home: eh, away: ea, supremacy: lam.supremacy, eloDiff: lam.eloDiff };
+      }
+    }
+  }
   let blendResult = oddsProbabilities
-    ? blendWithOdds(oddsProbabilities, dcResult, { competition: fixture.competition, weightProfile: loadSignalWeights() })
+    ? blendWithOdds(oddsProbabilities, dcResult, nationalEloUsed
+        // 国家队 Elo 是长期实力先验、友谊赛噪声大(整夜回测:弱信号高权重融市场会拖累)→ 权重保守 0.22,市场仍主导。
+        ? { competition: fixture.competition, weightProfile: loadSignalWeights(), dcWeight: 0.22 }
+        : { competition: fixture.competition, weightProfile: loadSignalWeights() })
     : dcResult
       ? { probabilities: dcResult.probabilities, blendSource: "dixon-coles-only", dcWeight: 1, dcResult }
       : { probabilities: null, blendSource: "data-missing", dcWeight: 0, dcResult: null };
+  // 来源诚实改写:Elo 兜底产的先验不冒充 dixon-coles(国家队 Elo ≠ 俱乐部 DC 拟合)。
+  if (nationalEloUsed && typeof blendResult.blendSource === "string") {
+    blendResult.blendSource = blendResult.blendSource.replace(/dixon-coles/g, "national-elo");
+  }
   // 借用先验(2026-05-31,「竞彩要全」铁律):竞彩让0档"未开售"→无欧赔、国际队又冷启动 ⇒ 本会 data-missing 被删。
   //   但同一场比赛常在 14 场胜负彩里有真实预测(同队)。recommendFixtures 二次传入该场 14 场的 wld 作先验,
   //   让竞彩跑完整机器(让球/比分/半全场/分档),竞彩明细补全。这是借**模型已对同场做出的真实预测**,非编造。
@@ -650,6 +679,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     memoryRecall: options.modelMemory
       ? recallSegmentPerformance(options.modelMemory, { competition: fixture.competition, probabilities, confidence })
       : null,
+    // 国家队 Elo 兜底用到时记录(实力差来源可追溯,诚实标注非 DC 拟合)。
+    nationalElo: nationalEloUsed,
     // 让球胜平负(竞彩独立玩法,与14场/任选9的胜负平不同;深盘让球场常**只开此盘、不开胜平负**)。
     //   直接用真实让球赔率去vig → 隐含概率 + 推荐方向。sfcSold=胜平负(让0档)是否开售。
     jingcaiLetqiu: (() => {

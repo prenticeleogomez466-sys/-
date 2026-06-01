@@ -11,7 +11,8 @@ const exportDir = getExportDir();
 
 // 比分/半全场允许的"真实来源"白名单(2026-05-30):市场赔率 + 真泊松矩阵(训练 DC / λ 派生)。
 // 任何不在白名单的来源(尤其历史死表 scoreForOutcome)都视为未真实跑出 → 自检报错。
-const REAL_SCORE_SOURCES = new Set(["market", "dixon-coles", "dixon-coles:market-derived", "poisson-derived-from-lambda", "poisson-matrix", "dc-matrix"]);
+// 2026-06-01:national-elo = 国家队 Elo 差转 λ 建的真泊松-τ 矩阵(俱乐部源无国家队时),真实来源非死表。
+const REAL_SCORE_SOURCES = new Set(["market", "dixon-coles", "dixon-coles:market-derived", "poisson-derived-from-lambda", "poisson-matrix", "dc-matrix", "national-elo"]);
 const REAL_HALFFULL_SOURCES = new Set(["market", "poisson-half-joint"]);
 // 让球线允许的可追溯来源:竞彩官方(500.com)/ 亚盘 / 无盘口时的诚实默认 0。
 const HANDICAP_LINE_SOURCES = new Set(["500.com-jczq", "asian", "default-0"]);
