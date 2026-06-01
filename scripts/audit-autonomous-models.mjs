@@ -38,6 +38,14 @@ const MODELS = [
     profileRequired: false,                 // holdout 证拟合未优于默认 → 诚实弃用,退回 HF_DEFAULTS
     engineProvenance: null,
   },
+  {
+    name: "半全场多路集成 (ensemble-halffull)",
+    module: "src/ensemble-halffull.js",
+    prodSymbol: "ensembleHalfFull",
+    profile: "ensemble-weights-halffull-profile.json",
+    kind: "ensemble",                       // 权重型 profile(前向逐步学得),非 isotonic
+    minProducers: 2,
+  },
 ];
 
 let failures = 0;
@@ -56,7 +64,17 @@ for (const m of MODELS) {
   check(engineSrc.includes(m.prodSymbol), `prediction-engine 真实引用 ${m.prodSymbol}(非孤儿)`);
 
   // ② + ③ 真实分析 + 真实数据
-  if (m.profileRequired) {
+  if (m.kind === "ensemble") {
+    const pPath = join(exp, m.profile);
+    if (!check(existsSync(pPath), `profile 已落盘 ${m.profile}`)) { line(""); continue; }
+    let prof; try { prof = JSON.parse(readFileSync(pPath, "utf8")); } catch { prof = null; }
+    check(prof?.usable === true, "profile.usable=true");
+    const nW = prof?.weights ? Object.keys(prof.weights).length : 0;
+    check(nW >= 1, `融合权重非空(前向逐步学得,${nW} 路入选)`);
+    check(Array.isArray(prof?.selectionTrail) && prof.selectionTrail.length >= 1, "带前向逐步 selectionTrail(真实分析,可追溯择优过程)");
+    check((prof?.testArms?.gain ?? 0) > 0, `holdout 集成 vs 现行 增益>0,实际 +${prof?.testArms?.gain}`);
+    check(Boolean(prof?.generatedAt), "带 generatedAt(可追溯)");
+  } else if (m.profileRequired) {
     const pPath = join(exp, m.profile);
     if (!check(existsSync(pPath), `profile 已落盘 ${m.profile}`)) { line(""); continue; }
     let prof; try { prof = JSON.parse(readFileSync(pPath, "utf8")); } catch { prof = null; }
