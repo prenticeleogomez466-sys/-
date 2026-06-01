@@ -184,9 +184,9 @@ function bridgeHandicapWld(prediction) {
   const favCoversCode = wld.code === "3" ? "3" : "0";           // 胜负平赢家"过盘"对应的让球态
   if (hw.pickCode === favCoversCode) return null;               // 让球玩法与胜负平同向 → 无歧义,不必解释
   const lineTxt = hp.line > 0 ? `受让+${hp.line}` : `让${hp.line}`;
-  const mode = prediction.scorePicks?.primary;
-  const modeTxt = mode ? `,比分众数 ${mode} 同时满足两者` : "";
-  return `让球↔胜负平 不矛盾(两个问题):胜负平问"谁赢"→推 ${wld.label};让球问"${lineTxt} 是否过盘"→推 ${hw.pick}${modeTxt}。`;
+  // 注:让球玩法取整条比分分布的覆盖概率(非单一比分众数),故不挂"众数同时满足两者"——
+  //   受让/走盘边界场众数可能落在另一侧,挂众数会出现"0-1 满足让球主胜"这类假陈述。
+  return `让球↔胜负平 看似不一致实则不矛盾(两个不同问题):胜负平问"谁赢"→推 ${wld.label};让球问"${lineTxt} 这条盘口是否过"→按整条比分分布的覆盖概率推 ${hw.pick}。强队常赢球但未必赢够盘口,故二者可不同向。`;
 }
 
 /* ───────────────── 4. 针对性风险 ───────────────── */

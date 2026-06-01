@@ -38,12 +38,19 @@ async function main() {
   //   旧逻辑 `m.date === date` 把它们漏掉(15 场只抓到 13)。改为:先取当日场次定位本批系列,
   //   再纳入该系列全部场次(含次日凌晨开球的同批场)。修复 2026-05-30。
   const seriesOf = (m) => String(m.matchnum ?? "").slice(0, -3);
-  const datedToday = spf.filter((m) => m.date === date);
-  if (!datedToday.length) {
-    console.log(JSON.stringify({ ok: false, date, reason: "500 源当日无竞彩场次", spfTotal: spf.length }, null, 2));
+  let anchored = spf.filter((m) => m.date === date);
+  if (!anchored.length && spf.length) {
+    // 国际比赛周无当日场:整批竞彩都是次日凌晨开球(kickoff 日 = date+1),m.date===date 全落空。
+    //   500 XML 只列「当前在售」竞彩 → 无当日场时,最早赛日那批就是今天竞彩单在售的批次。
+    //   取最早赛日定位本批,fixture 仍按业务日 date 落盘(2026-06-01 修:6 场国际赛漏抓归零)。
+    const earliest = spf.map((m) => m.date).filter(Boolean).sort()[0];
+    anchored = spf.filter((m) => m.date === earliest);
+  }
+  if (!anchored.length) {
+    console.log(JSON.stringify({ ok: false, date, reason: "500 源无任何竞彩场次", spfTotal: spf.length }, null, 2));
     return;
   }
-  const todaySeries = new Set(datedToday.map(seriesOf).filter(Boolean));
+  const todaySeries = new Set(anchored.map(seriesOf).filter(Boolean));
   const todays = spf.filter((m) => todaySeries.has(seriesOf(m)));
 
   const nspfByNum = new Map(nspf.map((m) => [m.matchnum, m]));

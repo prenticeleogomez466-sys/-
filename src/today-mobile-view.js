@@ -72,6 +72,7 @@ function detailCard(p) {
     <div class="row"><span class="k">比分</span> ${esc(p.scorePicks?.primary || "-")} &nbsp; <span class="k">半全场</span> ${esc(p.halfFullPicks?.primary || "-")}</div>
     <div class="row"><span class="k">让球</span> ${esc(hp.direction || "-")}${hp.line != null ? `(${hp.line})` : ""}${cover ? ` 覆盖 ${cover}` : ""} ${skellam ? `<span class="sk">${skellam}</span>` : ""}</div>
     <div class="row"><span class="k">让球胜平负</span> ${hwStr}</div>
+    ${p.differentialAnalysis?.handicapBridge ? `<div class="ec">↔ ${esc(p.differentialAnalysis.handicapBridge)}</div>` : ""}
     ${dc}
     ${ec.overUnderHint ? `<div class="ec">${esc(ec.overUnderHint)}</div>` : ""}
     ${ec.driftHint ? `<div class="ec">${esc(ec.driftHint)}</div>` : ""}
