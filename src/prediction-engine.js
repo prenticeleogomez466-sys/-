@@ -5,7 +5,7 @@ import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation, lambdaTotalFromMarket } from "./monte-carlo-simulator.js";
 import { worldCupLambdaContext, worldCupMatchPrior } from "./world-cup-priors.js";
 import { getExperienceBaseline } from "./experience-library-store.js";
-import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "./derived-score-model.js";
+import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull, handicapLadder, totalGoalsBands, halfFullDepth } from "./derived-score-model.js";
 import { analyzeUpsetTrap } from "./upset-trap-detector.js";
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
@@ -207,14 +207,16 @@ function harmonizeDuplicatePredictions(predictions) {
     if (prediction.fixture.marketType !== "shengfucai") return prediction;
     const source = authoritative.get(fixtureIdentityKey(prediction.fixture));
     if (!source) return prediction;
-    // 同场比分/半全场也走真矩阵(复用同场竞彩的 λ 构造真泊松矩阵),不落死表。
-    const scoreModel = buildDerivedScoreModel(source.simulation?.lambdas?.home, source.simulation?.lambdas?.away);
-    const scorePicks = buildScorePicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scoreModel);
-    const halfFullPicks = buildHalfFullPicks(source.pick.code, source.secondaryPick.code, prediction.marketSnapshot, source.probabilities, index, scorePicks, scoreModel);
-    enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, source.pick.code);
+    // 同场次直接复用竞彩源已算的比分/半全场(同一场比赛、同一 λ)——2026-06-01 修:旧逻辑按各自
+    //   index 重算 buildScorePicks,导致同场在竞彩表与14场表显示不同比分(如土耳其 0-1 vs 1-2)。
+    //   既然 wld/让球/概率都强制对齐竞彩源,比分/半全场也应原样复制,保证两表完全一致、不再各算各的。
+    const scorePicks = source.scorePicks ? JSON.parse(JSON.stringify(source.scorePicks)) : null;
+    const halfFullPicks = source.halfFullPicks ? JSON.parse(JSON.stringify(source.halfFullPicks)) : null;
     const next = {
       ...prediction,
       probabilities: { ...source.probabilities },
+      // 同步竞彩源 λ:14场原 simulation.lambdas 来自 14场自有赔率,与已对齐的比分/让球不同源,留着会误导核验。
+      simulation: source.simulation ? { ...prediction.simulation, ...source.simulation } : prediction.simulation,
       probabilityAdjustment: {
         ...prediction.probabilityAdjustment,
         harmonizedWith: source.fixture.id
@@ -449,6 +451,17 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 深度强化(2026-05-30 用户要求):给比分/半全场附真实概率 + 主方向内反超备选 + 完整分布,
   // 不再只给单一 argmax。所有附加量来自同一真泊松矩阵/半全场联合分布,可追溯、不破坏 wld 锚。
   enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, ranked[0].code);
+  // 分析模块强化(2026-06-01 用户要求"让球方向/比分/半全场分析模块强化技能"):
+  //   全部从同一真泊松矩阵/半全场联合分布派生,零编造、不破坏 wld 锚。
+  //   · 比分:总进球区间(0/1/2/3/4+)+ 集中度信心;· 半全场:反转风险/逆转/上半平打破率。
+  if (scoreModel?.matrix) {
+    scorePicks.deepAnalysis = totalGoalsBands(scoreModel.matrix);
+  }
+  {
+    const _eg = scoreModel?.expectedGoals ?? blendResult.dcResult?.expectedGoals;
+    const _hf = _eg && Number.isFinite(_eg.home) && Number.isFinite(_eg.away) ? halfFullJoint(_eg.home, _eg.away) : null;
+    if (_hf) halfFullPicks.deepAnalysis = halfFullDepth(_hf);
+  }
   // FF 档:从 dc matrix 派生扩展玩法(大小球/单双/上半场/亚盘/双胜彩/比分组/总进球)。
   // 缺 matrix 时 buildExtendedMarkets 自动返回 null,daily-report 据此决定是否输出该列。
   // 2026-05-31:训练 DC matrix 缺失(冷启动/借用/国际赛)时,退回 scoreModel.matrix(由本场 λ 构造,
@@ -574,6 +587,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       handicapWld,
       coverBreakdown: coverInfo?.cover ?? null,
       modelFairLine: coverInfo?.modelFairLine ?? null,
+      // 让球强化(2026-06-01):多档盘口(-2~+2)覆盖率阶梯 + 模型公平线。
+      //   国际赛/竞彩无让球盘(line=0)时也能告诉用户"模型认为该让几球 + 各盘口主胜/走盘/客胜覆盖"。
+      ladder: scoreModel?.matrix ? handicapLadder(scoreModel.matrix) : null,
       skellamCheck
     };
   })();

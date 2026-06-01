@@ -232,6 +232,30 @@ function memoryRecallLine(p) {
   return `<div class="meta mute">🧠 模型自知:${esc(m.note)}${m.leagueSufficient || m.tierSufficient ? "" : "(样本不足·仅参考)"}</div>`;
 }
 
+// 让球深度强化:模型公平让球线 + 多档盘口覆盖阶梯(国际赛无市场盘口时尤其有用)。
+function handicapDeepCell(p) {
+  const lad = p.handicapPick?.ladder;
+  if (!lad?.ladder?.length) return "";
+  const fl = lad.modelFairLine;
+  const flTxt = fl > 0 ? `主受让+${fl}` : fl < 0 ? `主让${Math.abs(fl)}` : "平手";
+  const key = lad.ladder.filter((c) => [-1, 0, 1].includes(c.line))
+    .map((c) => `${c.line > 0 ? "+" : ""}${c.line}盘 主${pct(c.home)}/走${pct(c.push)}/客${pct(c.away)}`).join("，");
+  return `<br><span class="mute">🔧模型公平线 <b>${flTxt}</b>(覆盖≈均衡)· ${key}</span>`;
+}
+// 比分深度强化:总进球区间分布 + 集中度信心。
+function scoreDeepCell(p) {
+  const d = p.scorePicks?.deepAnalysis;
+  if (!d?.bands) return "";
+  const b = d.bands;
+  return `<br><span class="mute">🔧总进球 0:${pct(b["0"])}/1:${pct(b["1"])}/2:${pct(b["2"])}/3:${pct(b["3"])}/4+:${pct(b["4+"])} · 集中度<b>${esc(d.concentration)}</b>(首选${pct(d.topScoreProb)})</span>`;
+}
+// 半全场深度强化:反转风险 + 逆转 + 上半平打破率。
+function halfFullDeepCell(p) {
+  const d = p.halfFullPicks?.deepAnalysis;
+  if (!d) return "";
+  return `<br><span class="mute">🔧半场=全场同向 ${pct(d.sameDirection)} · 领先被逆转 <b>${pct(d.reversalRisk)}</b> · 逆转/翻盘 ${pct(d.comeback)}${d.htDrawBreakRate != null ? ` · 上半平则下半分胜负 ${pct(d.htDrawBreakRate)}` : ""}</span>`;
+}
+
 function matchCard(p) {
   const f = p.fixture;
   const pr = p.probabilities;
@@ -258,13 +282,13 @@ function matchCard(p) {
       <tr class="anchor"><td>① 胜负平(欧赔)</td><td class="pick">${esc(p.pick.label)}</td><td>${esc(p.secondaryPick.label)}</td>
           <td>${euroMoveCell(p.marketSnapshot?.europeanOdds)}<br><span class="mute">模型概率 主${pct(pr.home)}/平${pct(pr.draw)}/客${pct(pr.away)}</span></td></tr>
       <tr><td>② 让球胜负平${lineTxt ? `（${lineTxt}）` : ""}</td><td class="pick">${hcpCell}</td><td>${hcpNote}</td>
-          <td>500.com 让球盘:${euroMoveCell(p.marketSnapshot?.handicapOdds)}</td></tr>
+          <td>500.com 让球盘:${euroMoveCell(p.marketSnapshot?.handicapOdds)}${handicapDeepCell(p)}</td></tr>
       <tr><td>③ 亚盘水位(皇冠)</td><td colspan="2">${asianCell(asian)}</td>
           <td>${asian ? "队伍专属·真实初→即变化" : '<span class="mute">odds.500本机拒连,详情页未取</span>'}</td></tr>
       <tr><td>④ 比分</td><td class="pick">${esc(scoreCell(p))}</td><td>${esc(scoreDistCell(p))}</td>
-          <td>真泊松矩阵·锚①方向</td></tr>
+          <td>真泊松矩阵·锚①方向${scoreDeepCell(p)}</td></tr>
       <tr><td>⑤ 半全场</td><td class="pick">${esc(halfFullCell(p))}</td><td>${esc(halfFullDistCell(p))}</td>
-          <td>半场联合分布·锚①方向</td></tr>
+          <td>半场联合分布·锚①方向${halfFullDeepCell(p)}</td></tr>
       <tr><td>⑥ 爆冷/诱盘</td>${upsetTrapCell(p)}</tr>
     </table>
     <div class="synth">🧭 综合判读:${synthesize(p, asian)}<br><span class="mute">${firedFactorsLine(p)}</span></div>

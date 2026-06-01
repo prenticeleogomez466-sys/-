@@ -1,7 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, matrixOutcomeProbs, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "../src/derived-score-model.js";
+import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, matrixOutcomeProbs, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull, handicapLadder, totalGoalsBands, halfFullDepth } from "../src/derived-score-model.js";
 import { halfFullProbsFromLambdas } from "../src/prediction-engine.js";
+
+test("强化·handicapLadder:多档盘口覆盖单调 + 公平线在 ±0.5 覆盖均衡处", () => {
+  const m = buildDerivedScoreModel(2.0, 0.8); // 主队占优
+  const r = handicapLadder(m.matrix);
+  assert.ok(r && Array.isArray(r.ladder) && r.ladder.length >= 7);
+  // 让主队更多球(line 越负)→ 主覆盖应单调下降
+  const homeAt = (l) => r.ladder.find((c) => c.line === l)?.home;
+  assert.ok(homeAt(1) > homeAt(0) && homeAt(0) > homeAt(-1), "主覆盖随 line 增大单调升");
+  assert.ok(Number.isFinite(r.modelFairLine));
+  // 每档三态和≈1
+  for (const c of r.ladder) assert.ok(Math.abs(c.home + c.push + c.away - 1) < 0.02);
+});
+
+test("强化·totalGoalsBands:区间和≈1 + 集中度分级", () => {
+  const m = buildDerivedScoreModel(1.4, 1.1);
+  const r = totalGoalsBands(m.matrix);
+  const sum = r.bands["0"] + r.bands["1"] + r.bands["2"] + r.bands["3"] + r.bands["4+"];
+  assert.ok(Math.abs(sum - 1) < 0.02, "总进球区间概率和≈1");
+  assert.ok(["集中", "中等", "分散"].includes(r.concentration));
+  assert.ok(r.topScoreProb > 0 && r.topScoreProb < 1);
+});
+
+test("强化·halfFullDepth:反转/逆转概率在 [0,1] 且同向占多数", () => {
+  const hf = { "主胜-主胜": 0.4, "平局-主胜": 0.2, "平局-平局": 0.15, "客胜-客胜": 0.1, "主胜-客胜": 0.03, "客胜-主胜": 0.02, "平局-客胜": 0.05, "主胜-平局": 0.03, "客胜-平局": 0.02 };
+  const r = halfFullDepth(hf);
+  assert.ok(r.sameDirection > 0 && r.sameDirection <= 1);
+  assert.ok(r.reversalRisk >= 0 && r.reversalRisk < 0.5, "领先被逆转应是小概率");
+  assert.ok(r.htDrawBreakRate >= 0 && r.htDrawBreakRate <= 1);
+  assert.equal(halfFullDepth(null), null);
+});
 
 test("buildDerivedScoreModel:从 λ 出真泊松矩阵,期望进球≈输入 λ", () => {
   const m = buildDerivedScoreModel(2.1, 0.7);

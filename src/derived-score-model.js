@@ -82,6 +82,71 @@ export function handicapCoverFromMatrix(matrix, line = 0) {
   return { line: Number(line) || 0, cover: atLine, modelFairLine: fairLine };
 }
 
+// ── 让球深度强化(2026-06-01):多档盘口覆盖率阶梯 + 模型公平线(国际赛无市场盘口时尤其有用)──
+//   对每条标准盘口线算 让球后 主胜/走盘/客胜 覆盖率;半盘(.5)无走盘。返回阶梯 + 公平线 + 推荐线。
+export function handicapLadder(matrix, opts = {}) {
+  if (!Array.isArray(matrix)) return null;
+  const lines = opts.lines ?? [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2];
+  const coverAt = (l) => {
+    let home = 0, push = 0, away = 0;
+    for (let h = 0; h < matrix.length; h++)
+      for (let a = 0; a < matrix[h].length; a++) {
+        const adj = h + l;
+        if (adj > a) home += matrix[h][a];
+        else if (adj === a) push += matrix[h][a];
+        else away += matrix[h][a];
+      }
+    return { line: l, home: round(home), push: round(push), away: round(away) };
+  };
+  const ladder = lines.map(coverAt);
+  // 模型公平线:含半盘,挑 |主覆盖−0.5| 最小(半盘把走盘并入更接近的一侧后比较)。
+  let fairLine = 0, bestGap = Infinity;
+  for (const c of ladder) {
+    const homeSide = c.home + c.push / 2; // 走盘按半算,逼近真实让球后主队不败强度
+    const gap = Math.abs(homeSide - 0.5);
+    if (gap < bestGap) { bestGap = gap; fairLine = c.line; }
+  }
+  return { ladder, modelFairLine: fairLine };
+}
+
+// ── 比分深度强化(2026-06-01):总进球区间分布 + 比分集中度(信心)──
+export function totalGoalsBands(matrix) {
+  if (!Array.isArray(matrix)) return null;
+  const bands = { "0": 0, "1": 0, "2": 0, "3": 0, "4+": 0 };
+  let top = 0;
+  for (let h = 0; h < matrix.length; h++)
+    for (let a = 0; a < matrix[h].length; a++) {
+      const t = h + a;
+      bands[t >= 4 ? "4+" : String(t)] += matrix[h][a];
+      if (matrix[h][a] > top) top = matrix[h][a];
+    }
+  for (const k of Object.keys(bands)) bands[k] = round(bands[k]);
+  // 集中度:首选比分概率(越高=比分越好猜);<0.10 散、>0.14 集中(经验阈)。
+  const concentration = top >= 0.14 ? "集中" : top >= 0.10 ? "中等" : "分散";
+  return { bands, topScoreProb: round(top), concentration };
+}
+
+// ── 半全场深度强化(2026-06-01):反转风险(HT≠FT 方向)+ 领先被逆转/落后被翻盘 ──
+//   hfDist: {"主胜-主胜":p, "平局-主胜":p, ...} 9 类(HT结果-FT结果)。
+export function halfFullDepth(hfDist) {
+  if (!hfDist || typeof hfDist !== "object") return null;
+  const g = (k) => Number(hfDist[k] ?? 0);
+  const sameDir = g("主胜-主胜") + g("平局-平局") + g("客胜-客胜"); // 半场=全场方向一致
+  // 领先被逆转:HT 领先方最终输(主胜-客胜 / 客胜-主胜)。
+  const leadLost = g("主胜-客胜") + g("客胜-主胜");
+  // 落后/平被翻成赢:HT 平→FT 非平,或 HT 落后→FT 赢(逆转向上)。
+  const comeback = g("平局-主胜") + g("平局-客胜") + g("主胜-客胜") + g("客胜-主胜");
+  // 全场打破僵局率:HT 平 → FT 非平。
+  const htDraw = g("平局-主胜") + g("平局-平局") + g("平局-客胜");
+  const breakDeadlock = htDraw > 0 ? round((g("平局-主胜") + g("平局-客胜")) / htDraw) : null;
+  return {
+    sameDirection: round(sameDir),
+    reversalRisk: round(leadLost),       // 领先被逆转(让球/稳胆要警惕)
+    comeback: round(comeback),           // 任意逆转/打破平局向赢
+    htDrawBreakRate: breakDeadlock,      // 上半平时下半分出胜负的概率
+  };
+}
+
 // 从比分矩阵取某个具体比分("2-1")的真实概率;越界/无效返回 null。
 export function scoreProbFromMatrix(matrix, score) {
   if (!Array.isArray(matrix) || typeof score !== "string") return null;
