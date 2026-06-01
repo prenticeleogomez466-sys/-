@@ -36,6 +36,7 @@
     "train:overunder": "node scripts/train-overunder-calibration.mjs",
     "audit:autonomous": "node scripts/audit-autonomous-models.mjs",
     "models:registry": "node scripts/models-registry.mjs",
+    "showcase:framework": "node scripts/build-framework-showcase.mjs",
     "backtest:clv": "node scripts/backtest-clv.mjs",
     "sweep:halflife": "node scripts/sweep-dc-halflife.mjs",
     "expand:espn": "node scripts/expand-espn-coverage.mjs",
