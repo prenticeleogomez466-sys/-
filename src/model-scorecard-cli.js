@@ -174,8 +174,8 @@ function countStatisticalModels() {
 }
 
 function countTeamRatings() {
-  // GG 档:team-graph-embedding 已删,similar-match-knn 替代
-  const ratings = ["pi-ratings", "massey-ratings", "colley-ratings", "similar-match-knn"];
+  // GG 档:team-graph-embedding / similar-match-knn 均已下线(回测打不过市场、未接生产)
+  const ratings = ["pi-ratings", "massey-ratings", "colley-ratings"];
   const count = ratings.filter((r) => hasFile(`${r}.js`)).length;
   // Elo 已有(advanced-data-runner 接 ClubElo)
   return { score: Math.min(6, count * 1.3 + 1), found: count + 1, max: 6 };

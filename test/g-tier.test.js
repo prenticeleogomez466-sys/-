@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { markovScoreMatrix, inPlayProbabilities, outcomesFromMatrix } from "../src/markov-match-simulator.js";
-import { findSimilarMatches } from "../src/similar-match-knn.js";
 import { allocateThompson, sampleBeta, sampleGamma, buildBetaPosteriorsFromLedger } from "../src/thompson-sampling-allocator.js";
 import { scanArbitrage, findMiddleBets } from "../src/cross-market-arbitrage.js";
 import { detectTilt } from "../src/tilt-detector.js";
@@ -39,30 +38,6 @@ describe("markov-match-simulator", () => {
     const redCard = inPlayProbabilities({ home: 0, away: 0, minute: 30 }, 2.0, 1.0, { homeRedCard: true });
     assert.ok(redCard.probabilities.home < normal.probabilities.home);
     assert.ok(redCard.probabilities.away > normal.probabilities.away);
-  });
-});
-
-describe("similar-match-knn", () => {
-  it("rejects insufficient history", () => {
-    const r = findSimilarMatches({ eloDiff: 50 }, [{ eloDiff: 50, actual: 3 }]);
-    assert.equal(r.ok, false);
-  });
-
-  it("finds similar matches and returns probability distribution", () => {
-    const history = [];
-    // 高 Elo 差(200-249) → 主胜
-    for (let i = 0; i < 30; i++) {
-      history.push({ eloDiff: 220 + i, oddsImpliedDiff: 0.4, league: "EPL", actual: 3 });
-    }
-    // 低 Elo 差(-50..0)→ 平局/客胜
-    for (let i = 0; i < 40; i++) {
-      history.push({ eloDiff: -50 + i, oddsImpliedDiff: 0.0, league: "EPL", actual: i < 20 ? 1 : 0 });
-    }
-    const r = findSimilarMatches({ eloDiff: 250, oddsImpliedDiff: 0.4, league: "EPL" }, history, { k: 10 });
-    assert.equal(r.ok, true);
-    assert.ok(r.probabilities.home > r.probabilities.away, `home=${r.probabilities.home}, away=${r.probabilities.away}`);
-    const s = r.probabilities.home + r.probabilities.draw + r.probabilities.away;
-    assert.ok(Math.abs(s - 1) < 0.01, `sum=${s}`);
   });
 });
 

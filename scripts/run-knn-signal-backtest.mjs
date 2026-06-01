@@ -23,7 +23,34 @@
  * 用法:node scripts/run-knn-signal-backtest.mjs
  */
 import { loadFootballDataMatches } from "../src/footballdata-loader.js";
-import { findSimilarMatches } from "../src/similar-match-knn.js";
+
+// findSimilarMatches:内联自已下线的 src/similar-match-knn.js(模块已删,此处保留以复现否决结论)。
+const KNN_WEIGHTS = { eloDiff: 1.0, oddsImpliedDiff: 1.5, xgDiff: 0.8, sameLeague: 0.5 };
+function knnDistance(t, m) {
+  let d2 = 0;
+  if (Number.isFinite(t.eloDiff) && Number.isFinite(m.eloDiff)) d2 += KNN_WEIGHTS.eloDiff * ((t.eloDiff - m.eloDiff) / 200) ** 2;
+  if (Number.isFinite(t.oddsImpliedDiff) && Number.isFinite(m.oddsImpliedDiff)) d2 += KNN_WEIGHTS.oddsImpliedDiff * (t.oddsImpliedDiff - m.oddsImpliedDiff) ** 2;
+  if (Number.isFinite(t.xgDiff) && Number.isFinite(m.xgDiff)) d2 += KNN_WEIGHTS.xgDiff * (t.xgDiff - m.xgDiff) ** 2;
+  if (t.league && m.league) d2 += KNN_WEIGHTS.sameLeague * (t.league === m.league ? 0 : 1);
+  return Math.sqrt(d2);
+}
+function findSimilarMatches(target, history, opts = {}) {
+  const k = opts.k ?? 20;
+  if (!Array.isArray(history) || history.length < (opts.minSamples ?? 30)) return { ok: false };
+  const near = history
+    .filter((m) => m && Number.isFinite(m.actual))
+    .map((m) => ({ distance: knnDistance(target, m), actual: m.actual }))
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, k);
+  if (!near.length) return { ok: false };
+  const tot = near.reduce((s, d) => s + 1 / (d.distance + 0.001), 0);
+  const p = { home: 0, draw: 0, away: 0 };
+  for (const d of near) {
+    const w = (1 / (d.distance + 0.001)) / tot;
+    if (d.actual === 3) p.home += w; else if (d.actual === 1) p.draw += w; else if (d.actual === 0) p.away += w;
+  }
+  return { ok: true, probabilities: p };
+}
 
 const CUTOFF = 0.7;            // 前 70% 历史池 / 后 30% 样本外
 const HISTORY_CAP = 16000;    // 历史池上限(取最靠近 cutoff 的若干场,控时长)
