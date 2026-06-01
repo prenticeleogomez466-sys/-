@@ -6,7 +6,6 @@
  * 用法:node scripts/run-league-drawcal-backtest.mjs
  */
 import { loadFootballDataMatches, ALL_LEAGUES, LEAGUE_LABELS } from "../src/footballdata-loader.js";
-import { loadEspnResults, ESPN_LEAGUES } from "../src/espn-results-source.js";
 
 const actual = (h, a) => (h > a ? "home" : h < a ? "away" : "draw");
 const MOVE = 0.6, CAP = 0.10, MIN_LG = 120;

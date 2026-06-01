@@ -28,18 +28,16 @@
 import { buildEnsemblePrediction } from "./ratings-ensemble.js";
 import { buildConformalCalibrator } from "./conformal-prediction.js";
 import { applyTemperature } from "./temperature-calibration.js";
-import { computeCLV } from "./clv-tracker.js";
 import { decomposeProbability } from "./feature-importance.js";
 import { detectTilt } from "./tilt-detector.js";
 import { computeRiskOfRuinFormula, analyzeDrawdown, shouldStop } from "./bankroll-risk-management.js";
 import { sensitivityAnalysis } from "./sensitivity-analysis.js";
 import { scanArbitrage } from "./cross-market-arbitrage.js";
 import { allocateThompson } from "./thompson-sampling-allocator.js";
-import { kellyFraction, dutchingStakes } from "./dutching-optimizer.js";
+import { kellyFraction } from "./dutching-optimizer.js";
 import { generateExplanation } from "./explanation-generator.js";
-import { skellamDistribution, asianHandicapFromSkellam } from "./skellam-distribution.js";
+import { skellamDistribution } from "./skellam-distribution.js";
 import { markovScoreMatrix, outcomesFromMatrix } from "./markov-match-simulator.js";
-import { findSimilarMatches } from "./similar-match-knn.js";
 import { performanceReport } from "./betting-performance.js";
 import { detectDistributionShift } from "./adversarial-validation.js";
 // I 档接入(2026-05-29)

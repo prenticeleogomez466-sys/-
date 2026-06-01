@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDataSubdir, getExportDir } from "./paths.js";
-import { loadFixtures, saveFixtures } from "./fixture-store.js";
+import { saveFixtures } from "./fixture-store.js";
 import { loadMarketSnapshots, saveMarketSnapshots } from "./market-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));

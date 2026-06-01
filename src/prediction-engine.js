@@ -23,7 +23,6 @@ import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.
 import { scopeJingcaiFixtures } from "./jingcai-business-day.js";
 import { buildExtendedMarkets } from "./extended-markets.js";
 import { calibrateOver25 } from "./overunder-calibration.js";
-import { deriveHandicapFromScore, verifyRecommendationConsistency } from "./consistency-derivation.js";
 import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";

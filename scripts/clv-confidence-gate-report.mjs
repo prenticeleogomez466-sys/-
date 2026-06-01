@@ -6,7 +6,7 @@
 // ③ 应用: 把 gate() 套到最新真实推荐行, 输出哪些该降档。
 // 用法: node scripts/clv-confidence-gate-report.mjs
 
-import { gate, computeCLV, devig } from "../src/clv-confidence-gate.js";
+import { gate, computeCLV } from "../src/clv-confidence-gate.js";
 import fs from "node:fs";
 
 const BASE = "https://www.football-data.co.uk/mmz4281";

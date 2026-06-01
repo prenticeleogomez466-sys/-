@@ -17,8 +17,6 @@
  * 输出格式跟 prediction 结构兼容,可直接被 daily-report.js xlsx-writer 消费。
  */
 
-import { canonicalTeamName } from "./team-aliases.js";
-
 const MIN_LEG_ODDS = 1.8;
 const MAX_LEG_ODDS = 3.5;
 const MIN_COMBO_EV = 0.10;

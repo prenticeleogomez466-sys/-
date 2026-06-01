@@ -10,7 +10,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { fixtureDir, loadFixtures, saveFixtures } from "./fixture-store.js";
+import { loadFixtures, saveFixtures } from "./fixture-store.js";
 import { loadOpenFootballMatches } from "./openfootball-loader.js";
 import { loadStatsbombSeasonForTraining } from "./statsbomb-loader.js";
 import { loadFootballDataMatches, EXTENDED_LEAGUES, LEAGUE_LABELS } from "./footballdata-loader.js";

@@ -3,7 +3,7 @@
 // 无市场单双赔率 → 模型质量测:模型从 DC 矩阵算 P(单)=Σ matrix[h][a] (h+a 为奇),vs 实际 + naive。
 // 先验:总进球奇偶接近 50/50、极难预测,预期模型≈naive(诚实=正常,别夸大)。
 // 跑法:node scripts/run-oddeven-quality-backtest.mjs
-import { loadFootballDataMatches, LEAGUE_LABELS } from "../src/footballdata-loader.js";
+import { loadFootballDataMatches } from "../src/footballdata-loader.js";
 import { fitFromMatches, predictFromFitted } from "../src/dixon-coles-engine.js";
 
 const minTrain = 400, maxTrain = 4000;

@@ -16,7 +16,7 @@
  *   - 不替用户弃赛([[feedback-confidence-not-autosuppress]]):分歧只下调信心提示、给覆盖/双选建议,绝不抑制玩法。
  *   - 实时跑通不造假([[feedback-no-fabrication-live-only]]):缺数据的处理路标 available:false,绝不编造。
  */
-import { canonicalLeague, leagueProfile } from "./league-profile.js";
+import { canonicalLeague } from "./league-profile.js";
 import { isSoftCompetition } from "./competition-soft-recalibration.js";
 import { buildHistoricalLenses } from "./historical-lens.js";
 
