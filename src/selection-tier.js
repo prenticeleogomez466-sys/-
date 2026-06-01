@@ -18,13 +18,15 @@
  */
 
 // 阈值取"档内"边界,hit 用该档**档内**实测命中率(更诚实:落在此区间的真实命中)。
+// dcHit = 双选(双重机会·覆盖market top2)实测命中率(2026-06-02 backtest-double-chance,45811场):
+//   低信心场单选命中低,但双选命中仍高 → 可执行规则:强热门单关、弱/均势走双选。
 const TIERS = [
-  { key: "T1", min: 0.80, hitWithin: 0.882, label: "🟢一档", short: "强信心" },
-  { key: "T2", min: 0.72, hitWithin: 0.795, label: "🟢一档", short: "强信心" },
-  { key: "T3", min: 0.65, hitWithin: 0.731, label: "🟢二档", short: "高信心" },
-  { key: "T4", min: 0.55, hitWithin: 0.626, label: "🟡三档", short: "中等" },
-  { key: "T5", min: 0.45, hitWithin: 0.502, label: "🟠偏弱", short: "偏弱" },
-  { key: "T6", min: 0.00, hitWithin: 0.407, label: "⚪硬币档", short: "≈掷硬币" },
+  { key: "T1", min: 0.80, hitWithin: 0.882, dcHit: 0.93, label: "🟢一档", short: "强信心", play: "单关" },
+  { key: "T2", min: 0.72, hitWithin: 0.795, dcHit: 0.92, label: "🟢一档", short: "强信心", play: "单关" },
+  { key: "T3", min: 0.65, hitWithin: 0.731, dcHit: 0.921, label: "🟢二档", short: "高信心", play: "单关" },
+  { key: "T4", min: 0.55, hitWithin: 0.626, dcHit: 0.839, label: "🟡三档", short: "中等", play: "单关或双选" },
+  { key: "T5", min: 0.45, hitWithin: 0.502, dcHit: 0.776, label: "🟠偏弱", short: "偏弱", play: "双选" },
+  { key: "T6", min: 0.00, hitWithin: 0.407, dcHit: 0.718, label: "⚪硬币档", short: "≈掷硬币", play: "双选或弃" },
 ];
 
 /**
@@ -39,7 +41,9 @@ export function selectionTier(marketFavProb) {
     key: t.key,
     label: t.label,
     short: t.short,
-    backtestHit: t.hitWithin,                 // 该档档内实测命中率
+    backtestHit: t.hitWithin,                 // 该档单选档内实测命中率
+    doubleChanceHit: t.dcHit,                 // 该档双选(双重机会)实测命中率
+    play: t.play,                             // 可执行建议:单关/单关或双选/双选/双选或弃
     bankerEligible: t.min >= 0.65,            // ≥0.65(回测档内≥73%)才够格做胆码/任选9 单选
     marketFavProb: Number.isFinite(p) ? Math.round(p * 1000) / 1000 : null,
   };
