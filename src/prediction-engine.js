@@ -29,6 +29,7 @@ import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { ensembleHalfFull } from "./ensemble-halffull.js";
+import { scoreConfidenceTier, halfFullConfidenceTier } from "./score-halffull-tier.js";
 
 // 半全场分布:优先多路集成(model_notau 80%+经验 20%,回测 LL 1.9624→1.9488),profile/经验表
 // 不可用则回退裸 halfFullJoint(τ+状态默认)。league 缺则集成用全局经验。
@@ -1168,6 +1169,10 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   // 主方向内的反超/不同首半场备选(如主胜场的"平局-主胜"慢热反超),挖出被单 argmax 埋没的二线路径
   halfFullPicks.primaryAlt = bestDistinctFirstHalfHalfFull(hfDist, primaryCode, halfFullPicks.primary);
   halfFullPicks.distribution = topHalfFull(hfDist, 4);
+  // 信心分层板块(2026-06-02 通宵 cycle10,回测证高信心档命中率显著更高:半全场≥40%档命中43.2% vs 均27%):
+  //   按首选概率贴档+该档实测命中率+是否够格胆码。只贴档不弃赛(feedback-confidence-not-autosuppress)。
+  scorePicks.confidenceTier = scoreConfidenceTier(scorePicks.primaryProbability);
+  halfFullPicks.confidenceTier = halfFullConfidenceTier(halfFullPicks.primaryProbability);
 }
 
 // 从 Dixon-Coles 的 topScores(已经按概率从高到低排好)挑符合指定 outcome 的最高概率比分。
