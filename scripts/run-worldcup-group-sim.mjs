@@ -6,7 +6,7 @@
  * 复用生产 eloExpectation。东道主(美/加/墨)小组赛本土 +35Elo(同 world-cup-priors 加成)。
  * 遵 feedback-no-fabrication:缺 Elo 的队如实列出、不猜测。
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "../src/paths.js";
 import { eloExpectation, teamPrior } from "../src/world-cup-priors.js";
@@ -75,6 +75,11 @@ function main() {
   rows.forEach((r, i) => {
     console.log(`${String(i + 1).padEnd(5)} ${(r.zh).padEnd(12)} ${String(r.elo).padEnd(6)} ${(r.p * 100).toFixed(1)}%`);
   });
+  if (process.argv.includes("--json")) {
+    const path = "D:/football-model-exports/worldcup-group-advance.json";
+    writeFileSync(path, JSON.stringify({ n: N, generatedFrom: "real-groups+elo", rows: rows.map((r) => ({ team: r.zh, elo: r.elo, advanceProb: Math.round(r.p * 1000) / 10 })) }, null, 1));
+    console.log("已写 JSON:", path);
+  }
   console.log("\n诚实:基于真实分组+当前Elo的小组赛模拟(中立场+东道主本土+35);不含淘汰赛(避免编造bracket配对)。");
   console.log("Elo 已验有判别力(轮5命中50.5%)但国际赛爆冷常态,出线概率是分布预期、非确定。");
 }
