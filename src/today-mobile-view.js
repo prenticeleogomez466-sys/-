@@ -15,6 +15,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const pct = (v) => (v == null ? "-" : typeof v === "string" ? v : `${(v * 100).toFixed(0)}%`);
 
 const PAGE_HEAD = (titleSuffix) => `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>今日足球 · ${esc(titleSuffix)}</title><style>
 *{box-sizing:border-box}body{font-family:-apple-system,"Microsoft YaHei",sans-serif;margin:0;background:#0f1419;color:#e6e6e6;padding:14px;-webkit-text-size-adjust:100%}
 h1{font-size:21px;margin:0 0 4px}.sub{color:#8a939b;font-size:12.5px;margin-bottom:12px;line-height:1.6}

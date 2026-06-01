@@ -116,7 +116,11 @@ function Run-Daily {
 
 function Run-Recap {
   Invoke-Step "sync previous-day results" "npm run fixtures:sync:soft -- --date=$Date"
-  Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date"
+  # 赛果回填(2026-05-31 用户"数据不全 全补上去"):授权源覆盖不全(国际赛/北欧/日职/欧冠等),
+  # 用 ESPN 全联赛单日赛果按 canonical 主队锚定补进 store,大幅提升结算率。$true 失败不阻塞。
+  Invoke-Step "backfill real results from ESPN" "npm run recap:backfill -- --date=$Date" $true
+  # 用 --no-result-sync:store 已由上面两步填好,recap 只结算不再二次 sync(避免覆盖 ESPN 回填赛果)。
+  Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date --no-result-sync"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
   # 神选复盘:把全部历史复盘汇成桌面单一总表(每日命中率+逐场明细),用户每天就看这一张。
   # 放在 recap:daily 之后 → 前一日赛果已回填,桌面表立即刷新到最新。

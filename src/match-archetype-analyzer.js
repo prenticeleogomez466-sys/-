@@ -16,7 +16,8 @@
 import { leagueProfile } from "./league-profile.js";
 
 const PCT = (v) => (Number.isFinite(v) ? `${(v * 100).toFixed(0)}%` : "—");
-const PP = (v) => (Number.isFinite(v) ? `${(v * 100).toFixed(1)}pp` : "—");
+// divergence 来自 clv-confidence-gate.gate(),已是 pp 单位(模型比市场高几个百分点),勿再 ×100。
+const PPraw = (v) => (Number.isFinite(v) ? `${v.toFixed(1)}pp` : "—");
 
 /* ───────────────── 1. 赛事原型分类 ───────────────── */
 
@@ -79,7 +80,8 @@ function collectDrivers(prediction, archetype) {
   if (Number.isFinite(cover)) {
     const depth = archetype.handicap.key;
     const w = depth === "deep" ? 0.95 : depth === "standard" ? 0.75 : 0.55;
-    d.push({ w, key: "handicap", text: `让球盘覆盖率 ${PCT(cover)}（${prediction.handicapPick.label}）` });
+    const hpLabel = prediction.handicapPick.handicapWld?.pick ?? prediction.handicapPick.direction ?? "让球";
+    d.push({ w, key: "handicap", text: `让球盘覆盖率 ${PCT(cover)}（${hpLabel}）` });
   }
 
   // 亚盘水位异动(庄家临场加固/松动)
@@ -122,7 +124,7 @@ function collectDrivers(prediction, archetype) {
   // 市场背离(逆市押独门=陷阱)
   const md = prediction.marketDivergence;
   if (md?.tag && md.tag !== "aligned") {
-    d.push({ w: 0.7, key: "divergence", text: `模型与市场分歧 ${PP(md.divergence)}（${md.tag}）— 分歧越大越该谨慎` });
+    d.push({ w: 0.7, key: "divergence", text: `模型与市场分歧 ${PPraw(md.divergence)}（${md.tag}）— 分歧越大越该谨慎` });
   }
 
   // 联赛专家门控:本联赛历史样本撑度(低样本=结论靠大模型兜底,该降信心)
@@ -169,6 +171,24 @@ function readHandicap(prediction, archetype) {
   }
 }
 
+/* ─────────── 3b. 让球↔胜负平 桥接(消除"赢球却推让球反方向"的表面矛盾) ───────────
+ * 胜负平问"谁赢"(锚 wld),让球玩法问"这条盘口是否过"(独立走覆盖矩阵)。深盘/标盘场强队常
+ * 赢球(主胜)但吃不下盘口 → 让球玩法转买受让方(让球客胜),人眼并排看像自相矛盾。这里挑明
+ * 两者问的是不同问题,并挂比分众数佐证。**纯解释、不改任何字段、仍以 wld 为锚(遵硬规则)。**/
+function bridgeHandicapWld(prediction) {
+  const hp = prediction.handicapPick;
+  const hw = hp?.handicapWld;
+  const wld = prediction.pick;
+  if (!hw || !wld || !Number.isFinite(hp.line) || hp.line === 0) return null;
+  if (wld.code !== "3" && wld.code !== "0") return null;        // 仅解释主/客胜方向
+  const favCoversCode = wld.code === "3" ? "3" : "0";           // 胜负平赢家"过盘"对应的让球态
+  if (hw.pickCode === favCoversCode) return null;               // 让球玩法与胜负平同向 → 无歧义,不必解释
+  const lineTxt = hp.line > 0 ? `受让+${hp.line}` : `让${hp.line}`;
+  const mode = prediction.scorePicks?.primary;
+  const modeTxt = mode ? `,比分众数 ${mode} 同时满足两者` : "";
+  return `让球↔胜负平 不矛盾(两个问题):胜负平问"谁赢"→推 ${wld.label};让球问"${lineTxt} 是否过盘"→推 ${hw.pick}${modeTxt}。`;
+}
+
 /* ───────────────── 4. 针对性风险 ───────────────── */
 
 function readRisk(prediction, archetype) {
@@ -200,6 +220,7 @@ export function analyzeMatch(prediction) {
   };
   const drivers = collectDrivers(prediction, archetype);
   const handicapRead = readHandicap(prediction, archetype);
+  const handicapBridge = bridgeHandicapWld(prediction);
   const riskRead = readRisk(prediction, archetype);
 
   // 原型一句话(逐场不同的"画像")
@@ -217,13 +238,14 @@ export function analyzeMatch(prediction) {
     archetypeLine,
     drivers: topDrivers,
     handicapRead,
+    handicapBridge,
     riskRead,
     // 拼成一段"针对本场"的叙述(替代旧固定模板)
-    narrative: buildNarrative(prediction, archetypeLine, topDrivers, handicapRead, riskRead),
+    narrative: buildNarrative(prediction, archetypeLine, topDrivers, handicapRead, riskRead, handicapBridge),
   };
 }
 
-function buildNarrative(prediction, archetypeLine, topDrivers, handicapRead, riskRead) {
+function buildNarrative(prediction, archetypeLine, topDrivers, handicapRead, riskRead, handicapBridge) {
   const pick = prediction.pick;
   const probPct = pick ? PCT(pick.probability) : "—";
   const parts = [];
@@ -231,6 +253,7 @@ function buildNarrative(prediction, archetypeLine, topDrivers, handicapRead, ris
   if (pick) parts.push(`【方向】${pick.label}(概率 ${probPct},信心 ${prediction.confidence ?? "—"}/风险 ${prediction.risk ?? "—"})`);
   if (topDrivers.length) parts.push(`【主导逻辑】${topDrivers.map((d, i) => `${i + 1}) ${d.text}`).join("；")}`);
   if (handicapRead) parts.push(`【盘口】${handicapRead}`);
+  if (handicapBridge) parts.push(`【让球↔胜负平】${handicapBridge}`);
   if (riskRead.length) parts.push(`【针对性风险】${riskRead.join("；")}`);
   return parts.join("\n");
 }

@@ -27,8 +27,8 @@ const SOFT_RE = /(友谊|热身|国际|国家队|国家|Nations|International|In
 
 const MIN_HIST_N = 80;          // 历史同情境样本下限,低于此不采信其平局率
 const HIST_FULL_N = 300;        // 历史样本达此量给满权
-const MAX_DRAW_SHIFT = 0.12;    // 单次平局位移封顶(沿用融合层 ±12%)
-const BLEND_ALPHA = 0.6;        // 朝目标移动的比例(不一步到位,留模型自身判断)
+const MAX_DRAW_SHIFT = 0.15;    // 单次平局位移封顶(2026-06-01 12%→15%:均势场平局没提足,放宽)
+const BLEND_ALPHA = 0.68;       // 朝目标移动的比例(2026-06-01 0.6→0.68:平局卡在 24%,更靠目标)
 const MIN_APPLY = 0.005;        // 位移过小不动,避免无意义抖动
 
 function round(v) {
@@ -70,9 +70,16 @@ export function recalibrateSoftCompetition(probabilities, competition, experienc
   const histDraw = (histN >= MIN_HIST_N && Number.isFinite(experienceBaseline?.drawRate))
     ? Number(experienceBaseline.drawRate) : null;
 
+  // 均势依赖的平局目标(2026-06-01):真实规律——主客越接近平局率越高(均势≈30%、悬殊≈16%)。
+  //   **仅在均势场(强弱差小)作为提升目标加入**,且只增不减(不拉低悬殊场平局,法国vs海地仍≈16%)。
+  const edge = Math.abs(h0 - a0);
+  const balancedDraw = Math.max(0.16, Math.min(0.30, 0.30 - edge * 0.32));
+
   const targets = [];
   if (Number.isFinite(compDraw)) targets.push({ v: compDraw, w: 1 });
   if (histDraw != null) targets.push({ v: histDraw, w: Math.min(histN / HIST_FULL_N, 1) * 1.5 });
+  // 只在均势(edge<0.20)且能提升平局(balancedDraw>当前)时加入,避免压低悬殊场平局。
+  if (edge < 0.20 && balancedDraw > d0) targets.push({ v: balancedDraw, w: 1.2 });
   if (!targets.length) return { applied: false, probabilities };
 
   const tw = targets.reduce((s, t) => s + t.w, 0);

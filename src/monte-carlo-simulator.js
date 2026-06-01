@@ -3,6 +3,13 @@ export function buildMonteCarloSimulation(fixture, probabilities, options = {}) 
   const seed = hash(`${fixture.id}-${fixture.kickoff}-${fixture.homeTeam}-${fixture.awayTeam}`);
   const rng = mulberry32(seed);
   const lambdas = estimateGoalLambdas(probabilities, options.xg, options.experienceBaseline, options.marketTotal);
+  // 世界杯专属 λ 乘子(海拔/气温/赛制阶段,见 world-cup-priors.js)。非世界杯场 worldCupMult=1,无影响。
+  const wcMult = Number(options.worldCupMult);
+  if (Number.isFinite(wcMult) && wcMult > 0 && Math.abs(wcMult - 1) > 1e-6) {
+    lambdas.home = round(clamp(lambdas.home * wcMult, 0.15, 5));
+    lambdas.away = round(clamp(lambdas.away * wcMult, 0.15, 5));
+    lambdas.source = `${lambdas.source ?? "?"}+wc×${wcMult}`;
+  }
   const outcomes = { home: 0, draw: 0, away: 0 };
   const scores = new Map();
   for (let index = 0; index < iterations; index += 1) {
@@ -67,7 +74,14 @@ function estimateGoalLambdas(probabilities, xg, experienceBaseline = null, marke
   const expHome = finiteNumber(experienceBaseline?.avgGoals?.home, null);
   const expAway = finiteNumber(experienceBaseline?.avgGoals?.away, null);
   if (expHome !== null && expAway !== null && expHome + expAway > 0.5) {
-    const expTotal = clamp(expHome + expAway, 1.4, 4.2);
+    // 2026-06-01 修「比分全 1-0」根因:经验桶对同一联赛(尤其国际赛只有一个粗桶)只给一个固定
+    //   总量(如 2.67),导致强弱悬殊场与均势场总进球完全一样、比分坍缩到清一色 1-0。
+    //   解法:在经验桶总量上叠加**本场结构调节**(与下方 probability-derived 同公式):
+    //     · 强弱越悬殊(|homeEdge| 大)→ 强队碾压、净胜球空间大 → 总量↑;
+    //     · 平局压力越高(均势闷局)→ 总量↓。
+    //   使同一经验桶内不同对阵的 λ 总量真正拉开,比分分布随强弱差异化(强队场冒 2-0/2-1/3-0)。
+    const structAdj = Math.abs(homeEdge) * 0.55 - Math.max(0, drawPressure - 0.25) * 1.2;
+    const expTotal = clamp(expHome + expAway + structAdj, 1.4, 4.6);
     // 经验桶自带方向(side+favProb 档),其 home/away 已含主场倾向;再按本场精确概率差微调分配,
     // 避免同桶不同赔率完全雷同。基准分配 = 经验桶分配,叠加本场 edge 偏移(阻尼)。
     const expShare = expHome / (expHome + expAway);

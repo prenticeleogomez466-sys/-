@@ -95,13 +95,23 @@ test("topHalfFull:半全场 9 路 top-n 按概率降序", () => {
 
 import { evaluateDrawLean } from "../src/prediction-engine.js";
 
-test("evaluateDrawLean:低进球均势(平≥30%且与最高差≤5%)把平提为主推", () => {
+test("evaluateDrawLean:均势闷局(平≥26%、进前二、与最高差≤8%)把平提为主推", () => {
+  // 2026-06-01:门槛 0.30/0.05 → 0.26/0.08(真实均势国际赛平局上限≈29%,旧门槛永不触发)。
+  const ranked = [
+    { code: "3", probability: 0.38 }, { code: "1", probability: 0.32 }, { code: "0", probability: 0.30 }
+  ];
+  const r = evaluateDrawLean(ranked);
+  assert.equal(r.applies, true);
+  assert.equal(r.ranked[0].code, "1", "平进前二且接近,应提为主推");
+});
+
+test("evaluateDrawLean:平局仅第三(非前二)即便接近也不强推平", () => {
+  // 客胜 0.33 > 平 0.31 时,把第三的平提为主推不合理 → 须进前二约束。
   const ranked = [
     { code: "3", probability: 0.36 }, { code: "0", probability: 0.33 }, { code: "1", probability: 0.31 }
   ];
   const r = evaluateDrawLean(ranked);
-  assert.equal(r.applies, true);
-  assert.equal(r.ranked[0].code, "1", "平应提为主推");
+  assert.equal(r.applies, false, "平第三不提为主推");
 });
 
 test("evaluateDrawLean:热门明显领先(差>5%)不强行推平", () => {
