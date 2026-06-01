@@ -68,6 +68,27 @@ function main() {
     console.log(`淘汰赛 λ 乘子: 实测 ${lambdaRatio.toFixed(3)}(淘汰赛/小组赛进球比)| 先验现行 lowest×0.96 / lower×0.98`);
     console.log(`淘汰赛平局率: 实测比小组赛 +${drawDelta.toFixed(1)}pp(${(kS.drawRate * 100).toFixed(1)}% vs ${(gS.drawRate * 100).toFixed(1)}%)→ 软重校准淘汰赛应上调平局目标`);
   }
+
+  // ── 半全场维度(仅 2006+ 有 ht 的样本)──
+  let htG = 0, ftG = 0, nHt = 0; const grid = {};
+  const oc = (h, a) => (h > a ? "胜" : h < a ? "负" : "平");
+  for (const d of listFixtureDates()) {
+    const { fixtures } = loadFixtures(d);
+    for (const f of fixtures) {
+      if (!(f.tags || []).includes("worldcup") || !f.result || f.result.halfHome == null) continue;
+      const r = f.result; nHt++; htG += r.halfHome + r.halfAway; ftG += r.home + r.away;
+      const key = oc(r.halfHome, r.halfAway) + "-" + oc(r.home, r.away);
+      grid[key] = (grid[key] || 0) + 1;
+    }
+  }
+  if (nHt > 0) {
+    const htDraw = (grid["平-胜"] || 0) + (grid["平-平"] || 0) + (grid["平-负"] || 0);
+    const htLead = (grid["胜-胜"] || 0) + (grid["胜-平"] || 0) + (grid["胜-负"] || 0);
+    console.log("\n=== 半全场验证(2006+ 有半场样本)===");
+    console.log(`样本 ${nHt} 场 | 半场进球占比 halfRatio 实测 ${(htG / ftG).toFixed(4)} vs 模型假设 0.46`);
+    console.log(`  → 世界杯开局更谨慎、下半场放开,halfRatio 偏低;接入世界杯专用 halfRatio 待 leak-safe 半全场回测验证净增益(勿仅凭比例差改)`);
+    console.log(`HT 平局率 ${(htDraw / nHt * 100).toFixed(1)}%(国际赛开局谨慎)| HT 领先→守住胜 ${(((grid["胜-胜"] || 0)) / htLead * 100).toFixed(1)}%`);
+  }
 }
 
 main();
