@@ -28,6 +28,13 @@ import { calibrateOver25 } from "./overunder-calibration.js";
 import { asianHandicapFromSkellam } from "./skellam-distribution.js";
 import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";
+import { ensembleHalfFull } from "./ensemble-halffull.js";
+
+// 半全场分布:优先多路集成(model_notau 80%+经验 20%,回测 LL 1.9624→1.9488),profile/经验表
+// 不可用则回退裸 halfFullJoint(τ+状态默认)。league 缺则集成用全局经验。
+function hfDistribution(lambdaHome, lambdaAway, league) {
+  return ensembleHalfFull(lambdaHome, lambdaAway, league) ?? halfFullJoint(lambdaHome, lambdaAway);
+}
 import { selectionTier } from "./selection-tier.js";
 import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
@@ -476,10 +483,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     };
   }
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scoreModel);
-  const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, scoreModel);
+  const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, scoreModel, fixture?.competition);
   // 深度强化(2026-05-30 用户要求):给比分/半全场附真实概率 + 主方向内反超备选 + 完整分布,
   // 不再只给单一 argmax。所有附加量来自同一真泊松矩阵/半全场联合分布,可追溯、不破坏 wld 锚。
-  enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, ranked[0].code);
+  enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, ranked[0].code, fixture?.competition);
   // 分析模块强化(2026-06-01 用户要求"让球方向/比分/半全场分析模块强化技能"):
   //   全部从同一真泊松矩阵/半全场联合分布派生,零编造、不破坏 wld 锚。
   //   · 比分:总进球区间(0/1/2/3/4+)+ 集中度信心;· 半全场:反转风险/逆转/上半平打破率。
@@ -1128,24 +1135,24 @@ function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {
 
 // 半全场预测优先级同上:市场比分赔率 → DC/λ 泊松半场联合分布(halfFullFromDcResult 从 expectedGoals 真算)。
 // dcResult 恒为真矩阵(带 expectedGoals),halfFullFromDcResult 必有解,halfFullForScore 死表已不接入。
-function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, scorePicks = {}, dcResult = null) {
+function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, scorePicks = {}, dcResult = null, league = null) {
   const primaryScore = scorePicks.primary ?? bestScoreFromMatrix(dcResult?.matrix, code);
   const secondaryScore = scorePicks.secondary ?? bestScoreFromMatrix(dcResult?.matrix, secondaryCode);
   const primaryFromMarket = halfFullFromMarket(snapshot, code, new Set(), primaryScore);
-  const primaryFromDc = primaryFromMarket ? null : halfFullFromDcResult(dcResult, code, new Set(), primaryScore);
+  const primaryFromDc = primaryFromMarket ? null : halfFullFromDcResult(dcResult, code, new Set(), primaryScore, league);
   const exclusion = new Set([primaryFromMarket, primaryFromDc].filter(Boolean));
   const secondaryFromMarket = halfFullFromMarket(snapshot, secondaryCode, exclusion, secondaryScore);
-  const secondaryFromDc = secondaryFromMarket ? null : halfFullFromDcResult(dcResult, secondaryCode, exclusion, secondaryScore);
+  const secondaryFromDc = secondaryFromMarket ? null : halfFullFromDcResult(dcResult, secondaryCode, exclusion, secondaryScore, league);
   const source = primaryFromMarket ? "market" : (dcResult?.expectedGoals ? "poisson-half-joint" : "none");
   return {
-    primary: primaryFromMarket ?? primaryFromDc ?? halfFullFromDcResult(dcResult, code, new Set(), primaryScore),
-    secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullFromDcResult(dcResult, secondaryCode, new Set(), secondaryScore),
+    primary: primaryFromMarket ?? primaryFromDc ?? halfFullFromDcResult(dcResult, code, new Set(), primaryScore, league),
+    secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullFromDcResult(dcResult, secondaryCode, new Set(), secondaryScore, league),
     source
   };
 }
 
 // 深度强化:给比分/半全场附概率 + 分布 + 主方向内"不同首半场"反超备选(真实矩阵派生,可追溯)。
-function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCode) {
+function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCode, league = null) {
   const matrix = scoreModel?.matrix ?? null;
   scorePicks.primaryProbability = scoreProbFromMatrix(matrix, scorePicks.primary);
   scorePicks.secondaryProbability = scoreProbFromMatrix(matrix, scorePicks.secondary);
@@ -1154,7 +1161,7 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   // 半全场联合分布(2026-05-31 升级,walk-forward 回测最优:τ低分修正+拟合半场比例+状态依赖 chase=0.18,
   //   LogLoss 1.9069→1.9039 / Brier 0.8136→0.8129;参数见 halftime-fulltime-model.HF_DEFAULTS)。
   const hfDist = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)
-    ? halfFullJoint(eg.home, eg.away)
+    ? hfDistribution(eg.home, eg.away, league)
     : null;
   halfFullPicks.primaryProbability = hfDist?.[halfFullPicks.primary] != null ? round(hfDist[halfFullPicks.primary]) : null;
   halfFullPicks.secondaryProbability = hfDist?.[halfFullPicks.secondary] != null ? round(hfDist[halfFullPicks.secondary]) : null;
@@ -1181,10 +1188,10 @@ export function scoreFromDcResult(dcResult, code, excluded = new Set()) {
 // 联合分布 → 9 outcome 概率聚合,挑符合 final outcome + 跟 score 兼容的最高 prob 的。
 // 改进(2026-05-29 用户反馈"半全场全一样"):secondary 从原本"按 prob 第二"变成
 // "first-half 不同的 prob 最高"— 这样主胜场不会出现 主胜-主胜 备 主胜-主胜 的废话备选。
-export function halfFullFromDcResult(dcResult, code, excluded = new Set(), score = "") {
+export function halfFullFromDcResult(dcResult, code, excluded = new Set(), score = "", league = null) {
   if (!dcResult?.expectedGoals) return null;
-  // 升级版半全场联合分布(τ+拟合比例+状态依赖,回测最优;旧 halfFullProbsFromLambdas 仅留作对照/测试)
-  const probs = halfFullJoint(dcResult.expectedGoals.home, dcResult.expectedGoals.away);
+  // 多路集成半全场(model_notau 80%+经验 20%,回测 LL 1.9624→1.9488);profile 缺则回退 halfFullJoint。
+  const probs = hfDistribution(dcResult.expectedGoals.home, dcResult.expectedGoals.away, league);
   const candidates = Object.entries(probs)
     .filter(([halfFull]) => halfFullFinalOutcomeCode(halfFull) === code)
     .filter(([halfFull]) => !excluded.has(halfFull))
