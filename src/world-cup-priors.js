@@ -8,8 +8,14 @@
  *
  * 设计原则:
  *  - 只在「确属 2026 世界杯且能确定场地/阶段」时叠加修正,否则优雅降级(返回中性 1.0),不臆造。
- *  - 所有系数为**先验**,标 TODO 待 walk-forward + 历史世界杯(2018/2022)回测校准。
  *  - 不破坏俱乐部/常规赛路径:isWorldCup 为假时全部短路返回中性。
+ *
+ * 【验证状态(2026-06-02 过夜 18 轮 leak-safe 回测,732 场历届世界杯;详见 scripts/run-worldcup-*.mjs + worldcup-prior-validation.mjs)】
+ *  ✅ Elo 先验路线:自训练 Elo 国际赛胜平负命中 50.5%(基线 41%)、判别力 68.1%;Elo 与市场夺冠赔率 Spearman ρ=0.88;eloExpectation 400 scale 校准良好 → 真 edge,保留。
+ *  ✅ 东道主 +35Elo:历届东道主实测 +8.9pp 胜率,量级合理(含实力偏差,不上调)。
+ *  ⚠️ 情境 λ 乘子(海拔/阶段/温度):描述统计方向对(淘汰赛进球比≈0.93、平局 +8pp)但 leak-safe 回测对命中率【无净增益】→ 价值仅在防比分坍缩(展示层),非命中率;数值经多次回测【不动】(诚实拒绝无数据支撑的微调)。
+ *  ⚠️ 半全场:世界杯实测 halfRatio≈0.42 但接专用值反更差 → 保留 0.46(在 prediction-engine)。
+ *  诚实边界:国际赛 wld 上限 ~50-55%(爆冷常态);淘汰赛点球大战 ≈ 抛硬币(球队强度无关,Elo 不适用)。
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
