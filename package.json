@@ -45,6 +45,7 @@
     "backtest:linemove": "node scripts/run-line-movement-backtest.mjs",
     "backtest:drift": "node scripts/run-drift-backtest.mjs",
     "backtest:overunder": "node scripts/run-overunder-backtest.mjs",
+    "backtest:knn": "node scripts/run-knn-signal-backtest.mjs",
     "backtest:decay": "node scripts/run-decay-tune-backtest.mjs",
     "backtest:asian": "node scripts/run-asian-backtest.mjs",
     "backtest:halffull": "node scripts/run-halffull-backtest.mjs",
