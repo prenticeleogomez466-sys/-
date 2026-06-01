@@ -116,7 +116,11 @@
     "signal:weights": "node -e \"import('./src/signal-weight-tuner.js').then(m => console.log(JSON.stringify(m.buildSignalWeightsProfile(), null, 2)))\"",
     "backtest:handicap-method": "node scripts/run-handicap-method-backtest.mjs",
     "backtest:lowgoals-value": "node scripts/run-lowgoals-value-backtest.mjs",
-    "sync:understat": "node scripts/sync-understat-xg.mjs"
+    "sync:understat": "node scripts/sync-understat-xg.mjs",
+    "wc:suite": "node scripts/worldcup-suite.mjs",
+    "wc:validate": "node scripts/worldcup-prior-validation.mjs",
+    "wc:groups": "node scripts/run-worldcup-group-sim.mjs",
+    "wc:backfill": "node scripts/backfill-worldcup-history.mjs"
   },
   "engines": {
     "node": ">=20"
