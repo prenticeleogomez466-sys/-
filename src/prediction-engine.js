@@ -3,6 +3,7 @@ import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js"
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation, lambdaTotalFromMarket } from "./monte-carlo-simulator.js";
+import { worldCupLambdaContext, worldCupMatchPrior } from "./world-cup-priors.js";
 import { getExperienceBaseline } from "./experience-library-store.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull } from "./derived-score-model.js";
 import { analyzeUpsetTrap } from "./upset-trap-detector.js";
@@ -50,6 +51,13 @@ const HALF_FULL_POOLS = {
   "1": ["平局-平局", "主胜-平局", "客胜-平局"],
   "0": ["客胜-客胜", "平局-客胜", "主胜-客胜"]
 };
+
+// λ 物理上限闸门(2026-06-01,前置到 predictFixture):与 pre-export-selfcheck.js 的
+//   LAMBDA_SIDE_BLOCK=4.0 / LAMBDA_TOTAL_BLOCK=5.5 同值同义。pre-export 是出表前最后拦截,
+//   这里前置到算 handicap/比分之前——λ 一旦超物理上限,后续派生全失真,直接判 unpredictable,
+//   不再白算。复用同一组阈值,确保前后口径一致。
+const LAMBDA_SIDE_BLOCK = 4.0;
+const LAMBDA_TOTAL_BLOCK = 5.5;
 
 const FOURTEEN_DEFAULT_MAX_BANKERS = 6;
 const FOURTEEN_DEFAULT_BANKER_MIN_GAP = 0.22;
@@ -146,13 +154,19 @@ export function recommendFixtures(date) {
 // 判据(只用概率,平≥30% 本身已蕴含低进球均势):平不是最高、平≥0.30、平与最高差≤0.05 → 把平提为主推。
 // 阈值可由 env 覆盖。返回 { applies, ranked, margin }。
 export function evaluateDrawLean(ranked, env = process.env) {
-  const minDraw = Number(env.DRAW_LEAN_MIN_PROB ?? 0.30);
-  const maxGap = Number(env.DRAW_LEAN_MAX_GAP ?? 0.05);
+  // 2026-06-01 修「永远不推平」:旧门槛 minDraw=0.30,但真实均势国际赛平局率 26-29%(模型软重校准后
+  //   平局上限≈29%),永远够不到 0.30 → drawLean 从不触发、argmax 结构性永不选平。诊断实证:某日 20 场
+  //   平局概率均 24%/最高 28.8%、推平 0 场。下调门槛到能反映真实均势平局,并放宽 gap:平局只要进前二、
+  //   与领先者足够接近(均势闷局),即把平提为主推。仍以 wld 概率为锚、不反推。
+  const minDraw = Number(env.DRAW_LEAN_MIN_PROB ?? 0.26);
+  const maxGap = Number(env.DRAW_LEAN_MAX_GAP ?? 0.08);
   const draw = ranked.find((r) => r.code === "1");
   const leader = ranked[0];
   if (!draw || leader.code === "1") return { applies: false, ranked };
   const gap = leader.probability - draw.probability;
-  if (draw.probability < minDraw || gap > maxGap) return { applies: false, ranked };
+  // 平局须进前二(是第二高)才提为主推,避免把明显第三的平局硬抬。
+  const drawRank = ranked.findIndex((r) => r.code === "1");
+  if (draw.probability < minDraw || gap > maxGap || drawRank > 1) return { applies: false, ranked };
   // 把平提到首位,其余按概率降序(原热门退为次选)
   const rest = ranked.filter((r) => r.code !== "1").sort((a, b) => b.probability - a.probability);
   return { applies: true, ranked: [draw, ...rest], margin: round(gap) };
@@ -255,6 +269,16 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   让竞彩跑完整机器(让球/比分/半全场/分档),竞彩明细补全。这是借**模型已对同场做出的真实预测**,非编造。
   if (!blendResult.probabilities && options.priorProbabilities && Number.isFinite(options.priorProbabilities.home)) {
     blendResult = { probabilities: { ...options.priorProbabilities }, blendSource: options.priorSource ?? "borrowed-prior", dcWeight: 0, dcResult: null };
+  }
+  // 世界杯 Elo 先验兜底(2026-06-01):世界杯参赛队赛前常**既无竞彩赔率、又不在俱乐部 DC 训练集**,
+  //   原本直接 data-missing 整场放弃。改为:若对阵双方都是 48 强(team-priors 有 Elo),用真实 Elo
+  //   推标准胜平负先验(world-cup-priors.eloExpectation)兜底。这是**用查证到的真实实力数据**作先验,
+  //   非队名哈希编造;质量已验证(挪威vs瑞典 Elo先验≈实盘竞赛)。仍排在赔率/DC/同场14场先验之后。
+  if (!blendResult.probabilities) {
+    const wcPrior = worldCupMatchPrior(fixture?.homeTeam, fixture?.awayTeam, { hostHome: true });
+    if (wcPrior && Number.isFinite(wcPrior.probabilities?.home)) {
+      blendResult = { probabilities: { ...wcPrior.probabilities }, blendSource: wcPrior.source, dcWeight: 0, dcResult: null };
+    }
   }
   // 2026-05-30 诚实闸门(用户硬规则「缺失数据绝不编造」):既无实时市场赔率、又不在 Dixon-Coles
   //   训练集 ⇒ 没有任何真实先验。绝不再用队名哈希的 seededProbabilities 编一个假概率
@@ -363,7 +387,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const ouOverProb = (Number.isFinite(ouOver) && Number.isFinite(ouUnder) && ouOver > 1 && ouUnder > 1)
     ? (1 / ouOver) / (1 / ouOver + 1 / ouUnder) : null;
   const marketTotal = lambdaTotalFromMarket({ line: Number.isFinite(ouLine) ? ouLine : null, overProb: ouOverProb });
-  const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations, experienceBaseline, marketTotal });
+  // 世界杯专属特征(海拔/气温/赛制阶段 → λ 总量乘子)。非 2026 世界杯正赛场返回 isWC:false、乘子=1。
+  const wcCtx = worldCupLambdaContext(fixture, fixture?.date ?? fixture?.matchDate ?? null);
+  probabilityAdjustment.worldCup = wcCtx.isWC ? wcCtx : null;
+  const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations, experienceBaseline, marketTotal, worldCupMult: wcCtx.lambdaMult });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
   const confidence = confidenceWithAdvancedSignals(ranked[0].probability, gap, advancedFeatures);
   // 比分/半全场真实来源(2026-05-30 用户硬要求"不许兜底"):
@@ -396,6 +423,27 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   }
   // 上报给自检/让球/日报的 expectedGoals 与比分用的同一 λ(收缩后),保证 λ 物理闸门核到的就是真用值。
   const reconciledExpectedGoals = scoreModel?.expectedGoals ?? blendResult.dcResult?.expectedGoals ?? null;
+  // λ 物理上限闸门前置(2026-06-01 P3):算完 scoreModel/reconciledExpectedGoals 后立即体检——
+  //   单队 λ>4.0 或合计>5.5 = 非物理(DC 强队对鱼腩 λ 偶尔冲到 4+),后续 handicap/比分/半全场
+  //   连带失真。直接判该场 unpredictable(沿用 data-missing 结构),不再往下算。复用 pre-export 同阈值。
+  const _lamH = Number(reconciledExpectedGoals?.home);
+  const _lamA = Number(reconciledExpectedGoals?.away);
+  if (Number.isFinite(_lamH) && Number.isFinite(_lamA)
+      && (_lamH > LAMBDA_SIDE_BLOCK || _lamA > LAMBDA_SIDE_BLOCK || (_lamH + _lamA) > LAMBDA_TOTAL_BLOCK)) {
+    return {
+      fixture,
+      unpredictable: true,
+      provenance: blendResult.blendSource,
+      dataMissingReason: `λ超物理上限(主${_lamH.toFixed(2)}/客${_lamA.toFixed(2)}/合计${(_lamH + _lamA).toFixed(2)})——疑 λ 被算错放大,不预测(不出失真比分/让球)`,
+      marketSnapshot: snapshot,
+      probabilities: null,
+      pick: null,
+      secondaryPick: null,
+      scorePicks: null,
+      halfFullPicks: null,
+      handicapPick: null
+    };
+  }
   const scorePicks = buildScorePicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scoreModel);
   const halfFullPicks = buildHalfFullPicks(ranked[0].code, ranked[1].code, snapshot, probabilities, index, scorePicks, scoreModel);
   // 深度强化(2026-05-30 用户要求):给比分/半全场附真实概率 + 主方向内反超备选 + 完整分布,
@@ -640,9 +688,71 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   替代旧固定模板 buildReason/generateExplanation。挂已算字段,零假编。
   prediction.differentialAnalysis = analyzeMatch(prediction);
   if (prediction.differentialAnalysis?.narrative) prediction.rationale = prediction.differentialAnalysis.narrative;
+  // 红队自检(2026-06-01 P1/P2,落实 prompt <red_team> 硬规则):三条反问,只下调信心/加风险标签,
+  //   不改 pick/概率方向(遵 wld 锚定 + 不替用户弃赛)。挂 prediction.redTeam + riskNotes。
+  redTeamCheck(prediction, {
+    blendSource: blendResult.blendSource,
+    hasMarketPrior: Boolean(oddsProbabilities),
+    analogWld: experienceBaseline?.wld ?? null,
+    calibrationPriorProb: calibrated.priorProb,
+    calibrationDelta: calibrated.delta,
+  });
   const consistencyErrors = validatePredictionConsistency(prediction);
   if (consistencyErrors.length) throw new Error(`推荐派生市场冲突：${fixture.homeTeam} 对 ${fixture.awayTeam}；${consistencyErrors.join("；")}`);
   return prediction;
+}
+
+// 红队自检(2026-06-01,落实 prompt <red_team>):对已算好的预测做三条对抗性反问,命中则下调信心 +
+//   加风险标签。**只附加/降信心,不改 pick.code/概率方向**(遵 wld 锚定 + 不替用户弃赛硬规则)。
+//   结果挂 prediction.redTeam = { flags, note },并把标签并入 prediction.riskNotes。
+//   信心下调后强制夹到 [0,100]。
+export function redTeamCheck(prediction, ctx = {}) {
+  const flags = [];
+  let confidenceDelta = 0;
+  let directionNote = null;
+  // (a) 单一来源:provenance=dixon-coles-only 且无赔率印证 → 信心 -10pp。
+  if (ctx.blendSource === "dixon-coles-only" && !ctx.hasMarketPrior) {
+    flags.push("⚠单一来源(无市场印证)");
+    confidenceDelta -= 10;
+  }
+  // (b) 历史类比(同情境历史 WLD,即 historical-analog/KNN)方向与 argmax(pick.label) 反向 → 信心 -5pp。
+  //     analogWld={home,draw,away} 经验频率;取其 argmax 与本场 pick.code 比,反向(且不为平局)即分歧。
+  const analog = ctx.analogWld;
+  const pickCode = prediction?.pick?.code;
+  if (analog && Number.isFinite(analog.home) && Number.isFinite(analog.away) && pickCode) {
+    const analogRanked = [
+      { code: "3", p: Number(analog.home) },
+      { code: "1", p: Number(analog.draw) },
+      { code: "0", p: Number(analog.away) },
+    ].sort((a, b) => b.p - a.p);
+    const analogTop = analogRanked[0].code;
+    // 反向:类比主推与本场主推不一致(平局视为不同方向,但 1↔1 不算反向)。
+    if (analogTop !== pickCode) {
+      flags.push("⚠类比反向");
+      confidenceDelta -= 5;
+      directionNote = "分歧·中信心";
+    }
+  }
+  // (c) 校准前后 argmax 概率跳变 >10pp → 加"校准过度自信"标签(不再额外降信心,标签即提示)。
+  if (Number.isFinite(ctx.calibrationDelta) && Math.abs(ctx.calibrationDelta) > 0.10) {
+    flags.push("⚠校准过度自信");
+  }
+  if (Number.isFinite(confidenceDelta) && confidenceDelta !== 0 && Number.isFinite(prediction.confidence)) {
+    prediction.confidence = Math.max(0, Math.min(100, prediction.confidence + confidenceDelta));
+  }
+  const note = flags.length
+    ? `红队自检命中${flags.length}条:${flags.join("、")}${confidenceDelta ? `(信心${confidenceDelta}pp)` : ""}`
+    : "红队自检通过(无对抗性疑点)";
+  prediction.redTeam = {
+    flags,
+    note,
+    confidenceDelta,
+    directionNote,
+    priorProb: ctx.calibrationPriorProb ?? null,
+    calibrationDelta: ctx.calibrationDelta ?? null,
+  };
+  prediction.riskNotes = [...(prediction.riskNotes ?? []), ...flags];
+  return prediction.redTeam;
 }
 
 // 用本场欧赔(优先收盘 final → 当前 current → 开盘 initial,越接近收盘=市场金标准)算市场背离。
@@ -992,7 +1102,7 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   const matrix = scoreModel?.matrix ?? null;
   scorePicks.primaryProbability = scoreProbFromMatrix(matrix, scorePicks.primary);
   scorePicks.secondaryProbability = scoreProbFromMatrix(matrix, scorePicks.secondary);
-  scorePicks.distribution = topScoresWithProb(matrix, 5);
+  scorePicks.distribution = topScoresWithProb(matrix, 8); // 2026-06-01 5→8:均势客胜场客胜比分概率分散,Top5 常只够 1 个 wld 一致比分(治"保黑只显示 0-1"),取 8 让各方向都凑得齐 Top3
   const eg = scoreModel?.expectedGoals;
   // 半全场联合分布(2026-05-31 升级,walk-forward 回测最优:τ低分修正+拟合半场比例+状态依赖 chase=0.18,
   //   LogLoss 1.9069→1.9039 / Brier 0.8136→0.8129;参数见 halftime-fulltime-model.HF_DEFAULTS)。

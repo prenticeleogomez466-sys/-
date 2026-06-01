@@ -111,7 +111,7 @@ function toJingcaiRow(prediction) {
     fixture.kickoff?.slice(5, 16) ?? "",                         // 4 开赛(月-日 时:分)
     prediction.jingcaiLetqiu && prediction.jingcaiLetqiu.sfcSold === false
       ? "⛔ 未开售(本场只让球)"
-      : outcomeCodeToChinese(prediction.pick.code),               // 5 胜平负(不让球;深盘场常未开售)
+      : wldCellWithDraw(prediction),               // 5 胜平负(不让球);均势场标注双选含平(primary 不变,复盘按 primary 结算)
     jingcaiLetqiuText(prediction),                               // 6 让球胜平负(竞彩主玩法,真实让球赔率)
     buildScoreCandidates(prediction),                            // 7 比分(首选 + 备选,不再单一)
     buildHalfFullCandidates(prediction),                         // 8 半全场(首选 + 备选)
@@ -120,7 +120,8 @@ function toJingcaiRow(prediction) {
     marketFlowCell(prediction),                                  // 11 盘口资金流向(欧赔漂移+亚盘水位变化+独立解读)
     experienceCell(prediction),                                  // 12 历史经验(同情境:平局/大小球/赔率漂移)
     confDetail,                                                  // 13 信心+分级+EV+注码
-    enrichedRationale(prediction)                                // 14 选择理由
+    enrichedRationale(prediction),                               // 14 选择理由
+    prediction.provenance ?? "—"                                 // 15 来源(胜平负先验 provenance,可追溯)
   ];
 }
 
@@ -213,6 +214,25 @@ export function experienceCell(prediction) {
     return "—";
   }
   return lines.join("\n");
+}
+
+// 胜平负列(2026-06-01「永远没平」修复):均势场(平局进前二且≥26%)标注双选含平,提示该兼顾平局。
+//   主推 prediction.pick.code **不变**(复盘仍按 primary 结算,口径一致),这里只是展示层的双选建议。
+//   悬殊场/主推明显场不加,避免滥推平。
+function wldCellWithDraw(prediction) {
+  const code = prediction.pick?.code;
+  const base = outcomeCodeToChinese(code);
+  const p = prediction.probabilities ?? {};
+  const draw = Number(p.draw);
+  if (!Number.isFinite(draw) || code === "1") return base; // 主推已是平、或无概率
+  const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
+    .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
+  const drawRank = arr.findIndex(([c]) => c === "1");
+  // 平局须进前二(仅次于主推)且 ≥26% → 均势闷局,提示双选含平。
+  if (draw >= 0.26 && drawRank === 1) {
+    return `${base} / 平(均势·平${Math.round(draw * 100)}%·可双选)`;
+  }
+  return base;
 }
 
 // 比分候选:DC top-N 概率比分中**强制跟 wld 一致 + 不同进球结构** 的 3 个比分
@@ -630,7 +650,8 @@ function jingcaiHeaders() {
     "概率分布(主/平/客)", "爆冷",
     "盘口资金流向(数据变化)",
     "历史经验(同情境)",
-    "信心 · 分级 · EV", "选择理由"
+    "信心 · 分级 · EV", "选择理由",
+    "来源"
   ];
 }
 
@@ -774,7 +795,7 @@ function totalGoalsLineupHeaders() {
 }
 
 function recapHeaders() {
-  return ["日期", "场次", "赛事", "比赛", "首选", "次选", "比分首选", "比分次选", "半全场首选", "半全场次选", "主胜概率", "平局概率", "客胜概率", "原始主胜概率", "原始平局概率", "原始客胜概率", "蒙特卡洛主胜", "蒙特卡洛平局", "蒙特卡洛客胜", "蒙特卡洛比分Top3", "风险", "信心", "资金决策", "EV", "每100单位建议", "理由", "实际赛果", "实际比分", "命中"];
+  return ["日期", "场次", "赛事", "比赛", "首选", "次选", "比分首选", "比分次选", "半全场首选", "半全场次选", "让球线", "让球胜平负", "让球编码", "主胜概率", "平局概率", "客胜概率", "原始主胜概率", "原始平局概率", "原始客胜概率", "蒙特卡洛主胜", "蒙特卡洛平局", "蒙特卡洛客胜", "蒙特卡洛比分Top3", "风险", "信心", "资金决策", "EV", "每100单位建议", "理由", "实际赛果", "实际比分", "命中"];
 }
 
 function modelHealthRows(sourceGate, audit) {

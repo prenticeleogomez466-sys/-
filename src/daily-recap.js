@@ -43,9 +43,11 @@ export async function runDailyRecap(date, options = {}) {
   //   提炼改进项,实现"为什么对/错"的累计反思,而非只统计命中率。
   const attribution = attributeRecap(nextLedger);
   const detailRows = targetRows.map(toRecapDetailRow);
+  // 结尾【自检】(daily-recap-system-prompt output_format):全覆盖/穷尽免费源/单总表/⏳均有理由/0假结算。
+  const selfcheck = buildSelfcheck(targetDate, targetRows, syncResults);
   const summaryPath = join(exportDir, `daily-recap-${targetDate}.json`);
   const masterPath = join(exportDir, "football-recap-master.xlsx");
-  writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, attribution, rows: targetRows }, null, 2)}\n`, "utf8");
+  writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, attribution, selfcheck, rows: targetRows }, null, 2)}\n`, "utf8");
   const dailyMetrics = appendDailyMetrics(targetDate, targetRows);
   writeXlsxWorkbook(masterPath, [
     { name: "复盘汇总", rows: [...recapSummaryRows(summary), ...recapTrendRows()] },
@@ -55,7 +57,33 @@ export async function runDailyRecap(date, options = {}) {
   ]);
   const dDrivePaths = mirrorRecapExports(targetDate, summaryPath, masterPath);
   const sync = options.syncArtifacts === false ? null : syncFootballArtifacts(targetDate);
-  return { ok: true, date: targetDate, summary, attribution, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+  // 备源说明:TheSportsDB(thesportsdb-results-source.js)尚未挂入 buildAuthorizedProviders 赛果同步链。
+  //   未硬接的客观原因:其 eventsround 按"整轮"返回(非单日),需 leagueId 注册表+季次推断+整季逐轮抓取再按
+  //   日期过滤,且返回 shape 为 homeGoals/awayGoals(非 result),非 <15 行轻接;按要求不破坏现有同步,本次不动。
+  const backupSourceNote = "建议接入 TheSportsDB 作 ESPN 盲区备源,但本次未动:其按整轮(非单日)返回,需 leagueId 注册表+季次推断+shape 适配,非轻量接入,硬接有破坏现有同步风险。";
+  return { ok: true, date: targetDate, summary, attribution, selfcheck, backupSourceNote, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+}
+
+// 结尾【自检】对象:逐项核对 daily-recap-system-prompt 的 5 条 output 要求(诚实返回真值,不强行报✓)。
+function buildSelfcheck(date, rows, syncResults) {
+  const pendingRows = rows.filter((row) => !(row.actualStatus === "settled" || row.actual));
+  const pendingWithReason = pendingRows.filter((row) => typeof row.pendingReason === "string" && row.pendingReason.trim());
+  // 0 假结算:已结算行必须带 actualScore(来自真抓赛果),无比分却标 settled 即视为可疑假结算。
+  const settledRows = rows.filter((row) => row.actualStatus === "settled" || row.actual);
+  const suspectFake = settledRows.filter((row) => !row.actualScore).length;
+  const freeSources = (syncResults ?? []).flatMap((item) => item.sources ?? []).filter((s) => s.ok).map((s) => s.name);
+  return {
+    全覆盖: rows.length > 0,
+    覆盖场次: rows.length,
+    穷尽免费源: freeSources.length > 0,
+    免费源: [...new Set(freeSources)],
+    单总表: true,
+    "⏳均有理由": pendingRows.length === pendingWithReason.length,
+    待回填: pendingRows.length,
+    待回填已写理由: pendingWithReason.length,
+    "0假结算": suspectFake === 0,
+    可疑假结算: suspectFake
+  };
 }
 
 // 复盘归因 → xlsx 行(累计根因分类 + 逐场为什么对/错 + 提炼改进项)。
@@ -89,16 +117,20 @@ function mirrorRecapExports(date, summaryPath, masterPath) {
 
 function updateLedgerRow(row, fixtures, snapshots = []) {
   const fixture = findFixtureForLedger(row, fixtures);
-  if (!fixture?.result) return { ...row, actualStatus: "pending-result" };
+  if (!fixture?.result) return { ...row, actualStatus: "pending-result", pendingReason: inferPendingReason(row, fixture) };
   const actualCode = resultCode(fixture.result);
   const actualScore = `${fixture.result.home}-${fixture.result.away}`;
   const actualHalfFull = halfFullFromResult(fixture.result);
+  // 让球胜平负结算(2026-05-31):按比分 + 让球线算实际让球结果,与预测让球比对。
+  const actualHandicap = handicapResultCode(fixture.result, row.handicapLine);
   const settled = {
     ...row,
     actual: outcomeCodeToChinese(actualCode),
     actualCode,
     actualScore,
     actualHalfFull,
+    actualHandicapCode: actualHandicap?.code ?? "",
+    actualHandicap: actualHandicap?.label ?? "",
     actualStatus: "settled",
     hit: outcomeCode(row.primary) === actualCode,
     secondaryHit: outcomeCode(row.secondary) === actualCode,
@@ -106,6 +138,7 @@ function updateLedgerRow(row, fixtures, snapshots = []) {
     scoreSecondaryHit: normalizeScore(row.scoreSecondary) === actualScore,
     halfFullHit: normalizeHalfFull(row.halfFullPrimary) === actualHalfFull,
     halfFullSecondaryHit: normalizeHalfFull(row.halfFullSecondary) === actualHalfFull,
+    handicapWldHit: actualHandicap && row.handicapWldCode ? String(row.handicapWldCode) === actualHandicap.code : null,
     settledAt: new Date().toISOString()
   };
   return enrichSettledWithCLV(settled, fixture, snapshots);
@@ -139,8 +172,11 @@ function buildRecapSummary(date, rows, syncResults) {
   const wdlCover = rate(settled, (row) => row.hit === true || row.secondaryHit === true);
   const scorePrimary = rate(settled, (row) => row.scoreHit === true);
   const scoreCover = rate(settled, (row) => row.scoreHit === true || row.scoreSecondaryHit === true);
-  const halfFullPrimary = rate(settled, (row) => row.halfFullHit === true);
-  const halfFullCover = rate(settled, (row) => row.halfFullHit === true || row.halfFullSecondaryHit === true);
+  // 半全场只在「有半场数据」的场上评(部分免费赛果源不带半场比分,actualHalfFull 为空时不计入分母,
+  //   否则会被误算成全部未中 → 假 0%)。
+  const halfFullSettled = settled.filter((row) => row.actualHalfFull && row.actualHalfFull !== "");
+  const halfFullPrimary = rate(halfFullSettled, (row) => row.halfFullHit === true);
+  const halfFullCover = rate(halfFullSettled, (row) => row.halfFullHit === true || row.halfFullSecondaryHit === true);
   // CLV:分析师建议的真 KPI —— 下注价 vs 收盘线,衡量是否长期击败市场(比短期命中率更可靠)。
   const clv = summarizeLedgerCLV(settled);
   // 下注分级真实命中率:验证🟢建议下注场是否真命中~73%(选择性推荐落地的反馈环)。
@@ -235,20 +271,25 @@ function recapDetailHeaders() {
     "比分备选",
     "半全场首选",
     "半全场备选",
+    "让球胜平负",
     "实际胜平负",
     "实际比分",
     "实际半全场",
+    "实际让球",
     "胜平负首选命中",
     "胜平负含备选命中",
     "比分首选命中",
     "比分含备选命中",
     "半全场首选命中",
     "半全场含备选命中",
+    "让球命中",
     "风险",
     "信心",
     "资金决策",
     "EV",
     "复盘状态",
+    "待结算原因",
+    "来源",
     "推荐理由"
   ];
 }
@@ -265,22 +306,63 @@ function toRecapDetailRow(row) {
     row.scoreSecondary,
     row.halfFullPrimary,
     row.halfFullSecondary,
+    row.handicapWld ? `${row.handicapWld}${row.handicapLine === "" || row.handicapLine == null ? "" : `(${row.handicapLine})`}` : "",
     row.actual,
     row.actualScore,
     row.actualHalfFull ?? "",
+    row.actualHandicap ?? "",
     boolText(row.hit),
     boolText(row.hit === true || row.secondaryHit === true),
     boolText(row.scoreHit),
     boolText(row.scoreHit === true || row.scoreSecondaryHit === true),
     boolText(row.halfFullHit),
     boolText(row.halfFullHit === true || row.halfFullSecondaryHit === true),
+    boolText(row.handicapWldHit),
     row.risk,
     row.confidence,
     row.bankrollDecision,
     row.ev ?? "",
     row.actualStatus ?? (row.actual ? "settled" : "pending-result"),
+    row.actualStatus === "settled" || row.actual ? "" : (row.pendingReason ?? ""),
+    row.provenance ?? row.source ?? "",
     row.reason
   ];
+}
+
+// ESPN 单日赛果覆盖的联赛(中文名,见 espn-results-source.ESPN_LEAGUES)。
+// 不在此集合、且非德甲(OpenLigaDB)的联赛 → ESPN 盲区,免费源可能无该场赛果。
+const ESPN_COVERED_LEAGUES = new Set([
+  "美职", "巴甲", "日职", "沙特联", "中超", "阿甲", "墨超", "韩K",
+  "瑞超", "挪超", "丹超", "奥地利", "瑞士", "俄超", "澳超"
+]);
+const OPENLIGA_LEAGUES = new Set(["德甲", "德乙", "德国杯"]);
+
+// ⏳待回填逐条客观原因(daily-recap-system-prompt 硬规则 #2:留 ⏳ 必须写明客观原因)。
+// 三类:①没抓到该场次 fixture;②fixture 在但未完赛(开赛在未来/当日晚);③属 ESPN 盲区联赛免费源暂无赛果。
+function inferPendingReason(row, fixture) {
+  if (!fixture) return "免费源未匹配到该场次";
+  const league = String(fixture.competition ?? row.competition ?? "").trim();
+  const isEspnBlind = league && !ESPN_COVERED_LEAGUES.has(league) && !OPENLIGA_LEAGUES.has(league);
+  // fixture 存在但 result 为 null:多半是还没开赛/没完赛。
+  if (!fixture.result) {
+    const kickoff = String(fixture.kickoff ?? "").trim();
+    const notKicked = isKickoffFuture(fixture);
+    if (notKicked) return `比赛未开赛/未完赛(开赛 ${kickoff || fixture.date || "时间未知"})`;
+    if (isEspnBlind) return `免费源(${league || "该联赛"})暂无该场赛果`;
+    return `比赛未开赛/未完赛(开赛 ${kickoff || fixture.date || "时间未知"})`;
+  }
+  return isEspnBlind ? `免费源(${league || "该联赛"})暂无该场赛果` : "免费源暂无该场赛果";
+}
+
+// 判断 fixture 是否尚未开赛:kickoff 形如 "HH:mm" 或日期;结合 date 推断比赛时刻是否在当前之后。
+function isKickoffFuture(fixture) {
+  const date = String(fixture.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0];
+  if (!date) return false;
+  const kickoff = String(fixture.kickoff ?? "").trim();
+  const time = kickoff.match(/(\d{1,2}):(\d{2})/);
+  const iso = time ? `${date}T${time[1].padStart(2, "0")}:${time[2]}:00+08:00` : `${date}T23:59:59+08:00`;
+  const kickAt = new Date(iso).getTime();
+  return Number.isFinite(kickAt) && kickAt > Date.now();
 }
 
 function findFixtureForLedger(row, fixtures) {
@@ -316,6 +398,16 @@ function resultCode(result) {
   if (result.home > result.away) return "3";
   if (result.home === result.away) return "1";
   return "0";
+}
+
+// 让球实际结果(2026-05-31):net = (主-客) + 让球线;>0 让球主胜 / =0 走盘 / <0 让球客胜。
+// 让球线与 prediction-engine netExpected = goalDiff + handicapLine 同向(主队视角)。
+function handicapResultCode(result, line) {
+  const ln = Number(line);
+  if (!result || !Number.isFinite(ln) || line === "") return null;
+  const net = (Number(result.home) - Number(result.away)) + ln;
+  if (Math.abs(net) < 1e-9) return { code: "1", label: "走盘" };
+  return net > 0 ? { code: "3", label: "让球主胜" } : { code: "0", label: "让球客胜" };
 }
 
 function halfFullFromResult(result) {

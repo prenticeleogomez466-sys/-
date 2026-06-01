@@ -19,7 +19,22 @@ export function loadCalibrationProfile(path = profilePath) {
   }
 }
 
+// 包装层(2026-06-01,红队自检 P2-c 支持):在各分支返回外统一补 priorProb / delta,
+// 供 prediction-engine 的 redTeamCheck 判"校准前后 argmax 概率跳变 >10pp = 过度自信"。
+// priorProb = 校准前 argmax 概率;delta = 校准后该方向概率 - 校准前(可正可负)。零侵入各分支逻辑。
 export function calibrateProbabilities(probabilities, profile = emptyProfile(), context = {}) {
+  const priorNormalized = normalizeProbabilities(probabilities);
+  const priorFavorite = favoriteOutcome(priorNormalized);
+  const result = calibrateProbabilitiesCore(probabilities, profile, context);
+  const calibratedFavoriteProb = Number(result.probabilities?.[priorFavorite.key]);
+  result.priorProb = round(priorFavorite.probability);
+  result.delta = Number.isFinite(calibratedFavoriteProb)
+    ? round(calibratedFavoriteProb - priorFavorite.probability)
+    : null;
+  return result;
+}
+
+function calibrateProbabilitiesCore(probabilities, profile = emptyProfile(), context = {}) {
   const normalized = normalizeProbabilities(probabilities);
   const favorite = favoriteOutcome(normalized);
   const bucket = probabilityBucket(favorite.probability);

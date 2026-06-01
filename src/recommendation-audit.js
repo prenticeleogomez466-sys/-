@@ -30,6 +30,11 @@ export function auditRecommendations(recommendations) {
       checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 缺少实时赔率快照` });
     }
     if (!Number.isFinite(prediction.confidence) || prediction.confidence < 0 || prediction.confidence > 100) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 信心值越界：${prediction.confidence}` });
+    // 诚实上限运行时护栏(2026-06-01 P5,落实 prompt 诚实上限硬规则):provenance=odds-only(纯市场隐含、
+    //   无 DC 独立印证)却给出 >68 的高信心 = 越过单选诚实命中上限。只提示不拦截(买不买由用户定)。
+    if (prediction.confidence > 68 && prediction.provenance === "odds-only") {
+      checks.push({ level: "warning", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 信心 ${prediction.confidence} 超诚实上限(纯市场赔率来源 odds-only,无独立模型印证),谨慎` });
+    }
     if (Math.abs(Object.values(prediction.probabilities ?? {}).reduce((sum, value) => sum + Number(value || 0), 0) - 1) > 0.02) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 胜平负概率未归一` });
     if (!prediction.scorePicks?.primary || !prediction.halfFullPicks?.primary) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} 缺少比分或半全场派生` });
     for (const message of validatePredictionConsistency(prediction)) checks.push({ level: "error", message: `${fixture.homeTeam} 对 ${fixture.awayTeam} ${message}` });
