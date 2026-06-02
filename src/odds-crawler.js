@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import "./env.js";
 import { loadFixtures } from "./fixture-store.js";
 import { findMarketSnapshot, loadMarketSnapshots, normalizeMarketSnapshot, saveMarketSnapshots } from "./market-data-store.js";
+import { backfillFromStabilityCache, updateStabilityCache } from "./odds-stability-cache.js";
 import { getDataSubdir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -190,8 +191,25 @@ export async function crawlMarketData(date, options = {}) {
     }
   }
 
-  const saved = matched.length ? saveMarketSnapshots(date, merged, { source: sources.filter((source) => source.ok).map((source) => source.name).join("+") }) : null;
-  const result = { date, fixtures: fixtureSet.fixtures.length, sources, fetched: candidates.length, matched: matched.length, saved: Boolean(saved), path: saved?.path ?? null, snapshots: merged };
+  // 2026-06-02: 单调稳定缓存。先把本轮抓到的真实盘口存为 last-good,再用历史
+  // last-good 回填本轮缺失/被派生 fallback 顶替的市场 —— 让同批比赛多次抓取
+  // 复现最高质量数据,消除"每次效果都不一样"。纯加法,可用环境变量关闭。
+  let stabilityBackfilled = 0;
+  if (process.env.ODDS_STABILITY_CACHE_ENABLED !== "0") {
+    try {
+      updateStabilityCache(date, merged);
+      const stability = backfillFromStabilityCache(date, merged, fixtureSet.fixtures);
+      merged = stability.snapshots;
+      stabilityBackfilled = stability.backfilled;
+      matched = alignSnapshots(merged, fixtureSet.fixtures);
+      sources.push({ name: "稳定缓存回填(last-good)", fetched: stabilityBackfilled, ok: stabilityBackfilled > 0, error: stabilityBackfilled ? undefined : "无需回填(实时已最优或缓存为空)" });
+    } catch (error) {
+      sources.push({ name: "稳定缓存回填(last-good)", fetched: 0, ok: false, error: error.message });
+    }
+  }
+
+  const saved = (matched.length || stabilityBackfilled) ? saveMarketSnapshots(date, merged, { source: sources.filter((source) => source.ok).map((source) => source.name).join("+") }) : null;
+  const result = { date, fixtures: fixtureSet.fixtures.length, sources, fetched: candidates.length, matched: matched.length, stabilityBackfilled, saved: Boolean(saved), path: saved?.path ?? null, snapshots: merged };
   mkdirSync(exportDir, { recursive: true });
   writeFileSync(join(exportDir, `odds-crawler-${date}.json`), `${JSON.stringify(result, null, 2)}\n`, "utf8");
   return result;
