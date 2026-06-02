@@ -65,6 +65,10 @@ function detailCard(p) {
   const hwStr = hw ? `<b>${esc(hw.pick)}</b> ${(hw.probability * 100).toFixed(0)}% <span class="conf">让主${(hw.probabilities.home * 100).toFixed(0)}/走盘${(hw.probabilities.push * 100).toFixed(0)}/让客${(hw.probabilities.away * 100).toFixed(0)}</span>` : "-";
   // 双选建议(均势场覆盖平局,单选平命中物理上限~28%)
   const dc = p.doubleChance ? `<div class="row dc"><span class="k">双选</span> <b>${esc(p.doubleChance.pick)}</b> ${(p.doubleChance.combinedProbability * 100).toFixed(0)}% <span class="conf">${esc(p.doubleChance.note)}</span></div>` : "";
+  // 亚盘水位深抓判读(titan007 初盘→即时 + 资金流向信号)
+  const aw = p.asianWaterAnalysis;
+  const lineTxt = (n) => n == null ? "?" : (n === 0 ? "平手" : n < 0 ? `主让${Math.abs(n)}` : `主受让${n}`);
+  const awHtml = aw ? `<div class="row"><span class="k">亚盘水位</span> ${esc(lineTxt(aw.line))} · 初 ${esc(aw.early?.homeOdds)}/${esc(aw.early?.awayOdds)} → 即 ${esc(aw.late?.homeOdds)}/${esc(aw.late?.awayOdds)} <span class="sk">${esc(aw.movement || "")}·${esc(aw.signal || "")}</span></div>${aw.implication ? `<div class="ec warn">盘口资金:${esc(aw.implication.replace(/\*\*/g, ""))}</div>` : ""}` : "";
   return `<div class="card">
     <div class="hd"><span class="no">${esc(fx.sequence)}</span> ${esc(fx.homeTeam)} <span class="vs">vs</span> ${esc(fx.awayTeam)} <span class="lg">${esc(fx.competition)}</span></div>
     <div class="row main"><span class="k">胜平负</span> <b>${esc(p.pick?.label)}</b> <span class="prob">${pct(p.pick?.probability)}</span> <span class="conf">信心 ${Number.isFinite(conf) ? conf.toFixed(0) : "-"} · 风险 ${esc(p.risk || "-")}</span></div>
@@ -73,6 +77,7 @@ function detailCard(p) {
     <div class="row"><span class="k">比分</span> ${esc(p.scorePicks?.primary || "-")}${p.scorePicks?.wldConsistent && p.scorePicks.wldConsistent !== p.scorePicks.primary ? ` <span class="sk">方向一致 ${esc(p.scorePicks.wldConsistent)}</span>` : ""} &nbsp; <span class="k">半全场</span> ${esc(p.halfFullPicks?.primary || "-")}</div>
     <div class="row"><span class="k">让球</span> ${esc(hp.direction || "-")}${hp.line != null ? `(${hp.line})` : ""}${cover ? ` 覆盖 ${cover}` : ""} ${skellam ? `<span class="sk">${skellam}</span>` : ""}</div>
     <div class="row"><span class="k">让球胜平负</span> ${hwStr}</div>
+    ${awHtml}
     ${p.differentialAnalysis?.handicapBridge ? `<div class="ec">↔ ${esc(p.differentialAnalysis.handicapBridge)}</div>` : ""}
     ${dc}
     ${ec.overUnderHint ? `<div class="ec">${esc(ec.overUnderHint)}</div>` : ""}
