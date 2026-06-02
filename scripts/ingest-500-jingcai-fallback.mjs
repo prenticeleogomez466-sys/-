@@ -60,11 +60,21 @@ async function main() {
 
   for (const m of todays) {
     const fixtureId = `jc500-${date}-${m.matchnum}-${safeName(m.home)}-${safeName(m.away)}`;
-    const euro = oddsSet(m, "win", "draw", "lost");          // 胜平负 = 欧赔
-    const handicap = (() => {
-      const h = nspfByNum.get(m.matchnum);
-      return h ? oddsSet(h, "win", "draw", "lost") : null;   // 让球胜平负
-    })();
+    // ⚠️ 2026-06-02 修正重大映射错误(4角度对抗证伪+百家欧赔佐证):
+    //   500 的 pl_spf_2.xml 实际是【让球胜平负】、pl_nspf_2.xml 才是【胜平负(不让球)】——
+    //   与文件名直觉相反。旧代码把 spf(让球)当胜平负喂模型 → 1X2 方向系统性错(把客队让球盘当成主队胜平负)。
+    //   实测:克罗地亚vs比利时 真胜平负=2.57/2.85/2.57(势均,百家欧赔2.59/3.34/2.57佐证),
+    //         让球盘(主-1)=5.50/4.48/1.38(1.38是让球客胜非比利时大热)。
+    const nspfEntry = nspfByNum.get(m.matchnum);
+    const euro = nspfEntry ? oddsSet(nspfEntry, "win", "draw", "lost") : null;  // 胜平负 ← pl_nspf
+    const handicap = oddsSet(m, "win", "draw", "lost");                          // 让球胜平负 ← pl_spf
+    // 一致性守护:胜平负热门方(min赔)的让球盘赔率应更高(让1球更难cover);若反了说明仍喂反,告警。
+    if (euro && handicap) {
+      const favSide = euro.latest ? ["win","draw","lost"].reduce((b,k)=> (euro.latest[k]??9)<(euro.latest[b]??9)?k:b,"win") : null;
+      if (favSide && euro.latest && handicap.latest && Number(euro.latest[favSide]) > Number(handicap.latest[favSide]) + 0.3) {
+        console.error(`⚠️ 赔率一致性告警 ${m.home} vs ${m.away}:胜平负热门方赔率(${euro.latest[favSide]})高于让球(${handicap.latest[favSide]}),疑似 spf/nspf 仍喂反,请核查!`);
+      }
+    }
     const goalLine = nspfByNum.get(m.matchnum)?.latest?.goalline ?? "";
 
     fixtures.push({
@@ -118,7 +128,7 @@ async function main() {
     snapshots: snapshots.length,
     fixturePath: `data/fixtures/${date}.json`,
     marketPath: marketSaved.path,
-    sample: todays.map((m) => `${m.matchnum} ${m.league} ${m.home} vs ${m.away} 胜平负=${m.latest.win}/${m.latest.draw}/${m.latest.lost}`)
+    sample: todays.map((m) => { const n = nspfByNum.get(m.matchnum)?.latest; return `${m.matchnum} ${m.league} ${m.home} vs ${m.away} 胜平负=${n?`${n.win}/${n.draw}/${n.lost}`:"?"} 让球=${m.latest.win}/${m.latest.draw}/${m.latest.lost}`; })
   }, null, 2));
 }
 

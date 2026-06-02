@@ -1,49 +1,26 @@
-/**
- * 干净重建今日竞彩(2026-06-01)——清掉多源合并的旧污染,只留 Playwright 实测的真实 6 场。
- * 数据 = 2026-06-01 夜 trade.500.com 竞彩 SPF/NSPF XML(浏览器实抓,updatetime 当晚)。
- * 覆盖式 saveFixtures + saveMarketSnapshots(去掉旧 shengfucai 残留 + 冲突快照),再出推荐。
- */
 import { saveFixtures } from "../src/fixture-store.js";
 import { saveMarketSnapshots } from "../src/market-data-store.js";
 import { recommendFixtures } from "../src/prediction-engine.js";
-
-const DATE = "2026-06-01";
-const nowIso = new Date().toISOString();
-// matchnum, home, away, 开盘 spf, 收盘 spf, 让球 nspf(收盘)
+const DATE = process.argv[2] || "2026-06-02", KICK = "2026-06-03";
+const now = new Date().toISOString();
+// [num, 主, 客, 胜平负(主/平/客), 让球胜平负(主-1)(主/平/客)] —— 2026-06-02 修正:胜平负=不让球盘,让球=主队-1
 const M = [
-  ["1001", "保加利亚", "黑山", [1.47, 3.75, 5.5], [1.36, 4.00, 6.95], [2.74, 2.65, 2.58]],
-  ["1002", "挪威", "瑞典", [3.12, 3.45, 1.93], [3.15, 3.18, 2.01], [1.60, 3.43, 4.70]],
-  ["1003", "土耳其", "北马其顿", [2.86, 3.85, 1.93], [2.72, 3.50, 2.10], [1.15, 5.60, 12.50]],
-  ["1004", "奥地利", "突尼斯", [2.17, 3.30, 2.75], [2.24, 3.10, 2.78], [1.31, 4.35, 7.32]],
-  ["1005", "哥伦比亚", "哥斯达黎加", [1.97, 3.80, 2.80], [1.97, 3.98, 2.70], null],
-  ["1006", "加拿大", "乌兹别克斯坦", [2.67, 3.20, 2.27], [2.88, 3.07, 2.19], [1.50, 3.58, 5.45]],
+  ["2201","克罗地亚","比利时",[2.57,2.85,2.57],[5.50,4.48,1.38]],
+  ["2202","格鲁吉亚","罗马尼亚",[2.07,3.02,3.17],[4.66,3.65,1.56]],
+  ["2203","威尔士","加纳",[2.09,2.86,3.32],[4.65,3.71,1.55]],
 ];
-const odds = (a) => ({ home: a[0], draw: a[1], away: a[2] });
-
-const fixtures = M.map(([num, h, a]) => ({
-  id: `jc-${DATE}-${num}-${h}-${a}`, sequence: num, date: DATE,
-  homeTeam: h, awayTeam: a, competition: "国际赛", marketType: "jingcai",
-  kickoff: `2026-06-02T02:45:00+08:00`,
-}));
-const snapshots = M.map(([num, h, a, open, close, nspf]) => ({
-  id: `jc-${DATE}-${num}`, date: DATE, fixtureId: `jc-${DATE}-${num}-${h}-${a}`,
-  sequence: num, marketType: "jingcai", competition: "国际赛", homeTeam: h, awayTeam: a,
-  collectedAt: nowIso, source: "trade.500.com/jczq XML (Playwright 2026-06-01)",
-  europeanOdds: { initial: odds(open), current: odds(close), final: odds(close) },
-  handicapOdds: nspf ? { initial: odds(nspf), current: odds(nspf), final: odds(nspf) } : null,
-}));
-
-saveFixtures(DATE, fixtures, { source: "trade.500.com-jczq-clean (Playwright)" });
-saveMarketSnapshots(DATE, snapshots, { source: "trade.500.com-jczq-clean (Playwright)" });
-console.log(`干净重建:${fixtures.length} 场 fixtures + ${snapshots.length} 快照(覆盖旧污染)`);
-
+const od = (a) => ({ home:a[0], draw:a[1], away:a[2] });
+const fixtures = M.map(([n,h,a]) => ({ id:`jc-${DATE}-${n}-${h}-${a}`, sequence:n, date:DATE, homeTeam:h, awayTeam:a, competition:"国际赛", marketType:"jingcai", kickoff:`${KICK}T02:45:00+08:00` }));
+const snaps = M.map(([n,h,a,spf,rang]) => ({ id:`jc-${DATE}-${n}`, date:DATE, fixtureId:`jc-${DATE}-${n}-${h}-${a}`, sequence:n, marketType:"jingcai", competition:"国际赛", homeTeam:h, awayTeam:a, collectedAt:now, source:"trade.500.com/jczq XML (Playwright, 胜平负/让球已校正)", europeanOdds:{ initial:od(spf), current:od(spf), final:od(spf) }, handicapOdds:{ initial:od(rang), current:od(rang), final:od(rang) }, jingcaiHandicap:{ line:-1 } }));
+saveFixtures(DATE, fixtures, { source:"trade.500.com-jczq-corrected" });
+saveMarketSnapshots(DATE, snaps, { source:"trade.500.com-jczq-corrected" });
 const r = recommendFixtures(DATE);
-console.log(`\n进推荐 ${r.predictions.length} 场 | unpredictable ${r.unpredictable?.length ?? 0} | 14场available=${r.fourteen?.available}`);
-const dv = (o) => { const i = 1 / o.home + 1 / o.draw + 1 / o.away; return `主${(100 / o.home / i).toFixed(0)}/平${(100 / o.draw / i).toFixed(0)}/客${(100 / o.away / i).toFixed(0)}`; };
+const dv = (o) => { const i=1/o.home+1/o.draw+1/o.away; return {h:100/o.home/i,d:100/o.draw/i,a:100/o.away/i}; };
+console.log(`重建 ${fixtures.length} 场(胜平负已校正)`);
 for (const p of r.predictions) {
-  const f = p.fixture, pr = p.probabilities, sc = p.scorePicks, hf = p.halfFullPicks;
-  const m = M.find((x) => x[1] === f.homeTeam);
-  console.log(`\n【${f.homeTeam} vs ${f.awayTeam}】收盘赔率 ${m[4].join("/")} (市场${dv(odds(m[4]))})`);
-  console.log(`  模型胜平负: ${p.pick?.label}  主${(pr.home * 100).toFixed(0)}/平${(pr.draw * 100).toFixed(0)}/客${(pr.away * 100).toFixed(0)}  [${p.provenance}]`);
-  console.log(`  比分: ${sc?.primary}(${sc?.primaryProbability ? (sc.primaryProbability * 100).toFixed(1) + "%" : "-"}) 备${sc?.secondary} | 半全场: ${hf?.primary}(${hf?.primaryProbability ? (hf.primaryProbability * 100).toFixed(1) + "%" : "-"})`);
+  const f=p.fixture, pr=p.probabilities, sc=p.scorePicks, hf=p.halfFullPicks, m=M.find(x=>x[1]===f.homeTeam), mk=dv(od(m[3]));
+  console.log(`\n【${f.homeTeam} vs ${f.awayTeam}】胜平负 ${m[3].join("/")} 市场主${mk.h.toFixed(0)}/平${mk.d.toFixed(0)}/客${mk.a.toFixed(0)}`);
+  console.log(`  胜平负方向: ${p.pick?.label} 主${(pr.home*100).toFixed(0)}/平${(pr.draw*100).toFixed(0)}/客${(pr.away*100).toFixed(0)} [${p.provenance}]`);
+  console.log(`  让球(主-1) ${m[4].join("/")} → 让球方向: ${p.jingcaiLetqiu?.pick?.label||"-"}`);
+  console.log(`  比分: ${sc?.primary}(${sc?.primaryProbability?(sc.primaryProbability*100).toFixed(1)+"%":"-"}) ${sc?.confidenceTier?.label||""} | 半全场: ${hf?.primary}(${hf?.primaryProbability?(hf.primaryProbability*100).toFixed(1)+"%":"-"}) ${hf?.confidenceTier?.label||""}`);
 }
