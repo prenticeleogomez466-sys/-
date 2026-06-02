@@ -34,6 +34,28 @@ function competitorName(competitor) {
   return competitor?.team?.displayName ?? competitor?.team?.name ?? competitor?.team?.location ?? competitor?.team?.shortDisplayName ?? "";
 }
 
+function americanToDecimal(value) {
+  const ml = Number(String(value ?? "").replace(/[^0-9+-]/g, ""));
+  return moneyLineToDecimal(ml);
+}
+
+/**
+ * 从 scoreboard 的 odds 对象解析大小球总进球盘(line + 大/小水位,open→initial、close→current)。纯函数。
+ */
+export function parseEspnScoreboardTotals(competition) {
+  const odds = competition?.odds?.[0];
+  if (!odds) return null;
+  const line = Number(odds.overUnder);
+  if (!Number.isFinite(line)) return null;
+  const overOpen = americanToDecimal(odds.total?.over?.open?.odds);
+  const overClose = americanToDecimal(odds.total?.over?.close?.odds);
+  const underOpen = americanToDecimal(odds.total?.under?.open?.odds);
+  const underClose = americanToDecimal(odds.total?.under?.close?.odds);
+  const initial = { line, over: Number.isFinite(overOpen) ? round3(overOpen) : null, under: Number.isFinite(underOpen) ? round3(underOpen) : null };
+  const current = { line, over: Number.isFinite(overClose) ? round3(overClose) : null, under: Number.isFinite(underClose) ? round3(underClose) : null };
+  return { initial, current };
+}
+
 /**
  * 在 scoreboard JSON 里把赛事匹配到 fixtures。纯函数。
  * @returns {Array<{fixture, eventId, league, swap}>}
@@ -60,7 +82,7 @@ export function matchEspnEvents(json, fixtures, league = "") {
       const key = fixture.id || `${fHome}-${fAway}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      matches.push({ fixture, eventId: event.id, league: league || event.leagues?.[0]?.slug || "", date: event.date, swap });
+      matches.push({ fixture, eventId: event.id, league: league || event.leagues?.[0]?.slug || "", date: event.date, swap, totals: parseEspnScoreboardTotals(competition) });
     }
   }
   return matches;
@@ -90,7 +112,7 @@ export function parseEspnCoreOdds(item, { swap = false } = {}) {
   return { european, overUnder: Number.isFinite(overUnder) ? overUnder : null, provider: item.provider?.name ?? "ESPN" };
 }
 
-function buildSnapshot(fixture, parsed, date, collectedAtIso) {
+function buildSnapshot(fixture, parsed, date, collectedAtIso, totals = null) {
   return normalizeMarketSnapshot({
     date,
     fixtureId: fixture.id,
@@ -101,6 +123,7 @@ function buildSnapshot(fixture, parsed, date, collectedAtIso) {
     awayTeam: fixture.awayTeam,
     collectedAt: collectedAtIso,
     europeanOdds: { initial: parsed.european, current: parsed.european },
+    totals: totals ?? (parsed.overUnder != null ? { line: parsed.overUnder } : null),
     source: `ESPN scoreboard odds (${parsed.provider})`
   }, date);
 }
@@ -156,7 +179,8 @@ export async function crawlEspnScoreboardOdds(date, fixtures, fetchImpl = global
     try {
       const item = await fetchCoreOdds(m.league, m.eventId, fetchImpl, headers);
       const parsed = parseEspnCoreOdds(item, { swap: m.swap });
-      if (parsed) rows.push(buildSnapshot(m.fixture, parsed, date, m.date ? new Date(m.date).toISOString() : new Date().toISOString()));
+      const totals = m.totals ?? (Number.isFinite(Number(item?.overUnder)) ? { line: Number(item.overUnder) } : null);
+      if (parsed) rows.push(buildSnapshot(m.fixture, parsed, date, m.date ? new Date(m.date).toISOString() : new Date().toISOString(), totals));
     } catch {
       // 个别赛事 core odds 拉取失败,跳过。
     }

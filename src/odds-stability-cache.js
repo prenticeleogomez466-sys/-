@@ -81,11 +81,21 @@ function jingcaiHandicapQuality(value, source) {
   return isFallbackSource(source) ? 1 : 3;
 }
 
+function totalsQuality(market, source) {
+  const point = market?.current ?? market?.initial;
+  if (!point || !Number.isFinite(Number(point.line))) return 0;
+  if (isFallbackSource(source)) return 1;
+  // 有真实大/小水位算满分,只有 line 算次一档(仍比派生强)。
+  const hasWater = Number(point.over) > 1 || Number(point.under) > 1;
+  return hasWater ? 3 : 2;
+}
+
 const MARKETS = [
   { field: "europeanOdds", quality: europeanQuality },
   { field: "asianHandicap", quality: genericQuality },
   { field: "handicapOdds", quality: genericQuality },
-  { field: "jingcaiHandicap", quality: jingcaiHandicapQuality }
+  { field: "jingcaiHandicap", quality: jingcaiHandicapQuality },
+  { field: "totals", quality: totalsQuality }
 ];
 
 /**

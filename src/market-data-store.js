@@ -105,6 +105,8 @@ export function normalizeMarketSnapshot(snapshot = {}, fallbackDate, index = 0) 
     handicapOdds: normalizeOutcomeSet(snapshot.handicapOdds ?? snapshot.rangqiu ?? snapshot.letBall),
     scoreOdds: normalizeScoreSet(snapshot.scoreOdds ?? snapshot.scoreTop ?? snapshot.correctScoreOdds),
     halfFullOdds: normalizeHalfFullSet(snapshot.halfFullOdds ?? snapshot.halfFullTop ?? snapshot.hafuOdds),
+    // 大小球总进球盘(line + 大/小水位)。之前大小球玩法全靠模型派生,接 ESPN 真实盘后有据可依。
+    totals: normalizeTotalsSet(snapshot.totals ?? snapshot.overUnder ?? snapshot.ou),
     source: snapshot.source ?? ""
   };
 }
@@ -196,6 +198,24 @@ function normalizeHalfFullSet(value = {}) {
     .sort((left, right) => left.odds - right.odds)
     .slice(0, 12);
   return top.length ? { top } : null;
+}
+
+function normalizeTotalsSet(value = {}) {
+  if (value == null) return null;
+  // 允许直接传 { line, over, under }(无 initial/current 包裹)。
+  const flat = value.line != null && value.initial == null && value.current == null ? { initial: value, current: value } : value;
+  const initial = normalizeTotalsPoint(flat.initial ?? flat.open);
+  const current = normalizeTotalsPoint(flat.current ?? flat.close ?? flat.latest);
+  return initial || current ? { initial, current } : null;
+}
+
+function normalizeTotalsPoint(value = {}) {
+  if (value == null) return null;
+  const line = Number(value.line ?? value.total ?? value.ou);
+  if (!Number.isFinite(line)) return null;
+  const over = Number(value.over ?? value.overWater ?? value.overOdds);
+  const under = Number(value.under ?? value.underWater ?? value.underOdds);
+  return { line, over: Number.isFinite(over) && over > 1 ? over : null, under: Number.isFinite(under) && under > 1 ? under : null };
 }
 
 function hasInitialAndLatest(value) {

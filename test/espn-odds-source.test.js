@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { matchEspnEvents, moneyLineToDecimal, parseEspnCoreOdds } from "../src/espn-odds-source.js";
+import { matchEspnEvents, moneyLineToDecimal, parseEspnCoreOdds, parseEspnScoreboardTotals } from "../src/espn-odds-source.js";
 
 describe("espn odds source", () => {
   it("美式 moneyLine 正确转小数赔率", () => {
@@ -57,5 +57,25 @@ describe("espn odds source", () => {
     // 主客相反的 fixture 应标 swap=true
     const swapped = matchEspnEvents(json, [{ id: "jc-2", homeTeam: "比利时", awayTeam: "克罗地亚" }], "fifa.friendly");
     assert.equal(swapped[0].swap, true);
+  });
+
+  it("parseEspnScoreboardTotals 解析大小球 line + 大/小水位(美式→小数,open/close)", () => {
+    const competition = { odds: [{
+      overUnder: 2.5,
+      total: {
+        over: { open: { odds: "-130" }, close: { odds: "-115" } },
+        under: { open: { odds: "-105" }, close: { odds: "-115" } }
+      }
+    }] };
+    const totals = parseEspnScoreboardTotals(competition);
+    assert.equal(totals.current.line, 2.5);
+    assert.equal(totals.initial.over, 1.769); // -130 → 1.769
+    assert.equal(totals.current.over, 1.87);  // -115 → 1.870
+    assert.equal(totals.initial.under, 1.952); // -105 → 1.952
+  });
+
+  it("无 overUnder 时 totals 返回 null", () => {
+    assert.equal(parseEspnScoreboardTotals({ odds: [{}] }), null);
+    assert.equal(parseEspnScoreboardTotals({}), null);
   });
 });

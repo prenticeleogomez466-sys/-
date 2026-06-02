@@ -1018,6 +1018,7 @@ function mergeSnapshots(previous, next) {
       europeanOdds: snapshot.europeanOdds ?? existing.europeanOdds ?? null,
       asianHandicap: snapshot.asianHandicap ?? existing.asianHandicap ?? null,
       handicapOdds: snapshot.handicapOdds ?? existing.handicapOdds ?? null,
+      totals: snapshot.totals ?? existing.totals ?? null,
       collectedAt: latestIso(existing.collectedAt, snapshot.collectedAt),
       source: mergeSourceNames(existing.source, snapshot.source)
     });
