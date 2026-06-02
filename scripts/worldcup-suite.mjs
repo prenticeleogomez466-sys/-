@@ -16,6 +16,7 @@ const STEPS = [
   ["Elo→Poisson 框架", "run-worldcup-elo-poisson.mjs"],
   ["Elo 校准曲线(400 scale)", "run-worldcup-elo-calibration.mjs"],
   ["小组出线概率 MC", "run-worldcup-group-sim.mjs"],
+  ["夺冠概率 MC(model/market/blend)", "run-worldcup-champion-sim.mjs"],
 ];
 
 console.log("══════ 2026 世界杯验证套件(一键复验,leak-safe)══════\n");
