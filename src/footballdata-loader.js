@@ -123,6 +123,21 @@ async function loadOne(league, season, fetchImpl) {
     const ast = num(cells, idx("AST"));
     const shots = hs !== null && as !== null ? { home: hs, away: as } : null;
     const sot = hst !== null && ast !== null ? { home: hst, away: ast } : null;
+    // 角球(HC/AC)与牌(HY/AY/HR/AR/HF/AF):五大联赛逐场都有,低级别/早赛季部分缺 → null。
+    // 角球喂角球泊松模型(全新低流动性市场);牌喂黄牌/犯规模型。下游缺失自动忽略。
+    const hc = num(cells, idx("HC"));
+    const ac = num(cells, idx("AC"));
+    const corners = hc !== null && ac !== null ? { home: hc, away: ac } : null;
+    const hy = num(cells, idx("HY"));
+    const ay = num(cells, idx("AY"));
+    const hr = num(cells, idx("HR"));
+    const ar = num(cells, idx("AR"));
+    const hf = num(cells, idx("HF"));
+    const af = num(cells, idx("AF"));
+    const cards =
+      hy !== null && ay !== null
+        ? { homeYellow: hy, awayYellow: ay, homeRed: hr, awayRed: ar, homeFouls: hf, awayFouls: af }
+        : null;
     out.push({
       date,
       league,
@@ -143,6 +158,8 @@ async function loadOne(league, season, fetchImpl) {
       referee: (cells[idx("Referee")] || "").trim() || null,
       shots, // {home,away} 总射门数,或 null
       sot, // {home,away} 射正数,或 null
+      corners, // {home,away} 角球数,或 null
+      cards, // {homeYellow,awayYellow,homeRed,awayRed,homeFouls,awayFouls},或 null
       odds, // {home,draw,away} 去 vig 后的隐含概率,或 null(开盘均赔)
       oddsClose, // 收盘均赔隐含,或 null
       oddsPinnacle, // Pinnacle 开盘隐含,或 null
@@ -179,6 +196,8 @@ export async function loadFootballDataMatches(opts = {}) {
     withClosing: all.filter((m) => m.oddsClose).length,
     withPinnacle: all.filter((m) => m.oddsPinnacle).length,
     withShots: all.filter((m) => m.shots && m.sot).length,
+    withCorners: all.filter((m) => m.corners).length,
+    withCards: all.filter((m) => m.cards).length,
     withAsian: all.filter((m) => m.asian && (m.asian.line !== null || m.asian.lineClose !== null)).length,
     byLeague
   };

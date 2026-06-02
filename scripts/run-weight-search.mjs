@@ -11,19 +11,21 @@ const args = process.argv.slice(2);
 const getNum = (flag, def) => { const i = args.indexOf(flag); return i >= 0 && args[i + 1] ? Number(args[i + 1]) : def; };
 const apply = args.includes("--apply"); // 写 profile 才生效;不带只看结果
 
-// 消融裁决(R3):害校准 = home-away-split / time-decay-form / clean-sheet-streak
-const HURTS = ["home-away-split", "time-decay-form", "clean-sheet-streak"];
+// 消融裁决(2026-06-02 重测):害校准 = home-away-split / time-decay-form / h2h / derby
+//   (clean-sheet-streak 本窗中性偏有用 → 不再剔除;新增 h2h/derby,它们 Brier/LogLoss 双负)。
+const HURTS4 = ["home-away-split", "time-decay-form", "h2h", "derby"];
 const w = (obj) => obj; // 便捷
 
 const candidates = [
   { name: "baseline(全1)", signalWeights: null },
-  { name: "弃3害(disable)", disabledSignals: HURTS },
-  { name: "降3害@0.5", signalWeights: w({ "home-away-split": 0.5, "time-decay-form": 0.5, "clean-sheet-streak": 0.5 }) },
-  { name: "降3害@0.3", signalWeights: w({ "home-away-split": 0.3, "time-decay-form": 0.3, "clean-sheet-streak": 0.3 }) },
+  { name: "弃4害(disable)", disabledSignals: HURTS4 },
+  { name: "降4害@0.5", signalWeights: w({ "home-away-split": 0.5, "time-decay-form": 0.5, "h2h": 0.5, "derby": 0.5 }) },
+  { name: "降4害@0.3", signalWeights: w({ "home-away-split": 0.3, "time-decay-form": 0.3, "h2h": 0.3, "derby": 0.3 }) },
+  { name: "弃量大2(split+tdf)", disabledSignals: ["home-away-split", "time-decay-form"] },
+  { name: "弃3(split+tdf+h2h)", disabledSignals: ["home-away-split", "time-decay-form", "h2h"] },
   { name: "仅弃time-decay", disabledSignals: ["time-decay-form"] },
-  { name: "弃tdf+csstreak留split", disabledSignals: ["time-decay-form", "clean-sheet-streak"] },
-  { name: "留split@0.5,弃另2", signalWeights: w({ "home-away-split": 0.5, "time-decay-form": 0, "clean-sheet-streak": 0 }) },
-  { name: "仅helpers(fatigue+h2h)", disabledSignals: ["home-away-split", "time-decay-form", "clean-sheet-streak", "season-phase", "streak", "competition-type"] }
+  { name: "弃split,降tdf/h2h@0.4", signalWeights: w({ "home-away-split": 0, "time-decay-form": 0.4, "h2h": 0.4, "derby": 0.4 }) },
+  { name: "弃4害+留fatigue满", disabledSignals: HURTS4 }
 ];
 
 console.log("权重搜索回测中(单遍评估所有候选)...");
@@ -46,8 +48,12 @@ for (const c of rows) {
   console.log(`${c.name.padEnd(28)}${(c.accuracy * 100).toFixed(1)}%`.padEnd(38) + `${c.brier}`.padEnd(9) + `${c.logLoss}`.padEnd(10) + f((c.dHit * 100).toFixed(2) + "pp") + f(c.dBrier.toFixed(4)));
 }
 
-// 选择:命中率最高;平手(±0.000) 比 Brier 低。同时标注是否 Brier ≤ DC。
-const best = [...rows].sort((a, b) => (b.accuracy - a.accuracy) || (a.brier - b.brier))[0];
+// 选择(噪声感知):2k 场下 0.1pp 命中差≈1-2 场=噪声,不为它牺牲校准。
+// 取命中率在最高值 ACC_BAND(0.3pp) 内的候选,其中选 Brier 最低者 → 命中不丢、校准最优。
+const ACC_BAND = 0.003;
+const maxAcc = Math.max(...rows.map((c) => c.accuracy));
+const inBand = rows.filter((c) => c.accuracy >= maxAcc - ACC_BAND);
+const best = [...inBand].sort((a, b) => a.brier - b.brier)[0];
 const baseline = rows.find((c) => c.name.startsWith("baseline"));
 console.log(`\n最佳候选:${best.name} — 命中 ${(best.accuracy * 100).toFixed(1)}%(vs baseline ${(baseline.accuracy * 100).toFixed(1)}%,vsDC ${(best.dHit * 100).toFixed(2)}pp),Brier ${best.brier}(vsDC ${best.dBrier >= 0 ? "+" : ""}${best.dBrier.toFixed(4)})`);
 

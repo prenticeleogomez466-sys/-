@@ -117,10 +117,13 @@
     "backtest:handicap-method": "node scripts/run-handicap-method-backtest.mjs",
     "backtest:lowgoals-value": "node scripts/run-lowgoals-value-backtest.mjs",
     "sync:understat": "node scripts/sync-understat-xg.mjs",
+    "sync:api-football": "node scripts/sync-api-football.mjs",
+    "sync:fbref": "node scripts/sync-fbref.mjs",
     "wc:suite": "node scripts/worldcup-suite.mjs",
     "wc:validate": "node scripts/worldcup-prior-validation.mjs",
     "wc:groups": "node scripts/run-worldcup-group-sim.mjs",
-    "wc:backfill": "node scripts/backfill-worldcup-history.mjs"
+    "wc:backfill": "node scripts/backfill-worldcup-history.mjs",
+    "backtest:corners": "node scripts/run-corners-backtest.mjs"
   },
   "engines": {
     "node": ">=20"
