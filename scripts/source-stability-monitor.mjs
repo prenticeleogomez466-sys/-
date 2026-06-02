@@ -36,9 +36,13 @@ function classifyOdds(name, ok, fetched, error, hasShengfucai, hasJingcai) {
   const e = String(error ?? "");
   if (/缺少.*KEY|缺少 ODDS|未配置|ODDS_API_KEY/.test(e)) return "na";          // 付费源故意关
   if (/无需回填/.test(e)) return "ok";                                          // 缓存健康
-  if (!hasShengfucai && /期号|14\s*场|euro-asian|澳盘|欧洲四大|matching rows|sfc/i.test(e)) return "na";
+  // "数据尚未发布/无可匹配项"类失败属 na,而非源不稳:期号未开、当天该联赛无赛、
+  //  欧亚对比文章未出等 —— 这些是"没东西可抓",不是抓取链坏了。
+  if (/未发现匹配期号|期号|14\s*场|euro-asian|澳盘|欧洲四大|matching rows|no matching|未发现可匹配|sfc/i.test(e)) return "na";
   if (!hasShengfucai && !hasJingcai) return "na";                              // 今日无可抓市场
-  if (/缺亚盘 fixture 未获补救/.test(e) && !hasJingcai) return "na";
+  // CubeGoal 二轮救援是"最后兜底"抓亚盘,目标多为数日后的未来场次(盘口尚未挂出),
+  // 失败属预期而非源不稳 —— 归 na,避免长期 0% 误报掩盖真问题。
+  if (/二轮救援|缺亚盘 fixture 未获补救/.test(`${name} ${e}`)) return "na";
   return "fail";
 }
 

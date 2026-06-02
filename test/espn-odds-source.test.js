@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { matchEspnEvents, moneyLineToDecimal, parseEspnCoreOdds, parseEspnScoreboardTotals } from "../src/espn-odds-source.js";
+import { espnDateStamps, matchEspnEvents, moneyLineToDecimal, parseEspnCoreOdds, parseEspnScoreboardTotals } from "../src/espn-odds-source.js";
 
 describe("espn odds source", () => {
   it("美式 moneyLine 正确转小数赔率", () => {
@@ -77,5 +77,20 @@ describe("espn odds source", () => {
   it("无 overUnder 时 totals 返回 null", () => {
     assert.equal(parseEspnScoreboardTotals({ odds: [{}] }), null);
     assert.equal(parseEspnScoreboardTotals({}), null);
+  });
+
+  it("espnDateStamps 含 crawl 当天±1 + 每场自己开赛日(覆盖未来场次)", () => {
+    const stamps = espnDateStamps("2026-06-02", [
+      { kickoff: "2026-06-06" },
+      { kickoff: "2026-06-07" },
+      { kickoff: "2026-06-02" }
+    ]);
+    // crawl 当天±1
+    assert.ok(stamps.includes("20260601") && stamps.includes("20260602") && stamps.includes("20260603"));
+    // 未来开赛日(及前一天兜时区)
+    assert.ok(stamps.includes("20260606") && stamps.includes("20260605"));
+    assert.ok(stamps.includes("20260607") && stamps.includes("20260606"));
+    // 去重
+    assert.equal(stamps.length, new Set(stamps).size);
   });
 });

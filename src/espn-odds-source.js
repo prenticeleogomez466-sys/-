@@ -128,12 +128,28 @@ function buildSnapshot(fixture, parsed, date, collectedAtIso, totals = null) {
   }, date);
 }
 
-function espnDateStamps(date) {
-  const stamps = new Set();
-  const base = new Date(`${date}T00:00:00Z`);
-  for (const offset of [-1, 0, 1]) {
+function stampsAround(dateStr, offsets = [-1, 0, 1]) {
+  const out = [];
+  const base = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(base.getTime())) return out;
+  for (const offset of offsets) {
     const d = new Date(base.getTime() + offset * 86400e3);
-    stamps.add(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`);
+    out.push(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`);
+  }
+  return out;
+}
+
+function fixtureKickoffDate(fixture) {
+  return String(fixture?.kickoff ?? fixture?.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+}
+
+// 抓取日期戳 = crawl 当天±1 ∪ 每场自己的开赛日(及前一天兜时区)。
+// 这样未来场次(如 14 场胜负彩 06-06/07)也能提前拿到真实赔率并缓存。
+export function espnDateStamps(date, fixtures = []) {
+  const stamps = new Set(stampsAround(date));
+  for (const fixture of fixtures) {
+    const kickoff = fixtureKickoffDate(fixture);
+    if (kickoff) for (const s of stampsAround(kickoff, [-1, 0])) stamps.add(s);
   }
   return [...stamps];
 }
@@ -156,7 +172,7 @@ export async function crawlEspnScoreboardOdds(date, fixtures, fetchImpl = global
   const targets = fixtures.filter((f) => options.allFixtures || /国|际|友谊|world|nations|friendly|qual/i.test(`${f.competition ?? ""}`));
   if (!targets.length) return [];
   const leagues = options.leagues ?? ESPN_INTL_LEAGUES;
-  const stamps = espnDateStamps(date);
+  const stamps = espnDateStamps(date, targets);
   const headers = { "User-Agent": "Mozilla/5.0 football-ai-copilot/espn-odds" };
   const matchedByFixture = new Map();
   for (const league of leagues) {
