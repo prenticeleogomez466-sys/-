@@ -5,6 +5,7 @@ import "./env.js";
 import { loadFixtures } from "./fixture-store.js";
 import { findMarketSnapshot, loadMarketSnapshots, normalizeMarketSnapshot, saveMarketSnapshots } from "./market-data-store.js";
 import { backfillFromStabilityCache, updateStabilityCache } from "./odds-stability-cache.js";
+import { crawlEspnScoreboardOdds } from "./espn-odds-source.js";
 import { getDataSubdir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -163,6 +164,17 @@ export async function crawlMarketData(date, options = {}) {
       sources.push({ name: "CubeGoal公开赔率", fetched: 0, ok: false, error: error.message });
     }
   }
+  // 2026-06-02: ESPN scoreboard 冗余欧赔源,主补国际赛/友谊赛(新浪/付费源常年抓不到)。
+  if (process.env.ESPN_ODDS_ENABLED !== "0") {
+    try {
+      const rows = await crawlEspnScoreboardOdds(date, fixtureSet.fixtures, fetchImpl);
+      candidates.push(...rows);
+      sources.push({ name: "ESPN scoreboard odds", fetched: rows.length, ok: rows.length > 0, error: rows.length ? undefined : "无匹配国际赛事或当日无赔率" });
+    } catch (error) {
+      sources.push({ name: "ESPN scoreboard odds", fetched: 0, ok: false, error: error.message });
+    }
+  }
+
   let matched = alignSnapshots(candidates, fixtureSet.fixtures);
   let merged = mergeSnapshots(previous, matched);
 
