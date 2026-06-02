@@ -13,6 +13,8 @@ import { eloExpectation, teamPrior } from "../src/world-cup-priors.js";
 
 const N = 20000;
 const HOSTS = new Set(["United States", "Canada", "Mexico"]);
+const LAMTOT = 2.6; // 国际赛场均总进球(经验);泊松比分模拟按 we 分摊到两队(近似,使净胜球/进球数 tiebreak 有意义)
+function poissonSample(lam) { const L = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > L); return k - 1; }
 
 function load() {
   const dir = join(getDataSubdir("world-cup"), "2026");
@@ -48,23 +50,25 @@ function main() {
     for (const teams of Object.values(groups)) {
       const pts = Object.fromEntries(teams.map((t) => [t, 0]));
       const gd = Object.fromEntries(teams.map((t) => [t, 0]));
+      const gf = Object.fromEntries(teams.map((t) => [t, 0]));
       for (let i = 0; i < teams.length; i++) {
         for (let j = i + 1; j < teams.length; j++) {
           const A = teams[i], B = teams[j];
           let ha = 0;
           if (HOSTS.has(A)) ha += 35; if (HOSTS.has(B)) ha -= 35;
-          const e = eloExpectation(elo[A], elo[B], ha);
-          const r = Math.random();
-          if (r < e.home) { pts[A] += 3; gd[A]++; gd[B]--; }
-          else if (r < e.home + e.draw) { pts[A]++; pts[B]++; }
-          else { pts[B] += 3; gd[B]++; gd[A]--; }
+          const we = eloExpectation(elo[A], elo[B], ha).homeWinExpectancy;
+          // 泊松真实比分(we 分摊总进球,近似):强队进更多球,使净胜球/进球数 tiebreak 有意义
+          const ga = poissonSample(LAMTOT * we), gb = poissonSample(LAMTOT * (1 - we));
+          if (ga > gb) pts[A] += 3; else if (ga === gb) { pts[A]++; pts[B]++; } else pts[B] += 3;
+          gd[A] += ga - gb; gd[B] += gb - ga; gf[A] += ga; gf[B] += gb;
         }
       }
-      const ranked = [...teams].sort((x, y) => pts[y] - pts[x] || gd[y] - gd[x] || Math.random() - 0.5);
+      // FIFA tiebreaker: 积分 → 净胜球 → 进球数 →(相互战绩近似用随机)
+      const ranked = [...teams].sort((x, y) => pts[y] - pts[x] || gd[y] - gd[x] || gf[y] - gf[x] || Math.random() - 0.5);
       advance[ranked[0]]++; advance[ranked[1]]++;
-      thirds.push({ team: ranked[2], pts: pts[ranked[2]], gd: gd[ranked[2]] });
+      thirds.push({ team: ranked[2], pts: pts[ranked[2]], gd: gd[ranked[2]], gf: gf[ranked[2]] });
     }
-    thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || Math.random() - 0.5);
+    thirds.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || Math.random() - 0.5);
     for (let k = 0; k < 8; k++) advance[thirds[k].team]++;
   }
 
