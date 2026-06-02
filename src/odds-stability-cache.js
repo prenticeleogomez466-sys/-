@@ -115,7 +115,7 @@ export function updateStabilityCache(date, snapshots, nowIso = new Date().toISOS
       if (q <= 0) continue;
       const prev = entry.markets[field];
       if (!prev || q >= prev.quality) {
-        entry.markets[field] = { value, quality: q, source: snapshot.source ?? "", collectedAt: snapshot.collectedAt ?? nowIso, storedAt: nowIso };
+        entry.markets[field] = { value, quality: q, source: cleanSource(snapshot.source), collectedAt: snapshot.collectedAt ?? nowIso, storedAt: nowIso };
         stored += 1;
       }
     }
@@ -192,6 +192,19 @@ export function backfillFromStabilityCache(date, snapshots, fixtures, nowIso = n
   }
 
   return { snapshots: result, backfilled, details };
+}
+
+// 剥掉嵌套的"稳定缓存(...)"包裹,保留真实来源,避免源字符串跨轮无限增长。
+function cleanSource(source) {
+  let s = String(source ?? "");
+  let prev;
+  do { prev = s; s = s.replace(/稳定缓存\(([^()]*)\)/g, "$1"); } while (s !== prev);
+  const parts = [];
+  for (const piece of s.split("+")) {
+    const trimmed = piece.trim();
+    if (trimmed && !/^稳定缓存/.test(trimmed) && !parts.includes(trimmed)) parts.push(trimmed);
+  }
+  return parts.join("+");
 }
 
 function mergeSource(...sources) {
