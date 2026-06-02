@@ -26,7 +26,9 @@ if (!preds.length) {
 
 const html = renderTodayMobileHtml(rec, date);
 const four = rec.fourteen || {};
-const sels = Array.isArray(four.selections) ? four.selections : [];
+const fourOpen = four.available !== false;
+const jcCount = preds.filter((p) => (p.fixture?.marketType ?? "jingcai") !== "shengfucai").length;
+const sels = fourOpen && Array.isArray(four.selections) ? four.selections : [];
 const dan = sels.filter((s) => s.type === "胆").length, shuang = sels.filter((s) => s.type === "双选").length, quan = sels.filter((s) => s.type === "全选").length;
 const combos = sels.reduce((a, s) => a * (String(s.compound || s.single || "").split("/").filter(Boolean).length || 1), 1);
 const issue = (preds[0]?.fixture?.notes || "").match(/官方期号=([^;]+)/)?.[1]?.trim() || null;
@@ -40,7 +42,7 @@ for (const t of targets) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(t, html, "utf8");
 }
-console.log(`✅ 合一手机页已生成 (${preds.length}场竞彩 + 14场[胆${dan}/双${shuang}/全${quan}=${combos}注]${rec.fourteen?.renxuan9?.ok ? ` + 任选9(对${rec.fourteen.renxuan9.needCorrect})` : ""})`);
+console.log(`✅ 合一手机页已生成 (${jcCount}场竞彩${fourOpen ? ` + 14场[胆${dan}/双${shuang}/全${quan}=${combos}注]${rec.fourteen?.renxuan9?.ok ? ` + 任选9(对${rec.fourteen.renxuan9.needCorrect})` : ""}` : " · 今日无14场(本期已停售)"})`);
 console.log(`   期号 ${issue || "(无)"}`);
 targets.forEach((t) => console.log("   →", t));
 console.log("   📱 手机静态页: http://172.16.0.240/今日足球推荐.html");

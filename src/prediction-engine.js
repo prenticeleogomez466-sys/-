@@ -40,6 +40,7 @@ import { selectionTier } from "./selection-tier.js";
 import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
 import { analyzeMatch } from "./match-archetype-analyzer.js";
+import { synthesizeScenario, scenarioNarrative } from "./scenario-synthesizer.js";
 import { leagueExpertFromFitted } from "./league-expert-mixture.js";
 import { multimodalAnalysis, summarizeMultimodal } from "./multimodal-collab.js";
 
@@ -743,6 +744,18 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   替代旧固定模板 buildReason/generateExplanation。挂已算字段,零假编。
   prediction.differentialAnalysis = analyzeMatch(prediction);
   if (prediction.differentialAnalysis?.narrative) prediction.rationale = prediction.differentialAnalysis.narrative;
+  // 情景合成层(2026-06-02 用户要求"分析底层逻辑全面拆解"):把平局/大小球/爆冷/比分形态/
+  //   联赛特性/赛事重要度合成为一场的情景研判 + 玩法指引,挂 prediction.scenario,并接进叙述。
+  //   零重算零假编 —— 只读已算字段(scorePicks.deepAnalysis/extendedMarkets/upsetTrap/archetype/概率)。
+  // 球队特点外部源(若已同步):挂上供情景层读,描述性、不动概率方向。
+  //   API-Football=近期状态(api-football-source.js);FBref=xG 画像(fbref-source.js)。
+  prediction.teamTraits = fixtureAdvancedData?.apiFootball ?? null;
+  prediction.fbref = fixtureAdvancedData?.fbref ?? null;
+  prediction.scenario = synthesizeScenario(prediction);
+  if (prediction.scenario) {
+    const scNarr = scenarioNarrative(prediction.scenario);
+    if (scNarr) prediction.rationale = `${prediction.rationale ?? ""}\n${scNarr}`.trim();
+  }
   // 红队自检(2026-06-01 P1/P2,落实 prompt <red_team> 硬规则):三条反问,只下调信心/加风险标签,
   //   不改 pick/概率方向(遵 wld 锚定 + 不替用户弃赛)。挂 prediction.redTeam + riskNotes。
   redTeamCheck(prediction, {
@@ -864,9 +877,15 @@ export function scoreHalfFullConsistent(score, halfFull) {
 }
 
 export function validatePredictionConsistency(prediction) {
+  // 2026-06-02:比分首选(scorePicks.primary)已改为"真实最可能比分",可含平局/反向众数,
+  //   故不再核它与 wld 的方向一致 —— 比分是独立市场,只跟方向有逻辑关系、不跟具体比分绑死(用户澄清)。
+  //   方向一致性改核"与方向一致的比分"字段 wldConsistent(它才喂半全场/让球)。
+  // 回退:旧调用/单元测试只设 primary 时,退回核 primary;真实预测均设 wldConsistent。
+  const wldScore = prediction.scorePicks?.wldConsistent ?? prediction.scorePicks?.primary;
+  const wldScoreSec = prediction.scorePicks?.wldConsistentSecondary ?? prediction.scorePicks?.secondary;
   const checks = [
-    ["比分首选", prediction.scorePicks?.primary, prediction.pick?.code, scoreOutcomeCode],
-    ["比分次选", prediction.scorePicks?.secondary, prediction.secondaryPick?.code, scoreOutcomeCode],
+    ["方向一致比分", wldScore, prediction.pick?.code, scoreOutcomeCode],
+    ["方向一致比分次选", wldScoreSec, prediction.secondaryPick?.code, scoreOutcomeCode],
     ["半全场首选", prediction.halfFullPicks?.primary, prediction.pick?.code, halfFullFinalOutcomeCode],
     ["半全场次选", prediction.halfFullPicks?.secondary, prediction.secondaryPick?.code, halfFullFinalOutcomeCode]
   ];
@@ -876,8 +895,8 @@ export function validatePredictionConsistency(prediction) {
     return `${label} ${value || "缺失"} 与 ${outcomeCodeToChinese(expectedCode)} 不一致`;
   });
   const pathChecks = [
-    ["比分/半全场首选", prediction.scorePicks?.primary, prediction.halfFullPicks?.primary],
-    ["比分/半全场次选", prediction.scorePicks?.secondary, prediction.halfFullPicks?.secondary]
+    ["比分/半全场首选", wldScore, prediction.halfFullPicks?.primary],
+    ["比分/半全场次选", wldScoreSec, prediction.halfFullPicks?.secondary]
   ];
   for (const [label, score, halfFull] of pathChecks) {
     if (score && halfFull && !scoreHalfFullConsistent(score, halfFull)) errors.push(`${label} ${score} 与 ${halfFull} 路径冲突`);
@@ -1115,30 +1134,44 @@ function roundedProbabilitySet(values) {
 //   2. dcResult.topScores      ── Dixon-Coles 泊松矩阵 topScores(训练 DC 或 λ 派生矩阵)
 //   3. bestScoreFromMatrix     ── 全矩阵扫描该 wld 方向最高概率比分(保证有解,仍是真泊松,非死表)
 // dcResult 现恒为真矩阵(训练 DC 或 buildDerivedScoreModel 的 λ 泊松矩阵),scoreForOutcome 死表已不接入。
+// 2026-06-02 用户硬要求改写:比分首选不再被胜负平方向锁死(治"全是1-0/0-1、对方0球、永远没平盘")。
+//   根因:旧 primary = bestScoreFromMatrix(matrix, code) —— 只在 wld 方向的格子里取 argmax。低进球泊松里
+//   该格永远落在"对方0球"(1-0/2-0),且平局(1-1/0-0,常为全场最高概率)被结构性排除。
+//   新设计(用户选 A):
+//     · primary/secondary = 全矩阵真实众数(可含平局),即"模型最可能比分",头条展示这个;
+//     · wldConsistent/wldConsistentSecondary = 与胜负平方向一致的比分(旧锚定逻辑),
+//       继续喂半全场派生 + 让球 + 一致性自检,保证"方向锚"硬规则不破。
 function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, dcResult = null) {
   const matrix = dcResult?.matrix ?? null;
+  // ── 与胜负平方向一致的比分(旧锚定逻辑保留:喂半全场/让球/一致性核验)──
   const fromMarket = scoreFromMarket(snapshot, code);
   const fromMarketSecondary = scoreFromMarket(snapshot, secondaryCode, new Set(fromMarket ? [fromMarket] : []));
   const fromDc = fromMarket ? null : scoreFromDcResult(dcResult, code);
   const exclusionForSecondary = new Set([fromMarket, fromDc].filter(Boolean));
   const fromDcSecondary = fromMarketSecondary ? null : scoreFromDcResult(dcResult, secondaryCode, exclusionForSecondary);
-  const primary = fromMarket ?? fromDc ?? bestScoreFromMatrix(matrix, code);
-  const secondaryExclusion = new Set([primary].filter(Boolean));
+  const wldConsistent = fromMarket ?? fromDc ?? bestScoreFromMatrix(matrix, code);
+  const wldSecExcl = new Set([wldConsistent].filter(Boolean));
+  const wldConsistentSecondary = fromMarketSecondary ?? fromDcSecondary
+    ?? bestScoreFromMatrix(matrix, secondaryCode, wldSecExcl) ?? bestScoreFromMatrix(matrix, secondaryCode);
+  // ── 真实最可能比分(全矩阵众数,任意方向,可含平局)——头条 ──
+  const globalTop = topScoresWithProb(matrix, 8);
+  const primary = globalTop[0]?.score ?? wldConsistent;
+  const secondary = (globalTop[1]?.score && globalTop[1].score !== primary)
+    ? globalTop[1].score
+    : (wldConsistentSecondary ?? globalTop[2]?.score ?? wldConsistent);
   // 来源标记(供自检判真假):market=官方比分赔率;dcResult.source=训练DC/λ派生真泊松矩阵;
-  // matrix-scan=全矩阵扫描(仍真泊松)。绝不出现死表来源 —— 死表已删。
+  // poisson-matrix=全矩阵扫描(仍真泊松)。绝不出现死表来源 —— 死表已删。
   const source = fromMarket ? "market" : (fromDc ? (dcResult?.source ?? "dc-matrix") : (matrix ? (dcResult?.source ?? "poisson-matrix") : "none"));
-  return {
-    primary,
-    secondary: fromMarketSecondary ?? fromDcSecondary ?? bestScoreFromMatrix(matrix, secondaryCode, secondaryExclusion) ?? bestScoreFromMatrix(matrix, secondaryCode),
-    source
-  };
+  return { primary, secondary, wldConsistent, wldConsistentSecondary, source };
 }
 
 // 半全场预测优先级同上:市场比分赔率 → DC/λ 泊松半场联合分布(halfFullFromDcResult 从 expectedGoals 真算)。
 // dcResult 恒为真矩阵(带 expectedGoals),halfFullFromDcResult 必有解,halfFullForScore 死表已不接入。
 function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities = {}, index = 0, scorePicks = {}, dcResult = null, league = null) {
-  const primaryScore = scorePicks.primary ?? bestScoreFromMatrix(dcResult?.matrix, code);
-  const secondaryScore = scorePicks.secondary ?? bestScoreFromMatrix(dcResult?.matrix, secondaryCode);
+  // 半全场仍锚胜负平方向(用户硬规则未变):用"与方向一致的比分"做兼容性底座,不用真实众数 primary
+  //   (primary 可能是平局/反向众数,会与半全场全场方向冲突)。
+  const primaryScore = scorePicks.wldConsistent ?? scorePicks.primary ?? bestScoreFromMatrix(dcResult?.matrix, code);
+  const secondaryScore = scorePicks.wldConsistentSecondary ?? scorePicks.secondary ?? bestScoreFromMatrix(dcResult?.matrix, secondaryCode);
   const primaryFromMarket = halfFullFromMarket(snapshot, code, new Set(), primaryScore);
   const primaryFromDc = primaryFromMarket ? null : halfFullFromDcResult(dcResult, code, new Set(), primaryScore, league);
   const exclusion = new Set([primaryFromMarket, primaryFromDc].filter(Boolean));
@@ -1157,6 +1190,9 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   const matrix = scoreModel?.matrix ?? null;
   scorePicks.primaryProbability = scoreProbFromMatrix(matrix, scorePicks.primary);
   scorePicks.secondaryProbability = scoreProbFromMatrix(matrix, scorePicks.secondary);
+  // 与胜负平方向一致的比分概率(供展示"方向一致 1-0(12%)"+让球/半全场底座)
+  scorePicks.wldConsistentProbability = scoreProbFromMatrix(matrix, scorePicks.wldConsistent);
+  scorePicks.wldConsistentSecondaryProbability = scoreProbFromMatrix(matrix, scorePicks.wldConsistentSecondary);
   scorePicks.distribution = topScoresWithProb(matrix, 8); // 2026-06-01 5→8:均势客胜场客胜比分概率分散,Top5 常只够 1 个 wld 一致比分(治"保黑只显示 0-1"),取 8 让各方向都凑得齐 Top3
   const eg = scoreModel?.expectedGoals;
   // 半全场联合分布(2026-05-31 升级,walk-forward 回测最优:τ低分修正+拟合半场比例+状态依赖 chase=0.18,
@@ -1169,6 +1205,10 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   // 主方向内的反超/不同首半场备选(如主胜场的"平局-主胜"慢热反超),挖出被单 argmax 埋没的二线路径
   halfFullPicks.primaryAlt = bestDistinctFirstHalfHalfFull(hfDist, primaryCode, halfFullPicks.primary);
   halfFullPicks.distribution = topHalfFull(hfDist, 4);
+  // 2026-06-02 用户:"半全场只能胜胜平平?" —— 半全场首选(primary)锚 FT=wld 保持下注自洽,
+  //   但另给"最可能走势"(全 9 类真实众数,可为平局-主胜/平局-平局),让真实走势不被胜负平方向遮住。
+  const _tml = topHalfFull(hfDist, 1)[0] ?? null;
+  halfFullPicks.trueMostLikely = _tml ? { halfFull: _tml.halfFull, probability: _tml.probability } : null;
   // 信心分层板块(2026-06-02 通宵 cycle10,回测证高信心档命中率显著更高:半全场≥40%档命中43.2% vs 均27%):
   //   按首选概率贴档+该档实测命中率+是否够格胆码。只贴档不弃赛(feedback-confidence-not-autosuppress)。
   scorePicks.confidenceTier = scoreConfidenceTier(scorePicks.primaryProbability);
@@ -1385,8 +1425,15 @@ export function buildFourteenPlan(predictions, date = null) {
   // 2026-05-30 追加:胜负彩整期提前数日开售,但比赛在未来(如第 26083 期 05-27 开售、赛在 05-31~06-02)。
   // 若传入推荐日,则还要求本期至少有一场比赛落在当天,否则不算"今日 14 场",不发(避免把未来期混进今天的单)。
   const matchOnDate = !date || selected.some((p) => fixtureKickoffDate(p.fixture) === date);
+  // 2026-06-02 追加:仅"比赛日落在当天"不够 —— 整期可能比赛跨日(如 26083 期赛在 05-31~06-02),
+  // 但停售=05-31 19:30 早已截止,06-02 根本买不了。停售日早于推荐日的过期期次不算"今日 14 场"。
+  const stopSaleIso = (selected[0]?.fixture?.notes ?? "").match(/停售=([0-9T:.\-Z]+)/)?.[1] ?? null;
+  const stopSaleDate = stopSaleIso
+    ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(stopSaleIso))
+    : null;
+  const saleStillOpen = !date || !stopSaleDate || stopSaleDate >= date;
   const fourteenFull = selected.length === 14;
-  const hasRealFourteen = fourteenFull && matchOnDate;
+  const hasRealFourteen = fourteenFull && matchOnDate && saleStillOpen;
   const periodLabel = (selected[0]?.fixture?.notes ?? "").match(/第\d+期/)?.[0] ?? "本期";
   const source = selected.length ? selected : predictions.slice(0, 14);
   const rules = fourteenSelectionRules();
@@ -1529,9 +1576,11 @@ export function buildFourteenPlan(predictions, date = null) {
     available: hasRealFourteen,
     note: hasRealFourteen
       ? undefined
-      : fourteenFull && !matchOnDate
-        ? `14 场胜负彩${periodLabel}比赛日不在 ${date}(本期赛在未来),按规则今日不发 14 场。`
-        : "今日无 14 场胜负彩(不足 14 场),按硬规则不发 14 场。",
+      : fourteenFull && !saleStillOpen
+        ? `14 场胜负彩${periodLabel}已于 ${stopSaleDate} 停售,${date} 不可购买,按规则今日不发 14 场。`
+        : fourteenFull && !matchOnDate
+          ? `14 场胜负彩${periodLabel}比赛日不在 ${date}(本期赛在未来),按规则今日不发 14 场。`
+          : "今日无 14 场胜负彩(不足 14 场),按硬规则不发 14 场。",
     count: selections.length,
     singleLine: selections.map((item) => item.single).join(" "),
     compoundLine: selections.map((item) => item.compound).join(" "),

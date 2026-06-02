@@ -68,8 +68,9 @@ function detailCard(p) {
   return `<div class="card">
     <div class="hd"><span class="no">${esc(fx.sequence)}</span> ${esc(fx.homeTeam)} <span class="vs">vs</span> ${esc(fx.awayTeam)} <span class="lg">${esc(fx.competition)}</span></div>
     <div class="row main"><span class="k">胜平负</span> <b>${esc(p.pick?.label)}</b> <span class="prob">${pct(p.pick?.probability)}</span> <span class="conf">信心 ${Number.isFinite(conf) ? conf.toFixed(0) : "-"} · 风险 ${esc(p.risk || "-")}</span></div>
+    ${p.scenario?.headline ? `<div class="row"><span class="k">情景</span> ${esc(p.scenario.headline)}${p.scenario.marketGuidance?.length ? ` <span class="sk">${esc(p.scenario.marketGuidance.map((g) => g.market + "→" + g.lean).join(" · "))}</span>` : ""}</div>` : ""}
     <div class="row pr">主 ${pct(pr.home)} · 平 ${pct(pr.draw)} · 客 ${pct(pr.away)}</div>
-    <div class="row"><span class="k">比分</span> ${esc(p.scorePicks?.primary || "-")} &nbsp; <span class="k">半全场</span> ${esc(p.halfFullPicks?.primary || "-")}</div>
+    <div class="row"><span class="k">比分</span> ${esc(p.scorePicks?.primary || "-")}${p.scorePicks?.wldConsistent && p.scorePicks.wldConsistent !== p.scorePicks.primary ? ` <span class="sk">方向一致 ${esc(p.scorePicks.wldConsistent)}</span>` : ""} &nbsp; <span class="k">半全场</span> ${esc(p.halfFullPicks?.primary || "-")}</div>
     <div class="row"><span class="k">让球</span> ${esc(hp.direction || "-")}${hp.line != null ? `(${hp.line})` : ""}${cover ? ` 覆盖 ${cover}` : ""} ${skellam ? `<span class="sk">${skellam}</span>` : ""}</div>
     <div class="row"><span class="k">让球胜平负</span> ${hwStr}</div>
     ${p.differentialAnalysis?.handicapBridge ? `<div class="ec">↔ ${esc(p.differentialAnalysis.handicapBridge)}</div>` : ""}
@@ -99,29 +100,35 @@ export function renderTodayMobileHtml(rec, date) {
 <div class="empty">⚠ ${esc(date)} 暂无可预测场次。<br>可能尚未抓取今日竞彩/胜负彩赛程,或当日无赛事。<br>按「禁止假编」不展示任何臆造内容,抓到赛程后本页自动恢复。</div>
 </body></html>`;
   }
-  const { issue, matchDay, stopBJ } = metaInfo(preds, date);
+  // 竞彩明细只展示竞彩单场(jingcai),14 场 shengfucai 单独走下方 14 场区,不混进竞彩计数。
+  const jcPreds = preds.filter((p) => (p.fixture?.marketType ?? "jingcai") !== "shengfucai");
+  const { issue, matchDay, stopBJ } = metaInfo(jcPreds.length ? jcPreds : preds, date);
   const sels = Array.isArray(four.selections) ? four.selections : [];
   const dan = sels.filter((s) => s.type === "胆"), shuang = sels.filter((s) => s.type === "双选"), quan = sels.filter((s) => s.type === "全选");
   const combos = sels.reduce((a, s) => a * legOut(s), 1);
   const fourSec = (cls, title, list) => list.length ? `<div class="sec ${cls}">${title}(${list.length})</div><div class="grid">${list.map(fourCard).join("")}</div>` : "";
 
-  const rx9 = four.renxuan9;
+  const rx9 = four.available === false ? null : four.renxuan9;
   const rx9Html = rx9?.ok ? `<div class="sec rx">🎯 任选9(14场中需对 ${rx9.needCorrect} 场)</div><div class="grid">${rx9.picks.map((p) => {
     const pr = p.probabilities || {};
     return `<div class="card rx9"><div class="hd"><span class="no">${p.rank}</span> ${esc(p.match)} <span class="lg">${esc(p.competitionType || "")}</span></div>
     <div class="pick"><span class="kind rx">9</span> <b>${esc(p.pick)}</b> <span class="conf">主 ${esc(pr.home ?? "-")}·平 ${esc(pr.draw ?? "-")}·客 ${esc(pr.away ?? "-")} | 信心 ${Number(p.confidence).toFixed(0)}</span></div></div>`;
   }).join("")}</div>` : "";
 
-  const hasFour = sels.length > 0;
+  // 14 场只在生产闸门判定 available(恰 14 场 + 本期含当日比赛 + 仍在售)时才展示。
+  const hasFour = four.available !== false && sels.length > 0;
+  const fourUnavailNote = four.available === false && four.note ? `<div class="meta" style="border-left:3px solid #ffd166;padding-left:8px">🎟️ ${esc(four.note)}</div>` : "";
+  const jcCards = (jcPreds.length ? jcPreds : preds);
   return `${PAGE_HEAD(issue || date)}
 <h1>⚽ 今日足球推荐</h1>
 <div class="sub">实时跑通 · 闸门通过 · 信心已校准(ECE 2.47pp)· 只给信心+风险,下不下注由你决定</div>
-<div class="meta">${issue ? `<b>胜负彩 ${esc(issue)}</b> · ` : ""}比赛日 ${esc(matchDay)} · 共 ${preds.length} 场${stopBJ ? ` · 停售 ${esc(stopBJ)}(北京)` : ""}<br>
+<div class="meta">${issue && hasFour ? `<b>胜负彩 ${esc(issue)}</b> · ` : ""}比赛日 ${esc(matchDay)} · 竞彩 ${jcCards.length} 场${hasFour && stopBJ ? ` · 停售 ${esc(stopBJ)}(北京)` : ""}<br>
 全部数字本次实时跑出,可追溯真实赔率快照+DC拟合,provenance 0造假。</div>
+${fourUnavailNote}
 <div class="tabs"><a href="#jc">竞彩明细</a>${hasFour ? `<a href="#sf">14场胆双全</a>` : ""}${rx9Html ? `<a href="#rx">任选9</a>` : ""}</div>
 
-<div class="sec" id="jc">📋 竞彩明细 · 逐场(${preds.length})</div>
-<div class="grid">${preds.map(detailCard).join("")}</div>
+<div class="sec" id="jc">📋 竞彩明细 · 逐场(${jcCards.length})</div>
+<div class="grid">${jcCards.map(detailCard).join("")}</div>
 
 ${hasFour ? `<div class="sec" id="sf">🎟️ 14场胜负彩 · 胆/双/全拆分</div>
 <div class="summary"><b style="color:#06d6a0">胆 ${dan.length}</b> · <b style="color:#ffd166">双选 ${shuang.length}</b> · <b style="color:#ef476f">全选 ${quan.length}</b> &nbsp;→&nbsp; 复式 2<sup>${shuang.length}</sup>×3<sup>${quan.length}</sup> = <span class="combos">${combos.toLocaleString()} 注</span></div>
