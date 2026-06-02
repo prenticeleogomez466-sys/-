@@ -102,6 +102,29 @@ const MARKETS = [
  * 用本批快照刷新缓存:每个市场,质量更高的真实值才覆盖 last-good。
  * @returns {{stored:number, cache:object}}
  */
+/**
+ * 剪掉早于 referenceDate 指定天数的旧条目,防 stability-cache.json 无限增长。
+ * 纯按 entry.date(或 key 里的日期)字符串比较,不依赖系统时钟解析。
+ * @returns {{removed:number, remaining:number, cutoff:string}}
+ */
+export function pruneStabilityCache(referenceDate, maxAgeDays = Number(process.env.STABILITY_CACHE_MAX_AGE_DAYS ?? 21), cacheArg = null, nowIso = new Date().toISOString()) {
+  const cache = cacheArg ?? loadStabilityCache();
+  const ref = new Date(`${String(referenceDate).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(ref.getTime())) return { removed: 0, remaining: Object.keys(cache.entries).length, cutoff: "" };
+  const cutoffDate = new Date(ref.getTime() - maxAgeDays * 86400e3);
+  const cutoff = cutoffDate.toISOString().slice(0, 10);
+  let removed = 0;
+  for (const [key, entry] of Object.entries(cache.entries)) {
+    const entryDate = String(entry.date ?? key.split("__")[0] ?? "").slice(0, 10);
+    if (entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate) && entryDate < cutoff) {
+      delete cache.entries[key];
+      removed += 1;
+    }
+  }
+  if (removed && !cacheArg) writeStabilityCache(cache, nowIso);
+  return { removed, remaining: Object.keys(cache.entries).length, cutoff };
+}
+
 export function updateStabilityCache(date, snapshots, nowIso = new Date().toISOString()) {
   const cache = loadStabilityCache();
   let stored = 0;
@@ -121,8 +144,10 @@ export function updateStabilityCache(date, snapshots, nowIso = new Date().toISOS
     }
     cache.entries[key] = entry;
   }
-  if (stored) writeStabilityCache(cache, nowIso);
-  return { stored, cache };
+  // 顺手剪旧条目(对内存中的 cache 操作,合并到同一次写盘)。
+  const { removed } = pruneStabilityCache(date, undefined, cache, nowIso);
+  if (stored || removed) writeStabilityCache(cache, nowIso);
+  return { stored, removed, cache };
 }
 
 /**

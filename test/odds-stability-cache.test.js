@@ -60,6 +60,21 @@ describe("odds stability cache", () => {
     assert.ok(out.backfilled >= 1);
   });
 
+  it("pruneStabilityCache 剪掉超期旧条目,保留近期", async () => {
+    const { updateStabilityCache, pruneStabilityCache, loadStabilityCache } = await import("../src/odds-stability-cache.js");
+    // 两条相距 13 天,默认 21 天自动剪不掉,都保留。
+    updateStabilityCache("2026-05-20", [{ ...realSnapshot(), date: "2026-05-20", homeTeam: "旧主", awayTeam: "旧客" }]);
+    updateStabilityCache("2026-06-02", [{ ...realSnapshot(), date: "2026-06-02", homeTeam: "新主", awayTeam: "新客" }]);
+    const before = Object.keys(loadStabilityCache().entries).length;
+    assert.ok(before >= 2, "默认 21 天窗口内两条都该在");
+    // 手动用 10 天窗口剪:05-20 早于 cutoff(05-23)被剪,06-02 保留。
+    const res = pruneStabilityCache("2026-06-02", 10);
+    assert.equal(res.removed, 1, "应剪掉 2026-05-20 这条(>10天)");
+    const keys = Object.keys(loadStabilityCache().entries);
+    assert.ok(keys.some((k) => k.startsWith("2026-06-02")), "近期条目保留");
+    assert.ok(!keys.some((k) => k.startsWith("2026-05-20")), "超期条目已删");
+  });
+
   it("质量更高的新实时值应覆盖旧缓存(只升不降)", async () => {
     const { updateStabilityCache, backfillFromStabilityCache, loadStabilityCache } = await import("../src/odds-stability-cache.js");
     // 先存一个对称占位(质量1)
