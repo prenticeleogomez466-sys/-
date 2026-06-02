@@ -5,7 +5,7 @@
  * ⚠️诚实:淘汰赛配对用【随机近似】(无公开结构化 2026 bracket,绝不编造具体配对)→夺冠概率为粗略分布预期,
  *   非精确(真实固定bracket会让强队相遇时点不同)。点球50/50有据(2510.17641)。命中率上限不变。
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "../src/paths.js";
 import { eloExpectation, teamPrior } from "../src/world-cup-priors.js";
@@ -69,3 +69,8 @@ rows.slice(0, 16).forEach((r, i) => console.log(`${String(i + 1).padEnd(4)} ${r.
 // 审计:夺冠概率应与市场赔率正相关(Elo质量已验ρ0.88)
 const top5 = rows.slice(0, 5).map((r) => r.zh).join("/");
 console.log(`\n审计:夺冠前5=${top5};总概率和=${(rows.reduce((s, r) => s + r.p, 0) * 100).toFixed(0)}%(应≈100)`);
+if (process.argv.includes("--json")) {
+  const path = "D:/football-model-exports/worldcup-champion-prob.json";
+  writeFileSync(path, JSON.stringify({ n: N, alpha: ALPHA, rows: rows.slice(0, 32).map((r) => ({ team: r.zh, elo: r.elo, model: +(r.p * 100).toFixed(1), market: +(r.mkt * 100).toFixed(1), blend: +(r.blend * 100).toFixed(1), sf: +(r.sf * 100).toFixed(0) })) }, null, 1));
+  console.log("已写 JSON:", path);
+}
