@@ -124,6 +124,8 @@
     "wc:groups": "node scripts/run-worldcup-group-sim.mjs",
     "wc:backfill": "node scripts/backfill-worldcup-history.mjs",
     "wc:fusion": "node scripts/run-worldcup-fusion.mjs",
+    "wc:knockout-draw": "node scripts/run-worldcup-knockout-draw-check.mjs",
+    "backtest:intl-elo": "node scripts/run-intl-elo-backtest.mjs",
     "backtest:corners": "node scripts/run-corners-backtest.mjs"
   },
   "engines": {
