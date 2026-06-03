@@ -13,10 +13,14 @@
 //
 // 用法:node scripts/ingest-500-jingcai-fallback.mjs --date=2026-05-30
 
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import "../src/env.js";
 import { saveFixtures, loadFixtures } from "../src/fixture-store.js";
 import { saveMarketSnapshots, loadMarketSnapshots } from "../src/market-data-store.js";
 import { scopeJingcaiFixtures } from "../src/jingcai-business-day.js";
+import { parseJingcaiHandicapLine } from "../src/jingcai-fivehundred-stage.js";
 
 const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
 const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml";
@@ -55,6 +59,38 @@ async function main() {
 
   const nspfByNum = new Map(nspf.map((m) => [m.matchnum, m]));
   const collectedAt = new Date().toISOString();
+
+  // ---- odds.xml 全盘口接入(2026-06-03):亚盘水位 + 大小球,补 ingest 链路缺口 ----
+  const ODDS_URL = "https://www.500.com/static/public/jczq/xml/odds/odds.xml";
+  const oddsByNum = new Map();
+  try {
+    const oddsXml = await fetchXml(ODDS_URL);
+    for (const mm of oddsXml.matchAll(/<match\b([^>]*)>([\s\S]*?)<\/match>/g)) {
+      const attr = Object.fromEntries([...mm[1].matchAll(/(\w+)="([^"]*)"/g)].map((p) => [p[1], p[2]]));
+      const body = mm[2];
+      const pick = (tag) => { const t = body.match(new RegExp(`<${tag}\\b([^>]*)/?>`)); return t ? Object.fromEntries([...t[1].matchAll(/(\w+)="([^"]*)"/g)].map((p) => [p[1], p[2]])) : null; };
+      oddsByNum.set(attr.processname, { asian: pick("asian"), dxq: pick("dxq") });
+    }
+    console.error(`odds.xml: ${oddsByNum.size} 场亚盘/大小球`);
+  } catch (e) { console.error("odds.xml 抓取失败,亚盘/大小球降级:", e.message); }
+
+  // ---- 官方让球数(playwright 抓 jczq DOM,失败降级 line=0)----
+  let hcapByHome = {};
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const tmp = join(here, "..", ".tmp-ingest-handicap.json");
+    const r = spawnSync("node", [join(here, "scrape-jingcai-handicap.mjs"), "--out", tmp], { encoding: "utf8", timeout: 90000 });
+    if (r.status === 0) { hcapByHome = JSON.parse((await import("node:fs")).readFileSync(tmp, "utf8")); console.error(`官方让球数: ${Object.keys(hcapByHome).length} 场`); }
+    else { console.error("让球数抓取失败,降级 line=0:", (r.stderr || "").slice(0, 120)); }
+  } catch (e) { console.error("让球数抓取异常,降级 line=0:", e.message); }
+
+  // 盘口词/数字 → 数值(平手0 半球0.5 一球1 球半1.5;"2/2.5"→2.25)
+  const HW = { "平手": 0, "平手/半球": 0.25, "半球": 0.5, "半球/一球": 0.75, "一球": 1, "一球/球半": 1.25, "球半": 1.5, "球半/两球": 1.75, "两球": 2, "两球/两球半": 2.25, "两球半": 2.5, "两球半/三球": 2.75, "三球": 3 };
+  const numLine = (s) => { if (s == null) return null; const k = String(s).trim().replace(/^受/, ""); if (HW[k] != null) return HW[k]; const ps = k.split("/").map(Number).filter((n) => !isNaN(n)); return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null; };
+  // 亚盘式水位(0.80)→ 欧赔(1.80);已是欧赔(>1.5)则不动
+  const toEuro = (w) => { const n = Number(w); return Number.isFinite(n) ? (n < 1.5 ? n + 1 : n) : NaN; };
+  const firstVal = (o) => o ? (o.am ?? o.bet365 ?? o.lb ?? o.hg ?? o.wl ?? Object.values(o)[0] ?? null) : null;
+
   const fixtures = [];
   const snapshots = [];
 
@@ -93,6 +129,31 @@ async function main() {
       notes: `500.com 兜底(官方源被反爬封锁);业务日期=${date};编号=${m.matchnum}`
     });
 
+    // 让球线(竞彩官方,jczq DOM)+ 亚盘水位 + 大小球(odds.xml)
+    const jline = parseJingcaiHandicapLine(hcapByHome[m.home]);
+    const od = oddsByNum.get(m.matchnum);
+    let asianHandicap = null;
+    if (od?.asian) {
+      const parts = String(firstVal(od.asian) ?? "").split(",").map((s) => s.trim());
+      const mag = numLine(parts[1]);
+      const up = Number(parts[0]), down = Number(parts[2]);
+      if (mag != null && Number.isFinite(up) && Number.isFinite(down)) {
+        const sign = jline != null ? Math.sign(jline) : (up <= down ? -1 : 1);
+        const node = { line: sign * mag, home: up, away: down };
+        asianHandicap = { initial: node, current: node };
+      }
+    }
+    let totals = null;
+    if (od?.dxq) {
+      const parts = String(firstVal(od.dxq) ?? "").split(",").map((s) => s.trim());
+      const ln = numLine(parts[1]);
+      const over = toEuro(parts[0]), under = toEuro(parts[2]);
+      if (ln != null && Number.isFinite(over) && Number.isFinite(under)) {
+        const node = { line: ln, over, under };
+        totals = { initial: node, current: node };
+      }
+    }
+
     snapshots.push({
       date,
       fixtureId,
@@ -104,6 +165,9 @@ async function main() {
       collectedAt,
       europeanOdds: euro,
       handicapOdds: handicap,
+      jingcaiHandicap: jline != null ? { line: jline, source: "500.com-jczq" } : null,
+      asianHandicap,
+      totals,
       source: "500.com-jczq-fallback"
     });
   }

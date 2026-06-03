@@ -422,9 +422,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 大小球(O/U)盘口校准 λ 总量(2026-05-31 回测证实:比分命中+0.84pp/半全场LogLoss-0.46%/大小球校准更准)。
   //   从快照取 line + 两路 over/under 赔率(去vig→P(over)),解出市场预期进球总量,传给 λ 估计;
   //   缺盘口则为 null,estimateGoalLambdas 自动降级到联赛经验均值(无回退风险)。
-  const tg = snapshot?.totalGoals ?? snapshot?.totalGoalsOdds ?? snapshot?.overUnderOdds ?? null;
+  // 2026-06-03 修字段名不一致:market-store 规范化后存 `totals`,prediction 旧只读 totalGoals → ESPN/500 大小球盘读不到、一直派生。补读 totals。
+  const tg = snapshot?.totalGoals ?? snapshot?.totals ?? snapshot?.totalGoalsOdds ?? snapshot?.overUnderOdds ?? null;
   const tgNode = tg?.current ?? tg?.final ?? tg?.initial ?? tg ?? null;
-  const ouLine = Number(tgNode?.line ?? snapshot?.totalGoals?.current?.line ?? snapshot?.totalGoals?.initial?.line);
+  const ouLine = Number(tgNode?.line ?? tg?.current?.line ?? tg?.initial?.line);
   const ouOver = Number(tgNode?.over ?? tgNode?.overOdds ?? tgNode?.o);
   const ouUnder = Number(tgNode?.under ?? tgNode?.underOdds ?? tgNode?.u);
   const ouOverProb = (Number.isFinite(ouOver) && Number.isFinite(ouUnder) && ouOver > 1 && ouUnder > 1)
