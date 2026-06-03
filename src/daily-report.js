@@ -598,6 +598,9 @@ function toLedgerRow(prediction) {
     ensembleDraw: prediction.ensembleView?.probabilities?.draw ?? "",
     ensembleAway: prediction.ensembleView?.probabilities?.away ?? "",
     ensembleMethods: prediction.ensembleView?.methodCount ?? 0,
+    // 信号去偏学习闭环原料(2026-06-03 修):回写本场实际触发的信号 key,
+    // 供 signal-weight-tuner.signalPresent 判断,否则 signalWeights 永远 0 样本空转。
+    adjustmentSignals: (prediction.probabilityAdjustment?.signals ?? []).map((s) => s?.key).filter(Boolean),
     reason: prediction.rationale,
     // CLV 原料(结算时用):primaryOdds=下注价,primaryOpeningOdds=开盘价,betCapturedAt=捕获时刻
     primaryOdds: pickDecimalOdds(euBet, prediction.pick.code),
