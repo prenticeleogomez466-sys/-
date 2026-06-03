@@ -119,6 +119,8 @@
     "sync:understat": "node scripts/sync-understat-xg.mjs",
     "sync:api-football": "node scripts/sync-api-football.mjs",
     "sync:fbref": "node scripts/sync-fbref.mjs",
+    "sync:intl-xg": "python scripts/sb_fetch_intl_xg.py",
+    "show:intl-xg": "node scripts/show-intl-xg.mjs",
     "wc:suite": "node scripts/worldcup-suite.mjs",
     "wc:validate": "node scripts/worldcup-prior-validation.mjs",
     "wc:groups": "node scripts/run-worldcup-group-sim.mjs",
