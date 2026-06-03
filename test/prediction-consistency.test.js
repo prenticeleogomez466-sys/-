@@ -26,8 +26,11 @@ describe("prediction derived market consistency", () => {
     for (const item of cases) {
       const prediction = predictFixture(baseFixture, [{ fixtureId: baseFixture.id, date: baseFixture.date, europeanOdds: { current: item.odds } }]);
       assert.equal(prediction.pick.code, item.expected);
-      assert.equal(scoreOutcomeCode(prediction.scorePicks.primary), prediction.pick.code);
-      assert.equal(scoreOutcomeCode(prediction.scorePicks.secondary), prediction.secondaryPick.code);
+      // 2026-06-02 解耦:primary=真实最可能比分(独立,可含平局/反向),不再强制等于 wld 方向;
+      //   方向一致性落在 wldConsistent/wldConsistentSecondary。
+      assert.ok(/^\d+-\d+$/.test(prediction.scorePicks.primary), "首选应为真实比分");
+      assert.equal(scoreOutcomeCode(prediction.scorePicks.wldConsistent), prediction.pick.code);
+      assert.equal(scoreOutcomeCode(prediction.scorePicks.wldConsistentSecondary), prediction.secondaryPick.code);
       assert.equal(halfFullFinalOutcomeCode(prediction.halfFullPicks.primary), prediction.pick.code);
       assert.equal(halfFullFinalOutcomeCode(prediction.halfFullPicks.secondary), prediction.secondaryPick.code);
     }
@@ -89,14 +92,15 @@ describe("prediction derived market consistency", () => {
     assert.equal(hw.probabilities.away, hw.modelCover.away);
   });
 
-  it("fails audit when score or half-full conflicts with WDL outcome", () => {
+  it("fails audit when wld-consistent score or half-full conflicts with WDL outcome", () => {
     const prediction = predictFixture(baseFixture, [{ fixtureId: baseFixture.id, date: baseFixture.date, europeanOdds: { current: { home: 1.5, draw: 4.2, away: 6.5 } } }]);
-    prediction.scorePicks.primary = "0-1";
+    // 真实众数 primary 允许任意方向;方向一致比分 wldConsistent 与 wld 冲突才该拦。
+    prediction.scorePicks.wldConsistent = "0-1";
     const audit = auditRecommendations({ predictions: [prediction], fourteen: { count: 0 } });
 
     assert.equal(audit.ok, false);
     assert.ok(audit.summary.errors >= 1);
-    assert.match(audit.errors[0].message, /比分首选/);
+    assert.ok(audit.errors.some((e) => /方向一致比分/.test(e.message)), "应报方向一致比分冲突");
   });
 
   it("keeps score and half-full picks on a possible match path", () => {
@@ -108,8 +112,10 @@ describe("prediction derived market consistency", () => {
       halfFullOdds: { top: [{ halfFull: "负胜", odds: 18 }, { halfFull: "平胜", odds: 4.5 }] }
     }]);
 
-    assert.equal(prediction.scorePicks.primary, "2-0");
-    assert.equal(scoreHalfFullConsistent(prediction.scorePicks.primary, prediction.halfFullPicks.primary), true);
+    // 市场比分赔率 2-0 ⇒ 方向一致比分锚到 2-0;半全场与它路径自洽。真实众数 primary 独立(可平局)。
+    assert.equal(prediction.scorePicks.wldConsistent, "2-0");
+    assert.equal(scoreHalfFullConsistent(prediction.scorePicks.wldConsistent, prediction.halfFullPicks.primary), true);
+    assert.ok(/^\d+-\d+$/.test(prediction.scorePicks.primary), "首选仍为真实比分");
   });
 
   it("bounds confidence and rejects high-risk bankers", () => {

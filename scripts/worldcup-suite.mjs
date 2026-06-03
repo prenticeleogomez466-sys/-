@@ -17,6 +17,7 @@ const STEPS = [
   ["Elo 校准曲线(400 scale)", "run-worldcup-elo-calibration.mjs"],
   ["小组出线概率 MC", "run-worldcup-group-sim.mjs"],
   ["夺冠概率 MC(model/market/blend)", "run-worldcup-champion-sim.mjs"],
+  ["多模型融合(Opta+预测市场+本模型)", "run-worldcup-fusion.mjs"],
 ];
 
 console.log("══════ 2026 世界杯验证套件(一键复验,leak-safe)══════\n");
@@ -26,7 +27,7 @@ for (const [label, file] of STEPS) {
     const out = execSync(`node scripts/${file}`, { encoding: "utf8", cwd: process.cwd(), timeout: 120000 });
     const lines = out.trim().split("\n");
     // 取含关键数字/裁决的行(命中/ρ/Brier/→ 结论)
-    const key = lines.filter((l) => /命中|ρ|Brier|出线|进球比|→|pp|MAE|halfRatio|胜率|判别力|49\.|50\.|51\.|0\.8|0\.9/.test(l)).slice(-3);
+    const key = lines.filter((l) => /命中|ρ|Brier|出线|进球比|→|pp|MAE|halfRatio|胜率|判别力|融合冠军|市场锚定|49\.|50\.|51\.|0\.8|0\.9/.test(l)).slice(-3);
     console.log(`✅ ${label}  [${file}]`);
     key.forEach((l) => console.log("    " + l.trim()));
     console.log("");

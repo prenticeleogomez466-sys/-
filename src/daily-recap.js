@@ -136,6 +136,8 @@ function updateLedgerRow(row, fixtures, snapshots = []) {
     secondaryHit: outcomeCode(row.secondary) === actualCode,
     scoreHit: normalizeScore(row.scorePrimary) === actualScore,
     scoreSecondaryHit: normalizeScore(row.scoreSecondary) === actualScore,
+    // 全矩阵众数(均势最高单一比分,如 1-1)命中——计入"含备选"覆盖口径,补回头条改方向一致后丢失的高频比分。
+    scoreModeHit: row.scoreMode ? normalizeScore(row.scoreMode) === actualScore : false,
     halfFullHit: normalizeHalfFull(row.halfFullPrimary) === actualHalfFull,
     halfFullSecondaryHit: normalizeHalfFull(row.halfFullSecondary) === actualHalfFull,
     handicapWldHit: actualHandicap && row.handicapWldCode ? String(row.handicapWldCode) === actualHandicap.code : null,
@@ -171,7 +173,7 @@ function buildRecapSummary(date, rows, syncResults) {
   const wdlPrimary = rate(settled, (row) => row.hit === true);
   const wdlCover = rate(settled, (row) => row.hit === true || row.secondaryHit === true);
   const scorePrimary = rate(settled, (row) => row.scoreHit === true);
-  const scoreCover = rate(settled, (row) => row.scoreHit === true || row.scoreSecondaryHit === true);
+  const scoreCover = rate(settled, (row) => row.scoreHit === true || row.scoreSecondaryHit === true || row.scoreModeHit === true);
   // 半全场只在「有半场数据」的场上评(部分免费赛果源不带半场比分,actualHalfFull 为空时不计入分母,
   //   否则会被误算成全部未中 → 假 0%)。
   const halfFullSettled = settled.filter((row) => row.actualHalfFull && row.actualHalfFull !== "");

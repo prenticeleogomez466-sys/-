@@ -65,21 +65,29 @@ export function runPreExportSelfCheck(recommendations) {
     else if (p.handicapPick.direction !== p.pick?.label) fail("让球", `让球方向 ${p.handicapPick.direction} 未以 wld(${p.pick?.label})为锚`);
     else pass("让球");
 
-    // 比分(方向一致 + 进球物理合理)
+    // 比分(2026-06-02 改:首选=真实最可能比分,可含平局,不再核它与 wld 方向一致;
+    //   方向一致改核"与方向一致比分"wldConsistent。两者都做进球物理合理性核。)
     const score = p.scorePicks?.primary;
+    const wldScore = p.scorePicks?.wldConsistent ?? p.scorePicks?.primary; // 回退兼容旧对象
+    const saneGoals = (s) => {
+      const mm = String(s ?? "").match(/^(\d+)\s*-\s*(\d+)$/);
+      if (!mm) return `比分格式异常:${s}`;
+      const h = Number(mm[1]), a = Number(mm[2]);
+      if (h + a > SCORE_TOTAL_MAX || h > SCORE_SIDE_MAX || a > SCORE_SIDE_MAX) return `比分 ${s} 进球数异常(总>${SCORE_TOTAL_MAX} 或 单队>${SCORE_SIDE_MAX})— 疑 λ 失真`;
+      return null;
+    };
     if (!score) {
       fail("比分", "缺比分首选");
+    } else if (!wldScore) {
+      fail("比分", "缺与方向一致比分(wldConsistent)");
     } else {
-      const sc = scoreOutcomeCode(score);
-      const mm = String(score).match(/^(\d+)\s*-\s*(\d+)$/);
-      if (sc !== wld) fail("比分", `比分 ${score} 方向(${sc})与 wld(${wld})冲突`);
-      else if (!mm) fail("比分", `比分格式异常:${score}`);
-      else {
-        const h = Number(mm[1]);
-        const a = Number(mm[2]);
-        if (h + a > SCORE_TOTAL_MAX || h > SCORE_SIDE_MAX || a > SCORE_SIDE_MAX) fail("比分", `比分 ${score} 进球数异常(总>${SCORE_TOTAL_MAX} 或 单队>${SCORE_SIDE_MAX})— 疑 λ 失真`);
-        else pass("比分");
-      }
+      const wc = scoreOutcomeCode(wldScore);
+      const errMode = saneGoals(score);   // 真实众数进球合理性
+      const errWld = saneGoals(wldScore); // 方向一致比分进球合理性
+      if (wc !== wld) fail("比分", `方向一致比分 ${wldScore} 方向(${wc})与 wld(${wld})冲突`);
+      else if (errMode) fail("比分", errMode);
+      else if (errWld) fail("比分", errWld);
+      else pass("比分");
     }
 
     // 进球量级(λ)合理性 —— 比分/半全场/胜负平的共同底座,λ 算错则三者同错。

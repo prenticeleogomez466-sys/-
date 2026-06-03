@@ -123,6 +123,7 @@
     "wc:validate": "node scripts/worldcup-prior-validation.mjs",
     "wc:groups": "node scripts/run-worldcup-group-sim.mjs",
     "wc:backfill": "node scripts/backfill-worldcup-history.mjs",
+    "wc:fusion": "node scripts/run-worldcup-fusion.mjs",
     "backtest:corners": "node scripts/run-corners-backtest.mjs"
   },
   "engines": {

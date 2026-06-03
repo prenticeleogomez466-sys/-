@@ -104,6 +104,7 @@ function Run-Daily {
     Invoke-Step "verify odds gate" "npm run market:verify -- --date=$Date"
   }
   Invoke-Step "sync advanced free data layers" "npm run advanced:sync -- --date=$Date"
+  Invoke-Step "sync API-Football team form" "npm run sync:api-football -- --date $Date"
   Invoke-Step "strict data completeness check" "npm run standard:check -- --date=$Date"
   if ($AllowMissingOdds) {
     Invoke-Step "build offline daily xlsx" "npm run daily:no-web -- --date $Date"

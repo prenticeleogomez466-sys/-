@@ -235,12 +235,14 @@ function wldCellWithDraw(prediction) {
   return base;
 }
 
-// 比分候选:DC top-N 概率比分中**强制跟 wld 一致 + 不同进球结构** 的 3 个比分
-// 不再让"1-1 平局" 出现在主胜场的备选里
+// 比分候选(2026-06-02 二次修正):头条 = 与胜负平方向一致的最可能比分(自洽:主胜→1-0/2-1,
+//   平局pick→1-1/0-0,客胜→0-1/1-2),后接同方向备选,末尾小字披露"均势最高 X-X"(全矩阵众数)。
+//   背景:首版(同日)曾把头条改成全矩阵众数以求"敢报平",但低进球均势场众数恒为 1-1,导致整版
+//   比分全 1-1 且与"主胜/半全场主胜-主胜"自相矛盾(用户反馈"太降智")。改回方向一致作头条消除矛盾,
+//   仍保留 1-1 披露(诚实不藏);平局/均势 pick(drawLean)时方向一致比分本就是平局 → 仍敢报平。
 function buildScoreCandidates(prediction) {
   const wldCode = prediction.pick?.code;
-  const primary = prediction.scorePicks?.primary;
-  const secondary = prediction.scorePicks?.secondary;
+  const sp = prediction.scorePicks ?? {};
   const dcTops = prediction.dixonColes?.topScores ?? [];
   const matchesWld = (s) => {
     const m = String(s ?? "").match(/^(\d+)\s*-\s*(\d+)$/);
@@ -252,23 +254,40 @@ function buildScoreCandidates(prediction) {
     return false;
   };
   const pct = (v) => (Number.isFinite(v) ? ` (${Math.round(v * 100)}%)` : "");
-  // 用真实比分分布(带概率)里跟 wld 一致的 top 比分,首选在前;深度强化:展示概率而非裸比分
-  const probOf = new Map((prediction.scorePicks?.distribution ?? []).map((d) => [String(d.score).trim(), d.probability]));
-  probOf.set(String(primary ?? "").trim(), prediction.scorePicks?.primaryProbability ?? probOf.get(String(primary ?? "").trim()));
-  const ordered = [primary, secondary].concat((prediction.scorePicks?.distribution ?? []).map((d) => d.score)).concat(dcTops.map((t) => t?.score));
+  const probOf = new Map((sp.distribution ?? []).map((d) => [String(d.score).trim(), d.probability]));
+  const setProb = (s, v) => { const k = String(s ?? "").trim(); if (k && Number.isFinite(v)) probOf.set(k, v); };
+  setProb(sp.primary, sp.primaryProbability);
+  setProb(sp.secondary, sp.secondaryProbability);
+  setProb(sp.wldConsistent, sp.wldConsistentProbability);
+  setProb(sp.wldConsistentSecondary, sp.wldConsistentSecondaryProbability);
+
+  // ① 头条 = 与胜负平方向一致的最可能比分(2026-06-02 二次修正:头条不再用全矩阵众数,
+  //    避免均势低分场头条恒为平局 1-1 而与"主胜/客胜"pick + 半全场方向自相矛盾、整版雷同)。
+  const wldOrdered = [sp.primary, sp.wldConsistent, sp.secondary, sp.wldConsistentSecondary]
+    .concat((sp.distribution ?? []).map((d) => d.score))
+    .concat(dcTops.map((t) => t?.score));
+  const wldCands = [];
   const seen = new Set();
-  const candidates = [];
-  for (const s of ordered) {
-    if (!s) continue;
-    const clean = String(s).trim();
+  for (const s of wldOrdered) {
+    const clean = String(s ?? "").trim();
     if (!clean || seen.has(clean) || !matchesWld(clean)) continue;
     seen.add(clean);
-    candidates.push(`${clean}${pct(probOf.get(clean))}`);
-    if (candidates.length >= 4) break; // 2026-05-31 用户要"多给几个比分":3→4 个 wld 一致候选
+    wldCands.push(`${clean}${pct(probOf.get(clean))}`);
+    if (wldCands.length >= 3) break;
   }
-  if (!candidates.length) return primary ?? "—";
-  if (candidates.length === 1) return candidates[0];
-  return `${candidates[0]} | 备 ${candidates.slice(1).join(", ")}`;
+  if (!wldCands.length) {
+    // 极端兜底:方向一致比分取不到(几乎不会发生)→ 退回众数,至少有真实输出
+    const gm = String(sp.globalMode ?? sp.primary ?? "").trim();
+    return gm ? `${gm}${pct(probOf.get(gm))}` : "—";
+  }
+  // ② 均势最可能单一比分(全矩阵众数,可含平局)若与头条不同 → 小字披露(诚实不藏)
+  const mode = String(sp.globalMode ?? "").trim();
+  const headScore = String(wldCands[0]).split(" ")[0];
+  const modeNote = (mode && mode !== headScore && !seen.has(mode))
+    ? ` · 均势最高 ${mode}${pct(sp.globalModeProbability ?? probOf.get(mode))}` : "";
+  const head = wldCands[0];
+  const rest = wldCands.slice(1, 3);
+  return (rest.length ? `${head} | 备 ${rest.join(", ")}` : head) + modeNote;
 }
 
 // 半全场候选:首选(wld 锚)+ 备选,备选 first-half 必须跟首选不同
@@ -295,7 +314,13 @@ function buildHalfFullCandidates(prediction) {
       picks.push(`${hf}${pct(d.probability)}`);
       if (picks.length >= 3) break;
     }
-    if (picks.length) return picks.length === 1 ? picks[0] : `${picks[0]} | 备 ${picks.slice(1).join(", ")}`;
+    if (picks.length) {
+      const base = picks.length === 1 ? picks[0] : `${picks[0]} | 备 ${picks.slice(1).join(", ")}`;
+      // "最可能走势"(全9类真实众数,可含平局-主胜/平局-平局)若与首选不同,附上让用户看到真实走势
+      const tml = hp.trueMostLikely;
+      if (tml?.halfFull && tml.halfFull !== primary) return `${base} · 最可能走势 ${tml.halfFull}${pct(tml.probability)}`;
+      return base;
+    }
   }
   const main = `${primary}${pct(hp.primaryProbability)}`;
   if (hp.primaryAlt?.halfFull) return `${main} | 另 ${hp.primaryAlt.halfFull}${pct(hp.primaryAlt.probability)}`;
@@ -544,6 +569,8 @@ function toLedgerRow(prediction) {
     secondary: outcomeCodeToChinese(prediction.secondaryPick.code),
     scorePrimary: prediction.scorePicks.primary,
     scoreSecondary: prediction.scorePicks.secondary,
+    // 全矩阵真实众数(可含平局,头条已改为方向一致比分)——复盘覆盖口径纳入,保住高频比分命中率不回退。
+    scoreMode: prediction.scorePicks.globalMode ?? null,
     halfFullPrimary: prediction.halfFullPicks.primary,
     halfFullSecondary: prediction.halfFullPicks.secondary,
     // 让球胜平负(2026-05-31 复盘需求):记下让球玩法预测 + 让球线,结算时按比分算实际让球结果对比。

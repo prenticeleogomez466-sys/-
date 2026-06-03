@@ -1153,16 +1153,21 @@ function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {
   const wldSecExcl = new Set([wldConsistent].filter(Boolean));
   const wldConsistentSecondary = fromMarketSecondary ?? fromDcSecondary
     ?? bestScoreFromMatrix(matrix, secondaryCode, wldSecExcl) ?? bestScoreFromMatrix(matrix, secondaryCode);
-  // ── 真实最可能比分(全矩阵众数,任意方向,可含平局)——头条 ──
+  // ── 全矩阵真实众数(任意方向,可含平局)——仅作"最可能单一比分"披露,不再当头条 ──
+  //   2026-06-02 二次修正(用户反馈「比分全 1-1 + 半全场全主胜 太降智」):
+  //   低进球均势场的泊松众数恒为 1-1,把它当头条会与"主胜/客胜"pick + 半全场方向自相矛盾、且整版雷同。
+  //   故头条改回"与胜负平方向一致的比分"(coherent),众数降级为 globalMode 小字披露(诚实不藏、仍可见)。
+  //   平局/均势 pick(drawLean 触发 code=1)时 wldConsistent 本就是平局比分(1-1/0-0)→ 仍敢报平,不退回旧死锁。
   const globalTop = topScoresWithProb(matrix, 8);
-  const primary = globalTop[0]?.score ?? wldConsistent;
-  const secondary = (globalTop[1]?.score && globalTop[1].score !== primary)
-    ? globalTop[1].score
-    : (wldConsistentSecondary ?? globalTop[2]?.score ?? wldConsistent);
+  const globalMode = globalTop[0]?.score ?? null;
+  const globalModeSecondary = (globalTop[1]?.score && globalTop[1].score !== globalMode)
+    ? globalTop[1].score : (globalTop[2]?.score ?? null);
+  const primary = wldConsistent;                       // 头条 = 与 pick 方向一致(自洽)
+  const secondary = wldConsistentSecondary ?? globalModeSecondary ?? wldConsistent;
   // 来源标记(供自检判真假):market=官方比分赔率;dcResult.source=训练DC/λ派生真泊松矩阵;
   // poisson-matrix=全矩阵扫描(仍真泊松)。绝不出现死表来源 —— 死表已删。
   const source = fromMarket ? "market" : (fromDc ? (dcResult?.source ?? "dc-matrix") : (matrix ? (dcResult?.source ?? "poisson-matrix") : "none"));
-  return { primary, secondary, wldConsistent, wldConsistentSecondary, source };
+  return { primary, secondary, wldConsistent, wldConsistentSecondary, globalMode, globalModeSecondary, source };
 }
 
 // 半全场预测优先级同上:市场比分赔率 → DC/λ 泊松半场联合分布(halfFullFromDcResult 从 expectedGoals 真算)。
@@ -1193,6 +1198,8 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   // 与胜负平方向一致的比分概率(供展示"方向一致 1-0(12%)"+让球/半全场底座)
   scorePicks.wldConsistentProbability = scoreProbFromMatrix(matrix, scorePicks.wldConsistent);
   scorePicks.wldConsistentSecondaryProbability = scoreProbFromMatrix(matrix, scorePicks.wldConsistentSecondary);
+  // 最可能单一比分(全矩阵众数,可含平局)概率——供"均势最高 1-1 (13%)"披露小字
+  scorePicks.globalModeProbability = scoreProbFromMatrix(matrix, scorePicks.globalMode);
   scorePicks.distribution = topScoresWithProb(matrix, 8); // 2026-06-01 5→8:均势客胜场客胜比分概率分散,Top5 常只够 1 个 wld 一致比分(治"保黑只显示 0-1"),取 8 让各方向都凑得齐 Top3
   const eg = scoreModel?.expectedGoals;
   // 半全场联合分布(2026-05-31 升级,walk-forward 回测最优:τ低分修正+拟合半场比例+状态依赖 chase=0.18,
