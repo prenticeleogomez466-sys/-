@@ -341,12 +341,15 @@ export function scoreMatrix(p) {
   const mu = clampLambda(p.baseRate * p.attackAway * p.defenseHome);
   const rho = p.rho ?? -0.08;
   const tauFn = p.tauModel === "extended" ? extendedTau : tau;
+  // nbSize 有限正数 → 边缘用负二项(过离散,仅软赛事/国家队开);否则泊松(默认,俱乐部不变)。
+  const nbSize = Number(p.nbSize);
+  const pmf = (Number.isFinite(nbSize) && nbSize > 0) ? (k, lam) => nbPmf(k, lam, nbSize) : poissonPmf;
   const matrix = [];
   let total = 0;
   for (let h = 0; h <= MAX_GOALS; h++) {
     matrix[h] = [];
     for (let a = 0; a <= MAX_GOALS; a++) {
-      const prob = poissonPmf(h, lambda) * poissonPmf(a, mu) * tauFn(h, a, lambda, mu, rho);
+      const prob = pmf(h, lambda) * pmf(a, mu) * tauFn(h, a, lambda, mu, rho);
       matrix[h][a] = Math.max(prob, 0);
       total += matrix[h][a];
     }
@@ -390,6 +393,22 @@ function extendedTau(hg, ag, lambda, mu, rho) {
 function poissonPmf(k, lambda) {
   if (lambda <= 0) return k === 0 ? 1 : 0;
   return Math.exp(k * Math.log(lambda) - lambda - logFactorial(k));
+}
+// lgamma(Lanczos)— 供负二项 Γ(k+r) 用。
+const _lgC = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+  -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+function lgamma(z) {
+  if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - lgamma(1 - z);
+  z -= 1; let x = _lgC[0]; for (let i = 1; i < 9; i++) x += _lgC[i] / (z + i);
+  const t = z + 7.5; return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+}
+// 负二项 pmf:mean=mu, size=r(过离散 var=mu+mu²/r);r 非正/∞ 退化泊松。
+// 国际/友谊赛进球过离散(49k leak-safe:r≈8 holdout 精确比分 logloss −0.03,与 DC τ 正交叠加),
+// 仅软赛事/国家队路径开启(俱乐部 DC 自拟合参数,不开)。
+export function nbPmf(k, mu, r) {
+  if (!(r > 0) || !Number.isFinite(r)) return poissonPmf(k, mu);
+  if (mu <= 0) return k === 0 ? 1 : 0;
+  return Math.exp(lgamma(k + r) - lgamma(r) - logFactorial(k) + r * Math.log(r / (r + mu)) + k * Math.log(mu / (r + mu)));
 }
 
 const _lfCache = [0, 0];

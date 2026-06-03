@@ -160,3 +160,20 @@ test("evaluateDrawLean:平局概率偏低(<30%)不推平,即便接近", () => {
   const r = evaluateDrawLean(ranked);
   assert.equal(r.applies, false);
 });
+
+test("负二项 nbSize 过离散:软赛事比分矩阵更多 0 球 + 高尾更重(不改 wld 方向)", () => {
+  const pois = buildDerivedScoreModel(1.5, 1.2);                 // 默认泊松
+  const nb = buildDerivedScoreModel(1.5, 1.2, { nbSize: 8 });    // 负二项过离散
+  // 两者 wld 概率应接近(过离散主要改尾巴不改方向)
+  assert.ok(Math.abs(pois.probabilities.home - nb.probabilities.home) < 0.05);
+  // NB 的 0-0 概率应高于泊松(过离散→更多 0 球)
+  const p00 = scoreProbFromMatrix(pois.matrix, "0-0");
+  const n00 = scoreProbFromMatrix(nb.matrix, "0-0");
+  assert.ok(n00 > p00, `NB 0-0 (${n00.toFixed(4)}) 应 > 泊松 (${p00.toFixed(4)})`);
+  // NB 的高总进球尾巴(总分≥5)应高于泊松(过离散→更重尾)
+  const tail = (m) => { let s = 0; for (let h = 0; h < m.length; h++) for (let a = 0; a < m[h].length; a++) if (h + a >= 5) s += m[h][a]; return s; };
+  assert.ok(tail(nb.matrix) > tail(pois.matrix), `NB 高尾 (${tail(nb.matrix).toFixed(4)}) 应 > 泊松 (${tail(pois.matrix).toFixed(4)})`);
+  // nbSize 非法/缺省 → 退化泊松(与默认一致)
+  const nbOff = buildDerivedScoreModel(1.5, 1.2, { nbSize: 0 });
+  assert.ok(Math.abs(scoreProbFromMatrix(nbOff.matrix, "0-0") - p00) < 1e-9, "nbSize=0 应退化泊松");
+});

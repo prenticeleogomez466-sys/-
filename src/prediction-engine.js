@@ -26,7 +26,7 @@ import { scopeJingcaiFixtures } from "./jingcai-business-day.js";
 import { buildExtendedMarkets } from "./extended-markets.js";
 import { calibrateOver25 } from "./overunder-calibration.js";
 import { asianHandicapFromSkellam } from "./skellam-distribution.js";
-import { recalibrateSoftCompetition, softCompetitionLambdaScale } from "./competition-soft-recalibration.js";
+import { recalibrateSoftCompetition, softCompetitionLambdaScale, isSoftCompetition } from "./competition-soft-recalibration.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { ensembleHalfFull } from "./ensemble-halffull.js";
 import { scoreConfidenceTier, halfFullConfidenceTier } from "./score-halffull-tier.js";
@@ -36,6 +36,9 @@ import { scoreConfidenceTier, halfFullConfidenceTier } from "./score-halffull-ti
 function hfDistribution(lambdaHome, lambdaAway, league) {
   return ensembleHalfFull(lambdaHome, lambdaAway, league) ?? halfFullJoint(lambdaHome, lambdaAway);
 }
+// 负二项过离散 size:仅软赛事/国家队比分矩阵开(49k 国际赛 leak-safe:holdout 精确比分 logloss
+// −0.03,与 DC τ 正交)。俱乐部 DC 自拟合参数,不开(保持泊松)。
+const NB_SIZE_SOFT = 8;
 import { selectionTier } from "./selection-tier.js";
 import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
@@ -284,7 +287,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       ? eloToLambdas(eh, ea, { totalGoals: Number.isFinite(_ouLineHint) ? _ouLineHint : undefined })
       : null;
     if (lam) {
-      const eloModel = buildDerivedScoreModel(lam.home, lam.away);
+      const eloModel = buildDerivedScoreModel(lam.home, lam.away, { nbSize: NB_SIZE_SOFT });
       if (eloModel) {
         eloModel.source = "national-elo";
         dcResult = eloModel;
@@ -440,6 +443,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 软赛事 λ 强度衰减(2026-05-31):友谊/国际赛进球偏低,competition intensityMultiplier 半强度缩放
   //   (避免与市场赔率已隐含信息重复打折)。非软赛事 scale=1,俱乐部/有训练 DC 的场不受影响。
   const _lamScale = softCompetitionLambdaScale(fixture?.competition);
+  // 软赛事(国际/友谊/世界杯,isSoftCompetition)比分矩阵开负二项过离散;俱乐部 undefined=泊松。
+  // 注:用 isSoftCompetition 而非 _lamScale<1——世界杯满强度(scale=1)但仍属国际赛过离散范畴。
+  const _nbSize = isSoftCompetition(fixture?.competition) ? NB_SIZE_SOFT : undefined;
   // 比分 λ 市场校准对齐(2026-05-31 修 DC 强队 λ 高估):训练 DC 评级算的 λ **不含本场大小球盘口**,
   //   强队对鱼腩(拜仁/曼城等)λ 会冲到 4+ → 4-0/5-0 极端比分且触 λ 物理闸门拦掉全表,而概率
   //   融合里 DC 仅占 dcWeight、比分却 100% 用这个高估 λ(口径不一致)。修复:有市场校准 λ
@@ -455,11 +461,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       && _dcEg && Number.isFinite(_dcEg.home) && Number.isFinite(_dcEg.away)) {
     const lamH = ((1 - _dcW) * _mh + _dcW * _dcEg.home) * _lamScale;
     const lamA = ((1 - _dcW) * _ma + _dcW * _dcEg.away) * _lamScale;
-    scoreModel = buildDerivedScoreModel(lamH, lamA);
+    scoreModel = buildDerivedScoreModel(lamH, lamA, { nbSize: _nbSize });
     if (scoreModel && blendResult.dcResult.source) scoreModel.source = blendResult.dcResult.source;
   } else {
     scoreModel = blendResult.dcResult
-      ?? buildDerivedScoreModel((simulation.lambdas?.home ?? 0) * _lamScale, (simulation.lambdas?.away ?? 0) * _lamScale);
+      ?? buildDerivedScoreModel((simulation.lambdas?.home ?? 0) * _lamScale, (simulation.lambdas?.away ?? 0) * _lamScale, { nbSize: _nbSize });
   }
   // 上报给自检/让球/日报的 expectedGoals 与比分用的同一 λ(收缩后),保证 λ 物理闸门核到的就是真用值。
   const reconciledExpectedGoals = scoreModel?.expectedGoals ?? blendResult.dcResult?.expectedGoals ?? null;

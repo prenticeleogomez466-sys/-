@@ -21,12 +21,14 @@ export function buildDerivedScoreModel(lambdaHome, lambdaAway, opts = {}) {
   if (!Number.isFinite(lh) || !Number.isFinite(la)) return null;
   const rho = Number(opts.rho ?? process.env.DC_RHO ?? -0.08);
   const tauModel = opts.tauModel ?? process.env.DC_TAU_MODEL ?? "dixon-coles";
+  // nbSize:软赛事/国家队传 8 → 负二项过离散(49k 回测验证);默认 undefined=泊松(俱乐部不变)。
+  const nbSize = opts.nbSize;
   // baseRate=1 + attackHome=λH + attackAway=λA + 其余=1 ⇒ scoreMatrix 内 lambda=λH, mu=λA(显式 λ 入矩阵)
   const { matrix, lambda, mu } = scoreMatrix({
     baseRate: 1, homeAdv: 1,
     attackHome: lh, defenseAway: 1,
     attackAway: la, defenseHome: 1,
-    rho, tauModel
+    rho, tauModel, nbSize
   });
   return {
     source: "poisson-derived-from-lambda",
