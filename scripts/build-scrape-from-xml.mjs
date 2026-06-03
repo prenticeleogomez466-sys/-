@@ -33,7 +33,11 @@ function parseMatches(xml) {
 const spf = parseMatches(readFileSync(spfPath, "utf8"));
 const nspf = parseMatches(readFileSync(nspfPath, "utf8"));
 
-const seqs = [...spf.keys()].filter((s) => /^6/.test(s)).sort();
+// 不再写死"6 开头周六单":批次编号会变(国际赛周如 320x)。500 pl_spf_2.xml 只列当前在售竞彩,
+// 取最早赛日那批=本期在售单(同时含下批预售时,更晚赛日的自然被排除)。仿 ingest-500-fallback 锚定。
+const _dateOf = (seq) => spf.get(seq)?.meta?.date ?? "9999-99-99";
+const _earliest = [...spf.keys()].map(_dateOf).filter((d) => d !== "9999-99-99").sort()[0];
+const seqs = [...spf.keys()].filter((s) => _dateOf(s) === _earliest).sort();
 
 function buildRows(phase) {
   const rows = [];
