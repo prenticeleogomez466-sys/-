@@ -24,6 +24,12 @@ const groups = gdoc.groups;
 const zh = gdoc.team_name_zh || {};
 const HOSTS = new Set(["United States", "Canada", "Mexico"]);
 
+// 官方淘汰赛对阵表(FIFA 真实 R32 位次 + 第三名 495 分配表)。数据盘优先,回退仓库内 data/,再缺则强度种子树。
+let bracket = null;
+for (const p of [join(getDataSubdir("world-cup"), "2026", "bracket.json"), join(process.cwd(), "data", "world-cup", "2026", "bracket.json")]) {
+  try { bracket = JSON.parse(readFileSync(p, "utf8")); break; } catch { /* next */ }
+}
+
 // 评级源(免费替代 Opta Power Rankings):国家队 Elo 来自 team-priors(eloratings.net)。
 const eloCache = {};
 const eloOf = (t) => {
@@ -33,7 +39,8 @@ const eloOf = (t) => {
 };
 
 const phaseIntensity = { r32: 1.18, r16: 1.20, qf: 1.25, sf: 1.28, final: 1.28 };
-const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.6, hostAdv: 35, penTilt: 0, phaseIntensity }, N, SEED);
+const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.6, hostAdv: 35, penTilt: 0, phaseIntensity, bracket }, N, SEED);
+const bracketMode = bracket ? "FIFA官方对阵表(R32位次+第三名495分配)" : "强度种子树(无官方表回退)";
 
 // 市场隐含夺冠率(1/赔率 去 vig 归一)+ 混合(0.65市场+0.35模型,据 reference 学界结论:市场含全信息)
 const ALPHA = 0.65;
@@ -51,7 +58,7 @@ rows.sort((a, b) => b.blend - a.blend);
 
 const pc = (x) => (x * 100).toFixed(1) + "%";
 console.log(`=== 2026 世界杯超级计算机(N=${N} 次蒙特卡洛, seed=${SEED}, 引擎=tournament-simulator)===`);
-console.log("真实分组+Elo+真FIFA小组规则+强度种子布拉克特+90'→加时→点球50/50");
+console.log(`真实分组+Elo+真FIFA小组规则+${bracketMode}+90'→加时→点球50/50`);
 console.log("\n排名 球队          Elo   出线   16强   8强   4强   决赛  夺冠(模型) 市场  混合");
 rows.slice(0, 20).forEach((r, i) => {
   console.log(
@@ -59,7 +66,9 @@ rows.slice(0, 20).forEach((r, i) => {
   );
 });
 console.log(`\n审计:夺冠概率和=${pc(res.audit.champSum)}(应≈100%) | 出线期望和=${res.audit.advSum.toFixed(1)}(应=32) | 单调性=${res.audit.monotonic ? "✓" : "✗"} | 总闸门=${res.audit.ok ? "✓通过" : "✗"}`);
-console.log("⚠️ 诚实边界:R32 用强度种子树(非 FIFA 官方第三名分配位次);点球 50/50(学界);命中率上限不变。");
+console.log(bracket
+  ? "✅ R32 已用 FIFA 官方对阵表(胜者/亚军固定位次 + 第三名 495 组合官方分配,无同组重赛);点球 50/50(学界);命中率上限不变。"
+  : "⚠️ 诚实边界:未找到 bracket.json,R32 回退强度种子树;点球 50/50;命中率上限不变。");
 
 if (argv.includes("--json")) {
   const p = join(getExportDir(), "worldcup-supercomputer.json");

@@ -1,9 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import {
   mulberry32, poissonSample, sampleScoreline, rankGroup,
   standardSeedOrder, seedBracket, simulateGroupStage, runMonteCarlo,
 } from "../src/tournament-simulator.js";
+import { getDataSubdir } from "../src/paths.js";
+
+const BRACKET_PATH = join(getDataSubdir("world-cup"), "2026", "bracket.json");
+const HAS_BRACKET = existsSync(BRACKET_PATH);
+const BRACKET = HAS_BRACKET ? JSON.parse(readFileSync(BRACKET_PATH, "utf8")) : null;
 
 test("mulberry32 同 seed 可复现、不同 seed 不同", () => {
   const a = mulberry32(42), b = mulberry32(42), c = mulberry32(43);
@@ -76,6 +83,39 @@ test("simulateGroupStage 产 24 直接出线 + 8 最佳第三 = 32", () => {
   assert.equal(gs.runners.length, 12);
   assert.equal(gs.bestThirds.length, 8);
   assert.equal(gs.advancers.length, 32);
+});
+
+test("bracket.json:第三名分配表 495 行、骨架完整", { skip: !HAS_BRACKET }, () => {
+  assert.equal(Object.keys(BRACKET.thirdPlaceTable).length, 495);
+  assert.equal(BRACKET.r32.length, 16);
+  assert.equal(BRACKET.r16.length, 8);
+  assert.equal(BRACKET.qf.length, 4);
+  assert.equal(BRACKET.sf.length, 2);
+  assert.ok(BRACKET.final && BRACKET.final.m === 104);
+});
+
+test("官方表:任一第三名位次都不接收本组三名(无同组 R32 重赛)", { skip: !HAS_BRACKET }, () => {
+  const seen = {};
+  for (const assign of Object.values(BRACKET.thirdPlaceTable)) {
+    for (const [slot, g] of Object.entries(assign)) (seen[slot] ??= new Set()).add(g);
+  }
+  // 8 个接收位次,每个聚合来源组都不含自身组
+  assert.equal(Object.keys(seen).length, 8);
+  for (const [slot, set] of Object.entries(seen)) {
+    assert.ok(!set.has(slot[1]), `${slot} 收到本组三名 ${slot[1]}`);
+  }
+});
+
+test("runMonteCarlo 官方对阵表:审计通过、可复现、强队夺冠最高", { skip: !HAS_BRACKET }, () => {
+  const groups = {};
+  for (let g = 0; g < 12; g++) groups[String.fromCharCode(65 + g)] = [`${g}-1`, `${g}-2`, `${g}-3`, `${g}-4`];
+  const eloOf = (t) => (t === "0-1" ? 2100 : 1500 + (t.endsWith("-1") ? 250 : t.endsWith("-2") ? 120 : t.endsWith("-3") ? 40 : 0));
+  const cfg = { groups, eloOf, hosts: new Set(), lambdaTotal: 2.6, bracket: BRACKET };
+  const res = runMonteCarlo(cfg, 3000, 777);
+  assert.ok(res.audit.ok, `audit ${JSON.stringify(res.audit)}`);
+  assert.equal(res.teams[0].team, "0-1");
+  const res2 = runMonteCarlo(cfg, 3000, 777);
+  assert.equal(res.teams[0].champion, res2.teams[0].champion); // 同 seed 复现
 });
 
 test("runMonteCarlo:概率单调、夺冠和≈1、出线和≈32,强队夺冠概率最高", () => {

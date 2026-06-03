@@ -189,10 +189,68 @@ export function simulateKnockoutMatch(teamA, teamB, ctx, rng, eloOf) {
 }
 
 /**
- * 跑一届完整锦标赛(小组→R32→…→决赛)。
- * @returns {{champion, runnerUp, stageReached:{team:stage}}} stage∈ group/r32/r16/qf/sf/final/champion
+ * 官方对阵路径:用 bracket.json(FIFA 真实 R32 位次 + 第三名 495 分配表 + 赛号树)跑淘汰赛。
+ * 与强度种子树的区别:R32 胜者/亚军位次官方固定、第三名按出线8组组合查官方表、R16+ 按赛号树推进
+ * (非相邻折叠),且天然无同组 R32 重赛。
+ * @returns {{champion, stageReached:{team:stage}}}
+ */
+export function simulateTournamentOfficial(config, rng) {
+  const { groups, eloOf, bracket } = config;
+  const hosts = config.hosts instanceof Set ? config.hosts : new Set(config.hosts ?? []);
+  const phaseInt = config.phaseIntensity ?? { r32: 1.18, r16: 1.20, qf: 1.25, sf: 1.28, final: 1.28 };
+  const stageReached = {};
+  for (const teams of Object.values(groups)) for (const t of teams) stageReached[t] = "group";
+
+  const gs = simulateGroupStage(groups, eloOf, rng, {
+    lambdaTotal: config.lambdaTotal, groupIntensity: 1, hosts, hostAdv: config.hostAdv,
+  });
+  for (const a of gs.advancers) stageReached[a.team] = "r32";
+
+  // 按组建 1X/2X/3X 映射
+  const winnerByGroup = {}, runnerByGroup = {}, thirdByGroup = {};
+  for (const w of gs.winners) winnerByGroup[w.group] = w.team;
+  for (const r of gs.runners) runnerByGroup[r.group] = r.team;
+  for (const t of gs.bestThirds) thirdByGroup[t.group] = t.team;
+  const key = gs.bestThirds.map((t) => t.group).sort().join(",");
+  const assign = bracket.thirdPlaceTable?.[key];
+  if (!assign) return simulateTournamentSeeded(config, rng); // 安全兜底(理论上495组合全覆盖,不应触发)
+
+  const resolve = (slot) => {
+    if (slot[0] === "1") return winnerByGroup[slot[1]];
+    if (slot[0] === "2") return runnerByGroup[slot[1]];
+    if (slot.startsWith("T@")) { const g = assign[slot.slice(2)]; return g ? thirdByGroup[g] : undefined; }
+    return undefined;
+  };
+  const koCtx = (intensity) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt });
+  const mw = {}; // 赛号 -> 胜者
+
+  for (const mt of bracket.r32) {
+    const res = simulateKnockoutMatch(resolve(mt.home), resolve(mt.away), koCtx(phaseInt.r32), rng, eloOf);
+    mw[mt.m] = res.winner; stageReached[res.winner] = "r16";
+  }
+  const playRound = (matches, intensity, reach) => {
+    for (const mt of matches) {
+      const res = simulateKnockoutMatch(mw[mt.from[0]], mw[mt.from[1]], koCtx(intensity), rng, eloOf);
+      mw[mt.m] = res.winner; stageReached[res.winner] = reach;
+    }
+  };
+  playRound(bracket.r16, phaseInt.r16, "qf");
+  playRound(bracket.qf, phaseInt.qf, "sf");
+  playRound(bracket.sf, phaseInt.sf, "final");
+  playRound([bracket.final], phaseInt.final, "champion");
+  return { champion: mw[bracket.final.m], stageReached };
+}
+
+/**
+ * 跑一届完整锦标赛(小组→R32→…→决赛)。config.bracket 存在→走官方对阵表,否则→强度种子树。
+ * @returns {{champion, stageReached:{team:stage}}}
  */
 export function simulateTournament(config, rng) {
+  if (config.bracket) return simulateTournamentOfficial(config, rng);
+  return simulateTournamentSeeded(config, rng);
+}
+
+function simulateTournamentSeeded(config, rng) {
   const { groups, eloOf } = config;
   const hosts = config.hosts instanceof Set ? config.hosts : new Set(config.hosts ?? []);
   const phaseInt = config.phaseIntensity ?? { r32: 1.18, r16: 1.20, qf: 1.25, sf: 1.28, final: 1.28 };
