@@ -131,12 +131,14 @@
     "backtest:devig": "node scripts/run-devig-backtest.mjs",
     "backtest:rue-salvesen": "node scripts/run-rue-salvesen-backtest.mjs",
     "backtest:dispersion": "node scripts/run-goal-dispersion-backtest.mjs",
-    "backtest:corners": "node scripts/run-corners-backtest.mjs"
+    "backtest:corners": "node scripts/run-corners-backtest.mjs",
+    "jingcai:prepare": "node scripts/jingcai-prepare.mjs"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "playwright-core": "^1.60.0",
     "undici": "^8.3.0"
   }
 }
