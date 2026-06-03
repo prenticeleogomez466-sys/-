@@ -12,6 +12,10 @@ const readArg = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 
 const date = readArg("--date");
 const spfPath = readArg("--spf", "spf_tmp.xml");
 const nspfPath = readArg("--nspf", "nspf_tmp.xml");
+// 官方让球数(handicapCell,如 "0 -1")由 500 jczq 页面 DOM 抓取注入:{主队名 或 matchnum: "0 -1"}。
+// XML 不含让球数 → 不注入则 handicapCell 留空、line 默认 0(旧行为)。
+const hcapPath = readArg("--handicap", null);
+const hcap = hcapPath ? JSON.parse(readFileSync(hcapPath, "utf8")) : {};
 
 function parseMatches(xml) {
   const out = new Map();
@@ -51,7 +55,8 @@ function buildRows(phase) {
     const kickoff = `${s.meta.date.slice(5)}`; // MM-DD(XML 无开赛时刻)
     const teamCell = `${s.meta.home} VS ${s.meta.away}`;
     const oddsCell = [e.win, e.draw, e.lost, h?.win ?? "", h?.draw ?? "", h?.lost ?? ""].join(" ");
-    rows.push([seq, league, kickoff, teamCell, "", oddsCell]);
+    const handicapCell = hcap[s.meta.home] ?? hcap[seq] ?? hcap[`${s.meta.home} VS ${s.meta.away}`] ?? "";
+    rows.push([seq, league, kickoff, teamCell, handicapCell, oddsCell]);
   }
   return rows;
 }
