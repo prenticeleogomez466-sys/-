@@ -38,7 +38,8 @@ export function poissonSample(lambda, rng) {
 /**
  * 一场比赛抽样比分。用两队 Elo → 主胜期望 we → 按总进球 λtot 拆成主客 λ → 各自泊松。
  * @param {number} eloA @param {number} eloB
- * @param {object} ctx { lambdaTotal=2.6, homeAdv=0, intensity=1 } intensity=阶段强度(×λtot)
+ * @param {object} ctx { lambdaTotal=2.6, homeAdv=0, intensity=1, rueSalvesen=0.15 }
+ *   intensity=阶段强度(×λtot);rueSalvesen=γ 进球收缩(见下)
  * @returns {{a:number,b:number,we:number}}
  */
 export function sampleScoreline(eloA, eloB, ctx, rng) {
@@ -46,8 +47,17 @@ export function sampleScoreline(eloA, eloB, ctx, rng) {
   const exp = eloExpectation(eloA, eloB, ctx?.homeAdv ?? 0);
   const we = exp ? exp.homeWinExpectancy : 0.5;
   // 进球期望随实力差轻微放大领先方(避免强弱差全被平均化);保持总量≈lamTot。
-  const la = lamTot * we;
-  const lb = lamTot * (1 - we);
+  let la = lamTot * we;
+  let lb = lamTot * (1 - we);
+  // Rue-Salvesen γ 收缩(2026-06-03 接入,49k 国际赛 leak-safe 回测验证):
+  //   we 是胜率非进球比,线性拆分过度放大领先方 λ;按 (1−γ) 压缩两队 log-λ 之差,
+  //   几何均值(总进球)不变。holdout WLD logloss -0.0131、比分 -0.0015(均改善)。γ=0 关闭。
+  const gamma = ctx?.rueSalvesen ?? 0.15;
+  if (gamma && la > 0 && lb > 0) {
+    const dlt = (Math.log(la) - Math.log(lb)) / 2;
+    la = Math.exp(Math.log(la) - gamma * dlt);
+    lb = Math.exp(Math.log(lb) + gamma * dlt);
+  }
   return { a: poissonSample(la, rng), b: poissonSample(lb, rng), we };
 }
 

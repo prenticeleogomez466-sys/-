@@ -11,14 +11,15 @@
  * 纯函数, 无 IO。pickCode: 3=主胜, 1=平, 0=客胜(竞彩约定)。
  */
 
+import { shinDevig } from "./market-devig.js";
+
 const PICK_KEY = { 3: "home", 1: "draw", 0: "away", H: "home", D: "draw", A: "away" };
 
+// 去抽水改用 Shin(2026-06-03,替比例法):回测证 Shin 把 favourite-longshot 偏差
+// 从 1.19pp 降到 0.70pp,市场背离度更无偏。Shin 单调保序→pick 排序/裁决不变,仅幅度更准。
 export function devig(odds) {
-  if (!odds) return null;
-  const o = { home: Number(odds.home), draw: Number(odds.draw), away: Number(odds.away) };
-  if (!(o.home > 1 && o.draw > 1 && o.away > 1)) return null;
-  const ih = 1 / o.home, id = 1 / o.draw, ia = 1 / o.away, s = ih + id + ia;
-  return { home: ih / s, draw: id / s, away: ia / s };
+  const s = shinDevig(odds);
+  return s ? { home: s.home, draw: s.draw, away: s.away } : null;
 }
 
 /** CLV: 下注赔率 vs 收盘赔率, 返回 +CLV(%) 与判定。 */

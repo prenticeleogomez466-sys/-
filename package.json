@@ -126,6 +126,8 @@
     "wc:fusion": "node scripts/run-worldcup-fusion.mjs",
     "wc:knockout-draw": "node scripts/run-worldcup-knockout-draw-check.mjs",
     "backtest:intl-elo": "node scripts/run-intl-elo-backtest.mjs",
+    "backtest:devig": "node scripts/run-devig-backtest.mjs",
+    "backtest:rue-salvesen": "node scripts/run-rue-salvesen-backtest.mjs",
     "backtest:corners": "node scripts/run-corners-backtest.mjs"
   },
   "engines": {

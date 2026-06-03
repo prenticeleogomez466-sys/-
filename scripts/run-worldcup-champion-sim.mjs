@@ -9,10 +9,18 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "../src/paths.js";
 import { eloExpectation, teamPrior } from "../src/world-cup-priors.js";
+import { shinFromInverse } from "../src/market-devig.js";
 
 const N = 10000, LAMTOT = 2.6;
 const HOSTS = new Set(["United States", "Canada", "Mexico"]);
 const pois = (lam) => { const L = Math.exp(-lam); let k = 0, p = 1; do { k++; p *= Math.random(); } while (p > L); return k - 1; };
+// Rue-Salvesen γ=0.15 进球收缩(49k 国际赛 leak-safe 验证):压缩 we 线性拆分的过度领先 λ。
+const RUE = 0.15;
+function splitLam(we) {
+  let la = LAMTOT * we, lb = LAMTOT * (1 - we);
+  if (la > 0 && lb > 0) { const d = (Math.log(la) - Math.log(lb)) / 2; la = Math.exp(Math.log(la) - RUE * d); lb = Math.exp(Math.log(lb) + RUE * d); }
+  return [la, lb];
+}
 
 const gdoc = JSON.parse(readFileSync(join(getDataSubdir("world-cup"), "2026", "groups.json"), "utf8"));
 const groups = gdoc.groups; const zh = gdoc.team_name_zh || {};
@@ -22,7 +30,7 @@ for (const [g, ts] of Object.entries(groups)) for (const t of ts) { const tp = t
 function ko(A, B) { // knockout match → winner
   let ha = 0; if (HOSTS.has(A)) ha += 35; if (HOSTS.has(B)) ha -= 35;
   const we = eloExpectation(elo[A], elo[B], ha).homeWinExpectancy;
-  const ga = pois(LAMTOT * we), gb = pois(LAMTOT * (1 - we));
+  const [la, lb] = splitLam(we); const ga = pois(la), gb = pois(lb);
   if (ga > gb) return A; if (gb > ga) return B;
   return Math.random() < 0.5 ? A : B; // 点球≈抛硬币(学界)
 }
@@ -37,7 +45,7 @@ for (let s = 0; s < N; s++) {
     for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
       const A = ts[i], B = ts[j]; let ha = 0; if (HOSTS.has(A)) ha += 35; if (HOSTS.has(B)) ha -= 35;
       const we = eloExpectation(elo[A], elo[B], ha).homeWinExpectancy;
-      const ga = pois(LAMTOT * we), gb = pois(LAMTOT * (1 - we));
+      const [la, lb] = splitLam(we); const ga = pois(la), gb = pois(lb);
       if (ga > gb) pts[A] += 3; else if (ga === gb) { pts[A]++; pts[B]++; } else pts[B] += 3;
       gd[A] += ga - gb; gd[B] += gb - ga; gf[A] += ga; gf[B] += gb;
     }
@@ -56,11 +64,13 @@ for (let s = 0; s < N; s++) {
 }
 
 const rows = Object.entries(champ).map(([t, c]) => ({ zh: zh[t] || t, elo: elo[t], p: c / N, sf: final4[t] / N, odds: (teamPrior(t) || teamPrior(zh[t]))?.title_odds }));
-// 市场隐含夺冠率(1/赔率,48队归一化去vig);混合率=0.65市场+0.35模型(学界:市场含全信息、纯Elo偏集中→市场为主、模型修正)
+// 市场隐含夺冠率:48队 Shin 去抽水(2026-06-03 接入,替比例法)。
+// 冠军盘抽水巨大(1/赔率和≈1.3-1.5),比例法系统性高估热门;Shin 假设内幕比例 z 校正
+// favourite-longshot 偏差(回测:热门项|偏差| 1.19pp→0.70pp)。零赔率项保持 0。
 const ALPHA = 0.65;
-const rawMkt = rows.map((r) => (r.odds ? 1 / r.odds : 0));
-const mktSum = rawMkt.reduce((s, x) => s + x, 0) || 1;
-rows.forEach((r, i) => { r.mkt = rawMkt[i] / mktSum; r.blend = ALPHA * r.mkt + (1 - ALPHA) * r.p; });
+const invOdds = rows.map((r) => (r.odds ? 1 / r.odds : 0));
+const { probs: shinMkt, z: shinZ } = shinFromInverse(invOdds);
+rows.forEach((r, i) => { r.mkt = shinMkt[i]; r.blend = ALPHA * r.mkt + (1 - ALPHA) * r.p; });
 rows.sort((a, b) => b.blend - a.blend);
 console.log("=== 2026 世界杯夺冠概率 Monte-Carlo(N=" + N + ",真实分组+Elo,泊松+点球50/50)===");
 console.log("⚠️ 淘汰赛配对=随机近似(无公开 bracket,不编造);夺冠率=粗略分布预期、非精确");
