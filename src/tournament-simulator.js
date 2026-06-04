@@ -35,15 +35,53 @@ export function poissonSample(lambda, rng) {
   return k - 1;
 }
 
+/** seeded 标准正态(Box-Muller,用传入 rng,不用 Math.random)。 */
+function normalSample(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/** seeded Gamma(shape, scale=1)抽样 — Marsaglia & Tsang,用传入 rng。shape<1 用 boost。 */
+function gammaSample(shape, rng) {
+  if (shape < 1) return gammaSample(shape + 1, rng) * Math.pow(rng() || 1e-12, 1 / shape);
+  const d = shape - 1 / 3;
+  const c = 1 / Math.sqrt(9 * d);
+  for (;;) {
+    let x, v;
+    do { x = normalSample(rng); v = 1 + c * x; } while (v <= 0);
+    v = v * v * v;
+    const u = rng();
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+
+/**
+ * 负二项抽样(mean=μ, size=r → 过离散 var=μ+μ²/r),gamma-Poisson 混合实现:
+ *   λ ~ Gamma(shape=r, scale=μ/r),k ~ Poisson(λ)。r 非正/∞ → 退化为纯泊松。
+ * 与 dixon-coles-engine.nbPmf 同一参数化(国际赛 r≈8 已 leak-safe 验证,holdout 精确比分 logloss −0.03)。
+ */
+export function nbSample(mu, size, rng) {
+  const m = Math.max(0.05, Math.min(6, Number(mu) || 0));
+  if (!Number.isFinite(size) || size <= 0) return poissonSample(m, rng);
+  const lam = gammaSample(size, rng) * (m / size);
+  return poissonSample(lam, rng);
+}
+
 /**
  * 一场比赛抽样比分。用两队 Elo → 主胜期望 we → 按总进球 λtot 拆成主客 λ → 各自泊松。
  * @param {number} eloA @param {number} eloB
- * @param {object} ctx { lambdaTotal=2.6, homeAdv=0, intensity=1, rueSalvesen=0.15 }
- *   intensity=阶段强度(×λtot);rueSalvesen=γ 进球收缩(见下)
+ * @param {object} ctx { lambdaTotal=2.6, homeAdv=0, intensity=1, rueSalvesen=0.15, nbSize, venueMult=1 }
+ *   intensity=阶段强度(×λtot);rueSalvesen=γ 进球收缩(见下);
+ *   nbSize=负二项过离散 size(有限正数→过离散抽样,与单场模型 NB_SIZE_SOFT 一致;缺省=纯泊松);
+ *   venueMult=场地(海拔/气温)对总进球的乘子(默认 1=中性;逐场 venue 数据齐时由调用方传)。
  * @returns {{a:number,b:number,we:number}}
  */
 export function sampleScoreline(eloA, eloB, ctx, rng) {
-  const lamTot = (ctx?.lambdaTotal ?? 2.6) * (ctx?.intensity ?? 1);
+  const venueMult = Number.isFinite(ctx?.venueMult) ? ctx.venueMult : 1;
+  const lamTot = (ctx?.lambdaTotal ?? 2.6) * (ctx?.intensity ?? 1) * venueMult;
   const exp = eloExpectation(eloA, eloB, ctx?.homeAdv ?? 0);
   const we = exp ? exp.homeWinExpectancy : 0.5;
   // 进球期望随实力差轻微放大领先方(避免强弱差全被平均化);保持总量≈lamTot。
@@ -58,7 +96,10 @@ export function sampleScoreline(eloA, eloB, ctx, rng) {
     la = Math.exp(Math.log(la) - gamma * dlt);
     lb = Math.exp(Math.log(lb) + gamma * dlt);
   }
-  return { a: poissonSample(la, rng), b: poissonSample(lb, rng), we };
+  // 比分分布与单场世界杯模型统一:国际赛进球过离散用负二项(nbSize),否则纯泊松。
+  //   "大融合"核心 — 超算每场比分不再各算各的,与 prediction-engine 同一 NB(8) 分布(2026-06-04)。
+  const nb = ctx?.nbSize;
+  return { a: nbSample(la, nb, rng), b: nbSample(lb, nb, rng), we };
 }
 
 /**
@@ -110,7 +151,13 @@ export function rankGroup(teams, matches, eloOf) {
  * @returns {{ winners, runners, thirdsRanked, advancers(32), standings }}
  */
 export function simulateGroupStage(groups, eloOf, rng, opts = {}) {
-  const ctx = { lambdaTotal: opts.lambdaTotal ?? 2.6, intensity: opts.groupIntensity ?? 1 };
+  const ctx = {
+    lambdaTotal: opts.lambdaTotal ?? 2.6,
+    intensity: opts.groupIntensity ?? 1,
+    nbSize: opts.nbSize,
+    rueSalvesen: opts.rueSalvesen,
+    venueMult: opts.venueMult
+  };
   const hosts = opts.hosts instanceof Set ? opts.hosts : new Set(opts.hosts ?? []);
   const hostAdv = opts.hostAdv ?? 35;
   const winners = [], runners = [], thirds = [];
@@ -180,7 +227,7 @@ export function simulateKnockoutMatch(teamA, teamB, ctx, rng, eloOf) {
   let ha = 0;
   if (ctx?.hosts?.has(teamA)) ha += ctx.hostAdv ?? 35;
   if (ctx?.hosts?.has(teamB)) ha -= ctx.hostAdv ?? 35;
-  const base = { lambdaTotal: ctx?.lambdaTotal ?? 2.6, intensity: ctx?.intensity ?? 1, homeAdv: ha };
+  const base = { lambdaTotal: ctx?.lambdaTotal ?? 2.6, intensity: ctx?.intensity ?? 1, homeAdv: ha, nbSize: ctx?.nbSize, rueSalvesen: ctx?.rueSalvesen, venueMult: ctx?.venueMult };
   let { a, b } = sampleScoreline(eloOf(teamA), eloOf(teamB), base, rng);
   if (a > b) return { winner: teamA, loser: teamB, decided: "reg" };
   if (b > a) return { winner: teamB, loser: teamA, decided: "reg" };
@@ -214,6 +261,7 @@ export function simulateTournamentOfficial(config, rng) {
 
   const gs = simulateGroupStage(groups, eloOf, rng, {
     lambdaTotal: config.lambdaTotal, groupIntensity: 1, hosts, hostAdv: config.hostAdv,
+    nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult,
   });
   for (const a of gs.advancers) stageReached[a.team] = "r32";
 
@@ -232,7 +280,7 @@ export function simulateTournamentOfficial(config, rng) {
     if (slot.startsWith("T@")) { const g = assign[slot.slice(2)]; return g ? thirdByGroup[g] : undefined; }
     return undefined;
   };
-  const koCtx = (intensity) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt });
+  const koCtx = (intensity) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult });
   const mw = {}; // 赛号 -> 胜者
 
   for (const mt of bracket.r32) {
@@ -271,11 +319,12 @@ function simulateTournamentSeeded(config, rng) {
 
   const gs = simulateGroupStage(groups, eloOf, rng, {
     lambdaTotal: config.lambdaTotal, groupIntensity: 1, hosts, hostAdv: config.hostAdv,
+    nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult,
   });
   for (const a of gs.advancers) stageReached[a.team] = "r32";
 
   let bracket = seedBracket(gs.advancers, eloOf); // length 32
-  const koCtx = (intensity) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt });
+  const koCtx = (intensity) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult });
   const stages = [["r16", phaseInt.r32], ["qf", phaseInt.r16], ["sf", phaseInt.qf], ["final", phaseInt.sf], ["champion", phaseInt.final]];
   let round = bracket.map((x) => x.team);
   for (const [nextStage, intensity] of stages) {

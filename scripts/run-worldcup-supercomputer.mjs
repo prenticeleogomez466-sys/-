@@ -43,7 +43,10 @@ const eloOf = (t) => {
 //   旧值 1.18–1.28 把淘汰赛进球凭空抬高 18–28%,无实证支撑 → 高估强队碾压、低估点球大战变数。
 //   改:base λtot 2.6→2.54(=实证全程),phaseIntensity 全程 0.96(90' 淘汰 ~2.44,加时另按 /3 叠加 ≈2.5)。
 const phaseIntensity = { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 };
-const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket }, N, SEED);
+// 大融合(2026-06-04):比分分布与单场世界杯模型统一 —— 国际赛进球过离散 nbSize=8
+//   (= prediction-engine NB_SIZE_SOFT,49k 国际赛 leak-safe 验证 holdout 精确比分 logloss −0.03)。
+//   超算每场不再纯泊松"各算各的";过离散↑平局/极端比分 → 淘汰赛更多点球 → 夺冠分布更贴实证。
+const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket, nbSize: 8 }, N, SEED);
 const bracketMode = bracket ? "FIFA官方对阵表(R32位次+第三名495分配)" : "强度种子树(无官方表回退)";
 
 // 市场隐含夺冠率(1/赔率 去 vig 归一)+ 混合(0.65市场+0.35模型,据 reference 学界结论:市场含全信息)
