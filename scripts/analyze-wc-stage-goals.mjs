@@ -50,7 +50,8 @@ console.log(`全部    : n=${g.n + k.n}  场均总进球=${stats([...group, ...k
 console.log("");
 console.log(`模型 base lambdaTotal=2.6,groupIntensity=1 → 期望小组 2.600 球`);
 console.log(`经验 intensity(相对小组赛):小组=1.000  淘汰=${(k.gpg / g.gpg).toFixed(3)}`);
-console.log(`经验 intensity(相对模型base 2.6):小组=${(g.gpg / 2.6).toFixed(3)}  淘汰=${(k.gpg / 2.6).toFixed(3)}`);
+console.log(`经验 intensity(相对模型base 2.54):小组=${(g.gpg / 2.54).toFixed(3)}  淘汰=${(k.gpg / 2.54).toFixed(3)}`);
 console.log("");
-console.log("当前模型 phaseIntensity(写死): r32~1.18 r16 1.20 qf 1.25 sf/final 1.28");
-console.log("→ 若经验淘汰 intensity < 小组,则当前设定方向相反,淘汰赛进球被高估、点球大战被低估。");
+console.log("现行模型(2026-06-04 实证校准后): base λtot=2.54、phaseIntensity 全程 0.96。");
+console.log("→ 实证淘汰赛(含加时口径)≈小组赛;模型把加时单列(intensity/3)叠加,故 90' 淘汰 base 取 0.96 略低于小组,合理。");
+console.log("  (旧写死 1.18-1.28 已于 commit f4427f5 弃,曾高估淘汰赛进球、低估点球大战变数。)");
