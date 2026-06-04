@@ -56,6 +56,7 @@
     "backtest:scoredist": "node scripts/run-scoredist-backtest.mjs",
     "backtest:reliability": "node scripts/run-confidence-reliability.mjs",
     "backtest:selectivity": "node scripts/run-selectivity-curve.mjs",
+    "diagnose:recap": "node scripts/recap-actual-diagnosis.mjs",
     "check:parlay-corr": "node scripts/run-parlay-correlation-check.mjs",
     "check:lambda": "node scripts/check-lambda-sanity.mjs",
     "audit:experience": "node scripts/audit-experience-coverage.mjs",
