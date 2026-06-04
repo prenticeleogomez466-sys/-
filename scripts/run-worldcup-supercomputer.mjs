@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir, getExportDir } from "../src/paths.js";
-import { teamPrior } from "../src/world-cup-priors.js";
+import { teamPrior, groupVenueMults, matchVenueMult } from "../src/world-cup-priors.js";
 import { runMonteCarlo } from "../src/tournament-simulator.js";
 
 const argv = process.argv.slice(2);
@@ -46,7 +46,12 @@ const phaseIntensity = { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 }
 // 大融合(2026-06-04):比分分布与单场世界杯模型统一 —— 国际赛进球过离散 nbSize=8
 //   (= prediction-engine NB_SIZE_SOFT,49k 国际赛 leak-safe 验证 holdout 精确比分 logloss −0.03)。
 //   超算每场不再纯泊松"各算各的";过离散↑平局/极端比分 → 淘汰赛更多点球 → 夺冠分布更贴实证。
-const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket, nbSize: 8 }, N, SEED);
+// venue 逐场场地乘子(2026-06-04 大融合②):真实 FIFA 赛程 match-venues.json 每赛号→城市→海拔/气温 λ 乘子。
+//   仅墨西哥城(2240m)+6%、露天高温城(蒙特雷-5%/迈阿密/堪萨斯/费城-3%)非中性,其余顶棚/温和城中性。
+const groupVMs = groupVenueMults();
+const koVenueMult = {};
+for (let m = 73; m <= 104; m++) koVenueMult[m] = matchVenueMult(m);
+const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket, nbSize: 8, groupVenueMults: groupVMs, koVenueMult }, N, SEED);
 const bracketMode = bracket ? "FIFA官方对阵表(R32位次+第三名495分配)" : "强度种子树(无官方表回退)";
 
 // 市场隐含夺冠率(1/赔率 去 vig 归一)+ 混合(0.65市场+0.35模型,据 reference 学界结论:市场含全信息)

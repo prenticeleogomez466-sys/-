@@ -164,11 +164,15 @@ export function simulateGroupStage(groups, eloOf, rng, opts = {}) {
   const standings = {};
   for (const [g, teams] of Object.entries(groups)) {
     const matches = [];
+    // 逐场场地乘子(海拔/气温):opts.groupVenueMults[组]=该组6场 venueMult(赛号序);缺省退 ctx.venueMult。
+    const gvm = opts.groupVenueMults?.[g];
+    let pairIdx = 0;
     for (let i = 0; i < teams.length; i++) {
       for (let j = i + 1; j < teams.length; j++) {
         const A = teams[i], B = teams[j];
         let ha = 0; if (hosts.has(A)) ha += hostAdv; if (hosts.has(B)) ha -= hostAdv;
-        const { a, b } = sampleScoreline(eloOf(A), eloOf(B), { ...ctx, homeAdv: ha }, rng);
+        const vm = gvm ? gvm[pairIdx++] : ctx.venueMult;
+        const { a, b } = sampleScoreline(eloOf(A), eloOf(B), { ...ctx, homeAdv: ha, venueMult: vm }, rng);
         matches.push({ home: A, away: B, ga: a, gb: b });
       }
     }
@@ -262,6 +266,7 @@ export function simulateTournamentOfficial(config, rng) {
   const gs = simulateGroupStage(groups, eloOf, rng, {
     lambdaTotal: config.lambdaTotal, groupIntensity: 1, hosts, hostAdv: config.hostAdv,
     nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult,
+    groupVenueMults: config.groupVenueMults,
   });
   for (const a of gs.advancers) stageReached[a.team] = "r32";
 
@@ -280,16 +285,18 @@ export function simulateTournamentOfficial(config, rng) {
     if (slot.startsWith("T@")) { const g = assign[slot.slice(2)]; return g ? thirdByGroup[g] : undefined; }
     return undefined;
   };
-  const koCtx = (intensity) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult });
+  const koCtx = (intensity, venueMult) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: venueMult ?? config.venueMult });
+  // 淘汰赛逐场场地乘子:config.koVenueMult[赛号]=该场 venueMult(官方赛号→城市,仅官方对阵表路径有真实赛号)。
+  const vmOf = (m) => config.koVenueMult?.[m];
   const mw = {}; // 赛号 -> 胜者
 
   for (const mt of bracket.r32) {
-    const res = simulateKnockoutMatch(resolve(mt.home), resolve(mt.away), koCtx(phaseInt.r32), rng, eloOf);
+    const res = simulateKnockoutMatch(resolve(mt.home), resolve(mt.away), koCtx(phaseInt.r32, vmOf(mt.m)), rng, eloOf);
     mw[mt.m] = res.winner; stageReached[res.winner] = "r16";
   }
   const playRound = (matches, intensity, reach) => {
     for (const mt of matches) {
-      const res = simulateKnockoutMatch(mw[mt.from[0]], mw[mt.from[1]], koCtx(intensity), rng, eloOf);
+      const res = simulateKnockoutMatch(mw[mt.from[0]], mw[mt.from[1]], koCtx(intensity, vmOf(mt.m)), rng, eloOf);
       mw[mt.m] = res.winner; stageReached[res.winner] = reach;
     }
   };
@@ -320,11 +327,14 @@ function simulateTournamentSeeded(config, rng) {
   const gs = simulateGroupStage(groups, eloOf, rng, {
     lambdaTotal: config.lambdaTotal, groupIntensity: 1, hosts, hostAdv: config.hostAdv,
     nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult,
+    groupVenueMults: config.groupVenueMults,
   });
   for (const a of gs.advancers) stageReached[a.team] = "r32";
 
   let bracket = seedBracket(gs.advancers, eloOf); // length 32
-  const koCtx = (intensity) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult });
+  const koCtx = (intensity, venueMult) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: venueMult ?? config.venueMult });
+  // 淘汰赛逐场场地乘子:config.koVenueMult[赛号]=该场 venueMult(官方赛号→城市,仅官方对阵表路径有真实赛号)。
+  const vmOf = (m) => config.koVenueMult?.[m];
   const stages = [["r16", phaseInt.r32], ["qf", phaseInt.r16], ["sf", phaseInt.qf], ["final", phaseInt.sf], ["champion", phaseInt.final]];
   let round = bracket.map((x) => x.team);
   for (const [nextStage, intensity] of stages) {

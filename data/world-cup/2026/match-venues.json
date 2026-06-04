@@ -1,0 +1,39 @@
+{
+  "edition": "2026",
+  "_provenance": {
+    "source": "FIFA 官方 2026 世界杯赛程(每赛号→承办城市)。小组赛1-72:NBC Sports full schedule;淘汰赛73-104:Wikipedia 2026 FIFA World Cup knockout stage。2026-06-04 核。",
+    "note": "城市名用 venues.json 的 city 字段口径;淘汰赛球场所在郊区(Inglewood/Foxborough/Guadalupe/Santa Clara/Miami Gardens/East Rutherford/Arlington)经 cityAliases 归一到承办城市。",
+    "usage": "tournament-simulator 按赛号查城市→venueLambdaMultiplier 出 venueMult(海拔/气温对总进球λ的乘子);中高海拔实测中性,仅墨西哥城+6%/露天高温城-3~5% 非中性。"
+  },
+  "cityAliases": {
+    "Inglewood": "Los Angeles",
+    "Foxborough": "Boston",
+    "Guadalupe": "Monterrey",
+    "East Rutherford": "New York/New Jersey",
+    "Arlington": "Dallas",
+    "Santa Clara": "San Francisco Bay Area",
+    "Miami Gardens": "Miami"
+  },
+  "matchCity": {
+    "1": "Mexico City", "2": "Guadalajara", "3": "Atlanta", "4": "Guadalajara", "5": "Mexico City", "6": "Monterrey",
+    "7": "Toronto", "8": "San Francisco Bay Area", "9": "Los Angeles", "10": "Vancouver", "11": "Vancouver", "12": "Seattle",
+    "13": "New York/New Jersey", "14": "Boston", "15": "Boston", "16": "Philadelphia", "17": "Miami", "18": "Atlanta",
+    "19": "Los Angeles", "20": "Vancouver", "21": "Seattle", "22": "San Francisco Bay Area", "23": "Los Angeles", "24": "San Francisco Bay Area",
+    "25": "Houston", "26": "Philadelphia", "27": "Toronto", "28": "Kansas City", "29": "New York/New Jersey", "30": "Philadelphia",
+    "31": "Dallas", "32": "Monterrey", "33": "Houston", "34": "Monterrey", "35": "Dallas", "36": "Kansas City",
+    "37": "Los Angeles", "38": "Seattle", "39": "Los Angeles", "40": "Vancouver", "41": "Seattle", "42": "Vancouver",
+    "43": "Atlanta", "44": "Miami", "45": "Atlanta", "46": "Miami", "47": "Houston", "48": "Guadalajara",
+    "49": "New York/New Jersey", "50": "Boston", "51": "Philadelphia", "52": "New York/New Jersey", "53": "Boston", "54": "Toronto",
+    "55": "Kansas City", "56": "San Francisco Bay Area", "57": "Dallas", "58": "San Francisco Bay Area", "59": "Kansas City", "60": "Dallas",
+    "61": "Houston", "62": "Mexico City", "63": "Houston", "64": "Guadalajara", "65": "Miami", "66": "Atlanta",
+    "67": "Dallas", "68": "Toronto", "69": "Boston", "70": "Toronto", "71": "New York/New Jersey", "72": "Philadelphia",
+    "73": "Inglewood", "74": "Foxborough", "75": "Guadalupe", "76": "Houston", "77": "East Rutherford", "78": "Arlington",
+    "79": "Mexico City", "80": "Atlanta", "81": "Santa Clara", "82": "Seattle", "83": "Toronto", "84": "Inglewood",
+    "85": "Vancouver", "86": "Miami Gardens", "87": "Kansas City", "88": "Arlington",
+    "89": "Philadelphia", "90": "Houston", "91": "East Rutherford", "92": "Mexico City", "93": "Arlington", "94": "Seattle", "95": "Atlanta", "96": "Vancouver",
+    "97": "Foxborough", "98": "Inglewood", "99": "Miami Gardens", "100": "Kansas City",
+    "101": "Arlington", "102": "Atlanta",
+    "103": "Miami Gardens",
+    "104": "East Rutherford"
+  }
+}

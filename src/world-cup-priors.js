@@ -33,6 +33,7 @@ function load() {
   const venuesDoc = read("venues.json");
   const groupsDoc = read("groups.json");
   const formatDoc = read("format.json");
+  const matchVenuesDoc = read("match-venues.json");
   // 建中文/英文 → venue 的城市索引(场馆匹配用)
   const venueByCity = new Map();
   for (const v of venuesDoc?.venues ?? []) {
@@ -48,8 +49,38 @@ function load() {
       if (zh[t]) teamGroup.set(zh[t], g);
     }
   }
-  _cache = { venuesDoc, groupsDoc, formatDoc, venueByCity, teamGroup, zh };
+  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, venueByCity, teamGroup, zh };
   return _cache;
+}
+
+/**
+ * 赛号(1-104)→ 该场 venueLambdaMultiplier(海拔/气温对总进球λ的乘子)。
+ * 用真实 FIFA 赛程 match-venues.json(每赛号→承办城市)+ venues.json 城市海拔/气温。
+ * 淘汰赛球场郊区名(Inglewood 等)经 cityAliases 归一到承办城市。无数据/无 venue → 1(中性)。
+ */
+export function matchVenueMult(matchNumber) {
+  const { matchVenuesDoc, venueByCity } = load();
+  if (!matchVenuesDoc) return 1;
+  let city = matchVenuesDoc.matchCity?.[String(matchNumber)];
+  if (!city) return 1;
+  city = matchVenuesDoc.cityAliases?.[city] ?? city;
+  const venue = venueByCity.get(city.toLowerCase()) ?? venueByCity.get(city);
+  return venueLambdaMultiplier(venue).mult;
+}
+
+/**
+ * 各组(按 groups.json 键顺序)6 场比赛的 venueMult 数组,赛号顺序:第1组=1..6、第2组=7..12…
+ * 返回 { 组键: [m1..m6 的 venueMult] };供锦标赛引擎给小组赛逐场施加场地乘子。
+ */
+export function groupVenueMults() {
+  const { groupsDoc } = load();
+  const keys = Object.keys(groupsDoc?.groups ?? {});
+  const out = {};
+  keys.forEach((k, gi) => {
+    const base = gi * 6; // 第 gi 组首场赛号 = base+1
+    out[k] = [1, 2, 3, 4, 5, 6].map((j) => matchVenueMult(base + j));
+  });
+  return out;
 }
 
 /** 是否属于 2026 世界杯正赛:竞赛名命中世界杯 且 日期落在赛会窗口内。 */

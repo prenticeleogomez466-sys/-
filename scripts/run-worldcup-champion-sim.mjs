@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir, getExportDir } from "../src/paths.js";
-import { teamPrior } from "../src/world-cup-priors.js";
+import { teamPrior, groupVenueMults, matchVenueMult } from "../src/world-cup-priors.js";
 import { shinFromInverse } from "../src/market-devig.js";
 import { runMonteCarlo } from "../src/tournament-simulator.js";
 
@@ -40,7 +40,10 @@ const eloOf = (t) => {
 // 进球强度实证校准(见 run-worldcup-supercomputer.mjs / analyze-wc-stage-goals.mjs):base 2.54、淘汰赛 0.96。
 const phaseIntensity = { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 };
 // 大融合(2026-06-04):比分分布与单场世界杯模型统一 —— nbSize=8 国际赛过离散(= prediction-engine NB_SIZE_SOFT)。
-const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket, nbSize: 8 }, N, SEED);
+const groupVMs = groupVenueMults();
+const koVenueMult = {};
+for (let m = 73; m <= 104; m++) koVenueMult[m] = matchVenueMult(m);
+const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket, nbSize: 8, groupVenueMults: groupVMs, koVenueMult }, N, SEED);
 
 // 市场隐含夺冠率:48 队 Shin 去抽水(替比例法,校 favourite-longshot 偏差)。零赔率项保持 0。
 const base = res.teams.map((r) => ({ team: zh[r.team] || r.team, en: r.team, elo: eloOf(r.team), p: r.champion, sf: r.sf, odds: (teamPrior(r.team) || teamPrior(zh[r.team]))?.title_odds }));
