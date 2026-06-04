@@ -27,7 +27,12 @@ import { join } from "node:path";
 const TOKEN = process.env.FOOTBALL_DATA_ORG_TOKEN || process.env.FOOTBALL_DATA_API_TOKEN || "";
 const args = process.argv.slice(2);
 const dry = args.includes("--dry");
-const dateArg = (() => { const i = args.indexOf("--date"); return i >= 0 ? args[i + 1] : null; })();
+const dateArg = (() => {
+  const pre = args.find((a) => a.startsWith("--date="));
+  if (pre) return pre.slice("--date=".length);
+  const i = args.indexOf("--date");
+  return i >= 0 ? args[i + 1] : null;
+})();
 const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
 
 if (!TOKEN) {

@@ -96,6 +96,7 @@
     "recommend:audit": "node src/recommendation-audit.js",
     "recap:daily": "node src/daily-recap.js",
     "recap:backfill": "node scripts/backfill-results.mjs",
+    "recap:backfill-ht": "node scripts/backfill-halftime-fdorg.mjs",
     "recap:desktop": "node scripts/build-shenxuan-recap-desktop.mjs",
     "recap:health": "node src/recap-automation-health.js",
     "backtest:evolution": "node src/evolution-backtest.js",

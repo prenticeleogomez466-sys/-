@@ -120,6 +120,9 @@ function Run-Recap {
   # 赛果回填(2026-05-31 用户"数据不全 全补上去"):授权源覆盖不全(国际赛/北欧/日职/欧冠等),
   # 用 ESPN 全联赛单日赛果按 canonical 主队锚定补进 store,大幅提升结算率。$true 失败不阻塞。
   Invoke-Step "backfill real results from ESPN" "npm run recap:backfill -- --date=$Date" $true
+  # 半场比分回填(2026-06-04 用户"半全场睁眼"):ESPN 不带 HT、Sofascore 反爬,用 football-data.org
+  # 免费档 score.halfTime 补世界杯+五大联赛+巴甲+欧冠的半场,让半全场玩法可结算/学习。无 token 优雅跳过。$true 失败不阻塞。
+  Invoke-Step "backfill half-time scores from football-data.org" "npm run recap:backfill-ht -- --date=$Date" $true
   # 用 --no-result-sync:store 已由上面两步填好,recap 只结算不再二次 sync(避免覆盖 ESPN 回填赛果)。
   Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date --no-result-sync"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
