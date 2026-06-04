@@ -625,6 +625,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       line: handicapLine,
       lineSource: handicapLineSource,
       direction: ranked[0].label,
+      directionCode: ranked[0].code,
       anchor: "wld",
       netExpected: goalDiff !== null ? round(goalDiff + handicapLine) : null,
       expectedGoalDiff: goalDiff,

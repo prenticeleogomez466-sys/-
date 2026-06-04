@@ -357,7 +357,15 @@ function handicapRecommendText(prediction) {
   // Skellam 独立交叉校验(2026-05-30):矩阵与 Skellam 让球分歧大时附「低信心」提示,
   // 让用户自己判断下不下——只提示、不抑制玩法(用户硬规则)。
   const sk = h.skellamCheck && !h.skellamCheck.agree ? ` ｜${h.skellamCheck.note}` : "";
-  return `让 ${lineStr} → ${h.direction}${cover}${sk}`;
+  // 让球玩法最优方向(DC-τ argmax,leak-safe 回测 +4.37pp 覆盖命中 vs 跟 wld 主推方向):
+  //   方向(头条)仍锚 wld(用户硬规则 2026-05-29:玩让球买的就是主推方向、不纠结)。
+  //   但当"让球这门独立玩法"的最优方向与 wld 不一致时,把它标注出来供用户自己选——不替弃赛、不改头条。
+  //   口径与 2026-06-02"比分解锁出 wld、改真实众数、wldConsistent 另存"一致:头条守一致,边上给最优。
+  const hw = h.handicapWld;
+  const optimal = (hw && hw.pickCode && h.directionCode && hw.pickCode !== h.directionCode)
+    ? ` ｜🎯让球玩法最优: ${hw.pick} ${pct(hw.probability)}(${hw.source === "market-asian-water" ? "亚盘水位" : "DC-τ"},回测+4.4pp,与主推不同向)`
+    : "";
+  return `让 ${lineStr} → ${h.direction}${cover}${sk}${optimal}`;
 }
 
 // 信心从裸数字变成"等级(数字)"对用户更友好
