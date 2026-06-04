@@ -20,6 +20,8 @@
     "sync:wc-weather": "node scripts/sync-worldcup-weather.mjs",
     "china:sources": "node src/china-web-source-runner.js",
     "china:sources:sync": "node src/china-web-source-runner.js --sync-fixtures",
+    "ingest:zgzcw": "node scripts/ingest-zgzcw-odds.mjs",
+    "ingest:zgzcw:merge": "node scripts/ingest-zgzcw-odds.mjs --merge",
     "crawler:realtime": "node src/realtime-crawler-runner.js",
     "crawler:realtime:strict": "node src/realtime-crawler-runner.js --require-external-odds --require-full-odds",
     "model:scorecard": "node scripts/run-model-scorecard.mjs",
