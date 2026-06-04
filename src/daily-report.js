@@ -109,9 +109,7 @@ function toJingcaiRow(prediction) {
     competitionCategory(fixture?.competition),                   // 2 赛事类型
     `${fixture.homeTeam} vs ${fixture.awayTeam}`,                // 3 对阵
     fixture.kickoff?.slice(5, 16) ?? "",                         // 4 开赛(月-日 时:分)
-    prediction.jingcaiLetqiu && prediction.jingcaiLetqiu.sfcSold === false
-      ? "⛔ 未开售(本场只让球)"
-      : wldCellWithDraw(prediction),               // 5 胜平负(不让球);均势场标注双选含平(primary 不变,复盘按 primary 结算)
+    wldDisplayCell(prediction),                    // 5 胜平负(不让球);未开售/让0赔率缺失会标注,均势场标注双选含平
     jingcaiLetqiuText(prediction),                               // 6 让球胜平负(竞彩主玩法,真实让球赔率)
     buildScoreCandidates(prediction),                            // 7 比分(首选 + 备选,不再单一)
     buildHalfFullCandidates(prediction),                         // 8 半全场(首选 + 备选)
@@ -219,6 +217,21 @@ export function experienceCell(prediction) {
 // 胜平负列(2026-06-01「永远没平」修复):均势场(平局进前二且≥26%)标注双选含平,提示该兼顾平局。
 //   主推 prediction.pick.code **不变**(复盘仍按 primary 结算,口径一致),这里只是展示层的双选建议。
 //   悬殊场/主推明显场不加,避免滥推平。
+// 胜平负显示闸(2026-06-04):区分三种"让0胜平负不可直接投/不可靠"的情形,避免把脏数据当干净推荐。
+//  ① sfcSold===false:竞彩明确只让球,让0未开售 → ⛔。
+//  ② sfcSold!==true 且存在非0官方让球线:让0胜平负赔率缺失/未抓全(伊拉克等悬殊盘只剩让球档),
+//     此时 wld 概率是用让球赔率反推的,直胜数字不可靠 → 标注"仅参考",但不抑制玩法(守"信心不替用户弃赛")。
+//  ③ 正常 → 原 wldCellWithDraw。
+function wldDisplayCell(prediction) {
+  const lq = prediction.jingcaiLetqiu;
+  if (lq && lq.sfcSold === false) return "⛔ 未开售(本场只让球)";
+  const line = Number(prediction.handicapPick?.line);
+  if (lq && lq.sfcSold !== true && Number.isFinite(line) && line !== 0) {
+    return `⚠️ 让0赔率缺失(本场让${line},直胜仅参考):${wldCellWithDraw(prediction)}`;
+  }
+  return wldCellWithDraw(prediction);
+}
+
 function wldCellWithDraw(prediction) {
   const code = prediction.pick?.code;
   const base = outcomeCodeToChinese(code);
