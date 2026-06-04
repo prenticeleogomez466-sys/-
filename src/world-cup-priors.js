@@ -36,6 +36,7 @@ function load() {
   const groupsDoc = read("groups.json");
   const formatDoc = read("format.json");
   const matchVenuesDoc = read("match-venues.json");
+  const matchDatesDoc = read("match-dates.json");
   const matchOddsDoc = read("match-odds.json");
   // 建中文/英文 → venue 的城市索引(场馆匹配用)
   const venueByCity = new Map();
@@ -52,8 +53,17 @@ function load() {
       if (zh[t]) teamGroup.set(zh[t], g);
     }
   }
-  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, matchOddsDoc, venueByCity, teamGroup, zh };
+  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, matchDatesDoc, matchOddsDoc, venueByCity, teamGroup, zh };
   return _cache;
+}
+
+/**
+ * 赛号 → 承办城市【当地比赛日期】(YYYY-MM-DD),来自真实赛程 match-dates.json(fixturedownload feed)。
+ * 供 matchVenueMult/MC 查 Open-Meteo 真实预报。无赛程文件/无该场 → null。
+ */
+export function matchLocalDate(matchNumber) {
+  const { matchDatesDoc } = load();
+  return matchDatesDoc?.matchDate?.[String(matchNumber)]?.localDate ?? null;
 }
 
 /**
@@ -68,8 +78,10 @@ export function matchVenueMult(matchNumber, opts = {}) {
   if (!city) return 1;
   city = matchVenuesDoc.cityAliases?.[city] ?? city;
   const venue = venueByCity.get(city.toLowerCase()) ?? venueByCity.get(city);
-  // 有比赛日期时查 Open-Meteo 真实预报最高温(承办城市,~16天窗内);无则回退气候均温。
-  const realHighTempC = opts.isoDate ? realHighTempForCityDate(venue?.city, opts.isoDate) : null;
+  // 比赛日期:调用方传 opts.isoDate 优先,否则按赛号自查真实赛程当地日期(match-dates.json)。
+  //   有日期 → 查 Open-Meteo 真实预报最高温(承办城市,~16天窗内);窗外/无预报 → 回退气候均温。
+  const isoDate = opts.isoDate ?? matchLocalDate(matchNumber);
+  const realHighTempC = isoDate ? realHighTempForCityDate(venue?.city, isoDate) : null;
   return venueLambdaMultiplier(venue, { realHighTempC }).mult;
 }
 
@@ -227,9 +239,12 @@ export function worldCupLambdaContext(fixture, date) {
   if (!isWorldCup2026(competition, date ?? fixture?.date)) {
     return { isWC: false, lambdaMult: 1, factors: [] };
   }
-  const phase = worldCupPhase(date ?? fixture?.date);
+  const matchDate = date ?? fixture?.date;
+  const phase = worldCupPhase(matchDate);
   const venue = worldCupVenue(fixture);
-  const { mult: venueMult, factors: venueFactors } = venueLambdaMultiplier(venue);
+  // 单场分析日期已知 → 查 Open-Meteo 真实预报最高温(承办城市,~16天窗内),替换静态气候均温;窗外回退均温。
+  const realHighTempC = realHighTempForCityDate(venue?.city, matchDate);
+  const { mult: venueMult, factors: venueFactors } = venueLambdaMultiplier(venue, { realHighTempC });
   // 阶段对总量的轻微影响:淘汰赛更谨慎 → 进球略减(平局倾向另在软重校准里处理)。
   // 数据背书(2026-06-01,scripts/worldcup-prior-validation.mjs,5届世界杯 320 场真实赛果):
   //   淘汰赛/小组赛进球比实测 0.946、淘汰赛 90 分钟平局率实测 +12.9pp(35.0% vs 22.1%)
