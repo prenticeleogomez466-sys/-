@@ -207,7 +207,8 @@ export function simulateKnockoutMatch(teamA, teamB, ctx, rng, eloOf) {
 export function simulateTournamentOfficial(config, rng) {
   const { groups, eloOf, bracket } = config;
   const hosts = config.hosts instanceof Set ? config.hosts : new Set(config.hosts ?? []);
-  const phaseInt = config.phaseIntensity ?? { r32: 1.18, r16: 1.20, qf: 1.25, sf: 1.28, final: 1.28 };
+  // 默认进球强度=实证校准(analyze-wc-stage-goals.mjs,448 场世界杯:淘汰赛≈小组赛,非更高)。旧默认 1.18–1.28 无据已弃。
+  const phaseInt = config.phaseIntensity ?? { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 };
   const stageReached = {};
   for (const teams of Object.values(groups)) for (const t of teams) stageReached[t] = "group";
 
@@ -263,7 +264,8 @@ export function simulateTournament(config, rng) {
 function simulateTournamentSeeded(config, rng) {
   const { groups, eloOf } = config;
   const hosts = config.hosts instanceof Set ? config.hosts : new Set(config.hosts ?? []);
-  const phaseInt = config.phaseIntensity ?? { r32: 1.18, r16: 1.20, qf: 1.25, sf: 1.28, final: 1.28 };
+  // 默认进球强度=实证校准(analyze-wc-stage-goals.mjs,448 场世界杯:淘汰赛≈小组赛,非更高)。旧默认 1.18–1.28 无据已弃。
+  const phaseInt = config.phaseIntensity ?? { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 };
   const stageReached = {};
   for (const teams of Object.values(groups)) for (const t of teams) stageReached[t] = "group";
 

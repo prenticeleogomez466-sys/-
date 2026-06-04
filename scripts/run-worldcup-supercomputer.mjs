@@ -38,8 +38,12 @@ const eloOf = (t) => {
   return (eloCache[t] = tp?.elo || 1500);
 };
 
-const phaseIntensity = { r32: 1.18, r16: 1.20, qf: 1.25, sf: 1.28, final: 1.28 };
-const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.6, hostAdv: 35, penTilt: 0, phaseIntensity, bracket }, N, SEED);
+// 进球强度实证校准(scripts/analyze-wc-stage-goals.mjs,1998-2022 32队×7届 448 场,leak-safe):
+//   世界杯全程场均 2.536 球;淘汰赛(含加时记录口径)= 小组赛,扣加时后 90' 淘汰赛反更低 ~2.40。
+//   旧值 1.18–1.28 把淘汰赛进球凭空抬高 18–28%,无实证支撑 → 高估强队碾压、低估点球大战变数。
+//   改:base λtot 2.6→2.54(=实证全程),phaseIntensity 全程 0.96(90' 淘汰 ~2.44,加时另按 /3 叠加 ≈2.5)。
+const phaseIntensity = { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 };
+const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket }, N, SEED);
 const bracketMode = bracket ? "FIFA官方对阵表(R32位次+第三名495分配)" : "强度种子树(无官方表回退)";
 
 // 市场隐含夺冠率(1/赔率 去 vig 归一)+ 混合(0.65市场+0.35模型,据 reference 学界结论:市场含全信息)

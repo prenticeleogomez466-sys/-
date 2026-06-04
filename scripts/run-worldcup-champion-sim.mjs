@@ -37,7 +37,9 @@ const eloOf = (t) => {
   return (eloCache[t] = tp?.elo || 1500);
 };
 
-const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.6, hostAdv: 35, penTilt: 0, bracket }, N, SEED);
+// 进球强度实证校准(见 run-worldcup-supercomputer.mjs / analyze-wc-stage-goals.mjs):base 2.54、淘汰赛 0.96。
+const phaseIntensity = { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 };
+const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket }, N, SEED);
 
 // 市场隐含夺冠率:48 队 Shin 去抽水(替比例法,校 favourite-longshot 偏差)。零赔率项保持 0。
 const base = res.teams.map((r) => ({ team: zh[r.team] || r.team, en: r.team, elo: eloOf(r.team), p: r.champion, sf: r.sf, odds: (teamPrior(r.team) || teamPrior(zh[r.team]))?.title_odds }));
