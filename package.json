@@ -16,6 +16,7 @@
     "market:crawl:soft": "node src/market-data-runner.js --crawl",
     "market:verify": "node src/market-data-runner.js --strict",
     "market:status": "node src/market-data-runner.js",
+    "sync:wc-weather": "node scripts/sync-worldcup-weather.mjs",
     "china:sources": "node src/china-web-source-runner.js",
     "china:sources:sync": "node src/china-web-source-runner.js --sync-fixtures",
     "crawler:realtime": "node src/realtime-crawler-runner.js",

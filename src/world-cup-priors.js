@@ -22,6 +22,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "./paths.js";
 import { shinFromInverse } from "./market-devig.js";
+import { realHighTempForCityDate } from "./worldcup-weather.js";
 
 let _cache = null;
 function load() {
@@ -60,14 +61,16 @@ function load() {
  * 用真实 FIFA 赛程 match-venues.json(每赛号→承办城市)+ venues.json 城市海拔/气温。
  * 淘汰赛球场郊区名(Inglewood 等)经 cityAliases 归一到承办城市。无数据/无 venue → 1(中性)。
  */
-export function matchVenueMult(matchNumber) {
+export function matchVenueMult(matchNumber, opts = {}) {
   const { matchVenuesDoc, venueByCity } = load();
   if (!matchVenuesDoc) return 1;
   let city = matchVenuesDoc.matchCity?.[String(matchNumber)];
   if (!city) return 1;
   city = matchVenuesDoc.cityAliases?.[city] ?? city;
   const venue = venueByCity.get(city.toLowerCase()) ?? venueByCity.get(city);
-  return venueLambdaMultiplier(venue).mult;
+  // 有比赛日期时查 Open-Meteo 真实预报最高温(承办城市,~16天窗内);无则回退气候均温。
+  const realHighTempC = opts.isoDate ? realHighTempForCityDate(venue?.city, opts.isoDate) : null;
+  return venueLambdaMultiplier(venue, { realHighTempC }).mult;
 }
 
 /**
@@ -186,7 +189,7 @@ export function worldCupVenue(fixture) {
  *  - 恒温顶棚场:抵消高温,温度乘子归 1。
  * 返回 { mult, factors:[...] }。无 venue → {mult:1, factors:[]}(中性)。
  */
-export function venueLambdaMultiplier(venue) {
+export function venueLambdaMultiplier(venue, opts = {}) {
   if (!venue) return { mult: 1, factors: [] };
   let mult = 1;
   const factors = [];
@@ -201,10 +204,14 @@ export function venueLambdaMultiplier(venue) {
     if (alt >= 2000) { mult *= 1.06; factors.push(`海拔${alt}m(>2000m极端·弹道快+客队折损)→进球↑6%[待墨城实测]`); }
     else if (alt >= 1200) { factors.push(`海拔${alt}m(中高海拔)→进球中性[2010届内进球比0.981实测,原×1.03已撤]`); }
   }
-  const temp = Number(venue.june_july_avg_high_c);
+  // 高温→进球乘子:优先用 Open-Meteo 真实预报最高温(opts.realHighTempC,~16天窗内的世界杯场次),
+  //   无预报则回退 venues.json 静态气候均温 june_july_avg_high_c(诚实 fallback)。同一有界机制,只换数据来源。
+  const usingReal = opts.realHighTempC != null && Number.isFinite(Number(opts.realHighTempC));
+  const temp = usingReal ? Number(opts.realHighTempC) : Number(venue.june_july_avg_high_c);
+  const tempTag = usingReal ? "真实预报" : "气候均温";
   if (Number.isFinite(temp) && !venue.indoor_climate_controlled) {
-    if (temp >= 34) { mult *= 0.95; factors.push(`高温${temp}℃(节奏↓·补水暂停)→进球↓5%`); }
-    else if (temp >= 30) { mult *= 0.97; factors.push(`偏热${temp}℃→进球↓3%`); }
+    if (temp >= 34) { mult *= 0.95; factors.push(`高温${temp}℃(${tempTag}·节奏↓·补水暂停)→进球↓5%`); }
+    else if (temp >= 30) { mult *= 0.97; factors.push(`偏热${temp}℃(${tempTag})→进球↓3%`); }
   } else if (venue.indoor_climate_controlled) {
     factors.push("恒温顶棚→气温中性");
   }
