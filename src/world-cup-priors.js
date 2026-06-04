@@ -287,6 +287,53 @@ export function teamPrior(name) {
   return key ? teams[key] : null;
 }
 
+// ─────────────────── 洲际 Elo 偏置校正(leak-safe OOS 验证·变好才上线)───────────────────
+/**
+ * 纯 Elo 被洲内比赛喂养,洲际对阵存在系统性偏置。**方向以数据拟合为准**(非先验立场):
+ *   scripts/wc-evo-confederation.mjs 在 6472 场洲际赛上 leak-safe 拟合出的 Elo 修正量为
+ *   UEFA +20、CONMEBOL 0(参考)、CONCACAF/CAF −60、AFC/OFC −80 ——
+ *   即长期样本上 Elo **低估 UEFA、高估 AFC/CAF/CONCACAF/OFC**(欧洲深度占优;2022 摩洛哥/日本属个例)。
+ * 世界杯小组赛全是洲际对阵,故对 eloDiff 加 (Δ主队洲 − Δ客队洲) 再映射,正=boost、负=haircut。
+ * 实证:held-out 后 40%(2589 场)ΔBrier +0.0052、ΔWLD +1.31pp(±40 稳健版 +0.0040/+1.16pp)→ 过闸接入。
+ * 纪律:OOS 已验证的 Elo 先验校正,非凭空加概率信号(遵命中率闭环硬规则)。
+ */
+const CONFED_ELO_DELTA = { CONMEBOL: 0, UEFA: 20, CONCACAF: -60, CAF: -60, AFC: -80, OFC: -80 };
+
+/** 2026 世界杯 48 队 → 所属洲足联(en 名)。 */
+const WC_CONFED = {
+  // UEFA(欧洲)
+  Austria: "UEFA", Belgium: "UEFA", "Bosnia and Herzegovina": "UEFA", Croatia: "UEFA", Czechia: "UEFA",
+  England: "UEFA", France: "UEFA", Germany: "UEFA", Netherlands: "UEFA", Norway: "UEFA", Portugal: "UEFA",
+  Scotland: "UEFA", Spain: "UEFA", Sweden: "UEFA", Switzerland: "UEFA", Turkiye: "UEFA",
+  // CONMEBOL(南美)
+  Argentina: "CONMEBOL", Brazil: "CONMEBOL", Colombia: "CONMEBOL", Ecuador: "CONMEBOL", Paraguay: "CONMEBOL", Uruguay: "CONMEBOL",
+  // CONCACAF(中北美加勒比)
+  Canada: "CONCACAF", Curacao: "CONCACAF", Haiti: "CONCACAF", Mexico: "CONCACAF", Panama: "CONCACAF", "United States": "CONCACAF",
+  // CAF(非洲)
+  Algeria: "CAF", "Cape Verde": "CAF", "DR Congo": "CAF", Egypt: "CAF", Ghana: "CAF", "Ivory Coast": "CAF",
+  Morocco: "CAF", Senegal: "CAF", "South Africa": "CAF", Tunisia: "CAF",
+  // AFC(亚洲;澳大利亚 2006 起属 AFC)
+  Australia: "AFC", Iran: "AFC", Iraq: "AFC", Japan: "AFC", Jordan: "AFC", "Korea Republic": "AFC",
+  Qatar: "AFC", "Saudi Arabia": "AFC", Uzbekistan: "AFC",
+  // OFC(大洋洲)
+  "New Zealand": "OFC",
+};
+
+/** 队名(en)→ 洲足联,未知 → null。 */
+export function confederationOf(teamEn) {
+  return WC_CONFED[teamEn] ?? null;
+}
+
+/**
+ * 一场对阵的洲际 Elo 校正量(Δ主队洲 − Δ客队洲),叠加到 eloDiff。
+ * 任一队洲属未知 → 该队 delta 取 0(退回纯 Elo,不臆造)。
+ */
+export function confederationEloAdjustment(homeEn, awayEn) {
+  const dh = CONFED_ELO_DELTA[confederationOf(homeEn)] ?? 0;
+  const da = CONFED_ELO_DELTA[confederationOf(awayEn)] ?? 0;
+  return dh - da;
+}
+
 /**
  * Elo 胜平负先验(标准 Elo + 经验平局率分解)。世界杯多为中立场,homeAdv 默认 0。
  *  We = 1/(10^(-(dr)/400)+1) 为主队期望分;平局率按 |dr| 经验收缩(均势≈0.30、悬殊≈0.10)。
@@ -315,13 +362,16 @@ export function worldCupMatchPrior(homeTeam, awayTeam, opts = {}) {
   // 中立场默认无主场优势;东道主在本土给 +35 Elo(温和先验,待校准)。
   const HOSTS = new Set(["United States", "Canada", "Mexico"]);
   const homeAdv = opts.neutral === false ? 60 : (HOSTS.has(h.en) && opts.hostHome ? 35 : 0);
-  const exp = eloExpectation(h.elo, a.elo, homeAdv);
+  // 洲际偏置校正(OOS 已验证):叠加到 Elo 差再映射。
+  const confedAdj = confederationEloAdjustment(h.en, a.en);
+  const exp = eloExpectation(h.elo, a.elo, homeAdv + confedAdj);
   if (!exp) return null;
   return {
     probabilities: { home: exp.home, draw: exp.draw, away: exp.away },
     eloDiff: exp.eloDiff,
     homeAdv,
-    source: `world-cup-elo-prior(${h.elo} vs ${a.elo})`
+    confedAdj,
+    source: `world-cup-elo-prior(${h.elo} vs ${a.elo}${confedAdj ? `, confed${confedAdj > 0 ? "+" : ""}${confedAdj}` : ""})`
   };
 }
 
