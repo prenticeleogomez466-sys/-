@@ -238,7 +238,10 @@ async function crawlTheOddsApi(date, fetchImpl) {
   for (const sport of sports) {
     const url = new URL(`https://api.the-odds-api.com/v4/sports/${sport}/odds`);
     url.searchParams.set("apiKey", process.env.ODDS_API_KEY);
-    url.searchParams.set("regions", process.env.ODDS_API_REGIONS || "eu,uk,us");
+    // 免费档 500 credits/月,成本=regions×markets/次。默认仅 eu 区(含 Betfair 交易所/Pinnacle/1xBet/
+    //   Marathonbet 等 sharp 盘,聚合成共识收盘线足够 sharp);eu,uk,us 三区会 3 倍烧额度→几天耗尽致闸门缺赔率。
+    //   需更广覆盖再用 ODDS_API_REGIONS 覆盖。eu×(h2h,spreads)=2 credits/联赛/次。
+    url.searchParams.set("regions", process.env.ODDS_API_REGIONS || "eu");
     url.searchParams.set("markets", "h2h,spreads");
     url.searchParams.set("oddsFormat", "decimal");
     url.searchParams.set("dateFormat", "iso");
