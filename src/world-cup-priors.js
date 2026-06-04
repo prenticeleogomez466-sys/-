@@ -21,6 +21,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "./paths.js";
+import { shinFromInverse } from "./market-devig.js";
 
 let _cache = null;
 function load() {
@@ -34,6 +35,7 @@ function load() {
   const groupsDoc = read("groups.json");
   const formatDoc = read("format.json");
   const matchVenuesDoc = read("match-venues.json");
+  const matchOddsDoc = read("match-odds.json");
   // 建中文/英文 → venue 的城市索引(场馆匹配用)
   const venueByCity = new Map();
   for (const v of venuesDoc?.venues ?? []) {
@@ -49,7 +51,7 @@ function load() {
       if (zh[t]) teamGroup.set(zh[t], g);
     }
   }
-  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, venueByCity, teamGroup, zh };
+  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, matchOddsDoc, venueByCity, teamGroup, zh };
   return _cache;
 }
 
@@ -81,6 +83,49 @@ export function groupVenueMults() {
     out[k] = [1, 2, 3, 4, 5, 6].map((j) => matchVenueMult(base + j));
   });
   return out;
+}
+
+// ───────────────────────── 逐场临场赔率 → 市场隐含胜率(开赛后 match 级市场融合)─────────────────────────
+// 队名归一:英文规范名(经 teamPrior)优先,回退原串小写。用于把赔率 fixture 的队名对上模拟里的队名。
+function canonTeam(name) { return String(teamPrior(name)?.en ?? name ?? "").toLowerCase().trim(); }
+function pairKey(a, b) { return [a, b].sort().join("|"); }
+
+let _oddsIdxFor = null, _oddsIdx = null;
+function oddsIndex() {
+  const { matchOddsDoc } = load();
+  if (_oddsIdxFor === matchOddsDoc) return _oddsIdx;
+  _oddsIdxFor = matchOddsDoc;
+  _oddsIdx = new Map();
+  for (const fx of matchOddsDoc?.fixtures ?? []) {
+    const oH = Number(fx?.odds?.home), oD = Number(fx?.odds?.draw), oA = Number(fx?.odds?.away);
+    if (!(oH > 1 && oD > 1 && oA > 1)) continue; // 无效赔率跳过,不臆造
+    const { probs } = shinFromInverse([1 / oH, 1 / oD, 1 / oA]); // Shin 去抽水(校 favourite-longshot)
+    const h = canonTeam(fx.home), a = canonTeam(fx.away);
+    if (!h || !a) continue;
+    _oddsIdx.set(pairKey(h, a), { home: h, pH: probs[0], pD: probs[1], pA: probs[2] });
+  }
+  return _oddsIdx;
+}
+
+/**
+ * 取某场对阵的市场隐含(Shin 去抽水)概率,定向到 teamA。无该场赔率 → null(回退纯 Elo)。
+ * @returns {{we:number, win:number, draw:number, loss:number}|null} we=teamA 胜期望(win+0.5draw)
+ */
+export function worldCupMatchOdds(teamA, teamB) {
+  const idx = oddsIndex();
+  if (!idx.size) return null;
+  const ca = canonTeam(teamA), cb = canonTeam(teamB);
+  const rec = idx.get(pairKey(ca, cb));
+  if (!rec) return null;
+  const aIsHome = rec.home === ca;
+  const win = aIsHome ? rec.pH : rec.pA, draw = rec.pD, loss = aIsHome ? rec.pA : rec.pH;
+  return { we: win + 0.5 * draw, win, draw, loss };
+}
+
+/** 逐场市场胜率 resolver(给锦标赛引擎用):返回 teamA 的市场隐含胜期望 we,无赔率→null。 */
+export function marketWeOf(teamA, teamB) {
+  const o = worldCupMatchOdds(teamA, teamB);
+  return o ? o.we : null;
 }
 
 /** 是否属于 2026 世界杯正赛:竞赛名命中世界杯 且 日期落在赛会窗口内。 */

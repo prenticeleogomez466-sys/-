@@ -83,7 +83,14 @@ export function sampleScoreline(eloA, eloB, ctx, rng) {
   const venueMult = Number.isFinite(ctx?.venueMult) ? ctx.venueMult : 1;
   const lamTot = (ctx?.lambdaTotal ?? 2.6) * (ctx?.intensity ?? 1) * venueMult;
   const exp = eloExpectation(eloA, eloB, ctx?.homeAdv ?? 0);
-  const we = exp ? exp.homeWinExpectancy : 0.5;
+  let we = exp ? exp.homeWinExpectancy : 0.5;
+  // 开赛后 match 级市场融合(大融合③):有该场临场赔率时,市场隐含胜率(Shin 去抽水)按 α 融进
+  //   Elo 胜率——市场含全部公开信息、比纯 Elo sharp(据 reference_signal_backtest_findings)。
+  //   仅【已知对阵】(小组赛/下一轮)有 marketWe;无则纯 Elo(开赛前/未知对阵零改动)。
+  if (Number.isFinite(ctx?.marketWe)) {
+    const a = Number.isFinite(ctx?.marketAlpha) ? ctx.marketAlpha : 0.65;
+    we = a * ctx.marketWe + (1 - a) * we;
+  }
   // 进球期望随实力差轻微放大领先方(避免强弱差全被平均化);保持总量≈lamTot。
   let la = lamTot * we;
   let lb = lamTot * (1 - we);
@@ -156,7 +163,8 @@ export function simulateGroupStage(groups, eloOf, rng, opts = {}) {
     intensity: opts.groupIntensity ?? 1,
     nbSize: opts.nbSize,
     rueSalvesen: opts.rueSalvesen,
-    venueMult: opts.venueMult
+    venueMult: opts.venueMult,
+    marketAlpha: opts.marketAlpha
   };
   const hosts = opts.hosts instanceof Set ? opts.hosts : new Set(opts.hosts ?? []);
   const hostAdv = opts.hostAdv ?? 35;
@@ -172,7 +180,8 @@ export function simulateGroupStage(groups, eloOf, rng, opts = {}) {
         const A = teams[i], B = teams[j];
         let ha = 0; if (hosts.has(A)) ha += hostAdv; if (hosts.has(B)) ha -= hostAdv;
         const vm = gvm ? gvm[pairIdx++] : ctx.venueMult;
-        const { a, b } = sampleScoreline(eloOf(A), eloOf(B), { ...ctx, homeAdv: ha, venueMult: vm }, rng);
+        const mwe = opts.marketWeOf ? opts.marketWeOf(A, B) : undefined; // 有该场临场赔率→市场胜率,无→纯Elo
+        const { a, b } = sampleScoreline(eloOf(A), eloOf(B), { ...ctx, homeAdv: ha, venueMult: vm, marketWe: mwe ?? undefined }, rng);
         matches.push({ home: A, away: B, ga: a, gb: b });
       }
     }
@@ -231,7 +240,9 @@ export function simulateKnockoutMatch(teamA, teamB, ctx, rng, eloOf) {
   let ha = 0;
   if (ctx?.hosts?.has(teamA)) ha += ctx.hostAdv ?? 35;
   if (ctx?.hosts?.has(teamB)) ha -= ctx.hostAdv ?? 35;
-  const base = { lambdaTotal: ctx?.lambdaTotal ?? 2.6, intensity: ctx?.intensity ?? 1, homeAdv: ha, nbSize: ctx?.nbSize, rueSalvesen: ctx?.rueSalvesen, venueMult: ctx?.venueMult };
+  // 有该对阵临场赔率→市场胜率(定向到 teamA),无→纯 Elo(未知对阵/开赛前零改动)。
+  const mwe = ctx?.marketWeOf ? ctx.marketWeOf(teamA, teamB) : undefined;
+  const base = { lambdaTotal: ctx?.lambdaTotal ?? 2.6, intensity: ctx?.intensity ?? 1, homeAdv: ha, nbSize: ctx?.nbSize, rueSalvesen: ctx?.rueSalvesen, venueMult: ctx?.venueMult, marketWe: mwe ?? undefined, marketAlpha: ctx?.marketAlpha };
   let { a, b } = sampleScoreline(eloOf(teamA), eloOf(teamB), base, rng);
   if (a > b) return { winner: teamA, loser: teamB, decided: "reg" };
   if (b > a) return { winner: teamB, loser: teamA, decided: "reg" };
@@ -267,6 +278,7 @@ export function simulateTournamentOfficial(config, rng) {
     lambdaTotal: config.lambdaTotal, groupIntensity: 1, hosts, hostAdv: config.hostAdv,
     nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult,
     groupVenueMults: config.groupVenueMults,
+    marketWeOf: config.marketWeOf, marketAlpha: config.marketAlpha,
   });
   for (const a of gs.advancers) stageReached[a.team] = "r32";
 
@@ -285,7 +297,7 @@ export function simulateTournamentOfficial(config, rng) {
     if (slot.startsWith("T@")) { const g = assign[slot.slice(2)]; return g ? thirdByGroup[g] : undefined; }
     return undefined;
   };
-  const koCtx = (intensity, venueMult) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: venueMult ?? config.venueMult });
+  const koCtx = (intensity, venueMult) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: venueMult ?? config.venueMult, marketWeOf: config.marketWeOf, marketAlpha: config.marketAlpha });
   // 淘汰赛逐场场地乘子:config.koVenueMult[赛号]=该场 venueMult(官方赛号→城市,仅官方对阵表路径有真实赛号)。
   const vmOf = (m) => config.koVenueMult?.[m];
   const mw = {}; // 赛号 -> 胜者
@@ -328,11 +340,12 @@ function simulateTournamentSeeded(config, rng) {
     lambdaTotal: config.lambdaTotal, groupIntensity: 1, hosts, hostAdv: config.hostAdv,
     nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: config.venueMult,
     groupVenueMults: config.groupVenueMults,
+    marketWeOf: config.marketWeOf, marketAlpha: config.marketAlpha,
   });
   for (const a of gs.advancers) stageReached[a.team] = "r32";
 
   let bracket = seedBracket(gs.advancers, eloOf); // length 32
-  const koCtx = (intensity, venueMult) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: venueMult ?? config.venueMult });
+  const koCtx = (intensity, venueMult) => ({ hosts, hostAdv: config.hostAdv, lambdaTotal: config.lambdaTotal, intensity, penTilt: config.penTilt, nbSize: config.nbSize, rueSalvesen: config.rueSalvesen, venueMult: venueMult ?? config.venueMult, marketWeOf: config.marketWeOf, marketAlpha: config.marketAlpha });
   // 淘汰赛逐场场地乘子:config.koVenueMult[赛号]=该场 venueMult(官方赛号→城市,仅官方对阵表路径有真实赛号)。
   const vmOf = (m) => config.koVenueMult?.[m];
   const stages = [["r16", phaseInt.r32], ["qf", phaseInt.r16], ["sf", phaseInt.qf], ["final", phaseInt.sf], ["champion", phaseInt.final]];

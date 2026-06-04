@@ -12,7 +12,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "../src/paths.js";
-import { teamPrior, groupVenueMults } from "../src/world-cup-priors.js";
+import { teamPrior, groupVenueMults, marketWeOf } from "../src/world-cup-priors.js";
 import { simulateGroupStage, mulberry32 } from "../src/tournament-simulator.js";
 
 const argNum = (n, d) => { const i = process.argv.indexOf(n); return i >= 0 ? Number(process.argv[i + 1]) : d; };
@@ -42,7 +42,7 @@ for (const teams of Object.values(groups)) {
 const eloOf = (t) => elo[t] ?? 1500;
 
 // 大融合一致参数:与超算同分布(实证 base 2.54、NB(8) 过离散、venue 逐场场地乘子)。
-const opts = { lambdaTotal: 2.54, hosts: HOSTS, hostAdv: 35, nbSize: 8, groupVenueMults: groupVenueMults() };
+const opts = { lambdaTotal: 2.54, hosts: HOSTS, hostAdv: 35, nbSize: 8, groupVenueMults: groupVenueMults(), marketWeOf, marketAlpha: 0.65 };
 
 const rng = mulberry32(SEED);
 const advance = {};

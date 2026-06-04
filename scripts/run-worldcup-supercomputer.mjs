@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir, getExportDir } from "../src/paths.js";
-import { teamPrior, groupVenueMults, matchVenueMult } from "../src/world-cup-priors.js";
+import { teamPrior, groupVenueMults, matchVenueMult, marketWeOf, worldCupMatchOdds } from "../src/world-cup-priors.js";
 import { runMonteCarlo } from "../src/tournament-simulator.js";
 
 const argv = process.argv.slice(2);
@@ -51,7 +51,12 @@ const phaseIntensity = { r32: 0.96, r16: 0.96, qf: 0.96, sf: 0.96, final: 0.96 }
 const groupVMs = groupVenueMults();
 const koVenueMult = {};
 for (let m = 73; m <= 104; m++) koVenueMult[m] = matchVenueMult(m);
-const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket, nbSize: 8, groupVenueMults: groupVMs, koVenueMult }, N, SEED);
+// 大融合③ 开赛后 match 级市场融合:有逐场临场赔率的【已知对阵】用市场隐含胜率(Shin)α=0.65 融进 Elo。
+//   开赛前 match-odds.json fixtures 空 → marketWeOf 全 null → 纯 Elo(零改动)。开赛后填充即生效。
+let oddsCount = 0;
+for (const teams of Object.values(groups)) for (let i = 0; i < teams.length; i++) for (let j = i + 1; j < teams.length; j++) if (worldCupMatchOdds(teams[i], teams[j])) oddsCount++;
+const res = runMonteCarlo({ groups, eloOf, hosts: HOSTS, lambdaTotal: 2.54, hostAdv: 35, penTilt: 0, phaseIntensity, bracket, nbSize: 8, groupVenueMults: groupVMs, koVenueMult, marketWeOf, marketAlpha: 0.65 }, N, SEED);
+if (oddsCount) console.log(`【market 融合生效】${oddsCount} 场小组对阵有临场赔率,已 α=0.65 融市场胜率。`);
 const bracketMode = bracket ? "FIFA官方对阵表(R32位次+第三名495分配)" : "强度种子树(无官方表回退)";
 
 // 市场隐含夺冠率(1/赔率 去 vig 归一)+ 混合(0.65市场+0.35模型,据 reference 学界结论:市场含全信息)

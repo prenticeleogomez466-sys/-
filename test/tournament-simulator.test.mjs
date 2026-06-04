@@ -6,7 +6,7 @@ import {
   mulberry32, poissonSample, nbSample, sampleScoreline, rankGroup,
   standardSeedOrder, seedBracket, simulateGroupStage, runMonteCarlo,
 } from "../src/tournament-simulator.js";
-import { venueLambdaMultiplier, matchVenueMult, groupVenueMults, eloExpectation } from "../src/world-cup-priors.js";
+import { venueLambdaMultiplier, matchVenueMult, groupVenueMults, eloExpectation, worldCupMatchOdds, marketWeOf } from "../src/world-cup-priors.js";
 import { getDataSubdir } from "../src/paths.js";
 
 const BRACKET_PATH = join(getDataSubdir("world-cup"), "2026", "bracket.json");
@@ -210,4 +210,34 @@ test("eloExpectation 概率和恒为1、强队主胜更高", () => {
     assert.ok(Math.abs(e.home + e.draw + e.away - 1) < 1e-9, `和=${e.home + e.draw + e.away}`);
   }
   assert.ok(eloExpectation(1900, 1700, 0).home > eloExpectation(1800, 1800, 0).home);
+});
+
+// ───────────────────────── 开赛后 match 级市场融合(大融合③,2026-06-04)─────────────────────────
+
+test("sampleScoreline market 融合:marketWe 高→主胜占比明显升", () => {
+  const winShare = (ctx) => { const rng = mulberry32(1); let h = 0; const N = 20000;
+    for (let i = 0; i < N; i++) { const s = sampleScoreline(1700, 1800, ctx, rng); if (s.a > s.b) h++; } return h / N; };
+  const eloOnly = winShare({ lambdaTotal: 2.5 });               // 纯 Elo(弱队)
+  const withMkt = winShare({ lambdaTotal: 2.5, marketWe: 0.85 }); // 市场却看好该队
+  assert.ok(withMkt > eloOnly + 0.1, `market 融合应抬主胜 ${eloOnly.toFixed(2)}→${withMkt.toFixed(2)}`);
+});
+
+test("sampleScoreline 缺省 marketWe = 纯 Elo(开赛前/未知对阵零改动、可复现)", () => {
+  const r1 = mulberry32(2), r2 = mulberry32(2);
+  const a = sampleScoreline(1800, 1700, { lambdaTotal: 2.5, nbSize: 8 }, r1);
+  const b = sampleScoreline(1800, 1700, { lambdaTotal: 2.5, nbSize: 8, marketWe: undefined }, r2);
+  assert.deepEqual(a, b);
+});
+
+test("worldCupMatchOdds / marketWeOf 无逐场赔率→null(match-odds.json fixtures 空,纯 Elo)", () => {
+  // 开赛前 match-odds.json fixtures=[] → 任何对阵都无市场胜率,引擎回退纯 Elo
+  assert.equal(worldCupMatchOdds("Spain", "Mexico"), null);
+  assert.equal(marketWeOf("Spain", "Mexico"), null);
+});
+
+test("marketAlpha 控制市场权重:α=1 完全跟市场胜率", () => {
+  // marketWe=0.9, α=1 → we 应≈0.9 → 主胜占比应远高于 Elo 均势
+  const rng = mulberry32(3); let h = 0; const N = 20000;
+  for (let i = 0; i < N; i++) { const s = sampleScoreline(1800, 1800, { lambdaTotal: 2.5, marketWe: 0.9, marketAlpha: 1 }, rng); if (s.a > s.b) h++; }
+  assert.ok(h / N > 0.6, `α=1 跟市场 we=0.9 主胜占比应高,实际 ${(h / N).toFixed(2)}`);
 });

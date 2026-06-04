@@ -1,0 +1,12 @@
+{
+  "edition": "2026",
+  "_provenance": {
+    "purpose": "世界杯逐场 1X2 临场赔率(开赛后由免费源抓取填充)。supercomputer/champion-sim 据此做 match 级市场融合:有赔率的已知对阵用 Shin 去抽水的市场隐含胜率按 α=0.65 融进 Elo 胜率,无赔率回退纯 Elo。",
+    "scope": "仅作用于【已知对阵】:小组赛 72 场(分组已定,team1/team2 确定)+ 淘汰赛已定队的下一轮。蒙卡未来轮假设对阵无赔率(本质不可得),仍走 Elo。",
+    "honesty": "赛会 2026-06-11 才开,现无逐场临场赔率 → fixtures 暂空,机制 dormant、产出与纯 Elo 完全一致(零改动)。开赛后填充即自动生效,绝不臆造赔率。",
+    "schema": "fixtures:[{home, away, odds:{home,draw,away}(欧赔小数), collectedAt, source}];队名用 team-priors/groups 的英文规范名或中文均可(resolver 双向匹配)。",
+    "fillVia": "开赛后由每日免费赔率链路写入(ESPN scoreboard 已支持国际赛/世界杯欧赔,见 commit c0384ff),按 schema 追加 fixtures;或手填单场。引擎据此自动生效,空则纯 Elo。",
+    "verified": "2026-06-04 合成赔率端到端验证:注入'强捧南非'(1.30/5.0/9.0)→南非小组出线 19.7%→43.8%、韩国 80.2%→58.6%(正确朝市场偏移);还原空文件→回纯 Elo 零改动。"
+  },
+  "fixtures": []
+}
