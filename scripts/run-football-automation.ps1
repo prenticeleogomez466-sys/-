@@ -140,6 +140,10 @@ function Run-Daily {
   }
   Invoke-Step "sync advanced free data layers" "npm run advanced:sync -- --date=$Date"
   Invoke-Step "sync API-Football team form" "npm run sync:api-football -- --date $Date"
+  # 世界杯特征保鲜(2026-06-06):Open-Meteo 只给 ~16 天预报,要覆盖整届(6/11–7/19)必须每天重拉,
+  #   否则 venueLambdaMultiplier 一直用旧预报(开赛前会 stale)。AllowFailure:源挂了不阻塞主线。
+  Invoke-Step "refresh World Cup weather forecast (16-day window)" "npm run sync:wc-weather" $true
+  Invoke-Step "refresh World Cup schedule/match-dates" "npm run sync:wc-schedule" $true
   Invoke-Step "strict data completeness check" "npm run standard:check -- --date=$Date"
   if ($AllowMissingOdds) {
     Invoke-Step "build offline daily xlsx" "npm run daily:no-web -- --date $Date"
