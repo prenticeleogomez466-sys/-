@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getExportDir } from "./paths.js";
 import { judgmentFactorColumns, judgmentFactorRow } from "./factor-analysis.js";
-import { recommendFixtures, outcomeCodeToChinese, competitionCategory } from "./prediction-engine.js";
+import { recommendFixtures, outcomeCodeToChinese, competitionCategory, coherentHandicapView } from "./prediction-engine.js";
 import { deepFusionAnalysis } from "./deep-fusion-analysis.js";
 import { auditRecommendations, writeRecommendationAudit } from "./recommendation-audit.js";
 import { runPreExportSelfCheck, selfCheckRows } from "./pre-export-selfcheck.js";
@@ -363,12 +363,10 @@ function upsetRiskLabel(homeProb, drawProb, awayProb) {
 
 // 让球胜平负(竞彩主玩法):用真实让球赔率去vig的隐含概率 + 方向 + 让球线。深盘场只开此盘。
 function jingcaiLetqiuText(prediction) {
-  const lq = prediction.jingcaiLetqiu;
-  if (!lq?.pick) return handicapRecommendText(prediction); // 兜底:用模型让球派生
-  const ln = Number(lq.line);
-  const lineLabel = ln > 0 ? `受让+${ln}` : ln < 0 ? `让${ln}` : "平手";
-  const p = lq.probabilities ?? {};
-  return `[${lineLabel}] ${lq.pick.label} ${pct(lq.pick.probability)} · 主${pct(p.home)}/平${pct(p.draw)}/客${pct(p.away)}`;
+  // 让球一致化(2026-06-05):头条永远以 wld 为锚、不与主推冲突;没把握给双选+谨慎(coherentHandicapView)。
+  const v = coherentHandicapView(prediction);
+  if (!v) return "—";
+  return `[${v.lineStr}] ${v.headline}${v.detail ? ` · ${v.detail}` : ""}`;
 }
 
 // 让球推荐方向:展示"模型从比分锚点派生"的让球方向,跟胜平负/比分一致

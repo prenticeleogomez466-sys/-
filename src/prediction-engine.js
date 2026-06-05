@@ -251,6 +251,47 @@ export function computeDoubleChance(ranked, marketImplied = null, env = process.
   };
 }
 
+// 让球(竞彩独立玩法)一致化显示(2026-06-05 用户硬规则:玩法/让球/比分不允许冲突;没把握给多选)。
+//   让球头条**永远以 wld 为锚**(主推主胜→只会显示让球主胜或"让球主胜/走盘双选",绝不甩相反的让球客胜);
+//   wld 方向让球覆盖<50%(深盘/接近走盘=没把握)→ 给"该方向/走盘 双选 + 谨慎",不抑制玩法、不替弃赛。
+//   纯函数,daily-report(xlsx)与 today-mobile-view(手机页)共用,保证两处口径一致。
+export function coherentHandicapView(prediction) {
+  const wldCode = prediction?.pick?.code;
+  const lq = prediction?.jingcaiLetqiu;
+  const h = prediction?.handicapPick;
+  const pr = (v) => `${Math.round((Number(v) || 0) * 100)}%`;
+  let line, dist, src;
+  if (lq?.probabilities && lq.line != null) {
+    line = Number(lq.line);
+    const p = lq.probabilities;
+    dist = { home: Number(p.home) || 0, push: Number(p.draw ?? p.push) || 0, away: Number(p.away) || 0 };
+    src = "官方让球盘";
+  } else if (h?.handicapWld?.probabilities) {
+    line = Number(h.line);
+    const p = h.handicapWld.probabilities;
+    dist = { home: Number(p.home) || 0, push: Number(p.push) || 0, away: Number(p.away) || 0 };
+    src = h.line === 0 ? "平盘" : "模型让球";
+  } else if (h) {
+    return { lineStr: h.line === 0 ? "平盘" : `让${h.line}`, headline: h.direction || "—", detail: "", multi: false, source: "模型让球" };
+  } else {
+    return null;
+  }
+  const lineStr = !Number.isFinite(line) ? "" : line > 0 ? `受让+${line}` : line < 0 ? `让${line}` : "平手";
+  const side = wldCode === "3" ? "home" : wldCode === "0" ? "away" : "push";
+  const sideLabel = side === "home" ? "让球主胜" : side === "away" ? "让球客胜" : "走盘";
+  const sideP = dist[side] ?? 0, pushP = dist.push ?? 0;
+  const distStr = `让主${pr(dist.home)}/走盘${pr(dist.push)}/让客${pr(dist.away)}`;
+  if (side === "push") {
+    return { lineStr, headline: `走盘 ${pr(pushP)}`, detail: distStr, multi: false, source: src };
+  }
+  if (sideP >= 0.5) {
+    return { lineStr, headline: `${sideLabel} ${pr(sideP)}`, detail: distStr, multi: false, source: src };
+  }
+  // 没把握:wld 方向让球覆盖不足 → 双选(该方向+走盘)合计,谨慎;头条仍与 wld 同向,绝不冲突。
+  const combo = sideP + pushP;
+  return { lineStr, headline: `双选 ${sideLabel}/走盘 合计${pr(combo)}`, detail: `${distStr}·把握低(深盘/小胜风险,谨慎)`, multi: true, source: src };
+}
+
 function harmonizeDuplicatePredictions(predictions) {
   const authoritative = new Map(
     predictions

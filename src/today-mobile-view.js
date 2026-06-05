@@ -12,6 +12,7 @@
  */
 
 import { worldCupContextLine } from "./worldcup-context.js";
+import { coherentHandicapView } from "./prediction-engine.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pct = (v) => (v == null ? "-" : typeof v === "string" ? v : `${(v * 100).toFixed(0)}%`);
@@ -57,14 +58,39 @@ function metaInfo(preds, date) {
   return { issue, matchDay, stopBJ };
 }
 
+// 比分多候选(2026-06-05 用户"没把握给多选"):首选+备选+方向一致比分,去重,最多3个。
+function scoreCandidatesText(sp) {
+  if (!sp) return "-";
+  const seen = new Set(), out = [];
+  for (const s of [sp.primary, sp.secondary, sp.wldConsistent, sp.wldConsistentSecondary]) {
+    const c = String(s ?? "").trim();
+    if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+    if (out.length >= 3) break;
+  }
+  if (!out.length) return "-";
+  return out[0] + (out.length > 1 ? ` <span class="sk">备选 ${out.slice(1).join("/")}</span>` : "");
+}
+// 半全场多候选:首选+备选,去重。
+function halfFullCandidatesText(hf) {
+  if (!hf) return "-";
+  const seen = new Set(), out = [];
+  for (const s of [hf.primary, hf.secondary]) {
+    const c = String(s ?? "").trim();
+    if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+  }
+  if (!out.length) return "-";
+  return out[0] + (out.length > 1 ? ` <span class="sk">备 ${out.slice(1).join("/")}</span>` : "");
+}
+
 function detailCard(p) {
   const fx = p.fixture || {}, pr = p.probabilities || {}, ec = p.experienceContext || {}, hp = p.handicapPick || {};
   const conf = Number(p.confidence);
   const cover = hp.coverProbability != null ? `${(hp.coverProbability * 100).toFixed(0)}%` : null;
   const skellam = hp.skellamCheck?.note ? esc(hp.skellamCheck.note) : "";
-  // 让球玩法按让球分析出胜平负(让球后三态):让主胜/走盘/让客胜,常与原始胜平负相反(大热让球难覆盖)。
-  const hw = hp.handicapWld;
-  const hwStr = hw ? `<b>${esc(hw.pick)}</b> ${(hw.probability * 100).toFixed(0)}% <span class="conf">让主${(hw.probabilities.home * 100).toFixed(0)}/走盘${(hw.probabilities.push * 100).toFixed(0)}/让客${(hw.probabilities.away * 100).toFixed(0)}</span>` : "-";
+  // 让球一致化(2026-06-05 用户硬规则:玩法/让球/比分不冲突;没把握给双选):让球胜平负头条永远以 wld 为锚,
+  //   绝不甩与主推相反的方向;wld 方向覆盖不足→显示"该方向/走盘 双选+谨慎"。口径与 xlsx 共用 coherentHandicapView。
+  const chv = coherentHandicapView(p);
+  const hwStr = chv ? `<b>${esc(chv.headline)}</b> <span class="conf">${esc(chv.detail || chv.source || "")}</span>` : "-";
   // 双选建议(均势场覆盖平局,单选平命中物理上限~28%)
   const dc = p.doubleChance ? `<div class="row dc"><span class="k">双选</span> <b>${esc(p.doubleChance.pick)}</b> ${(p.doubleChance.combinedProbability * 100).toFixed(0)}% <span class="conf">${esc(p.doubleChance.note)}</span></div>` : "";
   // 亚盘水位深抓判读(titan007 初盘→即时 + 资金流向信号)
@@ -79,7 +105,7 @@ function detailCard(p) {
     <div class="row main"><span class="k">胜平负</span> <b>${esc(p.pick?.label)}</b> <span class="prob">${pct(p.pick?.probability)}</span> <span class="conf">信心 ${Number.isFinite(conf) ? conf.toFixed(0) : "-"} · 风险 ${esc(p.risk || "-")}</span></div>
     ${p.scenario?.headline ? `<div class="row"><span class="k">情景</span> ${esc(p.scenario.headline)}${p.scenario.marketGuidance?.length ? ` <span class="sk">${esc(p.scenario.marketGuidance.map((g) => g.market + "→" + g.lean).join(" · "))}</span>` : ""}</div>` : ""}
     <div class="row pr">主 ${pct(pr.home)} · 平 ${pct(pr.draw)} · 客 ${pct(pr.away)}</div>
-    <div class="row"><span class="k">比分</span> ${esc(p.scorePicks?.primary || "-")}${p.scorePicks?.wldConsistent && p.scorePicks.wldConsistent !== p.scorePicks.primary ? ` <span class="sk">方向一致 ${esc(p.scorePicks.wldConsistent)}</span>` : ""} &nbsp; <span class="k">半全场</span> ${esc(p.halfFullPicks?.primary || "-")}</div>
+    <div class="row"><span class="k">比分</span> ${esc(scoreCandidatesText(p.scorePicks))} &nbsp; <span class="k">半全场</span> ${esc(halfFullCandidatesText(p.halfFullPicks))}</div>
     <div class="row"><span class="k">让球</span> ${esc(hp.direction || "-")}${hp.line != null ? `(${hp.line})` : ""}${cover ? ` 覆盖 ${cover}` : ""} ${skellam ? `<span class="sk">${skellam}</span>` : ""}</div>
     <div class="row"><span class="k">让球胜平负</span> ${hwStr}</div>
     ${awHtml}
