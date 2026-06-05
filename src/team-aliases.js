@@ -191,7 +191,10 @@ const RAW_ALIASES = {
 
   // ───── 芬超(本季有推荐) ─────
   "坦佩雷山猫": "坦山猫", "坦山猫": "坦山猫", "ilves": "坦山猫", "ilvestampere": "坦山猫",
-  "赫尔辛基火花": "赫尔火花", "赫尔火花": "赫尔火花", "hjkhelsinki": "赫尔火花", "hjk": "赫尔火花",
+  // Gnistan(火花)与 HJK 是两支不同的赫尔辛基球队;2026-06-05 修错映射:HJK 曾被并进 Gnistan,
+  // 会把 HJK 赛果写到火花场次。HJK→赫尔辛基hjk(与中文名规范化一致),Gnistan→赫尔火花。
+  "赫尔辛基火花": "赫尔火花", "赫尔火花": "赫尔火花", "gnistan": "赫尔火花",
+  "赫尔辛基hjk": "赫尔辛基hjk", "hjkhelsinki": "赫尔辛基hjk", "hjk": "赫尔辛基hjk",
   "塞伊奈约基": "塞伊奈", "塞伊奈": "塞伊奈", "seinajoki": "塞伊奈", "spsjk": "塞伊奈",
   "ac奥卢": "ac奥卢", "acoulu": "ac奥卢",
   "kupskuopio": "kups", "kups": "kups",
