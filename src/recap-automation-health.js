@@ -37,6 +37,15 @@ export function checkRecapAutomationHealth(date = todayInShanghai()) {
   return result;
 }
 
+// 复盘任务排在每天上午 11 点这个 recap 窗口(实际计划任务跑 11:10,加固后又允许失败重试,
+// 触发分钟可能是 11:00/11:10/11:15)。旧逻辑死磕字符串 "T11:00" → 任务跑 11:10 时此处恒 false,
+// 让 health(recap 第8步)恒 exit 1,把"7步全绿"的整条 recap 误判为失败(cry-wolf,真故障反被淹没)。
+// 改为匹配上午 11 点整点小时(任意分钟),既反映真实健康、又不被分钟级重排误伤。
+export function isMorningRecapTrigger(triggers) {
+  const arr = Array.isArray(triggers) ? triggers : [triggers].filter(Boolean);
+  return arr.some((trigger) => /T11:[0-5]\d/.test(String(trigger)));
+}
+
 function readScheduledTask(name) {
   if (process.platform !== "win32") return { ok: false, name, error: "Windows Scheduled Task check only runs on Windows" };
   try {
@@ -54,7 +63,7 @@ function readScheduledTask(name) {
       name,
       state: parsed.State,
       triggers,
-      atEleven: triggers.some((trigger) => String(trigger).includes("T11:00")),
+      atEleven: isMorningRecapTrigger(triggers),
       nextRunTime: parsed.NextRunTime,
       lastRunTime: parsed.LastRunTime,
       lastTaskResult: parsed.LastTaskResult
@@ -79,7 +88,7 @@ function renderMarkdown(result) {
     `状态：${result.ok ? "通过" : "未通过"}`,
     "",
     `- 计划任务：${result.task.ok ? "存在" : "缺失"}`,
-    `- 触发时间：${result.task.atEleven ? "每日 11:00" : "不是 11:00 或无法读取"}`,
+    `- 触发时间：${result.task.atEleven ? "每日上午 11 点 recap 窗口" : "不在 11 点窗口或无法读取"}`,
     `- 任务状态：${result.task.state ?? result.task.error ?? ""}`,
     `- 下一次运行：${result.task.nextRunTime ?? ""}`,
     `- 最近运行：${result.latestRun ? `${result.latestRun.ok ? "成功" : "失败"} ${result.latestRun.generatedAt}` : "暂无摘要"}`,
