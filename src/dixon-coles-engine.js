@@ -37,7 +37,7 @@ const OUTCOMES = ["home", "draw", "away"];
  *   opts.maxDates  最多回溯多少个比赛日（默认 120）
  *   opts.minMatches 最少需要多少场有赛果的比赛（默认 60）
  *   opts.iterations 迭代次数（默认 80）
- *   opts.homeAdvantage 主场优势初始值（默认 1.24，2026-05-31 由 1.28 下调:backtest:homeadv 实证主场优势下降、1.28高估主胜+1.6pp）
+ *   opts.homeAdvantage 主场优势初始值（默认 1.22，2026-06-05 由 1.24 再下调:backtest:homeadv 实证最优=1.22,主胜校准 gap 0.6pp→0.1pp,LogLoss/命中差在噪声内;主场优势持续下降趋势）
  *   opts.decayDays 时间衰减半衰期天数（默认 180。2026-05-31 在 51k 场扫 90/180/365/730:365 纯DC略优 RPS-0.0009但触发冷启动校准过度收缩守护回归,marginal 不值得→保留 180,见 sweep-dc-halflife.mjs）
  * @returns {Object} fitted 对象，传给 predictFromFitted
  */
@@ -48,7 +48,7 @@ export function fitFromFixtureStore(opts = {}) {
   //   修裸调隐患:render-recommendation-html 等裸调原走 120 弱窗 → 现自动享 700。
   const maxDates = opts.maxDates ?? 700;
   const minMatches = opts.minMatches ?? 60;
-  const homeAdvantage = opts.homeAdvantage ?? 1.24;
+  const homeAdvantage = opts.homeAdvantage ?? 1.22;
   // beforeDate(可选):只用严格早于该日期的赛果拟合 —— 给 walk-forward 回测防数据泄漏用。
   const beforeDate = opts.beforeDate ?? null;
   const allDates = listFixtureDates();
@@ -114,7 +114,7 @@ export function fitFromFixtureStore(opts = {}) {
  */
 export function fitFromMatches(rawMatches = [], opts = {}) {
   const minMatches = opts.minMatches ?? 60;
-  const homeAdvantage = opts.homeAdvantage ?? 1.24;
+  const homeAdvantage = opts.homeAdvantage ?? 1.22;
   const referenceDate = opts.referenceDate ?? rawMatches.reduce((mx, m) => (m.date > mx ? m.date : mx), "0000-00-00");
   // shot-regressed(分析师 P0):有 shots/SOT 时,把高方差的实际进球向射门期望回归去噪后再拟合,
   // 攻防强度更接近"潜在实力"而非"运气实现值"。转化率从训练切片自校准(walk-forward 不泄漏)。
@@ -497,7 +497,7 @@ function fit(matches, opts) {
 export function fitPerLeague(matches, opts = {}) {
   const minLeagueMatches = opts.minLeagueMatches ?? 80;
   const minMatches = opts.minMatches ?? 60;
-  const homeAdvantage = opts.homeAdvantage ?? 1.24;
+  const homeAdvantage = opts.homeAdvantage ?? 1.22;
   const fitOpts = {
     iterations: opts.iterations ?? 80,
     homeAdvantage,
