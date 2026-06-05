@@ -238,8 +238,12 @@ $Summary = [ordered]@{
   steps = $Steps
 }
 
-$Summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
-Write-Log "Summary written: $SummaryPath"
+# 无 BOM 写出:PS5.1 的 Set-Content -Encoding UTF8 会加 UTF-8 BOM(efbbbf),
+#   导致严格 JSON 消费者(python json.load / Node JSON.parse(utf8))解析崩、
+#   automation-*-latest.json 摘要读不出(health 的 latestRun 静默丢失)。改用 WriteAllText + UTF8Encoding($false)。
+$SummaryJson = $Summary | ConvertTo-Json -Depth 6
+[System.IO.File]::WriteAllText($SummaryPath, $SummaryJson, (New-Object System.Text.UTF8Encoding $false))
+Write-Log "Summary written (no BOM): $SummaryPath"
 
 if ($Failed.Count -gt 0) {
   exit 1

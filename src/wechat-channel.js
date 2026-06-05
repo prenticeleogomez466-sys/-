@@ -344,7 +344,7 @@ function safeEqual(left = "", right = "") {
 function readJsonIfExists(path) {
   if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    return JSON.parse(readFileSync(path, "utf8").replace(/^﻿/, "")); // 去 UTF-8 BOM(PS Set-Content 历史遗留),防 JSON.parse 噎住静默丢数据
   } catch {
     return null;
   }

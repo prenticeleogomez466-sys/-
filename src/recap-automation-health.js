@@ -73,9 +73,12 @@ function readScheduledTask(name) {
   }
 }
 
-function readJson(path) {
+export function readJson(path) {
   try {
-    return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
+    // 去 UTF-8 BOM:历史上 run-football-automation.ps1 用 Set-Content -Encoding UTF8 写出带 BOM 的
+    //   automation-*-latest.json,JSON.parse(utf8) 会被 BOM 噎住 → 静默 null、latestRun 丢失。
+    //   PS 写端已改无 BOM(WriteAllText+UTF8Encoding($false)),读端也容旧 BOM 文件,双保险。
+    return existsSync(path) ? JSON.parse(readFileSync(path, "utf8").replace(/^﻿/, "")) : null;
   } catch {
     return null;
   }
