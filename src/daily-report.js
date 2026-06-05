@@ -441,11 +441,11 @@ function toSimpleJingcaiRow(prediction) {
   ];
 }
 
-function simpleFourteenHeaders() {
+export function simpleFourteenHeaders() {
   return ["序", "赛事", "比赛", "胜负平", "覆盖", "信心"];
 }
 
-function toSimpleFourteenRow(selection) {
+export function toSimpleFourteenRow(selection) {
   return [
     selection.index,
     selection.competitionType ?? "—",
