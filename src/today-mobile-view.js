@@ -11,6 +11,8 @@
  * 供 scripts/render-today-mobile.mjs(写文件)与 src/server.js(/today 实时路由)共用。
  */
 
+import { worldCupContextLine } from "./worldcup-context.js";
+
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pct = (v) => (v == null ? "-" : typeof v === "string" ? v : `${(v * 100).toFixed(0)}%`);
 
@@ -69,8 +71,11 @@ function detailCard(p) {
   const aw = p.asianWaterAnalysis;
   const lineTxt = (n) => n == null ? "?" : (n === 0 ? "平手" : n < 0 ? `主让${Math.abs(n)}` : `主受让${n}`);
   const awHtml = aw ? `<div class="row"><span class="k">亚盘水位</span> ${esc(lineTxt(aw.line))} · 初 ${esc(aw.early?.homeOdds)}/${esc(aw.early?.awayOdds)} → 即 ${esc(aw.late?.homeOdds)}/${esc(aw.late?.awayOdds)} <span class="sk">${esc(aw.movement || "")}·${esc(aw.signal || "")}</span></div>${aw.implication ? `<div class="ec warn">盘口资金:${esc(aw.implication.replace(/\*\*/g, ""))}</div>` : ""}` : "";
+  // 世界杯单场:附赛会级背景(双方出线/夺冠概率,来自超算);非世界杯/无数据→空(自动休眠)。
+  const wcLine = worldCupContextLine(fx.homeTeam, fx.awayTeam, fx.competition);
   return `<div class="card">
     <div class="hd"><span class="no">${esc(fx.sequence)}</span> ${esc(fx.homeTeam)} <span class="vs">vs</span> ${esc(fx.awayTeam)} <span class="lg">${esc(fx.competition)}</span></div>
+    ${wcLine ? `<div class="row wc"><span class="k">🏆 赛会</span> ${esc(wcLine)}</div>` : ""}
     <div class="row main"><span class="k">胜平负</span> <b>${esc(p.pick?.label)}</b> <span class="prob">${pct(p.pick?.probability)}</span> <span class="conf">信心 ${Number.isFinite(conf) ? conf.toFixed(0) : "-"} · 风险 ${esc(p.risk || "-")}</span></div>
     ${p.scenario?.headline ? `<div class="row"><span class="k">情景</span> ${esc(p.scenario.headline)}${p.scenario.marketGuidance?.length ? ` <span class="sk">${esc(p.scenario.marketGuidance.map((g) => g.market + "→" + g.lean).join(" · "))}</span>` : ""}</div>` : ""}
     <div class="row pr">主 ${pct(pr.home)} · 平 ${pct(pr.draw)} · 客 ${pct(pr.away)}</div>
