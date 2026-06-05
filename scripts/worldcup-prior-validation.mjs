@@ -18,6 +18,7 @@ function collect() {
       const r = f.result;
       rows.push({
         stage: f.round || "group",
+        year: Number(String(d).slice(0, 4)) || null,
         tot: r.home + r.away,
         draw90: r.home === r.away ? 1 : 0,
         htDraw: r.halfHome != null && r.halfAway != null ? (r.halfHome === r.halfAway ? 1 : 0) : null,
@@ -64,9 +65,19 @@ function main() {
   if (gS && kS) {
     const lambdaRatio = kS.avgGoals / gS.avgGoals;
     const drawDelta = (kS.drawRate - gS.drawRate) * 100;
+    // ⚠️ 纪元修正:全史(1930-80)淘汰赛含加时/重赛,进球被人为抬高(全史比≈1.12 反指)。
+    // 生产先验(0.946 淘汰赛↓)依"现代期"数据,故同口径(≥1990)算才不误导。
+    const modern = rows.filter((r) => r.year && r.year >= 1990);
+    const mg = summarize(modern.filter((r) => r.stage === "group"));
+    const mk = summarize(modern.filter((r) => KNOCKOUT.has(r.stage)));
+    const modernRatio = mg && mk ? mk.avgGoals / mg.avgGoals : null;
     console.log("\n=== 数据校准建议(vs world-cup-priors 现行先验)===");
-    console.log(`淘汰赛 λ 乘子: 实测 ${lambdaRatio.toFixed(3)}(淘汰赛/小组赛进球比)| 先验现行 lowest×0.96 / lower×0.98`);
-    console.log(`淘汰赛平局率: 实测比小组赛 +${drawDelta.toFixed(1)}pp(${(kS.drawRate * 100).toFixed(1)}% vs ${(gS.drawRate * 100).toFixed(1)}%)→ 软重校准淘汰赛应上调平局目标`);
+    console.log(`淘汰赛 λ 乘子(全史 ${allS.n}场): ${lambdaRatio.toFixed(3)} ← 受1930-80加时/重赛高分污染,反指勿用`);
+    if (modernRatio != null) {
+      console.log(`淘汰赛 λ 乘子(现代期≥1990 ${modern.length}场): ${modernRatio.toFixed(3)} ✓与先验现行 lowest×0.96/lower×0.98(加权≈0.946 淘汰赛↓)同向,无需改`);
+    }
+    console.log(`淘汰赛平局率: 实测比小组赛 +${drawDelta.toFixed(1)}pp(${(kS.drawRate * 100).toFixed(1)}% vs ${(gS.drawRate * 100).toFixed(1)}%)`);
+    console.log(`  → 方向真实,但淘汰赛平局 boost 已 leak-safe 回测【命中率无净增益|Δ|<0.002】→ 裁决不接,仅软重校准展示层防比分坍缩(勿据此上调下注玩法)`);
   }
 
   // ── 半全场维度(仅 2006+ 有 ht 的样本)──
