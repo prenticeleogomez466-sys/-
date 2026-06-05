@@ -20,12 +20,15 @@ export function _resetCache() { CACHE = null; }
 const ALIASES = [
   [/英超|Premier\s*League|English\s*Premier/i, "英超"],
   [/西甲|La\s*Liga/i, "西甲"], [/德甲|Bundesliga/i, "德甲"], [/意甲|Serie\s*A/i, "意甲"], [/法甲|Ligue\s*1/i, "法甲"],
-  [/英冠|Championship/i, "英冠"], [/荷甲|Eredivisie/i, "荷甲"], [/葡超|Primeira/i, "葡超"], [/土超|Super\s*Lig/i, "土超"], [/比甲|Pro\s*League/i, "比甲"],
+  [/英冠|Championship/i, "英冠"], [/荷甲|Eredivisie/i, "荷甲"], [/葡超|Primeira/i, "葡超"], [/土超|Super\s*Lig/i, "土超"], [/比甲|Jupiler|Belgian\s*Pro/i, "比甲"],
   [/日职|J\.?\s*League|日本/i, "日职"], [/韩K|K\s*League|韩职|韩国/i, "韩K"],
   [/澳超|A-?League|澳大利亚/i, "澳超"], [/美职|MLS|美国职业/i, "美职"],
-  [/巴甲|Brasileir|巴西/i, "巴甲"], [/沙特|Saudi/i, "沙特联"], [/挪超|Eliteserien|挪威/i, "挪超"],
+  [/巴甲|Brasileir|巴西/i, "巴甲"], [/沙职|沙特|Saudi/i, "沙特联"], [/挪超|Eliteserien|挪威/i, "挪超"],
   [/瑞超|Allsvenskan|瑞典/i, "瑞超"], [/丹超|Superliga|丹麦/i, "丹超"], [/俄超|Russian|俄罗斯/i, "俄超"],
   [/墨超|Liga\s*MX|墨西哥/i, "墨超"], [/阿甲|阿根廷/i, "阿甲"], [/中超|Chinese|中国/i, "中超"],
+  [/芬超|Veikkausliiga|芬兰/i, "芬超"],
+  // 洲际杯赛:欧冠↔欧洲冠军联赛同一赛事(欧罗巴/欧协联为独立赛事,各自单变体不并)。
+  [/欧冠|欧洲冠军|Champions\s*League/i, "欧冠"],
 ];
 
 /** 把任意联赛名(中文全称/简称/英文)归一到规范 key,供跨数据源(画像/复盘账本)匹配。 */
