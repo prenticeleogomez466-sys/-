@@ -22,9 +22,31 @@ export function normalizeRaw(value) {
   return String(value ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9一-鿿]+/g, "");
 }
 
+// ESPN/英文源常把球队写成「俱乐部类型前缀 + 队名」(FC Groningen / VfL Wolfsburg /
+// AC Milan / 1. FC Köln)。normalizeRaw 去空格后变 "fcgroningen" 整串查不到别名,
+// 但短名 "groningen" 在表里。下面在精确查不到时剥前缀重查——**只有剥后命中已知
+// canonical 才采用**,否则原样返回,绝不臆造(配合 backfill 的 strict 双边匹配防错配)。
+const CLUB_PREFIXES = ["1fc", "1fsv", "fc", "afc", "ssc", "ssd", "asd", "vfl", "vfb", "sv", "tsv", "tsg", "fsv", "sc", "cf", "ac", "as", "us", "ud", "cd", "sd", "rc", "rcd", "fk", "nk", "hnk", "gnk", "bk", "if", "ngc"];
+function fallbackCanonical(key) {
+  for (const p of CLUB_PREFIXES) {
+    if (key.length > p.length + 2 && key.startsWith(p)) {
+      const stripped = key.slice(p.length);
+      if (ALIAS_TABLE[stripped]) return ALIAS_TABLE[stripped];
+    }
+  }
+  // 尾部俱乐部类型(... FC / ... SC)同理剥离重查。
+  for (const p of ["fc", "sc", "sv", "afc"]) {
+    if (key.length > p.length + 2 && key.endsWith(p)) {
+      const stripped = key.slice(0, key.length - p.length);
+      if (ALIAS_TABLE[stripped]) return ALIAS_TABLE[stripped];
+    }
+  }
+  return null;
+}
+
 export function canonicalTeamName(value) {
   const key = normalizeRaw(value);
-  return ALIAS_TABLE[key] ?? key;
+  return ALIAS_TABLE[key] ?? fallbackCanonical(key) ?? key;
 }
 
 // 一对一映射:lookup-key(normalizeRaw 后) → canonical-key(也是 normalizeRaw 后形态)
@@ -517,6 +539,15 @@ const RAW_ALIASES = {
   "congodr": "刚果民主共和国", "drcongo": "刚果民主共和国", "刚果民主共和国": "刚果民主共和国", "刚果(金)": "刚果民主共和国",
   "luxembourg": "卢森堡", "卢森堡": "卢森堡",
   "kenya": "肯尼亚", "肯尼亚": "肯尼亚",
+
+  // ───── ESPN 回填桥接补丁(2026-06-06, 逐场对 ESPN ground truth 核实) ─────
+  // 城市后缀/罗马化变体, 前缀剥离兜底覆盖不到的, 逐一直接映射。
+  "ajaxamsterdam": "阿贾克斯",         // ESPN 荷甲发全名 Ajax Amsterdam
+  "spartarotterdam": "鹿特丹斯巴达",
+  // 沙特: 赛果库用短变体, ESPN 用全称, 两侧收敛到同一 canonical。
+  "利雅胜利": "利雅得胜利",            // 赛果库变体 → Al Nassr
+  "利雅新月": "利雅得新月",            // 赛果库变体 → Al Hilal
+  "damac": "达马克", "达马克": "达马克",  // Al Nassr 4-1 Damac 已核
 };
 
 const ALIAS_TABLE = Object.fromEntries(

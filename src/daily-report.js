@@ -376,7 +376,7 @@ function simpleJingcaiHeaders() {
 }
 
 // 让胜负平极简格:头条方向 + 让球线,复用 coherentHandicapView(恒与 wld 同向)。
-function simpleHandicapCell(prediction) {
+export function simpleHandicapCell(prediction) {
   const v = coherentHandicapView(prediction);
   if (!v) return "—";
   const head = String(v.headline ?? "").trim();
@@ -384,7 +384,7 @@ function simpleHandicapCell(prediction) {
 }
 
 // 比分极简格:与胜负平方向一致的最可能比分(单一,不堆备选)。
-function simpleScoreCell(prediction) {
+export function simpleScoreCell(prediction) {
   const sp = prediction.scorePicks ?? {};
   const score = sp.wldConsistent ?? sp.primary;
   if (!score) return "—";
@@ -393,7 +393,7 @@ function simpleScoreCell(prediction) {
 }
 
 // 半全场极简格:终场方向 = wld 的最可能半全场路径(单一)。
-function simpleHalfFullCell(prediction) {
+export function simpleHalfFullCell(prediction) {
   const hp = prediction.halfFullPicks ?? {};
   if (!hp.primary) return "—";
   const p = hp.primaryProbability;
@@ -409,7 +409,7 @@ function simpleConfidenceCell(prediction) {
 // 胜负平极简格:只给方向(主胜/平局/客胜),均势→"主胜/平 双选",中低档→"双选 主/客";
 //   保留 ⛔未开售 / ⚠️直胜仅参考 两个真实性闸(脏数据不冒充干净推荐),去掉回测/单选命中率尾巴
 //   (那些明细在内部核验表的完整竞彩 sheet 里,此处求一眼看懂)。方向恒 = pick.code,与其余三列同源。
-function simpleWldCell(prediction) {
+export function simpleWldCell(prediction) {
   const lq = prediction.jingcaiLetqiu;
   if (lq && lq.sfcSold === false) return "⛔ 未开售(只让球)";
   const line = Number(prediction.handicapPick?.line);
