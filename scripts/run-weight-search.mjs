@@ -11,21 +11,24 @@ const args = process.argv.slice(2);
 const getNum = (flag, def) => { const i = args.indexOf(flag); return i >= 0 && args[i + 1] ? Number(args[i + 1]) : def; };
 const apply = args.includes("--apply"); // 写 profile 才生效;不带只看结果
 
-// 消融裁决(2026-06-02 重测):害校准 = home-away-split / time-decay-form / h2h / derby
-//   (clean-sheet-streak 本窗中性偏有用 → 不再剔除;新增 h2h/derby,它们 Brier/LogLoss 双负)。
+// 消融裁决(2026-06-05 重测):害校准 = home-away-split / time-decay-form / h2h / derby / competition-type
+//   (clean-sheet-streak 本窗中性偏有用 → 不剔除;competition-type 2026-06-05 ablation 219fire/命中-0.4pp/
+//    Brier-0.0023/LogLoss-0.0036 双负 → 纳入候选,由 leak-safe 搜索决定是否真该弃)。
 const HURTS4 = ["home-away-split", "time-decay-form", "h2h", "derby"];
+const HURTS5 = [...HURTS4, "competition-type"];
 const w = (obj) => obj; // 便捷
 
 const candidates = [
   { name: "baseline(全1)", signalWeights: null },
   { name: "弃4害(disable)", disabledSignals: HURTS4 },
+  { name: "弃5害(+competition-type)", disabledSignals: HURTS5 },
   { name: "降4害@0.5", signalWeights: w({ "home-away-split": 0.5, "time-decay-form": 0.5, "h2h": 0.5, "derby": 0.5 }) },
   { name: "降4害@0.3", signalWeights: w({ "home-away-split": 0.3, "time-decay-form": 0.3, "h2h": 0.3, "derby": 0.3 }) },
   { name: "弃量大2(split+tdf)", disabledSignals: ["home-away-split", "time-decay-form"] },
   { name: "弃3(split+tdf+h2h)", disabledSignals: ["home-away-split", "time-decay-form", "h2h"] },
   { name: "仅弃time-decay", disabledSignals: ["time-decay-form"] },
   { name: "弃split,降tdf/h2h@0.4", signalWeights: w({ "home-away-split": 0, "time-decay-form": 0.4, "h2h": 0.4, "derby": 0.4 }) },
-  { name: "弃4害+留fatigue满", disabledSignals: HURTS4 }
+  { name: "弃5害+留fatigue满", disabledSignals: HURTS5 }
 ];
 
 console.log("权重搜索回测中(单遍评估所有候选)...");
