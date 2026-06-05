@@ -9,6 +9,7 @@ import { auditRecommendations, writeRecommendationAudit } from "./recommendation
 import { runPreExportSelfCheck, selfCheckRows } from "./pre-export-selfcheck.js";
 import { runComprehensiveAudit, comprehensiveAuditRows } from "./comprehensive-audit.js";
 import { multimodalComparisonRows } from "./multimodal-collab.js";
+import { worldCupContextLine } from "./worldcup-context.js";
 import { assertLatestRealtimeSourceGate } from "./realtime-source-gate.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 
@@ -92,6 +93,8 @@ function unpredictableRows(unpredictable = []) {
 
 function toJingcaiRow(prediction) {
   const fixture = prediction.fixture;
+  // 世界杯单场:理由列前缀赛会级背景(双方出线/夺冠%);非世界杯/无超算数据→""(休眠)。
+  const wcCtx = worldCupContextLine(fixture?.homeTeam, fixture?.awayTeam, fixture?.competition);
   const probs = prediction.probabilities ?? {};
   const upset = upsetRiskLabel(probs.home, probs.draw, probs.away);
   const probSummary = `主 ${pct(probs.home)} / 平 ${pct(probs.draw)} / 客 ${pct(probs.away)}`;
@@ -118,7 +121,7 @@ function toJingcaiRow(prediction) {
     marketFlowCell(prediction),                                  // 11 盘口资金流向(欧赔漂移+亚盘水位变化+独立解读)
     experienceCell(prediction),                                  // 12 历史经验(同情境:平局/大小球/赔率漂移)
     confDetail,                                                  // 13 信心+分级+EV+注码
-    enrichedRationale(prediction),                               // 14 选择理由
+    (wcCtx ? `🏆赛会 ${wcCtx} · ` : "") + enrichedRationale(prediction), // 14 选择理由(世界杯场前缀赛会出线/夺冠)
     prediction.provenance ?? "—"                                 // 15 来源(胜平负先验 provenance,可追溯)
   ];
 }
