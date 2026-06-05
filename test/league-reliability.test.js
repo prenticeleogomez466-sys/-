@@ -23,3 +23,18 @@ test("isWeakLeague:仅可靠且命中<阈值才判弱;未知/样本不足/强联
   assert.equal(isWeakLeague("阿甲", null), false);     // 无 profile → 不臆断
   assert.equal(isWeakLeague("阿甲", { leagues: null }), false);
 });
+
+test("isWeakLeague:按 canonicalLeague 归一查,变体名也命中弱联赛(防样本割裂逃逸)", () => {
+  const prof = {
+    weakThreshold: 0.42,
+    leagues: {
+      // profile 以 canonical 键写入(沙特联/芬超),变体输入须归一后命中。
+      "沙特联": { accuracy: 0.38, total: 41, hit: 16, reliable: true },
+      "芬超": { accuracy: 0.40, total: 24, hit: 10, reliable: true },
+    }
+  };
+  assert.equal(isWeakLeague("沙特联", prof), true);
+  assert.equal(isWeakLeague("沙职", prof), true);            // 变体 → 归一沙特联
+  assert.equal(isWeakLeague("芬超", prof), true);
+  assert.equal(isWeakLeague("芬兰超级联赛", prof), true);     // 变体 → 归一芬超
+});

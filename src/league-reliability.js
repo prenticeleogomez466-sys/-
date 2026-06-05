@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getExportDir } from "./paths.js";
+import { canonicalLeague } from "./league-profile.js";
 
 let _cache;
 export function loadLeagueReliability() {
@@ -18,9 +19,12 @@ export function loadLeagueReliability() {
 }
 export function _resetLeagueReliabilityCache() { _cache = undefined; }
 
-/** 仅"回测可靠且明显偏弱"的联赛返回 true;未知/样本不足/强联赛 → false。 */
+/** 仅"回测可靠且明显偏弱"的联赛返回 true;未知/样本不足/强联赛 → false。
+ *  按 canonicalLeague 归一后查,避免"芬超/芬兰超级联赛""沙职/沙特联"变体分裂
+ *  使样本割裂(各自<20→reliable:false)而逃过弱联赛降级。profile 也以 canonical 键写入。 */
 export function isWeakLeague(league, prof = loadLeagueReliability()) {
   if (!league || !prof?.leagues) return false;
-  const lg = prof.leagues[league];
+  const canon = canonicalLeague(league);
+  const lg = prof.leagues[canon] ?? prof.leagues[league];
   return Boolean(lg?.reliable && Number.isFinite(lg.accuracy) && lg.accuracy < (prof.weakThreshold ?? 0.42));
 }

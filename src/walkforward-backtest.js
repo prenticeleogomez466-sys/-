@@ -17,6 +17,7 @@ import { fitFromFixtureStore, predictFromFitted } from "./dixon-coles-engine.js"
 import { loadHistoricalResults, buildFusionContext } from "./fusion-context-builder.js";
 import { fuseSignals, SIGNAL_NAMES } from "./signal-fusion-layer.js";
 import { calibrateProbabilities } from "./model-calibration.js";
+import { canonicalLeague } from "./league-profile.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const BUCKETS = [[0.33, 0.45], [0.45, 0.55], [0.55, 0.65], [0.65, 1.01]];
@@ -148,8 +149,8 @@ export function runWalkForwardBacktest(opts = {}) {
       // A. 纯 DC
       const probsDc = pred.probabilities;
       record(accDc, probsDc, actual);
-      // 按联赛记 DC 命中(top-pick)
-      const lg = f.competition || "未知";
+      // 按联赛记 DC 命中(top-pick)。canonicalLeague 归一,避免变体分裂割裂样本。
+      const lg = canonicalLeague(f.competition) || "未知";
       const top = OUTCOMES.reduce((a, b) => (probsDc[b] > probsDc[a] ? b : a), "home");
       if (!leagueAcc[lg]) leagueAcc[lg] = { total: 0, hit: 0 };
       leagueAcc[lg].total++;
