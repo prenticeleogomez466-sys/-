@@ -1,4 +1,5 @@
 import { loadFixtures } from "./fixture-store.js";
+import { isWeakLeague } from "./league-reliability.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
@@ -1506,6 +1507,9 @@ export function buildFourteenPlan(predictions, date = null) {
     })
     .filter((item) => {
       if (item.prediction.risk === "高") return false;
+      // 弱联赛(回测可靠且命中<阈值,如阿甲/墨超~37%)不得当胆 —— 仍可作多选覆盖,
+      // 但不被抬成高置信单关(避免把 37% 命中的场押成 6 胆里的一翻车整票完)。
+      if (isWeakLeague(item.prediction.fixture?.competition)) return false;
       if (item.gap < rules.bankerMinGap) return false;
       if (item.prediction.confidence < rules.bankerMinConfidence) return false;
       return true;
@@ -1686,7 +1690,8 @@ export function buildRenxuan9(source) {
     //   回测档内命中≥73% 才够格单选搏胆);避免把市场 coin-flip 场当胆。
     const isBanker = gap >= 0.22 && prediction.confidence >= 50
                      && prediction.risk !== "高" && singleCode !== "1"
-                     && prediction.selectionTier?.bankerEligible === true;
+                     && prediction.selectionTier?.bankerEligible === true
+                     && !isWeakLeague(prediction.fixture?.competition);
     let codes, coverageReason;
     if (isBanker) {
       codes = [singleCode];
