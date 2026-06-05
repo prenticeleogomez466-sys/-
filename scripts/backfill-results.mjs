@@ -41,6 +41,10 @@ const LEAGUES = [
 
 const args = process.argv.slice(2);
 const dry = args.includes("--dry");
+// --strict: 只写双边(主↔主且客↔客)匹配,丢弃单边锚定(home/away-anchored/nearest)。
+// 单边锚定靠"窗口内该队唯一"猜对家,队名映射不全时易把比分写到错的场(HJK→火花教训)。
+// 禁假编场景默认带上 --strict, 宁缺勿错。
+const strictOnly = args.includes("--strict");
 const dateArg = (() => { const i = args.indexOf("--date"); return i >= 0 ? args[i + 1] : null; })();
 const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
 
@@ -83,9 +87,10 @@ function teamLike(a, b) {
 //     用于 ESPN 客队英文名不映射中文(Hamarkameratene/IK Start)但主队能映射的北欧/沙特等。
 //  ③ 客队锚定唯一:对称兜底(主队名才是难映射的少数场)。
 // 不翻转主客(避免比分颠倒)。多candidate时取开赛日最接近 targetDate 的。
-function findEspn(pool, canonHome, canonAway, targetIso) {
+function findEspn(pool, canonHome, canonAway, targetIso, strict_ = strictOnly) {
   const strict = pool.filter((m) => teamLike(canonHome, m.ch) && teamLike(canonAway, m.ca));
   if (strict.length) return { m: nearest(strict, targetIso), how: "strict" };
+  if (strict_) return null; // strict-only: 不退化到单边锚定
   const byHome = pool.filter((m) => teamLike(canonHome, m.ch));
   if (byHome.length === 1) return { m: byHome[0], how: "home-anchored" };
   const byAway = pool.filter((m) => teamLike(canonAway, m.ca));
