@@ -73,6 +73,41 @@ function Invoke-Step([string]$Name, [string]$Command, [bool]$AllowFailure = $fal
   return $Ok
 }
 
+# 桌面《神选复盘.xlsx》新鲜度校验:核对桌面表确实在今天被刷新过(用户硬要求"永久"放桌面)。
+# 不是今天刷新 / 不存在 → 打 ALERT、计入 $Steps 摘要(ok=$false),供健康监控发现。
+function Verify-DesktopRecap {
+  $Candidates = @(
+    (Join-Path $env:USERPROFILE "Desktop\神选复盘.xlsx"),
+    "D:\Users\Administrator\Desktop\神选复盘.xlsx"
+  )
+  $Fresh = $false
+  $Found = $null
+  foreach ($p in $Candidates) {
+    if (Test-Path $p) {
+      $Found = $p
+      $age = (Get-Date) - (Get-Item $p).LastWriteTime
+      if ((Get-Item $p).LastWriteTime.Date -eq (Get-Date).Date) { $Fresh = $true; $Found = $p; break }
+    }
+  }
+  if ($Fresh) {
+    Write-Log "VERIFY: 桌面《神选复盘.xlsx》今日已刷新 => OK ($Found)"
+  } else {
+    $Msg = if ($Found) { "桌面《神选复盘.xlsx》存在但非今日刷新($Found),疑 recap:desktop 失败" } else { "桌面《神选复盘.xlsx》不存在,recap:desktop 未产出桌面副本" }
+    Write-Log "ALERT: $Msg"
+  }
+  $Steps.Add([ordered]@{
+    name = "verify desktop 神选复盘 freshness"
+    command = "Test-Path + LastWriteTime"
+    ok = $Fresh
+    allowedFailure = $false
+    exitCode = if ($Fresh) { 0 } else { 1 }
+    startedAt = (Get-Date).ToString("o")
+    finishedAt = (Get-Date).ToString("o")
+    seconds = 0
+  })
+  return $Fresh
+}
+
 function Run-Health {
   if ($AllowMissingOdds) {
     Invoke-Step "realtime football crawler gate" "npm run crawler:realtime -- --date=$Date --allow-missing-odds --no-external-odds --no-history"
@@ -123,12 +158,18 @@ function Run-Recap {
   # 半场比分回填(2026-06-04 用户"半全场睁眼"):ESPN 不带 HT、Sofascore 反爬,用 football-data.org
   # 免费档 score.halfTime 补世界杯+五大联赛+巴甲+欧冠的半场,让半全场玩法可结算/学习。无 token 优雅跳过。$true 失败不阻塞。
   Invoke-Step "backfill half-time scores from football-data.org" "npm run recap:backfill-ht -- --date=$Date" $true
+  # 第二 HT 源(2026-06-05):API-Football free 档补 fd.org 漏的联赛(挪超/瑞超/日职/解放者/国际友谊赛)半场。
+  # ⚠️ free 档仅近 ~3 天有数据,历史日期优雅跳过;100次/天足够(每日仅几次)。无 key 优雅跳过。$true 失败不阻塞。
+  Invoke-Step "backfill half-time scores from API-Football (gap leagues)" "npm run recap:backfill-ht-af -- --date=$Date" $true
   # 用 --no-result-sync:store 已由上面两步填好,recap 只结算不再二次 sync(避免覆盖 ESPN 回填赛果)。
   Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date --no-result-sync"
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
   # 神选复盘:把全部历史复盘汇成桌面单一总表(每日命中率+逐场明细),用户每天就看这一张。
   # 放在 recap:daily 之后 → 前一日赛果已回填,桌面表立即刷新到最新。
   Invoke-Step "build desktop 神选复盘 master table" "npm run recap:desktop" $true
+  # 桌面表新鲜度校验(2026-06-05 加):此前 recap:desktop 静默失败 → 桌面《神选复盘.xlsx》无声消失、
+  #   复盘任务仍报 0x0。现在显式核对桌面表是否今天刷新过;不是就打 ALERT 并计入摘要,不再悄悄漏。
+  Verify-DesktopRecap
   Invoke-Step "recap automation health" "npm run recap:health -- --date=$Date"
 }
 

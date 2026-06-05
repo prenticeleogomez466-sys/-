@@ -24,7 +24,10 @@ const cacheDir = getDataSubdir("api-football");
 const teamCachePath = join(cacheDir, "team-id-cache.json");
 
 export function apiFootballKey(env = process.env) {
-  return env.API_FOOTBALL_KEY || readLocalEnv()[`API_FOOTBALL_KEY`] || "";
+  if (env.API_FOOTBALL_KEY) return env.API_FOOTBALL_KEY;
+  // local.env 文件兜底只在使用默认 process.env 时启用;显式注入 env(测试)不读文件,保证可隔离可注入。
+  if (env === process.env) return readLocalEnv()[`API_FOOTBALL_KEY`] || "";
+  return "";
 }
 export function apiFootballConfigured(env = process.env) {
   return Boolean(apiFootballKey(env));
