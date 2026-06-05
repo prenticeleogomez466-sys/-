@@ -141,6 +141,9 @@ function updateLedgerRow(row, fixtures, snapshots = []) {
     halfFullHit: normalizeHalfFull(row.halfFullPrimary) === actualHalfFull,
     halfFullSecondaryHit: normalizeHalfFull(row.halfFullSecondary) === actualHalfFull,
     handicapWldHit: actualHandicap && row.handicapWldCode ? String(row.handicapWldCode) === actualHandicap.code : null,
+    // 双选(双重机会)结算(2026-06-05):实际结果落在覆盖的两个 code 内即命中。codes 来自下注时写入的 ledger。
+    doubleChanceHit: Array.isArray(row.doubleChanceCodes) && row.doubleChanceCodes.length
+      ? row.doubleChanceCodes.map(String).includes(String(actualCode)) : null,
     settledAt: new Date().toISOString()
   };
   return enrichSettledWithCLV(settled, fixture, snapshots);
@@ -179,6 +182,12 @@ function buildRecapSummary(date, rows, syncResults) {
   const halfFullSettled = settled.filter((row) => row.actualHalfFull && row.actualHalfFull !== "");
   const halfFullPrimary = rate(halfFullSettled, (row) => row.halfFullHit === true);
   const halfFullCover = rate(halfFullSettled, (row) => row.halfFullHit === true || row.halfFullSecondaryHit === true);
+  // 双选(双重机会)命中率(2026-06-05):全部计算了双选的场 + 单独看"主推双选"的场(市场热门<0.65),
+  //   验证"中低档主推双选"是否真把命中率拉高(回测中档84%/弱档78%)。
+  const dcSettled = settled.filter((row) => row.doubleChanceHit === true || row.doubleChanceHit === false);
+  const doubleChanceAll = rate(dcSettled, (row) => row.doubleChanceHit === true);
+  const dcRecommended = dcSettled.filter((row) => row.doubleChanceRecommended === true);
+  const doubleChanceRecommended = rate(dcRecommended, (row) => row.doubleChanceHit === true);
   // CLV:分析师建议的真 KPI —— 下注价 vs 收盘线,衡量是否长期击败市场(比短期命中率更可靠)。
   const clv = summarizeLedgerCLV(settled);
   // 下注分级真实命中率:验证🟢建议下注场是否真命中~73%(选择性推荐落地的反馈环)。
@@ -194,6 +203,8 @@ function buildRecapSummary(date, rows, syncResults) {
     scoreCover,
     halfFullPrimary,
     halfFullCover,
+    doubleChanceAll,
+    doubleChanceRecommended,
     clv,
     tierBreakdown,
     sync: syncResults.map((item) => ({
@@ -241,6 +252,8 @@ function recapSummaryRows(summary) {
     ["比分含备选命中率", pct(summary.scoreCover.accuracy), `${summary.scoreCover.hit}/${summary.scoreCover.total}`],
     ["半全场首选命中率", pct(summary.halfFullPrimary.accuracy), `${summary.halfFullPrimary.hit}/${summary.halfFullPrimary.total}`],
     ["半全场含备选命中率", pct(summary.halfFullCover.accuracy), `${summary.halfFullCover.hit}/${summary.halfFullCover.total}`],
+    ["双选(双重机会)命中率", summary.doubleChanceAll?.total ? pct(summary.doubleChanceAll.accuracy) : "无样本", `${summary.doubleChanceAll?.hit ?? 0}/${summary.doubleChanceAll?.total ?? 0};覆盖市场top2、舍最低项`],
+    ["双选·主推场命中率", summary.doubleChanceRecommended?.total ? pct(summary.doubleChanceRecommended.accuracy) : "无样本", `${summary.doubleChanceRecommended?.hit ?? 0}/${summary.doubleChanceRecommended?.total ?? 0};中低档(市场热门<0.65)主推双选,回测期望中84%/弱78%`],
     ["CLV 收盘线价值", summary.clv?.measurable ? `${Math.round((summary.clv.avgCLV ?? 0) * 1000) / 10}%` : "不可测", summary.clv?.verdict ?? "需收盘赔率快照"],
     ["CLV 击败收盘线率", summary.clv?.measurable ? `${Math.round((summary.clv.positiveRate ?? 0) * 100)}%` : "—", `样本 ${summary.clv?.samples ?? 0};长期盈利需 ≥55%`],
     ...tierBreakdownRows(summary.tierBreakdown),

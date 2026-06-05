@@ -195,20 +195,58 @@ function fixtureKickoffDate(fixture) {
 // 平局本质不可预测,硬推单平=72%翻车。所以均势场不强行猜平,而是给"主推方向+平"双选覆盖平局风险。
 // 触发:无强热门(领先<55%)且平局有威胁(≥28%)且平不是首推。返回 null 表示该场强热门、无需双选。
 // 不改 pick/比分/半全场(仍锚 wld),只附加一条覆盖平局的双选建议(用户决定买不买,不替弃赛)。
-export function computeDoubleChance(ranked, env = process.env) {
+// 双选(双重机会)分档实测命中率 —— 口径 = scripts/backtest-double-chance.mjs(45811 场带收盘赔率,
+//   覆盖市场 top2、舍概率最低项,dcHit=实际≠最低项)。按市场热门强度分桶。
+function doubleChanceBand(favP) {
+  if (favP >= 0.65) return { single: 0.772, double: 0.921 };
+  if (favP >= 0.55) return { single: 0.619, double: 0.839 };
+  if (favP >= 0.45) return { single: 0.502, double: 0.776 };
+  return { single: 0.403, double: 0.718 };
+}
+
+// 双选(双重机会)升一等公民(2026-06-05):泛化成"覆盖市场 top2、舍概率最低项"(1X/12/X2),
+//   与 backtest-double-chance 同口径。中低档(市场热门<0.65)单选命中物理偏低 → recommended=true,
+//   daily-report 主推双选(回测:中档单62%→双84%、弱档单50%→双78%);强档(≥0.65)仍单关。
+//   只升玩法建议、不改 prediction.pick.code(复盘 1X2 仍按 primary 结算,口径一致;双选另列单独结算)。
+export function computeDoubleChance(ranked, marketImplied = null, env = process.env) {
+  if (!Array.isArray(ranked) || ranked.length < 3) return null;
   const minDraw = Number(env.DOUBLE_CHANCE_MIN_DRAW ?? 0.28);
   const maxLeader = Number(env.DOUBLE_CHANCE_MAX_LEADER ?? 0.55);
-  const draw = ranked.find((r) => r.code === "1");
-  const leader = ranked[0];
-  if (!draw || !leader || leader.code === "1") return null;
-  if (draw.probability < minDraw || leader.probability >= maxLeader) return null;
-  const combined = round(leader.probability + draw.probability);
+  const CODE_LABEL = { "3": "主胜", "1": "平局", "0": "客胜" };
+  const modelProb = new Map(ranked.map((r) => [r.code, Number(r.probability)]));
+  // 选择"舍弃项"用市场隐含(更 sharp,与回测口径一致);缺则退模型概率。
+  const mkt = marketImplied && Number.isFinite(marketImplied.home)
+    ? { "3": Number(marketImplied.home), "1": Number(marketImplied.draw), "0": Number(marketImplied.away) }
+    : null;
+  const probFor = (code) => (mkt ? mkt[code] : modelProb.get(code)) ?? 0;
+  const allCodes = ["3", "1", "0"];
+  const favCode = allCodes.slice().sort((a, b) => probFor(b) - probFor(a))[0];
+  const marketFavProb = round(probFor(favCode));
+  const dropped = allCodes.slice().sort((a, b) => probFor(a) - probFor(b))[0]; // 概率最低=舍弃
+  const kept = allCodes.filter((c) => c !== dropped).sort((a, b) => Number(b) - Number(a)); // 按 3>1>0 排显示
+  const combined = round((modelProb.get(kept[0]) ?? 0) + (modelProb.get(kept[1]) ?? 0));
+  const shortCode = kept.map((c) => (c === "3" ? "1" : c === "1" ? "X" : "2")).join(""); // 1X/12/X2
+  const pickLabel = kept.map((c) => CODE_LABEL[c]).join("/");
+  const band = doubleChanceBand(marketFavProb);
+  const recommended = marketFavProb < 0.65; // 中低档主推双选;强档仍单关(胆码)
+  const draw = modelProb.get("1") ?? 0;
+  const note = recommended
+    ? `市场热门仅${(marketFavProb * 100).toFixed(0)}%·单选命中偏低(回测~${(band.single * 100).toFixed(0)}%) → 建议双选 ${pickLabel}(${shortCode})覆盖,回测命中~${(band.double * 100).toFixed(0)}%`
+    : (draw >= minDraw && favCode !== "1" && (modelProb.get(favCode) ?? 0) < maxLeader
+        ? `均势场·平局风险高(平${(draw * 100).toFixed(0)}%),可双选 ${pickLabel}(${shortCode})覆盖(合计${(combined * 100).toFixed(0)}%)`
+        : `强档可单关;如求稳可双选 ${pickLabel}(${shortCode}),回测命中~${(band.double * 100).toFixed(0)}%`);
   return {
-    pick: `${leader.label}/平局`,
-    codes: [leader.code, "1"],
+    pick: pickLabel,
+    codes: kept,
+    shortCode,
+    droppedCode: dropped,
     combinedProbability: combined,
-    drawProbability: round(draw.probability),
-    note: `均势场·平局风险高(平${(draw.probability * 100).toFixed(0)}%),单选命中低 → 建议双选 ${leader.label}/平 覆盖(合计${(combined * 100).toFixed(0)}%)`,
+    drawProbability: round(draw),
+    marketFavProb,
+    recommended,
+    backtestHit: band.double,
+    singleBacktestHit: band.single,
+    note,
   };
 }
 
@@ -671,7 +709,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     pick: ranked[0],
     secondaryPick: ranked[1],
     // 双选(双重机会)建议:均势场覆盖平局风险(单选平命中物理上限~28%,见 computeDoubleChance)。
-    doubleChance: computeDoubleChance(ranked, options.env ?? process.env),
+    doubleChance: computeDoubleChance(ranked, oddsProbabilities ?? null, options.env ?? process.env),
     risk,
     confidence,
     // 纯市场隐含概率(去vig)—— 选择分层的 sharp 信号(回测证明优于模型信心)。

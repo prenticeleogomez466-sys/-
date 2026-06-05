@@ -237,6 +237,13 @@ function wldCellWithDraw(prediction) {
   const base = outcomeCodeToChinese(code);
   const p = prediction.probabilities ?? {};
   const draw = Number(p.draw);
+  const dc = prediction.doubleChance;
+  // 双选升一等公民(2026-06-05):中低档(市场热门<0.65)单选命中物理偏低 → 主推双选(回测背书),
+  //   单选降为参考;强档(≥0.65)仍单关。只升玩法建议、不改 pick.code(复盘 1X2 仍按 primary 结算)。
+  if (dc?.recommended && dc.pick && dc.shortCode) {
+    const dHit = Number.isFinite(dc.backtestHit) ? `回测~${Math.round(dc.backtestHit * 100)}%` : "";
+    return `双选 ${dc.pick}(${dc.shortCode}·${dHit}) ⟨单选${base}仅参考·命中~${Math.round((dc.singleBacktestHit ?? 0) * 100)}%⟩`;
+  }
   if (!Number.isFinite(draw) || code === "1") return base; // 主推已是平、或无概率
   const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
     .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
@@ -622,6 +629,11 @@ function toLedgerRow(prediction) {
     // 信号去偏学习闭环原料(2026-06-03 修):回写本场实际触发的信号 key,
     // 供 signal-weight-tuner.signalPresent 判断,否则 signalWeights 永远 0 样本空转。
     adjustmentSignals: (prediction.probabilityAdjustment?.signals ?? []).map((s) => s?.key).filter(Boolean),
+    // 双选(双重机会)落档(2026-06-05):codes=覆盖的两个结果,结算时实际落其内即命中;
+    //   recommended=本场是否主推双选(市场热门<0.65),供复盘单独统计"双选主推命中率"。
+    doubleChanceCodes: prediction.doubleChance?.codes ?? null,
+    doubleChanceShort: prediction.doubleChance?.shortCode ?? "",
+    doubleChanceRecommended: prediction.doubleChance?.recommended === true,
     reason: prediction.rationale,
     // CLV 原料(结算时用):primaryOdds=下注价,primaryOpeningOdds=开盘价,betCapturedAt=捕获时刻
     primaryOdds: pickDecimalOdds(euBet, prediction.pick.code),
