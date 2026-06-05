@@ -75,11 +75,13 @@ def col_width_for(header, idx):
     if any(k in h for k in ["对阵", "比赛"]): return 30
     if "概率分布" in h or "概率(主/平/客)" in h or "主/平/客" in h: return 30
     if "信心 · 分级" in h or "信心 ·" in h: return 36
-    if any(k in h for k in ["让球", "半全场", "比分"]): return 26
+    if "让胜负平" in h or "让球" in h: return 24
+    if any(k in h for k in ["半全场", "比分"]): return 20
     if any(k in h for k in ["赛事类型", "爆冷"]): return 20
-    if "胜平负" in h: return 14
+    if "胜负平" in h or "胜平负" in h: return 16
     if "开赛" in h: return 14
     if "覆盖" in h or "单式" in h: return 18
+    if h == "赛事": return 14
     if h in ("序", "场次", "类型"): return 10
     if idx <= 1: return 12
     if idx <= 4: return 20
@@ -115,7 +117,10 @@ for sheet_name in wb.sheetnames:
         cell.border = HEADER_BORDER
         ws.column_dimensions[get_column_letter(c)].width = col_width_for(headers[c-1], c-1)
 
-    wld_col = next((i+1 for i, h in enumerate(headers) if "胜平负" in str(h) or h == "单式"), None)
+    # 胜负平方向染色:竞彩极简表里「胜负平」与「让胜负平」两列都按各自方向上色,
+    #   同向 → 同色,用户一眼即可看出四列方向一致(不一致会立刻露馅)。
+    wld_cols = [i+1 for i, h in enumerate(headers) if "胜负平" in str(h) or "胜平负" in str(h) or str(h) == "单式"]
+    wld_col = wld_cols[0] if wld_cols else None
     conf_col = next((i+1 for i, h in enumerate(headers) if "信心" in str(h)), None)
     type_col = next((i+1 for i, h in enumerate(headers) if h == "类型"), None)
     long_cols = [i+1 for i, h in enumerate(headers) if any(k in str(h or "") for k in ["选择理由", "比赛", "对阵", "说明", "融合判断要点", "evidence", "Evidence", "narrative"])]
@@ -132,13 +137,13 @@ for sheet_name in wb.sheetnames:
             cell.fill = row_fill
             cell.alignment = LEFT if c in long_cols else CENTER
 
-        # wld 列染色
-        if wld_col:
-            v = str(ws.cell(r, wld_col).value or "")
-            if "主胜" in v: ws.cell(r, wld_col).fill = HOME_FILL
-            elif "平局" in v or v.strip() == "平": ws.cell(r, wld_col).fill = DRAW_FILL
-            elif "客胜" in v: ws.cell(r, wld_col).fill = AWAY_FILL
-            ws.cell(r, wld_col).font = DATA_FONT_B
+        # wld 方向染色(胜负平 + 让胜负平 两列各按自身方向)
+        for wc in wld_cols:
+            v = str(ws.cell(r, wc).value or "")
+            if "主胜" in v: ws.cell(r, wc).fill = HOME_FILL
+            elif "客胜" in v: ws.cell(r, wc).fill = AWAY_FILL
+            elif "平局" in v or "走盘" in v or v.strip() == "平": ws.cell(r, wc).fill = DRAW_FILL
+            ws.cell(r, wc).font = DATA_FONT_B
 
         # 信心条件字体
         if conf_col:

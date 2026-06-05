@@ -176,18 +176,29 @@ const outPath = join(exportDir, "神选复盘.xlsx");
 writeXlsxWorkbook(outPath, sheets);
 console.log(`已生成神选复盘:${outPath}(${days.length} 天 / ${detailRows.length - 1} 场)`);
 
-// 桌面副本(用户每天就看这一张)
+// 桌面副本(用户每天就看这一张)。
+// 2026-06-05 加硬:此前桌面写失败(文件被占用/路径不存在)只 console.log 然后静默退出 0,
+//   导致桌面表能无声消失而复盘任务仍报成功(0x0)。改为:任一桌面候选写成即算成功;
+//   全部失败则 console.error + 退出码 1,让 recap 自动化的本步骤显式 WARN/ALERT,不再静默。
 const desktopCandidates = [join(homedir(), "Desktop"), "D:\\Users\\Administrator\\Desktop"];
+let desktopWritten = false;
+const desktopErrors = [];
 for (const dir of desktopCandidates) {
+  if (!existsSync(dir)) { desktopErrors.push(`${dir}(目录不存在)`); continue; }
+  const p = join(dir, "神选复盘.xlsx");
   try {
-    if (!existsSync(dir)) continue;
-    const p = join(dir, "神选复盘.xlsx");
     writeXlsxWorkbook(p, sheets);
     console.log(`桌面副本:${p}`);
+    desktopWritten = true;
     break;
   } catch (e) {
-    console.log(`桌面副本跳过(${dir}):${e.message}`);
+    desktopErrors.push(`${p}(${e.message})`);
   }
+}
+if (!desktopWritten) {
+  console.error(`⚠️ 桌面副本写入失败,全部候选均未成功:\n  - ${desktopErrors.join("\n  - ")}`);
+  console.error(`   D 盘总表已生成(${outPath}),但用户桌面《神选复盘.xlsx》未刷新——请检查文件是否被占用。`);
+  process.exitCode = 1;
 }
 
 // 控制台速览(最近 7 天)

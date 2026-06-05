@@ -52,8 +52,18 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   const recapRows = recommendations.predictions.map(toLedgerRow);
   const ledger = updateLedger(date, recapRows);
   const dailyPath = join(exportDir, `神选-竞彩推荐-${date}.xlsx`);
+  const internalPath = join(exportDir, `神选-内部核验-${date}.xlsx`);
   const masterPath = join(exportDir, "神选-复盘总表.xlsx");
+  // 用户面向:极简两表(竞彩 + 14场),无 14 场则只一张竞彩。每行只胜负平/让胜负平/比分/半全场。
+  const simpleFourteenRows = recommendations.fourteen.available === false || !fourteen.length
+    ? null
+    : [simpleFourteenHeaders(), ...fourteen.map(toSimpleFourteenRow)];
   writeXlsxWorkbook(dailyPath, [
+    { name: "竞彩", rows: [simpleJingcaiHeaders(), ...jingcai.map(toSimpleJingcaiRow)] },
+    ...(simpleFourteenRows ? [{ name: "14场", rows: simpleFourteenRows }] : [])
+  ]);
+  // 内部核验:原 13 张明细/审计/复盘/健康表全保留(不丢、供追溯),与极简表同次运行同源。
+  writeXlsxWorkbook(internalPath, [
     { name: "全面审计", rows: comprehensiveAuditRows(comprehensive) },
     { name: "出表自检", rows: selfCheckRows(selfCheck) },
     { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
@@ -70,7 +80,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "数据缺失·未预测", rows: unpredictableRows(recommendations.unpredictable) }
   ]);
   writeXlsxWorkbook(masterPath, [{ name: "复盘总表", rows: [recapHeaders(), ...ledger.map(Object.values)] }]);
-  return { date, dailyPath, masterPath, recommendations, audit, auditPath, selfCheck, sourceGate, health: { ok: true }, ledgerRows: ledger.length };
+  return { date, dailyPath, internalPath, masterPath, recommendations, audit, auditPath, selfCheck, sourceGate, health: { ok: true }, ledgerRows: ledger.length };
 }
 
 // 2026-05-30 诚实披露:无真实先验被剔除的场(未捕获赔率且不在 DC 训练集),
@@ -348,6 +358,102 @@ function buildHalfFullCandidates(prediction) {
   const main = `${primary}${pct(hp.primaryProbability)}`;
   if (hp.primaryAlt?.halfFull) return `${main} | 另 ${hp.primaryAlt.halfFull}${pct(hp.primaryAlt.probability)}`;
   return main;
+}
+
+// ============================================================================
+// 极简两表(2026-06-06 用户硬规则 feedback_jingcai_simple_table):
+//   日报对用户只出「竞彩」+「14场」两张表(无14场则一张),每行只看
+//   胜负平 / 让胜负平 / 比分 / 半全场(再加序/开赛/对阵/信心),一眼看懂、四者同向。
+//   四列全部从 pick.code(wld)一条主线派生,与 validatePredictionConsistency 同源 → 永不矛盾:
+//     胜负平   = wldDisplayCell(pick.code + ⛔/⚠️ 真实性闸 + 均势双选)
+//     让胜负平 = coherentHandicapView(头条恒与 wld 同向,没把握给"双选+走盘",绝不反向)
+//     比分     = scorePicks.wldConsistent(与 wld 方向一致的最可能比分)
+//     半全场   = halfFullPicks.primary(终场=wld 方向)
+//   明细/审计/复盘/健康等 13 张表移到「神选-内部核验-{date}.xlsx」,不丢、供核验。
+// ============================================================================
+function simpleJingcaiHeaders() {
+  return ["序", "开赛", "对阵", "胜负平", "让胜负平", "比分", "半全场", "信心"];
+}
+
+// 让胜负平极简格:头条方向 + 让球线,复用 coherentHandicapView(恒与 wld 同向)。
+function simpleHandicapCell(prediction) {
+  const v = coherentHandicapView(prediction);
+  if (!v) return "—";
+  const head = String(v.headline ?? "").trim();
+  return v.lineStr ? `${head}（${v.lineStr}）` : head;
+}
+
+// 比分极简格:与胜负平方向一致的最可能比分(单一,不堆备选)。
+function simpleScoreCell(prediction) {
+  const sp = prediction.scorePicks ?? {};
+  const score = sp.wldConsistent ?? sp.primary;
+  if (!score) return "—";
+  const p = sp.wldConsistentProbability ?? sp.primaryProbability;
+  return Number.isFinite(p) ? `${score}（${Math.round(p * 100)}%）` : String(score);
+}
+
+// 半全场极简格:终场方向 = wld 的最可能半全场路径(单一)。
+function simpleHalfFullCell(prediction) {
+  const hp = prediction.halfFullPicks ?? {};
+  if (!hp.primary) return "—";
+  const p = hp.primaryProbability;
+  return Number.isFinite(p) ? `${hp.primary}（${Math.round(p * 100)}%）` : String(hp.primary);
+}
+
+// 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。
+function simpleConfidenceCell(prediction) {
+  const tier = bettingTier(prediction.probabilities, prediction.fixture?.competition);
+  return `${confidenceLabel(prediction.confidence)} · ${tier}`;
+}
+
+// 胜负平极简格:只给方向(主胜/平局/客胜),均势→"主胜/平 双选",中低档→"双选 主/客";
+//   保留 ⛔未开售 / ⚠️直胜仅参考 两个真实性闸(脏数据不冒充干净推荐),去掉回测/单选命中率尾巴
+//   (那些明细在内部核验表的完整竞彩 sheet 里,此处求一眼看懂)。方向恒 = pick.code,与其余三列同源。
+function simpleWldCell(prediction) {
+  const lq = prediction.jingcaiLetqiu;
+  if (lq && lq.sfcSold === false) return "⛔ 未开售(只让球)";
+  const line = Number(prediction.handicapPick?.line);
+  const flag = (lq && lq.sfcSold !== true && Number.isFinite(line) && line !== 0) ? "⚠️直胜仅参考 " : "";
+  const code = prediction.pick?.code;
+  const base = outcomeCodeToChinese(code);
+  const dc = prediction.doubleChance;
+  if (dc?.recommended && dc.pick) return `${flag}双选 ${dc.pick}`;
+  const p = prediction.probabilities ?? {};
+  const draw = Number(p.draw);
+  if (Number.isFinite(draw) && code !== "1") {
+    const arr = [["3", p.home], ["1", p.draw], ["0", p.away]].filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
+    if (draw >= 0.26 && arr.findIndex(([c]) => c === "1") === 1) return `${flag}${base}/平 双选`;
+  }
+  return `${flag}${base}`;
+}
+
+function toSimpleJingcaiRow(prediction) {
+  const f = prediction.fixture;
+  return [
+    f.sequence,                              // 序
+    f.kickoff?.slice(5, 16) ?? "",           // 开赛(月-日 时:分)
+    `${f.homeTeam} vs ${f.awayTeam}`,        // 对阵
+    simpleWldCell(prediction),               // 胜负平(方向+双选,含⛔/⚠️真实性闸)
+    simpleHandicapCell(prediction),          // 让胜负平(恒与胜负平同向)
+    simpleScoreCell(prediction),             // 比分(方向一致)
+    simpleHalfFullCell(prediction),          // 半全场(终场=胜负平方向)
+    simpleConfidenceCell(prediction)         // 信心 · 分级
+  ];
+}
+
+function simpleFourteenHeaders() {
+  return ["序", "赛事", "比赛", "胜负平", "覆盖", "信心"];
+}
+
+function toSimpleFourteenRow(selection) {
+  return [
+    selection.index,
+    selection.competitionType ?? "—",
+    selection.match,
+    selection.single,                        // 单式胜负平方向
+    selection.compound,                      // 覆盖(单/双/全)
+    confidenceLabel(selection.confidence)
+  ];
 }
 
 // 爆冷指数:模型不看好的弱势一方仍占 ≥22% 时,14 场/竞彩历史上常爆冷于此
