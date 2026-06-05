@@ -46,3 +46,21 @@ test("空 predictions 优雅降级、不造数据", () => {
 test("esc 转义 HTML 危险字符", () => {
   assert.equal(__test.esc('<a>&"'), "&lt;a&gt;&amp;&quot;");
 });
+
+test("比分/半全场多候选不被双重转义(回归:曾把 <span> 转义成可见 &lt;span&gt; 乱码)", () => {
+  const sample = {
+    predictions: [{
+      fixture: { sequence: "1", homeTeam: "甲", awayTeam: "乙", competition: "国际赛" },
+      pick: { label: "主胜", probability: 0.5 }, probabilities: { home: 0.5, draw: 0.3, away: 0.2 },
+      confidence: 41, risk: "高",
+      scorePicks: { primary: "2-0", secondary: "1-2", wldConsistent: "2-0" },
+      halfFullPicks: { primary: "主胜-主胜", secondary: "客胜-客胜" },
+      handicapPick: { direction: "主胜", line: -1, coverProbability: 0.46 }
+    }],
+    fourteen: { available: false, selections: [] }
+  };
+  const html = renderTodayMobileHtml(sample, "2026-06-06");
+  assert.ok(!html.includes("&lt;span"), "不得出现被转义的 <span>(双重转义乱码)");
+  assert.match(html, /<span class="sk">备选 1-2<\/span>/, "备选比分应在真实 <span class=sk> 里");
+  assert.match(html, /<span class="sk">备 客胜-客胜<\/span>/, "备选半全场应在真实 <span class=sk> 里");
+});

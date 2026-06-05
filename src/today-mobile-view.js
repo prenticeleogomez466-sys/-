@@ -68,9 +68,11 @@ function scoreCandidatesText(sp) {
     if (out.length >= 3) break;
   }
   if (!out.length) return "-";
-  return out[0] + (out.length > 1 ? ` <span class="sk">备选 ${out.slice(1).join("/")}</span>` : "");
+  // 返回的是 HTML(含 <span class="sk">),调用处不能再 esc(否则双重转义成可见 &lt;span&gt; 乱码)。
+  //   内部对每个比分 token 各自 esc 做防御(值本是 "2-0" 类安全串,esc 不改变但保险)。
+  return esc(out[0]) + (out.length > 1 ? ` <span class="sk">备选 ${out.slice(1).map(esc).join("/")}</span>` : "");
 }
-// 半全场多候选:首选+备选,去重。
+// 半全场多候选:首选+备选,去重。返回 HTML(同上,调用处不再 esc)。
 function halfFullCandidatesText(hf) {
   if (!hf) return "-";
   const seen = new Set(), out = [];
@@ -79,7 +81,7 @@ function halfFullCandidatesText(hf) {
     if (c && !seen.has(c)) { seen.add(c); out.push(c); }
   }
   if (!out.length) return "-";
-  return out[0] + (out.length > 1 ? ` <span class="sk">备 ${out.slice(1).join("/")}</span>` : "");
+  return esc(out[0]) + (out.length > 1 ? ` <span class="sk">备 ${out.slice(1).map(esc).join("/")}</span>` : "");
 }
 
 function detailCard(p) {
@@ -105,7 +107,7 @@ function detailCard(p) {
     <div class="row main"><span class="k">胜平负</span> <b>${esc(p.pick?.label)}</b> <span class="prob">${pct(p.pick?.probability)}</span> <span class="conf">信心 ${Number.isFinite(conf) ? conf.toFixed(0) : "-"} · 风险 ${esc(p.risk || "-")}</span></div>
     ${p.scenario?.headline ? `<div class="row"><span class="k">情景</span> ${esc(p.scenario.headline)}${p.scenario.marketGuidance?.length ? ` <span class="sk">${esc(p.scenario.marketGuidance.map((g) => g.market + "→" + g.lean).join(" · "))}</span>` : ""}</div>` : ""}
     <div class="row pr">主 ${pct(pr.home)} · 平 ${pct(pr.draw)} · 客 ${pct(pr.away)}</div>
-    <div class="row"><span class="k">比分</span> ${esc(scoreCandidatesText(p.scorePicks))} &nbsp; <span class="k">半全场</span> ${esc(halfFullCandidatesText(p.halfFullPicks))}</div>
+    <div class="row"><span class="k">比分</span> ${scoreCandidatesText(p.scorePicks)} &nbsp; <span class="k">半全场</span> ${halfFullCandidatesText(p.halfFullPicks)}</div>
     <div class="row"><span class="k">让球</span> ${esc(hp.direction || "-")}${hp.line != null ? `(${hp.line})` : ""}${cover ? ` 覆盖 ${cover}` : ""} ${skellam ? `<span class="sk">${skellam}</span>` : ""}</div>
     <div class="row"><span class="k">让球胜平负</span> ${hwStr}</div>
     ${awHtml}
