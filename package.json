@@ -142,7 +142,8 @@
     "backtest:corners": "node scripts/run-corners-backtest.mjs",
     "jingcai:prepare": "node scripts/jingcai-prepare.mjs",
     "backtest:jleague": "node scripts/backtest-jleague-deep.mjs",
-    "backtest:jleague-levers": "node scripts/backtest-jleague-levers.mjs"
+    "backtest:jleague-levers": "node scripts/backtest-jleague-levers.mjs",
+    "mine:jleague": "node scripts/mine-jleague-profiles.mjs"
   },
   "engines": {
     "node": ">=20"
