@@ -27,6 +27,7 @@ const UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 
 // 覆盖竞彩常见全部联赛的 ESPN 联赛码(单日 scoreboard)。fin.1 等可能无赛果,空跑无害。
 const LEAGUES = [
+  "fifa.world", // 世界杯正赛(2026-06-06 验证 ESPN 码=fifa.world,64场/届);不补则开赛后赛果回填不进、recap 结算不了
   "fifa.friendly", "fifa.worldq.uefa", "fifa.worldq.conmebol", "fifa.worldq.concacaf",
   "fifa.worldq.afc", "fifa.worldq.caf", "fifa.nations", "uefa.nations",
   "uefa.champions", "uefa.europa", "uefa.europa.conf", "uefa.super_cup",
@@ -72,7 +73,26 @@ const NATION = {
   slovenia: "斯洛文尼亚", slovakia: "斯洛伐克", albania: "阿尔巴尼亚", israel: "以色列",
   newzealand: "新西兰", kosovo: "科索沃", luxembourg: "卢森堡", kazakhstan: "哈萨克斯坦",
 };
-function ck(name) { const c = canonicalTeamName(name); return NATION[c] ?? c; }
+// 俱乐部英→中桥(2026-06-06):ESPN 有赛果但 canonicalTeamName 桥不起来的联赛(美职/挪超/瑞超/英冠)。
+// 键 = canonicalTeamName(ESPN 英文名) 的归一形态(或其内置中文如博多格林特/南安普顿),
+// 值 = 对应 fixture 中文队名的 canonical 形态(实测自 src/team-aliases.js,如夏洛特fc/洛杉矶fc/萨普斯堡)。
+// 只收已逐场用 ESPN scoreboard 真名核对过的映射;strict 双边匹配,任一边不在表内则留 pending(宁缺勿假)。
+const CLUB = {
+  // 美职 MLS
+  minnesotaunitedfc: "明尼苏达", realsaltlake: "盐湖城", charlottefc: "夏洛特fc",
+  newenglandrevolution: "新英格兰", dcunited: "华盛顿", cfmontreal: "蒙特利尔",
+  nashvillesc: "纳什维尔", newyorkcityfc: "纽约城", portlandtimbers: "波特兰",
+  sanjoseearthquakes: "圣何塞", intermiamicf: "迈国际", philadelphiaunion: "费城",
+  lafc: "洛杉矶fc", seattlesoundersfc: "西雅图",
+  // 英冠
+  hullcity: "赫尔城", middlesbrough: "米堡", 南安普顿: "南安普敦",
+  // 挪超
+  博多格林特: "博德闪耀", skbrann: "布兰", kristiansundbk: "克里斯蒂",
+  vikingfk: "维京", sarpsborgfk: "萨普斯堡",
+  // 瑞超
+  gais: "哥德堡盖斯", kalmarff: "卡尔马",
+};
+function ck(name) { const c = canonicalTeamName(name); return CLUB[c] ?? NATION[c] ?? c; }
 
 // 双向子串匹配(对齐 recap 的 sameTeam):相等 或 一方包含另一方(长度≥2 防误配)。
 function teamLike(a, b) {

@@ -103,6 +103,7 @@
     "recap:backfill": "node scripts/backfill-results.mjs",
     "recap:backfill-ht": "node scripts/backfill-halftime-fdorg.mjs",
     "recap:backfill-ht-af": "node scripts/backfill-halftime-apifootball.mjs",
+    "wc:recap": "node scripts/wc-recap.mjs",
     "recap:desktop": "node scripts/build-shenxuan-recap-desktop.mjs",
     "recap:health": "node src/recap-automation-health.js",
     "backtest:evolution": "node src/evolution-backtest.js",

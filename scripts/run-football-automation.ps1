@@ -169,6 +169,8 @@ function Run-Recap {
   Invoke-Step "backfill half-time scores from API-Football (gap leagues)" "npm run recap:backfill-ht-af -- --date=$Date" $true
   # 用 --no-result-sync:store 已由上面两步填好,recap 只结算不再二次 sync(避免覆盖 ESPN 回填赛果)。
   Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date --no-result-sync"
+  #   世界杯赛果复盘校准:开赛后逐场验证赛前预测(出线Brier/夺冠logloss/爆冷);开赛前空态冻结基线。AllowFailure。
+  Invoke-Step "World Cup forecast recap calibration" "npm run wc:recap -- --json" $true
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
   # 神选复盘:把全部历史复盘汇成桌面单一总表(每日命中率+逐场明细),用户每天就看这一张。
   # 放在 recap:daily 之后 → 前一日赛果已回填,桌面表立即刷新到最新。
