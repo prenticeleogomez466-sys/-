@@ -80,6 +80,25 @@ export function matchFixtureToEvent(fixture, events) {
   return null;
 }
 
+// 近期交锋识别(两回合赛制线索):H2H 最近一次若在 fixture 前 ~16 天内 = 两队刚踢过,
+//   很可能是两回合淘汰赛首回合 → 标出"近X天交锋 A-B"作线索(留意累计形势/领先方轮换)。
+//   永久铁律:只标真实观测到的"刚交锋"事实+谨慎线索,不自动硬判"死签"(那是启发式会误判),
+//   累计/死签由用户结合判断。无近期交锋=null。
+export function recentMeetingContext(h2h, kickoffIso, withinDays = 16) {
+  if (!h2h || !kickoffIso) return null;
+  const first = String(h2h).split("/")[0].trim(); // "2026-05 5-0"
+  const m = first.match(/(\d{4})-(\d{2})\s+(\d+)-(\d+)/);
+  if (!m) return null;
+  const koMs = new Date(kickoffIso).getTime();
+  // H2H 只给到年-月,取该月中估算;保守用"月初"算最大间隔,够近才标
+  const metMs = new Date(`${m[1]}-${m[2]}-15T00:00Z`).getTime();
+  if (!Number.isFinite(koMs) || !Number.isFinite(metMs)) return null;
+  const days = Math.round((koMs - metMs) / 86400000);
+  if (days < 0 || days > withinDays + 15) return null; // +15 容月内估算误差
+  return { score: `${m[3]}-${m[4]}`, monthsTag: `${m[1]}-${m[2]}`,
+    note: `近期已交锋 ${m[3]}-${m[4]}(${m[1]}-${m[2]})——若两回合赛制,此为首回合,留意累计形势与领先方轮换` };
+}
+
 const espnUrl = (code, path) => `https://site.api.espn.com/apis/site/v2/sports/soccer/${code}/${path}`;
 async function espnJson(url, fetchImpl) {
   try { const r = await fetchImpl(url); return r.ok ? await r.json() : null; } catch { return null; }
@@ -119,12 +138,14 @@ export async function syncDeepContext(date, fixtures = [], fetchImpl = (typeof f
         teamForm(m.homeId), teamForm(m.awayId),
         espnJson(espnUrl(code, `summary?event=${m.event.id}`), fetchImpl),
       ]);
+      const h2h = parseEspnH2h(summary);
       fixtureData[fx.id] = {
         kickoffIso: m.event.date ?? null,
         kickoffBeijing: kickoffBeijing(m.event.date),
         home: { form: m.swapped ? aForm : hForm },
         away: { form: m.swapped ? hForm : aForm },
-        h2h: parseEspnH2h(summary),
+        h2h,
+        recentMeeting: recentMeetingContext(h2h, m.event.date),
         source: "ESPN (免授权)",
       };
     }

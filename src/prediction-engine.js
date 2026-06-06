@@ -140,9 +140,13 @@ export function recommendFixtures(date) {
   // 多模态协作汇总(2026-05-31):各路独立模型(市场赔率/DC纯泊松/信号融合/历史经验/让球覆盖)
   //   各自给胜平负判断 → 本层做 分流×对比×裁决,挂到每场 prediction.multimodal。
   //   严守硬规则:只读已算好的真实中间量、以 wld 为锚不改方向、分歧只下调信心不弃赛、缺数据 available:false。
+  const deepCtxLayer = advancedData?.layers?.deepContext?.fixtureData ?? {};
   for (const p of predictions) {
     // 传入已加载的历史比赛库(上方 loadHistoricalResults)→ 附 H2H/近期 历史小模型(稀疏则 available:false)。
     try { p.multimodal = multimodalAnalysis(p, { history }); } catch { p.multimodal = null; }
+    // 深度情景层(2026-06-06):ESPN 真实开赛时间/近5状态/H2H/近期交锋。情景展示用,不改 wld 概率方向。
+    //   无该场数据=null(标缺不兜底),展示层据此标"未取到"。
+    p.deepContext = deepCtxLayer[p.fixture?.id] ?? null;
   }
   const multimodalSummary = summarizeMultimodal(predictions);
   return {

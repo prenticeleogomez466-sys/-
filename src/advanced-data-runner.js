@@ -11,6 +11,7 @@ import { syncFotmobAllLayers } from "./public-football-data.js";
 import { fetchFplInjuries, injuriesForFixture } from "./free-injury-source.js";
 import { fetchEspnLineupsForFixtures } from "./lineup-source.js";
 import { buildXgLayerFromUnderstat } from "./understat-source.js";
+import { syncDeepContext } from "./deep-context.js";
 import { existsSync as _existsSync, readFileSync as _readFileSync } from "node:fs";
 import { getDataSubdir } from "./paths.js";
 
@@ -57,6 +58,10 @@ export async function syncAdvancedFootballData(date, options = {}) {
   result.layers.xg = await syncXg(date, fixtureSet.fixtures, fetchImpl, env, apiFootballFixtures, result.layers.form);
   result.layers.weather = await syncOpenMeteoWeather(date, fixtureSet.fixtures, fetchImpl, env);
   result.layers.news = await syncGdeltNews(date, fixtureSet.fixtures, fetchImpl, env);
+  // 深度情景层(2026-06-06):ESPN 真实开赛时间/近5状态/H2H/近期交锋,情景展示用不驱动概率。
+  //   ESPN 故障/不覆盖→优雅 {ok:false} 不阻塞主线;不进 applyDerivedAdvancedFallbacks(无兜底)。
+  try { result.layers.deepContext = await syncDeepContext(date, fixtureSet.fixtures, fetchImpl); }
+  catch (e) { result.layers.deepContext = { ok: false, source: "ESPN", count: 0, fixtureData: {}, warning: String(e?.message || e) }; }
 
   applyDerivedAdvancedFallbacks(result, fixtureSet.fixtures);
   applyLayerData(result.fixtures, result.layers);

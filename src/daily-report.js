@@ -43,7 +43,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   if (!comprehensive.ok) {
     throw new Error(`全面审计未通过(${comprehensive.blockers.length}项硬问题,已拦截出表)：${comprehensive.blockers.slice(0, 6).join("；")}${comprehensive.blockers.length > 6 ? " …" : ""}`);
   }
-  const jingcai = recommendations.predictions.filter((prediction) => prediction.fixture.marketType !== "shengfucai");
+  const jingcai = sortByKickoff(recommendations.predictions.filter((prediction) => prediction.fixture.marketType !== "shengfucai"));
   const fourteen = recommendations.fourteen.selections;
   // 硬规则:无真实 14 场时,14 场 sheet 给诚实说明行,不把竞彩比赛冒充成 14 场。
   const fourteenRows = recommendations.fourteen.available === false || !fourteen.length
@@ -372,7 +372,31 @@ function buildHalfFullCandidates(prediction) {
 //   明细/审计/复盘/健康等 13 张表移到「神选-内部核验-{date}.xlsx」,不丢、供核验。
 // ============================================================================
 function simpleJingcaiHeaders() {
-  return ["序", "开赛", "对阵", "胜负平", "让胜负平", "比分", "半全场", "信心"];
+  return ["开赛", "对阵", "胜负平", "让胜负平", "比分", "半全场", "近5场", "H2H交锋", "信心"];
+}
+
+// 深度情景单元(2026-06-06):优先用 ESPN 真实开赛时间;近5状态/H2H/近期交锋来自 deepContext。
+//   永久铁律:无该场 deepContext=标"未取到",不臆造。本层只展示不改 wld 概率。
+function dcKickoff(prediction) {
+  const dc = prediction.deepContext;
+  if (dc?.kickoffBeijing) return dc.kickoffBeijing;          // 真实时间(北京)
+  const ko = prediction.fixture?.kickoff;
+  return ko && /\d{2}:\d{2}/.test(ko) ? ko.slice(5, 16) : (ko?.slice(5, 10) ?? "");
+}
+function dcForm(prediction) {
+  const dc = prediction.deepContext;
+  if (!dc) return "未取到";
+  const h = dc.home?.form, a = dc.away?.form;
+  if (!h && !a) return "未取到";
+  return `主:${h ?? "—"} 客:${a ?? "—"}`;
+}
+function dcH2h(prediction) {
+  const dc = prediction.deepContext;
+  if (!dc) return "未取到";
+  const parts = [];
+  if (dc.h2h) parts.push(dc.h2h.replace(/\d{4}-/g, ""));     // 紧凑:去年份前缀
+  if (dc.recentMeeting?.score) parts.push(`⚠近期交锋${dc.recentMeeting.score}`);
+  return parts.length ? parts.join(" · ") : "无记录";
 }
 
 // 让胜负平极简格:头条方向 + 让球线,复用 coherentHandicapView(恒与 wld 同向)。
@@ -430,15 +454,27 @@ export function simpleWldCell(prediction) {
 function toSimpleJingcaiRow(prediction) {
   const f = prediction.fixture;
   return [
-    f.sequence,                              // 序
-    f.kickoff?.slice(5, 16) ?? "",           // 开赛(月-日 时:分)
+    dcKickoff(prediction),                   // 开赛(优先 ESPN 真实北京时间)
     `${f.homeTeam} vs ${f.awayTeam}`,        // 对阵
     simpleWldCell(prediction),               // 胜负平(方向+双选,含⛔/⚠️真实性闸)
     simpleHandicapCell(prediction),          // 让胜负平(恒与胜负平同向)
     simpleScoreCell(prediction),             // 比分(方向一致)
     simpleHalfFullCell(prediction),          // 半全场(终场=胜负平方向)
+    dcForm(prediction),                      // 近5场状态(ESPN真实,无=未取到)
+    dcH2h(prediction),                       // H2H交锋 + 近期交锋线索
     simpleConfidenceCell(prediction)         // 信心 · 分级
   ];
+}
+
+// 按真实开赛时间排序(有 deepContext 时间的在前升序,缺时间的按序号兜底排后)。
+function sortByKickoff(predictions) {
+  return [...predictions].sort((x, y) => {
+    const tx = x.deepContext?.kickoffIso, ty = y.deepContext?.kickoffIso;
+    if (tx && ty) return new Date(tx) - new Date(ty);
+    if (tx) return -1;
+    if (ty) return 1;
+    return (x.fixture?.sequence ?? 0) - (y.fixture?.sequence ?? 0);
+  });
 }
 
 export function simpleFourteenHeaders() {
