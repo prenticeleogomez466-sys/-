@@ -448,22 +448,23 @@ function simpleConfidenceCell(prediction) {
 // 胜负平极简格:只给方向(主胜/平局/客胜),均势→"主胜/平 双选",中低档→"双选 主/客";
 //   保留 ⛔未开售 / ⚠️直胜仅参考 两个真实性闸(脏数据不冒充干净推荐),去掉回测/单选命中率尾巴
 //   (那些明细在内部核验表的完整竞彩 sheet 里,此处求一眼看懂)。方向恒 = pick.code,与其余三列同源。
+// 胜负平极简格(2026-06-06 用户要主选+副选,同比分/半全场):取三概率前二=主选/副选(带%),
+//   保留⛔未开售/⚠️直胜仅参考真实性闸;模型主推双选时附"(主推双选)"提示。方向与比分/半全场同源(argmax)。
 export function simpleWldCell(prediction) {
   const lq = prediction.jingcaiLetqiu;
   if (lq && lq.sfcSold === false) return "⛔ 未开售(只让球)";
   const line = Number(prediction.handicapPick?.line);
   const flag = (lq && lq.sfcSold !== true && Number.isFinite(line) && line !== 0) ? "⚠️直胜仅参考 " : "";
-  const code = prediction.pick?.code;
-  const base = outcomeCodeToChinese(code);
-  const dc = prediction.doubleChance;
-  if (dc?.recommended && dc.pick) return `${flag}双选 ${dc.pick}`;
   const p = prediction.probabilities ?? {};
-  const draw = Number(p.draw);
-  if (Number.isFinite(draw) && code !== "1") {
-    const arr = [["3", p.home], ["1", p.draw], ["0", p.away]].filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
-    if (draw >= 0.26 && arr.findIndex(([c]) => c === "1") === 1) return `${flag}${base}/平 双选`;
-  }
-  return `${flag}${base}`;
+  const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
+    .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
+  if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  const main = `主选 ${outcomeCodeToChinese(arr[0][0])}${pct(arr[0][1])}`;
+  const sub = `副选 ${outcomeCodeToChinese(arr[1][0])}${pct(arr[1][1])}`;
+  const dc = prediction.doubleChance;
+  const hint = (dc?.recommended && dc.pick) ? `（主推双选 ${dc.pick}）` : "";
+  return `${flag}${main} / ${sub}${hint}`;
 }
 
 function toSimpleJingcaiRow(prediction) {

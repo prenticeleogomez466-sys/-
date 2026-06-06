@@ -13,8 +13,11 @@ import {
 // "同向"钉成回归不变量:谁日后把某列改成读别的字段、方向漂了,立刻红。
 
 // 从一个 cell 文本里判定它表达的方向:home / away / draw / null
+//   胜负平格现为"主选 X% / 副选 Y%"双向→只取主选那段判方向(主选=与比分/半全场同源)。
 function dirOfText(t) {
-  const s = String(t);
+  let s = String(t);
+  const mainSeg = s.match(/主选\s*(主胜|平局|客胜)/);
+  if (mainSeg) s = mainSeg[1];
   if (s.includes("主胜")) return "home";
   if (s.includes("客胜")) return "away";
   if (s.includes("平局") || s.includes("走盘") || /(^|[^胜])平([^负]|$)/.test(s)) return "draw";
