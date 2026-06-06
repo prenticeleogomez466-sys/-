@@ -24,6 +24,11 @@ import { parseJingcaiHandicapLine } from "../src/jingcai-fivehundred-stage.js";
 
 const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
 const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml";
+// 全赔种接入(2026-06-06 用户铁律"必须全部抓取"):比分/半全场/总进球真实市场盘,
+//   替原先 DC 泊松估算冒充。见 feedback_fetch_all_then_audit。
+const BF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_bf_2.xml";   // 比分
+const BQC_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_bqc_2.xml"; // 半全场
+const JQS_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_jqs_2.xml"; // 总进球数
 const REFERER = "https://trade.500.com/jczq/";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -36,6 +41,17 @@ async function main() {
   const [spfXml, nspfXml] = await Promise.all([fetchXml(SPF_URL), fetchXml(NSPF_URL)]);
   const spf = parseMatches(spfXml);
   const nspf = parseMatches(nspfXml);
+
+  // 比分/半全场/总进球 真实市场盘(按 matchid 索引;失败降级该赔种=空,审计闸会标缺)。
+  const bfByMatchid = new Map(), bqcByMatchid = new Map(), jqsByMatchid = new Map();
+  try {
+    const [bfXml, bqcXml, jqsXml] = await Promise.all([
+      fetchXml(BF_URL).catch(() => ""), fetchXml(BQC_URL).catch(() => ""), fetchXml(JQS_URL).catch(() => "")]);
+    for (const h of parseHeads(bfXml)) { const o = bfToScoreOdds(h); if (o.length) bfByMatchid.set(h.id ?? h.matchid, o); }
+    for (const h of parseHeads(bqcXml)) { const o = bqcToHalfFull(h); if (o.length) bqcByMatchid.set(h.id ?? h.matchid, o); }
+    for (const h of parseHeads(jqsXml)) { const o = jqsToTotalGoals(h); if (o.over25 != null) jqsByMatchid.set(h.id ?? h.matchid, o); }
+    console.error(`全赔种:比分 ${bfByMatchid.size} 场 / 半全场 ${bqcByMatchid.size} 场 / 总进球 ${jqsByMatchid.size} 场`);
+  } catch (e) { console.error("比分/半全场/总进球抓取失败,降级标缺:", e.message); }
 
   // 业务批次 = 竞彩编号系列(6xxx=本批/周六单,7xxx=下一批),与 kickoff 日期无关:
   //   同一张竞彩单里晚场会跨到次日凌晨开球(如 6014 欧冠决赛/6015 国际赛 kickoff 在 date+1),
@@ -168,6 +184,10 @@ async function main() {
       jingcaiHandicap: jline != null ? { line: jline, source: "500.com-jczq" } : null,
       asianHandicap,
       totals,
+      // 比分/半全场/总进球 真实市场盘(按 matchid;无=null 标缺,不冒充)。模型 buildScorePicks/buildHalfFullPicks 优先吃 .top。
+      scoreOdds: bfByMatchid.has(m.id) ? { top: bfByMatchid.get(m.id), source: "500.com-jczq-bf" } : null,
+      halfFullOdds: bqcByMatchid.has(m.id) ? { top: bqcByMatchid.get(m.id), source: "500.com-jczq-bqc" } : null,
+      totalGoalsOdds: jqsByMatchid.has(m.id) ? { ...jqsByMatchid.get(m.id), source: "500.com-jczq-jqs" } : null,
       source: "500.com-jczq-fallback"
     });
   }
@@ -179,6 +199,28 @@ async function main() {
     : "500.com-jczq-fallback";
   // 按业务日覆盖式落盘:对合并后的竞彩限当日 + 跨源去重(周六 vs 6001 重复 / 周日次日),
   // 避免反复兜底把场次越叠越多(17→35→48)。14 场/其它源原样保留。
+  // ===== 数据完整性审计闸(2026-06-06 用户铁律"抓完先审计核查再走下一步")=====
+  // 逐赔种核查覆盖率;缺失场如实告警(不静默用 DC 估算冒充市场盘)。覆盖严重不足时显著告警。
+  const audit = { 胜平负: 0, 让球: 0, 比分: 0, 半全场: 0, 大小球: 0, 总进球: 0, gaps: [] };
+  for (const s of snapshots) {
+    if (s.europeanOdds) audit.胜平负++;
+    if (s.handicapOdds) audit.让球++;
+    if (s.scoreOdds?.top?.length) audit.比分++;
+    if (s.halfFullOdds?.top?.length) audit.半全场++;
+    if (s.totals) audit.大小球++;
+    if (s.totalGoalsOdds?.over25 != null) audit.总进球++;
+    const miss = [];
+    if (!s.scoreOdds?.top?.length) miss.push("比分");
+    if (!s.halfFullOdds?.top?.length) miss.push("半全场");
+    if (s.totalGoalsOdds?.over25 == null && !s.totals) miss.push("大小球/总进球");
+    if (miss.length) audit.gaps.push(`${s.homeTeam} vs ${s.awayTeam}: 缺 ${miss.join("/")}`);
+  }
+  const n = snapshots.length || 1;
+  console.error(`\n=== 数据完整性审计(${snapshots.length}场)===`);
+  console.error(`胜平负 ${audit.胜平负}/${snapshots.length} · 让球 ${audit.让球}/${snapshots.length} · 比分 ${audit.比分}/${snapshots.length} · 半全场 ${audit.半全场}/${snapshots.length} · 大小球 ${audit.大小球}/${snapshots.length} · 总进球 ${audit.总进球}/${snapshots.length}`);
+  if (audit.gaps.length) console.error(`⚠️ 缺口(将如实标缺、不冒充):\n  ` + audit.gaps.join("\n  "));
+  else console.error("✅ 全赔种全覆盖");
+
   const scopedFixtures = scopeJingcaiFixtures(date, [...keepFixtures, ...fixtures]);
   const fixturesSaved = saveFixtures(date, scopedFixtures, { source: mergedSource });
   // 合并既有快照(不破坏其它源),再保存
@@ -204,6 +246,50 @@ async function fetchXml(url) {
   const buf = new Uint8Array(await response.arrayBuffer());
   return new TextDecoder("utf-8").decode(buf);
 }
+
+// 只解析 <m> 头属性(比分/半全场/总进球的赔率全在头属性里,无 <row>)。
+function parseHeads(xml) {
+  const heads = [];
+  for (const tag of (String(xml).match(/<m\b[^>]*\/?>/g) ?? [])) heads.push(attrMap(tag));
+  return heads;
+}
+// 比分 bf:aXY=主胜X-Y / bXY=客胜(镜像Y-X) / cXX=平局X-X。→ [{score,odds}] 按赔率升序(概率高在前)。
+function bfToScoreOdds(attrs) {
+  const out = [];
+  for (const [k, v] of Object.entries(attrs)) {
+    const odds = Number(v); if (!Number.isFinite(odds) || odds <= 1) continue;
+    let m;
+    if ((m = k.match(/^a(\d)(\d)$/))) out.push({ score: `${m[1]}-${m[2]}`, odds });
+    else if ((m = k.match(/^b(\d)(\d)$/))) out.push({ score: `${m[2]}-${m[1]}`, odds });
+    else if ((m = k.match(/^c(\d)(\d)$/))) out.push({ score: `${m[1]}-${m[2]}`, odds });
+  }
+  return out.sort((a, b) => a.odds - b.odds);
+}
+// 半全场 bqc:首字母=半场,次字母=全场;a=主胜 b=客胜 c=平局。→ [{halfFull,odds}] 按赔率升序。
+const BQC_L = { a: "主胜", b: "客胜", c: "平局" };
+function bqcToHalfFull(attrs) {
+  const out = [];
+  for (const [k, v] of Object.entries(attrs)) {
+    const odds = Number(v); if (!Number.isFinite(odds) || odds <= 1) continue;
+    const m = k.match(/^([abc])([abc])$/);
+    if (m) out.push({ halfFull: `${BQC_L[m[1]]}-${BQC_L[m[2]]}`, odds });
+  }
+  return out.sort((a, b) => a.odds - b.odds);
+}
+// 总进球 jqs:s0..s7=进0..7+球的赔率。→ 大小球派生(over/under 2.5 由 1/odds 反推概率聚合)。
+function jqsToTotalGoals(attrs) {
+  const probs = {};
+  let sum = 0;
+  for (let i = 0; i <= 7; i++) {
+    const o = Number(attrs[`s${i}`]);
+    if (Number.isFinite(o) && o > 1) { probs[i] = 1 / o; sum += probs[i]; }
+  }
+  if (sum <= 0) return { over25: null, under25: null, dist: null };
+  let under = 0, over = 0;
+  for (const [g, p] of Object.entries(probs)) { const np = p / sum; (Number(g) <= 2 ? (under += np) : (over += np)); }
+  return { over25: round2(over), under25: round2(under), dist: Object.fromEntries(Object.entries(probs).map(([g, p]) => [g, round2(p / sum)])) };
+}
+const round2 = (x) => Math.round(x * 1000) / 1000;
 
 function parseMatches(xml) {
   const matches = [];

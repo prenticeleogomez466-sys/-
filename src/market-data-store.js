@@ -27,7 +27,21 @@ export function saveMarketSnapshots(date, snapshots, metadata = {}) {
 
 export function findMarketSnapshot(fixture, snapshotsOrDate = fixture?.date) {
   const snapshots = Array.isArray(snapshotsOrDate) ? snapshotsOrDate : loadMarketSnapshots(snapshotsOrDate ?? fixture.date).snapshots;
-  return snapshots.find((snapshot) => snapshot.fixtureId === fixture.id) ?? snapshots.find((snapshot) => normalizeName(snapshot.homeTeam) === normalizeName(fixture.homeTeam) && normalizeName(snapshot.awayTeam) === normalizeName(fixture.awayTeam)) ?? null;
+  // 同一场可能有多源快照(主路径 Playwright 胜平负/让球 + 兜底注入器 比分/半全场/总进球)。
+  // 数据完整性铁律(2026-06-06 用户"所有数据都要抓全·不能缺",feedback_fetch_all_then_audit):
+  //   不再只返回首个匹配,而是【合并所有匹配快照的各赔种字段】——哪个源有该赔种就补进来,保证完整。
+  // 按 fixtureId 或 队名 都算同一场(多源快照常 fixtureId 不同:主路径 id vs 兜底 jc500-id)。
+  const sameMatch = (s) => s.fixtureId === fixture.id || (normalizeName(s.homeTeam) === normalizeName(fixture.homeTeam) && normalizeName(s.awayTeam) === normalizeName(fixture.awayTeam));
+  const matches = snapshots.filter(sameMatch);
+  if (!matches.length) return null;
+  // 基准优先取 fixtureId 精确匹配的(保官方/主路径基本盘),再用各源补全赔种字段。
+  const base = { ...(matches.find((s) => s.fixtureId === fixture.id) ?? matches[0]) };
+  const hasData = (v) => v != null && !(Array.isArray(v?.top) && v.top.length === 0) && !(typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);
+  const ODDS_FIELDS = ["europeanOdds", "handicapOdds", "asianHandicap", "totals", "scoreOdds", "halfFullOdds", "totalGoalsOdds", "jingcaiHandicap", "jingcaiLetqiu", "handicapOddsLetqiu"];
+  for (const f of ODDS_FIELDS) {
+    if (!hasData(base[f])) { const donor = matches.find((s) => hasData(s[f])); if (donor) base[f] = donor[f]; }
+  }
+  return base;
 }
 
 export function buildMarketCoverageStatus(date) {

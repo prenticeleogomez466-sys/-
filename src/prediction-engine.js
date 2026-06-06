@@ -1291,7 +1291,10 @@ function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {
   // 来源标记(供自检判真假):market=官方比分赔率;dcResult.source=训练DC/λ派生真泊松矩阵;
   // poisson-matrix=全矩阵扫描(仍真泊松)。绝不出现死表来源 —— 死表已删。
   const source = fromMarket ? "market" : (fromDc ? (dcResult?.source ?? "dc-matrix") : (matrix ? (dcResult?.source ?? "poisson-matrix") : "none"));
-  return { primary, secondary, wldConsistent, wldConsistentSecondary, globalMode, globalModeSecondary, source };
+  // 数据完整性(2026-06-06):有真实市场比分盘时,展示分布(主选/次选)直接 de-vig 市场盘,
+  //   而非 DC 估算(市场盘更准,见 feedback_fetch_all_then_audit)。无市场盘则 enrich 退回 DC 矩阵。
+  const marketDistribution = devigScoreDistribution(snapshot);
+  return { primary, secondary, wldConsistent, wldConsistentSecondary, globalMode, globalModeSecondary, source, marketDistribution };
 }
 
 // 半全场预测优先级同上:市场比分赔率 → DC/λ 泊松半场联合分布(halfFullFromDcResult 从 expectedGoals 真算)。
@@ -1310,7 +1313,8 @@ function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities 
   return {
     primary: primaryFromMarket ?? primaryFromDc ?? halfFullFromDcResult(dcResult, code, new Set(), primaryScore, league),
     secondary: secondaryFromMarket ?? secondaryFromDc ?? halfFullFromDcResult(dcResult, secondaryCode, new Set(), secondaryScore, league),
-    source
+    source,
+    marketDistribution: devigHalfFullDistribution(snapshot), // 有真实市场半全场盘→主选/次选用市场分布(含平局走势)
   };
 }
 
@@ -1324,7 +1328,8 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   scorePicks.wldConsistentSecondaryProbability = scoreProbFromMatrix(matrix, scorePicks.wldConsistentSecondary);
   // 最可能单一比分(全矩阵众数,可含平局)概率——供"均势最高 1-1 (13%)"披露小字
   scorePicks.globalModeProbability = scoreProbFromMatrix(matrix, scorePicks.globalMode);
-  scorePicks.distribution = topScoresWithProb(matrix, 8); // 2026-06-01 5→8:均势客胜场客胜比分概率分散,Top5 常只够 1 个 wld 一致比分(治"保黑只显示 0-1"),取 8 让各方向都凑得齐 Top3
+  // 有真实市场比分盘→用市场 de-vig 分布(主选/次选含平局如 1-1,准过 DC);无→退回 DC 矩阵。
+  scorePicks.distribution = scorePicks.marketDistribution ?? topScoresWithProb(matrix, 8); // 2026-06-01 5→8:均势客胜场客胜比分概率分散,Top5 常只够 1 个 wld 一致比分(治"保黑只显示 0-1"),取 8 让各方向都凑得齐 Top3
   const eg = scoreModel?.expectedGoals;
   // 半全场联合分布(2026-05-31 升级,walk-forward 回测最优:τ低分修正+拟合半场比例+状态依赖 chase=0.18,
   //   LogLoss 1.9069→1.9039 / Brier 0.8136→0.8129;参数见 halftime-fulltime-model.HF_DEFAULTS)。
@@ -1335,7 +1340,7 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   halfFullPicks.secondaryProbability = hfDist?.[halfFullPicks.secondary] != null ? round(hfDist[halfFullPicks.secondary]) : null;
   // 主方向内的反超/不同首半场备选(如主胜场的"平局-主胜"慢热反超),挖出被单 argmax 埋没的二线路径
   halfFullPicks.primaryAlt = bestDistinctFirstHalfHalfFull(hfDist, primaryCode, halfFullPicks.primary);
-  halfFullPicks.distribution = topHalfFull(hfDist, 4);
+  halfFullPicks.distribution = halfFullPicks.marketDistribution ?? topHalfFull(hfDist, 4);
   // 2026-06-02 用户:"半全场只能胜胜平平?" —— 半全场首选(primary)锚 FT=wld 保持下注自洽,
   //   但另给"最可能走势"(全 9 类真实众数,可为平局-主胜/平局-平局),让真实走势不被胜负平方向遮住。
   const _tml = topHalfFull(hfDist, 1)[0] ?? null;
@@ -1437,6 +1442,25 @@ function logFact(n) {
   let v = 0;
   for (let i = 2; i <= n; i++) v += Math.log(i);
   return v;
+}
+
+// 市场比分盘 de-vig → 概率分布(2026-06-06 用户铁律"用真盘不用估算")。占位/模板盘丢弃→返回 null 退回 DC。
+function devigScoreDistribution(snapshot) {
+  const rows = isScoreTopTemplate(snapshot?.scoreOdds?.top) ? [] : (snapshot?.scoreOdds?.top ?? []);
+  const inv = rows.map((r) => ({ score: String(r.score ?? "").replace(":", "-").trim(), p: 1 / Number(r.odds) }))
+    .filter((x) => x.score && Number.isFinite(x.p) && x.p > 0);
+  const sum = inv.reduce((a, b) => a + b.p, 0);
+  if (sum <= 0) return null;
+  return inv.map((x) => ({ score: x.score, probability: x.p / sum })).sort((a, b) => b.probability - a.probability);
+}
+// 市场半全场盘 de-vig → 概率分布。
+function devigHalfFullDistribution(snapshot) {
+  const rows = isHalfFullTopTemplate(snapshot?.halfFullOdds?.top) ? [] : (snapshot?.halfFullOdds?.top ?? []);
+  const inv = rows.map((r) => ({ halfFull: normalizeHalfFull(r.halfFull), p: 1 / Number(r.odds) }))
+    .filter((x) => x.halfFull && Number.isFinite(x.p) && x.p > 0);
+  const sum = inv.reduce((a, b) => a + b.p, 0);
+  if (sum <= 0) return null;
+  return inv.map((x) => ({ halfFull: x.halfFull, probability: x.p / sum })).sort((a, b) => b.probability - a.probability);
 }
 
 function scoreFromMarket(snapshot, code, excluded = new Set()) {

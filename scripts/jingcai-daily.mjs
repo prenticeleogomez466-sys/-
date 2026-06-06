@@ -59,6 +59,15 @@ if (afterCrawl.fixtures.filter((f) => f.marketType === "shengfucai").length === 
 const { captures, asian } = loadScrapeFile(date);
 const staged = stageJingcaiIntoStore(date, captures, asian);
 
+// 2b) 全赔种抓取 + 数据完整性审计(2026-06-06 用户永久铁律"必须全部抓取·抓完审计再走下一步"):
+//     注入 比分/半全场/总进球 真实市场盘(500.com XML)→ findMarketSnapshot 合并入快照,
+//     让模型用真盘而非 DC 估算(减小偏差)。失败不阻断(已有胜平负/让球仍可出),但审计行会标缺。
+{
+  const ing = spawnSync("node", [join(dirname(fileURLToPath(import.meta.url)), "ingest-500-jingcai-fallback.mjs"), `--date=${date}`], { encoding: "utf8", timeout: 180000 });
+  if (ing.stderr) process.stderr.write(ing.stderr.split("\n").filter((l) => /审计|全赔种|缺口|全覆盖|赔率一致性/.test(l)).join("\n") + "\n");
+  if (ing.status !== 0) console.error("⚠️ 全赔种抓取非0退出,比分/半全场可能退回DC估算(已标源)");
+}
+
 // 3) 出推荐包(skip 闸门:竞彩官方源不可达,数据来自 500.com 兜底)
 const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
 
