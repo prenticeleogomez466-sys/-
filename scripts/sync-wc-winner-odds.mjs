@@ -67,4 +67,32 @@ for (const [zh, t] of Object.entries(tp.teams)) {
 tp._title_odds_source = `The Odds API outright (${book.title}, ${book.last_update ?? "?"})`;
 if (!DRY) writeFileSync(TP_FILE, JSON.stringify(tp, null, 1));
 console.log(`源:${book.title} | 更新 title_odds ${updated} 队${DRY ? "(--dry未写)" : ""} | 未匹配 ${unmatched.length}:${unmatched.slice(0, 8).join("、")}${unmatched.length > 8 ? "…" : ""}`);
-console.log("下一步:重跑 node scripts/run-worldcup-supercomputer.mjs --json --xlsx 即用实时夺冠盘融合。");
+
+// ── 漂移追踪(融进同一脉搏):去vig夺冠率快照入史 + 对比上一快照报"被加注/退烧"。 ──
+// 真 edge=速度/CLV(市场往哪移),非命中率。每日拉盘自然积累,异动=锐钱方向。
+const HIST = "D:/football-model-data/world-cup/wc-winner-history.json";
+const en2zh = Object.fromEntries(Object.entries(tp.teams).map(([zh, t]) => [t.en, zh]));
+const sum = outcomes.reduce((s, o) => s + (o.price > 1 ? 1 / o.price : 0), 0) || 1;
+const probs = {};
+for (const o of outcomes) { const zh = en2zh[o.name] ?? en2zh[ALIAS[o.name]] ?? o.name; if (o.price > 1) probs[zh] = (1 / o.price) / sum; }
+const stamp = String(book.last_update ?? "").slice(0, 10) || "unknown";
+const hist = existsSync(HIST) ? JSON.parse(readFileSync(HIST, "utf8")) : [];
+const prev = hist.filter((h) => h.date !== stamp).at(-1) ?? null; // 上一不同日快照
+const idx = hist.findIndex((h) => h.date === stamp);
+const snap = { date: stamp, source: book.title, probs };
+if (idx >= 0) hist[idx] = snap; else hist.push(snap);
+if (!DRY) writeFileSync(HIST, JSON.stringify(hist.slice(-60), null, 1));
+
+if (prev) {
+  const movers = Object.keys(probs)
+    .map((zh) => ({ zh, now: probs[zh], was: prev.probs[zh] ?? null }))
+    .filter((m) => m.was != null && (m.now >= 0.01 || m.was >= 0.01))
+    .map((m) => ({ ...m, d: m.now - m.was }))
+    .sort((a, b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 6);
+  console.log(`\n夺冠盘漂移(vs ${prev.date}):`);
+  for (const m of movers) {
+    const dpp = (m.d * 100); const tag = dpp > 0.15 ? "📈被加注" : dpp < -0.15 ? "📉退烧" : "≈持平";
+    console.log(`  ${m.zh.padEnd(8)} ${(m.was*100).toFixed(1)}% → ${(m.now*100).toFixed(1)}%  (${dpp>=0?"+":""}${dpp.toFixed(1)}pp) ${tag}`);
+  }
+} else console.log(`\n夺冠盘漂移:首个快照(${stamp})已入史,下次拉盘起对比。`);
+console.log("\n下一步:重跑 node scripts/run-worldcup-supercomputer.mjs --json --xlsx 即用实时夺冠盘融合。");
