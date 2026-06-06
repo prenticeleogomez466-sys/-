@@ -422,21 +422,27 @@ export function simpleHandicapCell(prediction) {
   return v.lineStr ? `${head}（${v.lineStr}）` : head;
 }
 
-// 比分极简格:与胜负平方向一致的最可能比分(单一,不堆备选)。
+// 比分极简格(2026-06-06 用户要主选+副选):与胜负平方向一致的最可能比分 + 次可能比分,均带%。
 export function simpleScoreCell(prediction) {
   const sp = prediction.scorePicks ?? {};
-  const score = sp.wldConsistent ?? sp.primary;
-  if (!score) return "—";
-  const p = sp.wldConsistentProbability ?? sp.primaryProbability;
-  return Number.isFinite(p) ? `${score}（${Math.round(p * 100)}%）` : String(score);
+  const pct = (v) => Number.isFinite(v) ? `${Math.round(v * 100)}%` : "";
+  const main = sp.wldConsistent ?? sp.primary;
+  if (!main) return "—";
+  const sub = sp.wldConsistentSecondary ?? sp.secondary;
+  const mainStr = `主选 ${main}${pct(sp.wldConsistentProbability ?? sp.primaryProbability) ? "（" + pct(sp.wldConsistentProbability ?? sp.primaryProbability) + "）" : ""}`;
+  if (!sub || sub === main) return mainStr;
+  return `${mainStr} / 副选 ${sub}${pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) ? "（" + pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) + "）" : ""}`;
 }
 
-// 半全场极简格:终场方向 = wld 的最可能半全场路径(单一)。
+// 半全场极简格(主选+副选):终场方向=wld 的最可能 + 次可能半全场路径,均带%。
 export function simpleHalfFullCell(prediction) {
   const hp = prediction.halfFullPicks ?? {};
   if (!hp.primary) return "—";
-  const p = hp.primaryProbability;
-  return Number.isFinite(p) ? `${hp.primary}（${Math.round(p * 100)}%）` : String(hp.primary);
+  const pct = (v) => Number.isFinite(v) ? `${Math.round(v * 100)}%` : "";
+  const mainStr = `主选 ${hp.primary}${pct(hp.primaryProbability) ? "（" + pct(hp.primaryProbability) + "）" : ""}`;
+  const sub = hp.secondary;
+  if (!sub || sub === hp.primary) return mainStr;
+  return `${mainStr} / 副选 ${sub}${pct(hp.secondaryProbability) ? "（" + pct(hp.secondaryProbability) + "）" : ""}`;
 }
 
 // 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。
