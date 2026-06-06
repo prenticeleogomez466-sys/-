@@ -431,7 +431,7 @@ export function simpleScoreCell(prediction) {
   const sub = sp.wldConsistentSecondary ?? sp.secondary;
   const mainStr = `主选 ${main}${pct(sp.wldConsistentProbability ?? sp.primaryProbability) ? "（" + pct(sp.wldConsistentProbability ?? sp.primaryProbability) + "）" : ""}`;
   if (!sub || sub === main) return mainStr;
-  return `${mainStr} / 副选 ${sub}${pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) ? "（" + pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) + "）" : ""}`;
+  return `${mainStr} / 次选 ${sub}${pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) ? "（" + pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) + "）" : ""}`;
 }
 
 // 半全场极简格(主选+副选):终场方向=wld 的最可能 + 次可能半全场路径,均带%。
@@ -442,7 +442,7 @@ export function simpleHalfFullCell(prediction) {
   const mainStr = `主选 ${hp.primary}${pct(hp.primaryProbability) ? "（" + pct(hp.primaryProbability) + "）" : ""}`;
   const sub = hp.secondary;
   if (!sub || sub === hp.primary) return mainStr;
-  return `${mainStr} / 副选 ${sub}${pct(hp.secondaryProbability) ? "（" + pct(hp.secondaryProbability) + "）" : ""}`;
+  return `${mainStr} / 次选 ${sub}${pct(hp.secondaryProbability) ? "（" + pct(hp.secondaryProbability) + "）" : ""}`;
 }
 
 // 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。
