@@ -48,6 +48,7 @@ import { synthesizeScenario, scenarioNarrative } from "./scenario-synthesizer.js
 import { leagueExpertFromFitted } from "./league-expert-mixture.js";
 import { multimodalAnalysis, summarizeMultimodal } from "./multimodal-collab.js";
 import { isScoreTopTemplate, isHalfFullTopTemplate } from "./odds-authenticity.js";
+import { loadTeamProfiles, profileForFixture } from "./team-profile.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -141,12 +142,17 @@ export function recommendFixtures(date) {
   //   各自给胜平负判断 → 本层做 分流×对比×裁决,挂到每场 prediction.multimodal。
   //   严守硬规则:只读已算好的真实中间量、以 wld 为锚不改方向、分歧只下调信心不弃赛、缺数据 available:false。
   const deepCtxLayer = advancedData?.layers?.deepContext?.fixtureData ?? {};
+  // 球队画像层(2026-06-06):全联赛每队攻防/主客场/状态(近~2季 fixture-store),+ 主客场"市场存疑"识别。
+  //   情景/避坑展示用,不驱动 wld 概率(回测铁证:画像叠加市场不提命中)。样本不足队=null(标缺)。
+  let teamProfiles = null;
+  try { teamProfiles = loadTeamProfiles({ recentSeasonsFrom: seasonLookback(fixtureSet.date) }); } catch { teamProfiles = null; }
   for (const p of predictions) {
     // 传入已加载的历史比赛库(上方 loadHistoricalResults)→ 附 H2H/近期 历史小模型(稀疏则 available:false)。
     try { p.multimodal = multimodalAnalysis(p, { history }); } catch { p.multimodal = null; }
     // 深度情景层(2026-06-06):ESPN 真实开赛时间/近5状态/H2H/近期交锋。情景展示用,不改 wld 概率方向。
     //   无该场数据=null(标缺不兜底),展示层据此标"未取到"。
     p.deepContext = deepCtxLayer[p.fixture?.id] ?? null;
+    try { p.teamProfile = teamProfiles ? profileForFixture(p.fixture, teamProfiles) : null; } catch { p.teamProfile = null; }
   }
   const multimodalSummary = summarizeMultimodal(predictions);
   return {
@@ -351,6 +357,13 @@ function fixtureIdentityKey(fixture) {
 
 function canonicalTeamName(value) {
   return canonicalTeamNameFromTable(value);
+}
+
+// 画像窗口:取运行日约2年前作"近2季"画像下限(不时间衰减,用近期反映当前实力;无效日期回退null=全量)。
+function seasonLookback(date) {
+  const m = String(date ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return `${Number(m[1]) - 2}-${m[2]}-${m[3]}`;
 }
 
 // 物理 λ 闸(永久铁律配套):正常足球单队期望进球 0.3~2.5、合计 1.5~3.5;>3.5/队 或 合计>5.0

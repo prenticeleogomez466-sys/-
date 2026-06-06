@@ -372,7 +372,20 @@ function buildHalfFullCandidates(prediction) {
 //   明细/审计/复盘/健康等 13 张表移到「神选-内部核验-{date}.xlsx」,不丢、供核验。
 // ============================================================================
 function simpleJingcaiHeaders() {
-  return ["开赛", "对阵", "胜负平", "让胜负平", "比分", "半全场", "近5场", "H2H交锋", "信心"];
+  return ["开赛", "对阵", "胜负平", "让胜负平", "比分", "半全场", "近5场", "H2H交锋", "实力·主客场画像", "信心"];
+}
+
+// 实力画像单元(2026-06-06):主队主场实力 vs 客队客场实力 + 市场存疑标。无画像="未取到"(标缺)。
+function dcProfile(prediction) {
+  const tp = prediction.teamProfile;
+  if (!tp || (!tp.home && !tp.away)) return "未取到";
+  const h = tp.home, a = tp.away;
+  const parts = [];
+  if (h) parts.push(`主综合${h.ppg}(主场${h.homePpg ?? "—"})`);
+  if (a) parts.push(`客综合${a.ppg}(客场${a.awayPpg ?? "—"})`);
+  let s = parts.join(" / ");
+  if (tp.edge?.marketWatch) s += `\n⚠市场存疑:${tp.edge.note}`;
+  return s || "未取到";
 }
 
 // 深度情景单元(2026-06-06):优先用 ESPN 真实开赛时间;近5状态/H2H/近期交锋来自 deepContext。
@@ -462,6 +475,7 @@ function toSimpleJingcaiRow(prediction) {
     simpleHalfFullCell(prediction),          // 半全场(终场=胜负平方向)
     dcForm(prediction),                      // 近5场状态(ESPN真实,无=未取到)
     dcH2h(prediction),                       // H2H交锋 + 近期交锋线索
+    dcProfile(prediction),                   // 实力·主客场画像 + 市场存疑标
     simpleConfidenceCell(prediction)         // 信心 · 分级
   ];
 }
