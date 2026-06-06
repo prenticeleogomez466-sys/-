@@ -381,8 +381,10 @@ function dcProfile(prediction) {
   if (!tp || (!tp.home && !tp.away)) return "未取到";
   const h = tp.home, a = tp.away;
   const parts = [];
-  if (h) parts.push(`主综合${h.ppg}(主场${h.homePpg ?? "—"})`);
-  if (a) parts.push(`客综合${a.ppg}(客场${a.awayPpg ?? "—"})`);
+  // 永久铁律:ppg=0(薄样本/全负噪声,多见国家队混合历史)=不可信→标缺不摆 0 脏数据。
+  if (h && h.ppg > 0) parts.push(`主综合${h.ppg}(主场${h.homePpg ?? "—"})`);
+  if (a && a.ppg > 0) parts.push(`客综合${a.ppg}(客场${a.awayPpg ?? "—"})`);
+  if (!parts.length) return "未取到";
   let s = parts.join(" / ");
   if (tp.edge?.marketWatch) s += `\n⚠市场存疑:${tp.edge.note}`;
   return s || "未取到";
