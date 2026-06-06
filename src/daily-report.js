@@ -414,41 +414,37 @@ function dcH2h(prediction) {
   return parts.length ? parts.join(" · ") : "无记录";
 }
 
-// 让胜负平极简格(2026-06-06 用户要主选/次选·不带概率):让球后 主胜/走盘/客胜 取前二方向。
+// 让胜负平极简格(2026-06-06 二次修正·方向统一):铁律让球方向跟随胜负平(feedback_wld_anchor_inference),
+//   不独立重排。主选/次选 = 胜负平主选/次选方向直接映射让球标签(同序),保证四市场完美同向。不带概率。
 export function simpleHandicapCell(prediction) {
   const v = coherentHandicapView(prediction);
   if (!v) return "—";
   const line = v.lineStr ? `（${v.lineStr}）` : "";
-  const items = [...String(v.detail ?? "").matchAll(/(让主|走盘|让客)\s*(\d+)%/g)]
-    .map((m) => ({ d: { "让主": "让球主胜", "走盘": "走盘", "让客": "让球客胜" }[m[1]], p: +m[2] }))
-    .sort((a, b) => b.p - a.p);
-  if (items.length >= 2) return `主选 ${items[0].d} / 次选 ${items[1].d}${line}`;
+  const lbl = (c) => (c === "3" ? "让球主胜" : c === "0" ? "让球客胜" : "走盘");
+  const p = prediction.probabilities ?? {};
+  const order = [["3", p.home], ["1", p.draw], ["0", p.away]]
+    .filter(([, x]) => Number.isFinite(x)).sort((a, b) => b[1] - a[1]);
+  if (order.length >= 2) return `主选 ${lbl(order[0][0])} / 次选 ${lbl(order[1][0])}${line}`;
   return `${String(v.headline ?? "").replace(/\s*\d+%.*$/, "").trim()}${line}`;
 }
 
-// 比分极简格(2026-06-06 用户:不带概率·要考虑平局):用真实全矩阵分布取前二最可能比分(含1-1/0-0等平局,
-//   日职小球易平→平局比分常居首)。不再锁胜负平方向(比分是独立格子,见 feedback_wld_anchor_inference)。
+// 比分极简格(2026-06-06 二次修正·方向统一):用户指出比分/半全场与胜负平方向打架不知信哪个→
+//   恢复"四市场同向":比分主选=与胜负平主选同向的最可能比分(真市场盘 scoreFromMarket 出),
+//   次选=与胜负平次选同向的比分。平局由"胜负平本身敢选平/双选"体现,不让比分擅自跳平。不带概率。
 export function simpleScoreCell(prediction) {
   const sp = prediction.scorePicks ?? {};
-  const dist = Array.isArray(sp.distribution) ? [...sp.distribution].sort((a, b) => b.probability - a.probability) : [];
-  if (dist.length >= 2) {
-    const a = String(dist[0].score).trim(), b = String(dist[1].score).trim();
-    return b && b !== a ? `主选 ${a} / 次选 ${b}` : `主选 ${a}`;
-  }
-  const main = sp.primary ?? sp.wldConsistent;
-  return main ? `主选 ${main}` : "—";
+  const main = sp.wldConsistent ?? sp.primary;
+  if (!main) return "—";
+  const sub = sp.wldConsistentSecondary ?? sp.secondary;
+  return sub && sub !== main ? `主选 ${main} / 次选 ${sub}` : `主选 ${main}`;
 }
 
-// 半全场极简格(2026-06-06 用户:不带概率·要考虑平局):用真实9类联合分布取前二(含平局-平局/平局-客胜/
-//   主胜-平局等,日职半场常平→平局走势常居前)。不再锁 wld 终场方向。
+// 半全场极简格(方向统一):主选=与胜负平主选同向的半全场路径(真市场盘),次选=次选同向。平局由胜负平体现。
 export function simpleHalfFullCell(prediction) {
   const hp = prediction.halfFullPicks ?? {};
-  const dist = Array.isArray(hp.distribution) ? [...hp.distribution].sort((a, b) => b.probability - a.probability) : [];
-  if (dist.length >= 2) {
-    const a = String(dist[0].halfFull).trim(), b = String(dist[1].halfFull).trim();
-    return b && b !== a ? `主选 ${a} / 次选 ${b}` : `主选 ${a}`;
-  }
-  return hp.primary ? `主选 ${hp.primary}` : "—";
+  if (!hp.primary) return "—";
+  const sub = hp.secondary;
+  return sub && sub !== hp.primary ? `主选 ${hp.primary} / 次选 ${sub}` : `主选 ${hp.primary}`;
 }
 
 // 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。
