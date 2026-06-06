@@ -349,6 +349,14 @@ function canonicalTeamName(value) {
   return canonicalTeamNameFromTable(value);
 }
 
+// 物理 λ 闸(永久铁律配套):正常足球单队期望进球 0.3~2.5、合计 1.5~3.5;>3.5/队 或 合计>5.0
+//   几乎必是薄样本拟合垃圾,判不可信(返回 false)。缺值也判不可信(不臆断)。
+export function isPhysicalLambda(expectedGoals) {
+  const h = Number(expectedGoals?.home), a = Number(expectedGoals?.away);
+  if (!Number.isFinite(h) || !Number.isFinite(a)) return false;
+  return h <= 3.5 && a <= 3.5 && (h + a) <= 5.0;
+}
+
 export function predictFixture(fixture, marketSnapshots = [], index = 0, options = {}) {
   const snapshot = findMarketSnapshot(fixture, marketSnapshots);
   const oddsProbabilities = snapshot?.europeanOdds?.current ? probabilitiesFromOdds(snapshot.europeanOdds.current) : null;
@@ -357,6 +365,13 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const _ouLineHint = Number(snapshot?.totalGoals?.current?.line ?? snapshot?.totalGoals?.initial?.line ?? 2.55);
   const _marketHints = Number.isFinite(_asianLineHint) ? { asianLine: _asianLineHint, overUnderLine: _ouLineHint } : null;
   let dcResult = options.dixonColesFitted ? predictFromFitted(options.dixonColesFitted, fixture, _marketHints) : null;
+  // 🔴 永久铁律·最高指令(2026-06-06 用户投真钱定:「绝不用不可信/缺失数据兜底」):
+  //   DC 拟合对薄样本/高方差队(国际赛友谊为甚)会产出不物理的 λ(如斯洛伐克 λ主5.75=单队进5.75球、
+  //   总7球),这种垃圾值占 35% 混合权重会污染该场比分/大小球。识别并丢弃 → 下游自动退国家队 Elo
+  //   (λ 更稳)或纯市场赔率,绝不混不可信值。物理界:单队 λ≤3.5 且 两队合计≤5.0(正常足球 1.5~3.5 球)。
+  if (dcResult?.expectedGoals && !isPhysicalLambda(dcResult.expectedGoals)) {
+    dcResult = null;
+  }
   // 国家队 Elo 兜底(2026-06-01):历史库无该国家队(俱乐部源不含国家队友谊/资格赛)→ dcResult=null
   //   → 原退回纯 odds-only(无模型视角、无比分/半全场真矩阵)。改:两队都有国家队 Elo 时,用 Elo 差转
   //   期望进球 λ 建同款 DC-τ 矩阵作模型先验,使国家队也有 胜平负+比分+半全场。友谊赛信心不夸大(homeAdv 取小)。
