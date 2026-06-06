@@ -240,7 +240,10 @@ export function computeDoubleChance(ranked, marketImplied = null, env = process.
   const shortCode = kept.map((c) => (c === "3" ? "1" : c === "1" ? "X" : "2")).join(""); // 1X/12/X2
   const pickLabel = kept.map((c) => CODE_LABEL[c]).join("/");
   const band = doubleChanceBand(marketFavProb);
-  const recommended = marketFavProb < 0.65; // 中低档主推双选;强档仍单关(胆码)
+  // 双选触发阈值 0.65→0.70(2026-06-06 复盘偏差修正):286场复盘揭示头号失败=平局盲区
+  //   (主推从不选平、实际25.5%平局全错);270场阈值回测证 0.65→0.70 整体命中 75.2%→77.8%(+2.6pp),
+  //   >0.70 命中持平仅多覆盖降赔率=甜点。放宽让更多均势场主推双选接住平局,直击根因。
+  const recommended = marketFavProb < 0.70; // 中低档主推双选;强档(≥0.70)仍单关(胆码)
   const draw = modelProb.get("1") ?? 0;
   const note = recommended
     ? `市场热门仅${(marketFavProb * 100).toFixed(0)}%·单选命中偏低(回测~${(band.single * 100).toFixed(0)}%) → 建议双选 ${pickLabel}(${shortCode})覆盖,回测命中~${(band.double * 100).toFixed(0)}%`
