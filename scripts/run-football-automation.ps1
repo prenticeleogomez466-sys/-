@@ -144,6 +144,8 @@ function Run-Daily {
   #   否则 venueLambdaMultiplier 一直用旧预报(开赛前会 stale)。AllowFailure:源挂了不阻塞主线。
   Invoke-Step "refresh World Cup weather forecast (16-day window)" "npm run sync:wc-weather" $true
   Invoke-Step "refresh World Cup schedule/match-dates" "npm run sync:wc-schedule" $true
+  #   实时夺冠盘(Betfair outright)刷新 team-priors.title_odds → 超算 blend 原生吃最锐市场信号。
+  Invoke-Step "refresh World Cup winner outright odds" "npm run sync:wc-winner" $true
   Invoke-Step "strict data completeness check" "npm run standard:check -- --date=$Date"
   if ($AllowMissingOdds) {
     Invoke-Step "build offline daily xlsx" "npm run daily:no-web -- --date $Date"
