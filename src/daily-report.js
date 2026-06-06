@@ -467,10 +467,11 @@ export function simpleWldCell(prediction) {
   if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
   const pct = (v) => `${Math.round(v * 100)}%`;
   const main = `主选 ${outcomeCodeToChinese(arr[0][0])}${pct(arr[0][1])}`;
-  const sub = `副选 ${outcomeCodeToChinese(arr[1][0])}${pct(arr[1][1])}`;
-  const dc = prediction.doubleChance;
-  const hint = (dc?.recommended && dc.pick) ? `（主推双选 ${dc.pick}）` : "";
-  return `${flag}${main} / ${sub}${hint}`;
+  const sub = `次选 ${outcomeCodeToChinese(arr[1][0])}${pct(arr[1][1])}`;
+  // 平局永不忽略(2026-06-06 用户):平局不在前二时,把它的概率显式附后,避免平局盲区藏住平局。
+  const drawShown = arr.slice(0, 2).some(([c]) => c === "1");
+  const drawTail = (!drawShown && Number.isFinite(p.draw)) ? ` · 平${pct(p.draw)}` : "";
+  return `${flag}${main} / ${sub}${drawTail}`;
 }
 
 function toSimpleJingcaiRow(prediction) {

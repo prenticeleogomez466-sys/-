@@ -77,11 +77,10 @@ describe("极简表四列方向一致性不变量(simple-table-coherence)", () =
     assert.match(simpleWldCell(p), /未开售/);
   });
 
-  it("中低档双选升级(doubleChance.recommended)→ 胜负平显示双选但仍含主推方向", () => {
-    const p = makePrediction("0");
-    p.doubleChance = { recommended: true, pick: "平局/客胜", shortCode: "X2" };
+  it("胜负平给主选+次选,主选方向与比分/半全场同向(客胜场)", () => {
+    const p = makePrediction("0"); // away 0.55 highest
     const cell = simpleWldCell(p);
-    assert.match(cell, /双选/);
-    assert.match(cell, /客胜/); // 主推方向仍在,和比分/半全场同向
+    assert.match(cell, /主选\s*客胜/); // 主选=最高概率方向=客胜,与比分/半全场同源
+    assert.match(cell, /次选/);
   });
 });
