@@ -16,8 +16,10 @@ import {
 //   胜负平格现为"主选 X% / 副选 Y%"双向→只取主选那段判方向(主选=与比分/半全场同源)。
 function dirOfText(t) {
   let s = String(t);
-  const mainSeg = s.match(/主选\s*(主胜|平局|客胜)/);
+  // 胜负平/让球格现为"主选 X / 次选 Y"→只取主选段判方向(让球:让球主胜/走盘/让球客胜;胜负平:主胜/平局/客胜)。
+  const mainSeg = s.match(/主选\s*(让球主胜|让球客胜|走盘|主胜|平局|客胜)/);
   if (mainSeg) s = mainSeg[1];
+  if (s === "走盘") return "draw";
   if (s.includes("主胜")) return "home";
   if (s.includes("客胜")) return "away";
   if (s.includes("平局") || s.includes("走盘") || /(^|[^胜])平([^负]|$)/.test(s)) return "draw";

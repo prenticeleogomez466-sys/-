@@ -414,35 +414,41 @@ function dcH2h(prediction) {
   return parts.length ? parts.join(" · ") : "无记录";
 }
 
-// 让胜负平极简格:头条方向 + 让球线,复用 coherentHandicapView(恒与 wld 同向)。
+// 让胜负平极简格(2026-06-06 用户要主选/次选·不带概率):让球后 主胜/走盘/客胜 取前二方向。
 export function simpleHandicapCell(prediction) {
   const v = coherentHandicapView(prediction);
   if (!v) return "—";
-  const head = String(v.headline ?? "").trim();
-  return v.lineStr ? `${head}（${v.lineStr}）` : head;
+  const line = v.lineStr ? `（${v.lineStr}）` : "";
+  const items = [...String(v.detail ?? "").matchAll(/(让主|走盘|让客)\s*(\d+)%/g)]
+    .map((m) => ({ d: { "让主": "让球主胜", "走盘": "走盘", "让客": "让球客胜" }[m[1]], p: +m[2] }))
+    .sort((a, b) => b.p - a.p);
+  if (items.length >= 2) return `主选 ${items[0].d} / 次选 ${items[1].d}${line}`;
+  return `${String(v.headline ?? "").replace(/\s*\d+%.*$/, "").trim()}${line}`;
 }
 
-// 比分极简格(2026-06-06 用户要主选+副选):与胜负平方向一致的最可能比分 + 次可能比分,均带%。
+// 比分极简格(2026-06-06 用户:不带概率·要考虑平局):用真实全矩阵分布取前二最可能比分(含1-1/0-0等平局,
+//   日职小球易平→平局比分常居首)。不再锁胜负平方向(比分是独立格子,见 feedback_wld_anchor_inference)。
 export function simpleScoreCell(prediction) {
   const sp = prediction.scorePicks ?? {};
-  const pct = (v) => Number.isFinite(v) ? `${Math.round(v * 100)}%` : "";
-  const main = sp.wldConsistent ?? sp.primary;
-  if (!main) return "—";
-  const sub = sp.wldConsistentSecondary ?? sp.secondary;
-  const mainStr = `主选 ${main}${pct(sp.wldConsistentProbability ?? sp.primaryProbability) ? "（" + pct(sp.wldConsistentProbability ?? sp.primaryProbability) + "）" : ""}`;
-  if (!sub || sub === main) return mainStr;
-  return `${mainStr} / 次选 ${sub}${pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) ? "（" + pct(sp.wldConsistentSecondaryProbability ?? sp.secondaryProbability) + "）" : ""}`;
+  const dist = Array.isArray(sp.distribution) ? [...sp.distribution].sort((a, b) => b.probability - a.probability) : [];
+  if (dist.length >= 2) {
+    const a = String(dist[0].score).trim(), b = String(dist[1].score).trim();
+    return b && b !== a ? `主选 ${a} / 次选 ${b}` : `主选 ${a}`;
+  }
+  const main = sp.primary ?? sp.wldConsistent;
+  return main ? `主选 ${main}` : "—";
 }
 
-// 半全场极简格(主选+副选):终场方向=wld 的最可能 + 次可能半全场路径,均带%。
+// 半全场极简格(2026-06-06 用户:不带概率·要考虑平局):用真实9类联合分布取前二(含平局-平局/平局-客胜/
+//   主胜-平局等,日职半场常平→平局走势常居前)。不再锁 wld 终场方向。
 export function simpleHalfFullCell(prediction) {
   const hp = prediction.halfFullPicks ?? {};
-  if (!hp.primary) return "—";
-  const pct = (v) => Number.isFinite(v) ? `${Math.round(v * 100)}%` : "";
-  const mainStr = `主选 ${hp.primary}${pct(hp.primaryProbability) ? "（" + pct(hp.primaryProbability) + "）" : ""}`;
-  const sub = hp.secondary;
-  if (!sub || sub === hp.primary) return mainStr;
-  return `${mainStr} / 次选 ${sub}${pct(hp.secondaryProbability) ? "（" + pct(hp.secondaryProbability) + "）" : ""}`;
+  const dist = Array.isArray(hp.distribution) ? [...hp.distribution].sort((a, b) => b.probability - a.probability) : [];
+  if (dist.length >= 2) {
+    const a = String(dist[0].halfFull).trim(), b = String(dist[1].halfFull).trim();
+    return b && b !== a ? `主选 ${a} / 次选 ${b}` : `主选 ${a}`;
+  }
+  return hp.primary ? `主选 ${hp.primary}` : "—";
 }
 
 // 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。
@@ -465,13 +471,8 @@ export function simpleWldCell(prediction) {
   const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
     .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
   if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
-  const pct = (v) => `${Math.round(v * 100)}%`;
-  const main = `主选 ${outcomeCodeToChinese(arr[0][0])}${pct(arr[0][1])}`;
-  const sub = `次选 ${outcomeCodeToChinese(arr[1][0])}${pct(arr[1][1])}`;
-  // 平局永不忽略(2026-06-06 用户):平局不在前二时,把它的概率显式附后,避免平局盲区藏住平局。
-  const drawShown = arr.slice(0, 2).some(([c]) => c === "1");
-  const drawTail = (!drawShown && Number.isFinite(p.draw)) ? ` · 平${pct(p.draw)}` : "";
-  return `${flag}${main} / ${sub}${drawTail}`;
+  // 主选+次选,不带概率(2026-06-06 用户)。平局若是前二则自然显示;否则在比分(1-1)/半全场(平-平)里体现。
+  return `${flag}主选 ${outcomeCodeToChinese(arr[0][0])} / 次选 ${outcomeCodeToChinese(arr[1][0])}`;
 }
 
 function toSimpleJingcaiRow(prediction) {
