@@ -763,6 +763,10 @@ function toLedgerRow(prediction) {
     scoreSecondary: prediction.scorePicks.secondary,
     // 全矩阵真实众数(可含平局,头条已改为方向一致比分)——复盘覆盖口径纳入,保住高频比分命中率不回退。
     scoreMode: prediction.scorePicks.globalMode ?? null,
+    // 来源标记(2026-06-06 闭环纪律):记下比分/半全场用的是真市场盘(market)还是DC估算→
+    //   复盘可按来源分桶对比命中率,客观验证"用真盘是否真提命中"。见 feedback_fetch_all_then_audit。
+    scoreSource: prediction.scorePicks.source ?? null,
+    halfFullSource: prediction.halfFullPicks.source ?? null,
     halfFullPrimary: prediction.halfFullPicks.primary,
     halfFullSecondary: prediction.halfFullPicks.secondary,
     // 让球胜平负(2026-05-31 复盘需求):记下让球玩法预测 + 让球线,结算时按比分算实际让球结果对比。

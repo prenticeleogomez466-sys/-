@@ -188,6 +188,11 @@ function buildRecapSummary(date, rows, syncResults) {
   const doubleChanceAll = rate(dcSettled, (row) => row.doubleChanceHit === true);
   const dcRecommended = dcSettled.filter((row) => row.doubleChanceRecommended === true);
   const doubleChanceRecommended = rate(dcRecommended, (row) => row.doubleChanceHit === true);
+  // 比分/半全场 按来源分桶(2026-06-06 闭环纪律):真市场盘(market) vs DC估算,客观验证用真盘是否提命中。
+  const scoreByMarket = rate(settled.filter((r) => r.scoreSource === "market"), (r) => r.scoreHit === true);
+  const scoreByDc = rate(settled.filter((r) => r.scoreSource && r.scoreSource !== "market"), (r) => r.scoreHit === true);
+  const halfFullByMarket = rate(halfFullSettled.filter((r) => r.halfFullSource === "market"), (r) => r.halfFullHit === true);
+  const halfFullByDc = rate(halfFullSettled.filter((r) => r.halfFullSource && r.halfFullSource !== "market"), (r) => r.halfFullHit === true);
   // CLV:分析师建议的真 KPI —— 下注价 vs 收盘线,衡量是否长期击败市场(比短期命中率更可靠)。
   const clv = summarizeLedgerCLV(settled);
   // 下注分级真实命中率:验证🟢建议下注场是否真命中~73%(选择性推荐落地的反馈环)。
@@ -201,8 +206,12 @@ function buildRecapSummary(date, rows, syncResults) {
     winDrawLossCover: wdlCover,
     scorePrimary,
     scoreCover,
+    scoreByMarket,
+    scoreByDc,
     halfFullPrimary,
     halfFullCover,
+    halfFullByMarket,
+    halfFullByDc,
     doubleChanceAll,
     doubleChanceRecommended,
     clv,
