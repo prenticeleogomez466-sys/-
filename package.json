@@ -147,7 +147,8 @@
     "backtest:jleague-levers": "node scripts/backtest-jleague-levers.mjs",
     "mine:jleague": "node scripts/mine-jleague-profiles.mjs",
     "backtest:jleague-homeaway": "node scripts/backtest-jleague-homeaway.mjs",
-    "capture:closing-live": "node scripts/capture-closing-live.mjs"
+    "capture:closing-live": "node scripts/capture-closing-live.mjs",
+    "backtest:jleague-cal": "node scripts/backtest-jleague-calibration.mjs"
   },
   "engines": {
     "node": ">=20"
