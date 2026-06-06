@@ -47,6 +47,7 @@ import { analyzeMatch } from "./match-archetype-analyzer.js";
 import { synthesizeScenario, scenarioNarrative } from "./scenario-synthesizer.js";
 import { leagueExpertFromFitted } from "./league-expert-mixture.js";
 import { multimodalAnalysis, summarizeMultimodal } from "./multimodal-collab.js";
+import { isScoreTopTemplate, isHalfFullTopTemplate } from "./odds-authenticity.js";
 
 const OUTCOMES = [
   { key: "home", code: "3", label: "主胜" },
@@ -1404,7 +1405,9 @@ function logFact(n) {
 }
 
 function scoreFromMarket(snapshot, code, excluded = new Set()) {
-  const rows = snapshot?.scoreOdds?.top ?? [];
+  // 禁假编(2026-06-07):源给的若是主客对称的占位/模板比分盘(早盘未走盘),不可当真盘驱动,
+  //   丢弃→回退 DC 派生矩阵(odds-authenticity 防线接线,此前该模块是孤儿、防线没生效)。
+  const rows = isScoreTopTemplate(snapshot?.scoreOdds?.top) ? [] : (snapshot?.scoreOdds?.top ?? []);
   return rows
     .map((row) => String(row.score ?? "").replace(":", "-").trim())
     .filter((score) => scoreOutcomeCode(score) === code && !excluded.has(score))
@@ -1412,7 +1415,8 @@ function scoreFromMarket(snapshot, code, excluded = new Set()) {
 }
 
 function halfFullFromMarket(snapshot, code, excluded = new Set(), score = "") {
-  const rows = snapshot?.halfFullOdds?.top ?? [];
+  // 禁假编:占位/模板半全场盘(主客镜像对称)同样丢弃→回退 DC 矩阵。
+  const rows = isHalfFullTopTemplate(snapshot?.halfFullOdds?.top) ? [] : (snapshot?.halfFullOdds?.top ?? []);
   return rows
     .map((row) => normalizeHalfFull(row.halfFull))
     .filter((halfFull) => halfFullFinalOutcomeCode(halfFull) === code && !excluded.has(halfFull))

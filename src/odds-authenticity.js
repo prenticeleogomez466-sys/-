@@ -32,6 +32,48 @@ export function isHalfFullTemplate(bqc) {
   return approxEq(bqc["主主"], bqc["客客"]) && approxEq(bqc["主客"], bqc["客主"]) && approxEq(bqc["主平"], bqc["客平"]);
 }
 
+// ── top 数组版(2026-06-07 接线):管线实际用 snapshot.scoreOdds.top=[{score,odds}] /
+//    halfFullOdds.top=[{halfFull,odds}],不是原始 500 的 bf/bqc map。原模块只认 map 故一直是
+//    孤儿、这道"禁假编"防线没生效。下面按 top 数组判占位:镜像盘(主胜向 vs 客胜向)赔率对称=占位。
+const swapHomeAway = (s) => s === "主胜" ? "客胜" : s === "客胜" ? "主胜" : s; // 平局自镜像
+/** 比分 top 是否占位:score "h-a" 与镜像 "a-h" 赔率≥80%对称(且≥4对镜像)。 */
+export function isScoreTopTemplate(top) {
+  const rows = Array.isArray(top) ? top : Array.isArray(top?.top) ? top.top : [];
+  const odds = new Map();
+  for (const r of rows) {
+    const m = String(r?.score ?? "").replace(":", "-").match(/^(\d+)\s*-\s*(\d+)$/);
+    if (m && Number.isFinite(Number(r.odds))) odds.set(`${m[1]}-${m[2]}`, Number(r.odds));
+  }
+  let pairs = 0, sym = 0, seen = new Set();
+  for (const [k, v] of odds) {
+    const [h, a] = k.split("-");
+    if (h === a) continue;              // 平局比分(1-1)自镜像,跳过
+    const mk = `${a}-${h}`;
+    if (!odds.has(mk) || seen.has(k) || seen.has(mk)) continue;
+    seen.add(k); seen.add(mk); pairs++;
+    if (approxEq(v, odds.get(mk))) sym++;
+  }
+  return pairs >= 4 && sym / pairs >= 0.8;
+}
+/** 半全场 top 是否占位:主胜向 vs 客胜向镜像赔率≥80%对称(且≥3对)。 */
+export function isHalfFullTopTemplate(top) {
+  const rows = Array.isArray(top) ? top : Array.isArray(top?.top) ? top.top : [];
+  const odds = new Map();
+  for (const r of rows) {
+    const hf = String(r?.halfFull ?? "").trim();
+    if (/^(主胜|客胜|平局)-(主胜|客胜|平局)$/.test(hf) && Number.isFinite(Number(r.odds))) odds.set(hf, Number(r.odds));
+  }
+  let pairs = 0, sym = 0, seen = new Set();
+  for (const [k, v] of odds) {
+    const [x, y] = k.split("-");
+    const mk = `${swapHomeAway(x)}-${swapHomeAway(y)}`;
+    if (mk === k || !odds.has(mk) || seen.has(k) || seen.has(mk)) continue; // 平局-平局 等自镜像跳过
+    seen.add(k); seen.add(mk); pairs++;
+    if (approxEq(v, odds.get(mk))) sym++;
+  }
+  return pairs >= 3 && sym / pairs >= 0.8;
+}
+
 /**
  * 综合判定一场抓取的赔率真实性。
  * @returns {{authentic:boolean, templateMarkets:string[], note:string}}
