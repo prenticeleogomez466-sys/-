@@ -140,7 +140,8 @@
     "backtest:rue-salvesen": "node scripts/run-rue-salvesen-backtest.mjs",
     "backtest:dispersion": "node scripts/run-goal-dispersion-backtest.mjs",
     "backtest:corners": "node scripts/run-corners-backtest.mjs",
-    "jingcai:prepare": "node scripts/jingcai-prepare.mjs"
+    "jingcai:prepare": "node scripts/jingcai-prepare.mjs",
+    "backtest:jleague": "node scripts/backtest-jleague-deep.mjs"
   },
   "engines": {
     "node": ">=20"
