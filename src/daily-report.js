@@ -468,7 +468,9 @@ export function simpleWldCell(prediction) {
     .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
   if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
   // 主选+次选,不带概率(2026-06-06 用户)。平局若是前二则自然显示;否则在比分(1-1)/半全场(平-平)里体现。
-  return `${flag}主选 ${outcomeCodeToChinese(arr[0][0])} / 次选 ${outcomeCodeToChinese(arr[1][0])}`;
+  // 客胜信号盲区(2026-06-07,317场复盘):中信心主推客胜实测命中仅30.6%、反向主胜35.6%(模型次选才对)→提示别单押客胜。
+  const weakAway = (prediction.pick?.code === "0" && Number(prediction.confidence) < 60) ? "·客胜信号弱建议双选" : "";
+  return `${flag}主选 ${outcomeCodeToChinese(arr[0][0])} / 次选 ${outcomeCodeToChinese(arr[1][0])}${weakAway}`;
 }
 
 function toSimpleJingcaiRow(prediction) {

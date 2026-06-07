@@ -1614,6 +1614,9 @@ export function buildFourteenPlan(predictions, date = null) {
       // 弱联赛(回测可靠且命中<阈值,如阿甲/墨超~37%)不得当胆 —— 仍可作多选覆盖,
       // 但不被抬成高置信单关(避免把 37% 命中的场押成 6 胆里的一翻车整票完)。
       if (isWeakLeague(item.prediction.fixture?.competition)) return false;
+      // 客胜信号盲区(2026-06-07,317场live复盘):中信心(<60)主推客胜命中仅30.6%、实际35.6%反向主胜
+      //   (模型次选才对)=平局盲区客侧孪生;14场绝不当胆,≥60客胜健康(68.8%)放行。
+      if (item.prediction.pick?.code === "0" && item.prediction.confidence < 60) return false;
       if (item.gap < rules.bankerMinGap) return false;
       if (item.prediction.confidence < rules.bankerMinConfidence) return false;
       return true;
@@ -1795,7 +1798,10 @@ export function buildRenxuan9(source) {
     const isBanker = gap >= 0.22 && prediction.confidence >= 50
                      && prediction.risk !== "高" && singleCode !== "1"
                      && prediction.selectionTier?.bankerEligible === true
-                     && !isWeakLeague(prediction.fixture?.competition);
+                     && !isWeakLeague(prediction.fixture?.competition)
+                     // 客胜信号盲区(2026-06-07,317场live复盘):中信心(<60)主推客胜命中仅30.6%、
+                     //   实际35.6%反向是主胜(模型次选才对)=平局盲区客侧孪生;绝不当胆,≥60客胜健康(68.8%)放行。
+                     && !(singleCode === "0" && prediction.confidence < 60);
     let codes, coverageReason;
     if (isBanker) {
       codes = [singleCode];
