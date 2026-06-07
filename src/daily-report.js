@@ -437,32 +437,42 @@ export function simpleHandicapCell(prediction) {
 //   次选=与胜负平次选同向的比分。平局由"胜负平本身敢选平/双选"体现,不让比分擅自跳平。不带概率。
 export function simpleScoreCell(prediction) {
   const sp = prediction.scorePicks ?? {};
+  const code = prediction.pick?.code;
+  // 多选推荐(2026-06-07 用户要"比分根据方向多选"):从真实市场派生的比分分布里筛「与胜负平同向」的 top3,
+  //   带真实概率。比分 top1 物理天花板~12%(信息瓶颈),单押不可靠→给多个同向候选覆盖,诚实暴露发散度。
+  const sameDir = (s) => { const m = String(s).match(/(\d+)-(\d+)/); if (!m) return false; const h = +m[1], a = +m[2]; return code === "3" ? h > a : code === "0" ? h < a : h === a; };
+  const dist = Array.isArray(sp.marketDistribution) ? sp.marketDistribution : null;
+  if (dist) {
+    const picks = dist.filter((d) => sameDir(d.score)).slice(0, 3);
+    if (picks.length) return picks.map((d) => `${d.score}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
+  }
+  // 兜底:无分布时退方向一致的主选(+次选),仍同向。
   const main = sp.wldConsistent ?? sp.primary;
   if (!main) return "—";
   const sub = sp.wldConsistentSecondary ?? sp.secondary;
-  const base = sub && sub !== main ? `主选 ${main} / 次选 ${sub}` : `主选 ${main}`;
-  // 打破"比分千篇一律"(2026-06-07):比分 top1 物理天花板~12%(信息瓶颈,同半全场),死标签骗不了人。
-  //   带真实概率+可靠度,让相同比分逐场不同、诚实暴露这场比分多难猜(投真钱要知道别重注)。
-  const p = Number(sp.wldConsistentProbability);
-  if (!Number.isFinite(p)) return base;
-  const pct = `${Math.round(p * 100)}%`;
-  const note = p >= 0.15 ? "较集中" : p < 0.09 ? "极发散" : "";
-  return note ? `${base}(${pct}·${note})` : `${base}(${pct})`;
+  return sub && sub !== main ? `${main} / ${sub}` : main;
 }
 
 // 半全场极简格(方向统一):主选=与胜负平主选同向的半全场路径(真市场盘),次选=次选同向。平局由胜负平体现。
 export function simpleHalfFullCell(prediction) {
   const hp = prediction.halfFullPicks ?? {};
   if (!hp.primary) return "—";
+  const code = prediction.pick?.code;
+  const ftDir = code === "3" ? "主胜" : code === "0" ? "客胜" : "平局";
+  // 多选推荐(2026-06-07 用户要"半全场根据方向多选"):取「终场=胜负平方向」的 top3 半全场路径(含 平局-主胜
+  //   这类同终场不同上半场的真实候选),primary 恒排首保证方向清晰;带真实概率,诚实暴露发散度。
+  const dist = Array.isArray(hp.marketDistribution) ? hp.marketDistribution : null;
+  if (dist) {
+    const same = dist.filter((d) => String(d.halfFull).split("-")[1] === ftDir);
+    const ordered = [];
+    const primEntry = same.find((d) => d.halfFull === hp.primary);
+    if (primEntry) ordered.push(primEntry);
+    for (const d of same) { if (d.halfFull !== hp.primary && ordered.length < 3) ordered.push(d); }
+    if (ordered.length) return ordered.map((d) => `${d.halfFull}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
+  }
+  // 兜底:无分布时退方向一致的主选(+次选)。
   const sub = hp.secondary;
-  const base = sub && sub !== hp.primary ? `主选 ${hp.primary} / 次选 ${sub}` : `主选 ${hp.primary}`;
-  // 打破"半全场千篇一律"(2026-06-07):半全场 argmax 必"wld-wld"(信息瓶颈:每场仅 λ主/客 两数→衍生趋同),
-  //   死标签骗不了人。带真实概率+可靠度,让相同标签逐场不同、诚实暴露这场半全场可不可信(投真钱要知道)。
-  const p = Number(hp.primaryProbability);
-  if (!Number.isFinite(p)) return base;
-  const pct = `${Math.round(p * 100)}%`;
-  const note = p >= 0.40 ? "较可信" : p < 0.30 ? "发散难料" : "";
-  return note ? `${base}(${pct}·${note})` : `${base}(${pct})`;
+  return sub && sub !== hp.primary ? `${hp.primary} / ${sub}` : hp.primary;
 }
 
 // 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。
@@ -485,15 +495,17 @@ export function simpleWldCell(prediction) {
   const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
     .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
   if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
-  // 客胜信号盲区(2026-06-07,317场复盘):中信心主推客胜实测命中仅30.6%、反向主胜35.6%(模型次选才对)→提示别单押客胜。
-  const weakAway = (prediction.pick?.code === "0" && Number(prediction.confidence) < 60) ? "·客胜信号弱建议双选" : "";
-  // 带主选真实概率+可靠度(2026-06-07,与比分/半全场/让球四列统一):胜负平主选多高把握逐场不同、
-  //   诚实告诉能不能单押(投真钱要知道)。≥55%较稳、<40%势均建议双选。推翻 2026-06-06"不带概率"(用户嫌降智)。
+  // 明确单一方向(2026-06-07 用户硬要求"胜负平和让球都给明确方向"):主方向=pick.code(最高概率,四列同源),
+  //   带概率+可靠度;低信心不抑制玩法→附"可双选"提示但主方向仍单一明确(遵 feedback_confidence_not_autosuppress)。
+  const code = prediction.pick?.code ?? arr[0][0];
+  const dir = outcomeCodeToChinese(code);
+  const second = outcomeCodeToChinese(arr[1][0]);
   const top = Number(arr[0][1]);
   const pct = Number.isFinite(top) ? `${Math.round(top * 100)}%` : "";
-  const note = !Number.isFinite(top) ? "" : top >= 0.55 ? "·较稳" : top < 0.40 ? "·势均建议双选" : "";
-  const main = `主选 ${outcomeCodeToChinese(arr[0][0])}${pct ? `(${pct}${note})` : ""}`;
-  return `${flag}${main} / 次选 ${outcomeCodeToChinese(arr[1][0])}${weakAway}`;
+  // 客胜信号盲区(2026-06-07,317场复盘):中信心主推客胜命中仅30.6%→提示别单押(方向仍明确给客胜)。
+  const weakAway = (code === "0" && Number(prediction.confidence) < 60) ? "·客胜信号弱建议双选" : "";
+  const note = !Number.isFinite(top) ? "" : top >= 0.55 ? "·较稳" : top < 0.40 ? `·势均(可双选 ${dir}/${second})` : `·把握中(可双选 ${dir}/${second})`;
+  return `${flag}${dir}${pct ? `(${pct}${note})` : ""}${weakAway}`;
 }
 
 function toSimpleJingcaiRow(prediction) {

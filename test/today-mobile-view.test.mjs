@@ -47,20 +47,26 @@ test("esc 转义 HTML 危险字符", () => {
   assert.equal(__test.esc('<a>&"'), "&lt;a&gt;&amp;&quot;");
 });
 
-test("比分/半全场多候选不被双重转义(回归:曾把 <span> 转义成可见 &lt;span&gt; 乱码)", () => {
+test("比分/半全场同向多选不被双重转义(回归:曾把 <span> 转义成可见 &lt;span&gt; 乱码 + 反向比分混入)", () => {
   const sample = {
     predictions: [{
       fixture: { sequence: "1", homeTeam: "甲", awayTeam: "乙", competition: "国际赛" },
-      pick: { label: "主胜", probability: 0.5 }, probabilities: { home: 0.5, draw: 0.3, away: 0.2 },
+      pick: { code: "3", label: "主胜", probability: 0.5 }, probabilities: { home: 0.5, draw: 0.3, away: 0.2 },
       confidence: 41, risk: "高",
-      scorePicks: { primary: "2-0", secondary: "1-2", wldConsistent: "2-0" },
-      halfFullPicks: { primary: "主胜-主胜", secondary: "客胜-客胜" },
+      scorePicks: { primary: "2-0", wldConsistent: "2-0", marketDistribution: [
+        { score: "2-0", probability: 0.18 }, { score: "1-0", probability: 0.15 }, { score: "0-1", probability: 0.05 }
+      ] },
+      halfFullPicks: { primary: "主胜-主胜", marketDistribution: [
+        { halfFull: "主胜-主胜", probability: 0.45 }, { halfFull: "平局-主胜", probability: 0.2 }, { halfFull: "客胜-客胜", probability: 0.05 }
+      ] },
       handicapPick: { direction: "主胜", line: -1, coverProbability: 0.46 }
     }],
     fourteen: { available: false, selections: [] }
   };
   const html = renderTodayMobileHtml(sample, "2026-06-06");
   assert.ok(!html.includes("&lt;span"), "不得出现被转义的 <span>(双重转义乱码)");
-  assert.match(html, /<span class="sk">备选 1-2<\/span>/, "备选比分应在真实 <span class=sk> 里");
-  assert.match(html, /<span class="sk">备 客胜-客胜<\/span>/, "备选半全场应在真实 <span class=sk> 里");
+  assert.match(html, /<span class="sk">备选 1-0\(15%\)<\/span>/, "备选比分应在真实 span 里(同向)");
+  assert.ok(!html.includes("0-1"), "反向比分 0-1 不应混入比分候选(同向多选)");
+  assert.match(html, /<span class="sk">备 平局-主胜\(20%\)<\/span>/, "备选半全场应在真实 span 里(终场同向)");
+  assert.ok(!html.includes("客胜-客胜"), "终场≠主胜的半全场不应出现");
 });

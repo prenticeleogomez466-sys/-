@@ -15,15 +15,16 @@ import {
 // 从一个 cell 文本里判定它表达的方向:home / away / draw / null
 //   胜负平格现为"主选 X% / 副选 Y%"双向→只取主选那段判方向(主选=与比分/半全场同源)。
 function dirOfText(t) {
-  let s = String(t);
-  // 胜负平/让球格现为"主选 X / 次选 Y"→只取主选段判方向(让球:让球主胜/走盘/让球客胜;胜负平:主胜/平局/客胜)。
-  const mainSeg = s.match(/主选\s*(让球主胜|让球客胜|走盘|主胜|平局|客胜)/);
-  if (mainSeg) s = mainSeg[1];
-  if (s === "走盘") return "draw";
-  if (s.includes("主胜")) return "home";
-  if (s.includes("客胜")) return "away";
-  if (s.includes("平局") || s.includes("走盘") || /(^|[^胜])平([^负]|$)/.test(s)) return "draw";
-  return null;
+  const s = String(t);
+  // 2026-06-07「明确单一方向」:胜负平/让球/半全场首段即该场方向→取最左出现的方向词判方向
+  //   (让球"让球主胜…"、胜负平"客胜…"、半全场"主胜-主胜…"首段均为该场方向)。
+  const m = s.match(/(让球主胜|让球客胜|走盘|主胜|客胜|平局)/);
+  if (!m) return /平/.test(s) ? "draw" : null;
+  const w = m[1];
+  if (w === "走盘") return "draw";
+  if (w.includes("主胜")) return "home";
+  if (w.includes("客胜")) return "away";
+  return "draw";
 }
 // 比分 "2-1" → 主胜;"0-1" → 客胜;"1-1" → 平
 function dirOfScore(t) {
@@ -79,10 +80,35 @@ describe("极简表四列方向一致性不变量(simple-table-coherence)", () =
     assert.match(simpleWldCell(p), /未开售/);
   });
 
-  it("胜负平给主选+次选,主选方向与比分/半全场同向(客胜场)", () => {
+  it("胜负平给单一明确方向(=pick.code),不再并列主选/次选(客胜场)", () => {
     const p = makePrediction("0"); // away 0.55 highest
     const cell = simpleWldCell(p);
-    assert.match(cell, /主选\s*客胜/); // 主选=最高概率方向=客胜,与比分/半全场同源
-    assert.match(cell, /次选/);
+    assert.match(cell, /客胜/); // 明确单一方向=最高概率方向=客胜,与比分/半全场同源
+    assert.doesNotMatch(cell, /主选|次选/); // 用户 2026-06-07 要明确方向,不再"主选 X / 次选 Y"并列
+  });
+
+  it("比分/半全场支持同向多选推荐(有市场分布时给多个候选,且全部同向)", () => {
+    const p = makePrediction("3");
+    p.scorePicks = {
+      wldConsistent: "2-0", wldConsistentProbability: 0.15,
+      marketDistribution: [
+        { score: "2-0", probability: 0.15 }, { score: "1-0", probability: 0.14 },
+        { score: "2-1", probability: 0.12 }, { score: "0-1", probability: 0.05 }
+      ]
+    };
+    p.halfFullPicks = {
+      primary: "主胜-主胜", primaryProbability: 0.45,
+      marketDistribution: [
+        { halfFull: "主胜-主胜", probability: 0.45 }, { halfFull: "平局-主胜", probability: 0.22 },
+        { halfFull: "客胜-客胜", probability: 0.05 }
+      ]
+    };
+    const sc = simpleScoreCell(p);
+    assert.match(sc, / \/ /);          // 多选(候选用 / 分隔)
+    assert.doesNotMatch(sc, /0-1/);    // 只含同向(主胜 h>a),反向 0-1 不出现
+    const hf = simpleHalfFullCell(p);
+    assert.match(hf, / \/ /);          // 多选
+    assert.match(hf, /平局-主胜/);      // 含"同终场不同上半"的真实候选(终场=主胜)
+    assert.doesNotMatch(hf, /客胜-客胜/); // 终场≠主胜的不出现
   });
 });

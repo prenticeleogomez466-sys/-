@@ -58,30 +58,48 @@ function metaInfo(preds, date) {
   return { issue, matchDay, stopBJ };
 }
 
-// 比分多候选(2026-06-05 用户"没把握给多选"):首选+备选+方向一致比分,去重,最多3个。
-function scoreCandidatesText(sp) {
-  if (!sp) return "-";
-  const seen = new Set(), out = [];
-  for (const s of [sp.primary, sp.secondary, sp.wldConsistent, sp.wldConsistentSecondary]) {
-    const c = String(s ?? "").trim();
-    if (c && !seen.has(c)) { seen.add(c); out.push(c); }
-    if (out.length >= 3) break;
+// 比分多候选(2026-06-07 用户要"根据方向多选"):从真实市场分布筛「与胜负平同向」的 top3+概率,口径同 xlsx
+//   simpleScoreCell。反向比分绝不混入(旧 bug:用 primary/secondary 会甩出与主推相反的比分)。
+function scoreCandidatesText(p) {
+  const sp = p?.scorePicks; if (!sp) return "-";
+  const code = p?.pick?.code;
+  const sameDir = (s) => { const m = String(s).match(/(\d+)-(\d+)/); if (!m) return false; const h = +m[1], a = +m[2]; return code === "3" ? h > a : code === "0" ? h < a : h === a; };
+  const dist = Array.isArray(sp.marketDistribution) ? sp.marketDistribution : null;
+  let out = [];
+  if (dist) out = dist.filter((d) => sameDir(d.score)).slice(0, 3).map((d) => `${d.score}(${Math.round(Number(d.probability) * 100)}%)`);
+  if (!out.length) {
+    const seen = new Set();
+    for (const s of [sp.wldConsistent, sp.wldConsistentSecondary, sp.primary]) {
+      const c = String(s ?? "").trim();
+      if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+      if (out.length >= 3) break;
+    }
   }
   if (!out.length) return "-";
-  // 返回的是 HTML(含 <span class="sk">),调用处不能再 esc(否则双重转义成可见 &lt;span&gt; 乱码)。
-  //   内部对每个比分 token 各自 esc 做防御(值本是 "2-0" 类安全串,esc 不改变但保险)。
-  return esc(out[0]) + (out.length > 1 ? ` <span class="sk">备选 ${out.slice(1).map(esc).join("/")}</span>` : "");
+  // 返回 HTML(含 <span class="sk">),调用处不能再 esc(否则双重转义成可见 &lt;span&gt; 乱码)。
+  return esc(out[0]) + (out.length > 1 ? ` <span class="sk">备选 ${out.slice(1).map(esc).join(" / ")}</span>` : "");
 }
-// 半全场多候选:首选+备选,去重。返回 HTML(同上,调用处不再 esc)。
-function halfFullCandidatesText(hf) {
-  if (!hf) return "-";
-  const seen = new Set(), out = [];
-  for (const s of [hf.primary, hf.secondary]) {
-    const c = String(s ?? "").trim();
-    if (c && !seen.has(c)) { seen.add(c); out.push(c); }
+// 半全场多候选(2026-06-07 用户要"根据方向多选"):筛「终场=胜负平方向」的 top3+概率,primary 恒排首,口径同 xlsx。
+function halfFullCandidatesText(p) {
+  const hf = p?.halfFullPicks; if (!hf) return "-";
+  const code = p?.pick?.code;
+  const ftDir = code === "3" ? "主胜" : code === "0" ? "客胜" : "平局";
+  const dist = Array.isArray(hf.marketDistribution) ? hf.marketDistribution : null;
+  let out = [];
+  if (dist) {
+    const same = dist.filter((d) => String(d.halfFull).split("-")[1] === ftDir);
+    const ordered = [];
+    const primEntry = same.find((d) => d.halfFull === hf.primary);
+    if (primEntry) ordered.push(primEntry);
+    for (const d of same) { if (d.halfFull !== hf.primary && ordered.length < 3) ordered.push(d); }
+    out = ordered.map((d) => `${d.halfFull}(${Math.round(Number(d.probability) * 100)}%)`);
+  }
+  if (!out.length && hf.primary) {
+    const seen = new Set();
+    for (const s of [hf.primary, hf.secondary]) { const c = String(s ?? "").trim(); if (c && !seen.has(c)) { seen.add(c); out.push(c); } }
   }
   if (!out.length) return "-";
-  return esc(out[0]) + (out.length > 1 ? ` <span class="sk">备 ${out.slice(1).map(esc).join("/")}</span>` : "");
+  return esc(out[0]) + (out.length > 1 ? ` <span class="sk">备 ${out.slice(1).map(esc).join(" / ")}</span>` : "");
 }
 
 function detailCard(p) {
@@ -107,7 +125,7 @@ function detailCard(p) {
     <div class="row main"><span class="k">胜平负</span> <b>${esc(p.pick?.label)}</b> <span class="prob">${pct(p.pick?.probability)}</span> <span class="conf">信心 ${Number.isFinite(conf) ? conf.toFixed(0) : "-"} · 风险 ${esc(p.risk || "-")}</span></div>
     ${p.scenario?.headline ? `<div class="row"><span class="k">情景</span> ${esc(p.scenario.headline)}${p.scenario.marketGuidance?.length ? ` <span class="sk">${esc(p.scenario.marketGuidance.map((g) => g.market + "→" + g.lean).join(" · "))}</span>` : ""}</div>` : ""}
     <div class="row pr">主 ${pct(pr.home)} · 平 ${pct(pr.draw)} · 客 ${pct(pr.away)}</div>
-    <div class="row"><span class="k">比分</span> ${scoreCandidatesText(p.scorePicks)} &nbsp; <span class="k">半全场</span> ${halfFullCandidatesText(p.halfFullPicks)}</div>
+    <div class="row"><span class="k">比分</span> ${scoreCandidatesText(p)} &nbsp; <span class="k">半全场</span> ${halfFullCandidatesText(p)}</div>
     <div class="row"><span class="k">让球</span> ${esc(hp.direction || "-")}${hp.line != null ? `(${hp.line})` : ""}${cover ? ` 覆盖 ${cover}` : ""} ${skellam ? `<span class="sk">${skellam}</span>` : ""}</div>
     <div class="row"><span class="k">让球胜平负</span> ${hwStr}</div>
     ${awHtml}

@@ -301,9 +301,10 @@ export function coherentHandicapView(prediction) {
   if (sideP >= 0.5) {
     return { lineStr, headline: `${sideLabel} ${pr(sideP)}`, detail: distStr, multi: false, source: src };
   }
-  // 没把握:wld 方向让球覆盖不足 → 双选(该方向+走盘)合计,谨慎;头条仍与 wld 同向,绝不冲突。
+  // 用户要「明确方向」(2026-06-07):wld 方向让球覆盖不足时,头条仍给「明确单一方向 + 过盘概率」(锚 wld),
+  //   不再退化成"双选/走盘"模糊表述;把握低只作可靠度附注(可加保走盘双选),方向明确、概率诚实、不抑制玩法。
   const combo = sideP + pushP;
-  return { lineStr, headline: `双选 ${sideLabel}/走盘 合计${pr(combo)}`, detail: `${distStr}·把握低(深盘/小胜风险,谨慎)`, multi: true, source: src };
+  return { lineStr, headline: `${sideLabel} ${pr(sideP)}`, detail: `${distStr}·把握低(过盘${pr(sideP)},可加保走盘双选合计${pr(combo)})`, multi: true, source: src };
 }
 
 function harmonizeDuplicatePredictions(predictions) {
