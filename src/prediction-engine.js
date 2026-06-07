@@ -865,6 +865,17 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   prediction.leagueExpert = options.ratingsBootstrap?.hierarchical
     ? leagueExpertFromFitted(options.ratingsBootstrap.hierarchical, fixture?.competition)
     : null;
+  // 红队自检(2026-06-01 P1/P2,落实 prompt <red_team> 硬规则):三条反问,只下调信心/加风险标签,
+  //   不改 pick/概率方向(遵 wld 锚定 + 不替用户弃赛)。挂 prediction.redTeam + riskNotes。
+  //   ⚠ 顺序关键(2026-06-07 修 bug):redTeamCheck 必须在 differentialAnalysis/scenario 叙述生成「之前」跑。
+  //   否则叙述里的「信心 X」会固化下调前的旧值,与红队下调后的顶层 prediction.confidence 不一致(证伪揪出)。
+  redTeamCheck(prediction, {
+    blendSource: blendResult.blendSource,
+    hasMarketPrior: Boolean(oddsProbabilities),
+    analogWld: experienceBaseline?.wld ?? null,
+    calibrationPriorProb: calibrated.priorProb,
+    calibrationDelta: calibrated.delta,
+  });
   // 逐场差异化分析(2026-05-31):按 联赛性质×实力差×盘口深度 归原型,挑本场主导逻辑,
   //   替代旧固定模板 buildReason/generateExplanation。挂已算字段,零假编。
   prediction.differentialAnalysis = analyzeMatch(prediction);
@@ -881,15 +892,6 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     const scNarr = scenarioNarrative(prediction.scenario);
     if (scNarr) prediction.rationale = `${prediction.rationale ?? ""}\n${scNarr}`.trim();
   }
-  // 红队自检(2026-06-01 P1/P2,落实 prompt <red_team> 硬规则):三条反问,只下调信心/加风险标签,
-  //   不改 pick/概率方向(遵 wld 锚定 + 不替用户弃赛)。挂 prediction.redTeam + riskNotes。
-  redTeamCheck(prediction, {
-    blendSource: blendResult.blendSource,
-    hasMarketPrior: Boolean(oddsProbabilities),
-    analogWld: experienceBaseline?.wld ?? null,
-    calibrationPriorProb: calibrated.priorProb,
-    calibrationDelta: calibrated.delta,
-  });
   const consistencyErrors = validatePredictionConsistency(prediction);
   if (consistencyErrors.length) throw new Error(`推荐派生市场冲突：${fixture.homeTeam} 对 ${fixture.awayTeam}；${consistencyErrors.join("；")}`);
   return prediction;
