@@ -58,9 +58,10 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   const simpleFourteenRows = recommendations.fourteen.available === false || !fourteen.length
     ? null
     : [simpleFourteenHeaders(), ...fourteen.map(toSimpleFourteenRow)];
+  // 神选标准排版(恢复):每张表第1行"⚡ 神选 · 竞彩/14场 · 日期"大标题行 → xlsx-writer 把标题行+列头行做双表头(深紫)。
   writeXlsxWorkbook(dailyPath, [
-    { name: "竞彩", rows: [simpleJingcaiHeaders(), ...jingcai.map(toSimpleJingcaiRow)] },
-    ...(simpleFourteenRows ? [{ name: "14场", rows: simpleFourteenRows }] : [])
+    { name: "竞彩", rows: [[`⚡ 神选 · 竞彩 · ${date}`], simpleJingcaiHeaders(), ...jingcai.map(toSimpleJingcaiRow)] },
+    ...(simpleFourteenRows ? [{ name: "14场", rows: [[`⚡ 神选 · 14场 · ${date}`], ...simpleFourteenRows] }] : [])
   ]);
   // 内部核验:原 13 张明细/审计/复盘/健康表全保留(不丢、供追溯),与极简表同次运行同源。
   writeXlsxWorkbook(internalPath, [

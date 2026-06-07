@@ -25,12 +25,15 @@ function buildWorkbookFiles(sheets) {
 function sheetXml(rows, sheetName = "") {
   const maxColumns = rows.reduce((max, row) => Math.max(max, row.length), 0);
   const widths = chooseColumnWidths(sheetName, rows[0] ?? [], maxColumns);
+  // 双表头(2026-06-07 恢复神选标准):若第1行是"⚡神选"大标题,则标题行+列头行都用表头样式(深紫)。
+  const hasTitle = typeof rows[0]?.[0] === "string" && rows[0][0].startsWith("⚡");
+  const headerRows = hasTitle ? 2 : 1;
   const body = rows.map((row, rowIndex) => {
     const heightAttr = rowIndex === 0 ? ' ht="28" customHeight="1"' : ' ht="22" customHeight="1"';
-    return `<row r="${rowIndex + 1}"${heightAttr}>${row.map((value, columnIndex) => cellXml(rowIndex + 1, columnIndex + 1, value, rowIndex === 0, rowIndex)).join("")}</row>`;
+    return `<row r="${rowIndex + 1}"${heightAttr}>${row.map((value, columnIndex) => cellXml(rowIndex + 1, columnIndex + 1, value, rowIndex < headerRows, rowIndex)).join("")}</row>`;
   }).join("");
   const cols = maxColumns ? `<cols>${Array.from({ length: maxColumns }, (_, index) => `<col min="${index + 1}" max="${index + 1}" width="${widths[index]}" customWidth="1"/>`).join("")}</cols>` : "";
-  const views = rows.length > 1 ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` : "";
+  const views = rows.length > 1 ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${headerRows}" topLeftCell="A${headerRows + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` : "";
   const filter = rows.length > 1 && maxColumns ? `<autoFilter ref="A1:${columnName(maxColumns)}${rows.length}"/>` : "";
   return `<?xml version="1.0" encoding="UTF-8"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${views}${cols}<sheetData>${body}</sheetData>${filter}</worksheet>`;
 }
@@ -73,7 +76,7 @@ function stylesXml() {
     `<fills count="4">` +
       `<fill><patternFill patternType="none"/></fill>` +
       `<fill><patternFill patternType="gray125"/></fill>` +
-      `<fill><patternFill patternType="solid"><fgColor rgb="FF1F4E78"/><bgColor indexed="64"/></patternFill></fill>` +
+      `<fill><patternFill patternType="solid"><fgColor rgb="FF4A148C"/><bgColor indexed="64"/></patternFill></fill>` +
       `<fill><patternFill patternType="solid"><fgColor rgb="FFF2F6FB"/><bgColor indexed="64"/></patternFill></fill>` +
     `</fills>` +
     `<borders count="2">` +

@@ -6,10 +6,10 @@ const date = process.argv[2] ?? "2026-06-07";
 const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
 const jc = (pkg.recommendations?.predictions ?? []).filter((p) => p.fixture?.marketType === "jingcai");
 
-// 存稳定子文件夹(子目录不被 exports 根清理波及)
-const stable = `C:/Users/Administrator/Desktop/足球推荐/${date}`;
-mkdirSync(stable, { recursive: true });
-if (pkg.dailyPath && existsSync(pkg.dailyPath)) { copyFileSync(pkg.dailyPath, `${stable}/神选-竞彩推荐-${date}.xlsx`); console.log("✅ xlsx 已存稳定位置:", `${stable}/神选-竞彩推荐-${date}.xlsx`); }
+// 按神选标准存桌面根(和 神选复盘.xlsx 并列;桌面根不被清,只 exports 根被计划任务清——别建子文件夹)
+void mkdirSync;
+const target = `C:/Users/Administrator/Desktop/神选-竞彩推荐-${date}.xlsx`;
+if (pkg.dailyPath && existsSync(pkg.dailyPath)) { copyFileSync(pkg.dailyPath, target); console.log("✅ xlsx 已按神选标准存桌面根:", target); }
 
 const j = (x, n = 100) => { try { return JSON.stringify(x).slice(0, n); } catch { return String(x).slice(0, n); } };
 console.log(`\n今天 ${date} 竞彩 ${jc.length} 场 · 完整推荐(全维度)\n`);
