@@ -548,7 +548,8 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     ? (1 / ouOver) / (1 / ouOver + 1 / ouUnder) : null;
   const marketTotal = lambdaTotalFromMarket({ line: Number.isFinite(ouLine) ? ouLine : null, overProb: ouOverProb });
   // 世界杯专属特征(海拔/气温/赛制阶段 → λ 总量乘子)。非 2026 世界杯正赛场返回 isWC:false、乘子=1。
-  const wcCtx = worldCupLambdaContext(fixture, fixture?.date ?? fixture?.matchDate ?? null);
+  //   用 kickoff(真实比赛日)优先:14场胜负彩 fixture.date 是销售业务日(早于开赛),用它会漏判世界杯。
+  const wcCtx = worldCupLambdaContext(fixture, fixture?.kickoff ?? fixture?.matchDate ?? fixture?.date ?? null);
   probabilityAdjustment.worldCup = wcCtx.isWC ? wcCtx : null;
   const simulation = buildMonteCarloSimulation(fixture, probabilities, { xg: fixtureAdvancedData.xg, iterations: options.simulationIterations, experienceBaseline, marketTotal, worldCupMult: wcCtx.lambdaMult });
   const risk = riskWithAdvancedSignals(gap, advancedFeatures);
@@ -1336,6 +1337,15 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
   const hfDist = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away)
     ? hfDistribution(eg.home, eg.away, league)
     : null;
+  // 修"半全场千篇一律降智"(2026-06-07 用户实测18场只2种:主胜-主胜×15/客胜-客胜×3):
+  //   原 primary 把上半场也锚成全场方向→主胜恒"主胜-主胜"。改为"终场=wld 约束下 hfDist 真实最高概率路径":
+  //   终场仍=wld(守 feedback_jingcai_simple_table 四列同向自洽),上半场反映真实走势——
+  //   强队快攻=主胜-主胜 / 低进球慢热=平局-主胜 / 先丢后赢=客胜-主胜,逐场差异化。市场盘来源不动(已是真盘)。
+  if (halfFullPicks.source !== "market" && hfDist) {
+    const finalCh = { "3": "主胜", "1": "平局", "0": "客胜" }[primaryCode];
+    const onDir = Object.entries(hfDist).filter(([k]) => String(k).split("-")[1]?.trim() === finalCh).sort((a, b) => b[1] - a[1]);
+    if (onDir.length) halfFullPicks.primary = onDir[0][0];
+  }
   halfFullPicks.primaryProbability = hfDist?.[halfFullPicks.primary] != null ? round(hfDist[halfFullPicks.primary]) : null;
   halfFullPicks.secondaryProbability = hfDist?.[halfFullPicks.secondary] != null ? round(hfDist[halfFullPicks.secondary]) : null;
   // 主方向内的反超/不同首半场备选(如主胜场的"平局-主胜"慢热反超),挖出被单 argmax 埋没的二线路径

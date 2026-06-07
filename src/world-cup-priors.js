@@ -279,10 +279,13 @@ export function venueLambdaMultiplier(venue, opts = {}) {
  */
 export function worldCupLambdaContext(fixture, date) {
   const competition = fixture?.competition ?? fixture?.league ?? "";
-  if (!isWorldCup2026(competition, date ?? fixture?.date)) {
+  // 日期口径:必须用【真实比赛日】(kickoff),不能用 fixture.date —— 14场胜负彩的 date 是销售业务日
+  //   (如 6/07 开售、6/11+ 才开赛),用销售日会让 6/11 才踢的真·世界杯比赛落在窗口外、isWC 误判 false、
+  //   海拔/天气先验整批漏掉(2026-06-07 体检发现)。显式传入的 date 优先。
+  const matchDate = date ?? fixture?.kickoff ?? fixture?.matchDate ?? fixture?.date;
+  if (!isWorldCup2026(competition, matchDate)) {
     return { isWC: false, lambdaMult: 1, factors: [] };
   }
-  const matchDate = date ?? fixture?.date;
   const phase = worldCupPhase(matchDate);
   const venue = worldCupVenue(fixture);
   // 单场分析日期已知 → 查 Open-Meteo 真实预报最高温(承办城市,~16天窗内),替换静态气候均温;窗外回退均温。

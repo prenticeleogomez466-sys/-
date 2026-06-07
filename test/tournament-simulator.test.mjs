@@ -224,6 +224,15 @@ test("worldCupLambdaContext 高海拔在每日路径生效:墨城揭幕战 lambd
   assert.equal(c.lambdaMult, 1.06);
 });
 
+test("worldCupLambdaContext 按 kickoff 判定:14场胜负彩销售日在窗口外、比赛日在窗内→isWC=true", { skip: !HAS_SCHEDULE }, () => {
+  // 14场胜负彩 fixture.date=销售业务日(6/07,窗口外),kickoff=真实比赛日(6/12,窗内)。
+  // 用销售日会漏判世界杯→海拔/天气整批漏(2026-06-07 体检发现)。须按 kickoff 判定。
+  const fx = { homeTeam: "墨西哥", awayTeam: "南非", competition: "世界杯", date: "2026-06-07", kickoff: "2026-06-12" };
+  const c = worldCupLambdaContext(fx); // 不传显式 date → 内部应优先 kickoff
+  assert.equal(c.isWC, true);
+  assert.equal(c.lambdaMult, 1.06);
+});
+
 test("worldCupVenue 队名变体别名:USA/伊朗/科特迪瓦 中文 fixture 也能解析", { skip: !HAS_SCHEDULE }, () => {
   // 这三队 feed 用 USA / IR Iran / Côte d'Ivoire,与 groups.json 英文名不同 → 须经别名/去音调符归一
   for (const [h, a] of [["美国", "巴拉圭"], ["伊朗", "新西兰"], ["科特迪瓦", "厄瓜多尔"]]) {
