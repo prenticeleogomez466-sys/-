@@ -1,5 +1,6 @@
 @echo off
 chcp 65001 >nul
-REM 真临场收盘线轮询:赛前~25分钟内对临场场次重抓500真盘并冻结收盘。每~15分钟跑一次,自动逮每场临场价。
+REM Live closing-line poller: re-fetch 500 odds for matches ~25min pre-kickoff and freeze the closing line. Runs every ~15min.
+REM ASCII-only comments + absolute .mjs path so the run never depends on the scheduler working directory or active code page.
 cd /d D:\football-model
-"C:\Program Files\nodejs\node.exe" scripts\capture-closing-live.mjs --window=25 >> D:\football-model-data\logs\capture-closing-live.log 2>&1
+"C:\Program Files\nodejs\node.exe" "D:\football-model\scripts\capture-closing-live.mjs" --window=25 >> "D:\football-model-data\logs\capture-closing-live.log" 2>&1
