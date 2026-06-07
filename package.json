@@ -109,6 +109,7 @@
     "recap:health": "node src/recap-automation-health.js",
     "backtest:evolution": "node src/evolution-backtest.js",
     "sources:audit": "node src/data-source-registry.js",
+    "sources:health-probe": "node scripts/health-probe-all-sources.mjs",
     "sources:vet": "node src/source-vetting.js",
     "freeodds:audit": "node src/free-odds-source-registry.js",
     "wechat:check": "node src/wechat-smoke.js",

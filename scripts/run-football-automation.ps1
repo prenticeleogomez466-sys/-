@@ -118,6 +118,8 @@ function Run-Health {
   Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free odds source audit" "npm run freeodds:audit"
   Invoke-Step "data source audit" "npm run sources:audit"
+  # 深度实测体检(真发请求逐源判 实测/存疑 + 与上次对比告警),源挂了不阻塞主线。
+  Invoke-Step "deep data source health probe" "npm run sources:health-probe" $true
   Invoke-Step "credential check" "npm run credentials:check" $AllowMissingOdds.IsPresent
   Invoke-Step "wechat channel check" "npm run wechat:check"
   Invoke-Step "market coverage status" "npm run market:status -- --date=$Date"
