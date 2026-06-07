@@ -29,6 +29,14 @@ function localDateOf(dateUtc, city) {
 const feed = await (await fetch("https://fixturedownload.com/feed/json/fifa-world-cup-2026", { headers: { "User-Agent": "Mozilla/5.0" } })).json();
 if (!Array.isArray(feed) || !feed.length) { console.error("赛程 feed 为空,保留旧文件"); process.exit(1); }
 
+// feed Location → venues.json 口径城市(去 " Stadium" + cityAliases 归一)。
+//   这是【该场真实对阵】的承办城市(feed 自洽:对阵+地点同一条记录),与 matchCity[赛号]
+//   的 NBC/Wikipedia 编号口径不同——后者对 fixturedownload 的赛号 65/72 城市不一致(2026-06-07 核)。
+function feedCityOf(m) {
+  let c = String(m.Location || "").replace(/ Stadium$/i, "").trim();
+  return matchVenues.cityAliases?.[c] ?? c;
+}
+
 const out = {};
 let withCity = 0;
 for (const m of feed) {
@@ -36,8 +44,19 @@ for (const m of feed) {
   if (!n || !m.DateUtc) continue;
   // 承办城市优先用 match-venues.matchCity(经 cityAliases 归一);兜底从 Location 去 " Stadium"
   let city = matchVenues.matchCity?.[String(n)];
-  city = matchVenues.cityAliases?.[city] ?? city ?? String(m.Location || "").replace(/ Stadium$/i, "").trim();
-  out[String(n)] = { dateUtc: m.DateUtc, localDate: localDateOf(m.DateUtc, city), city };
+  city = matchVenues.cityAliases?.[city] ?? city ?? feedCityOf(m);
+  // homeTeam/awayTeam/venueCity:feed 自洽的【真实对阵 → 承办城市】,供 worldCupVenue 按对阵解析
+  //   每日竞彩 fixture(只带队名+日期、无场馆字段)的场馆/海拔/天气。小组赛队名为真;淘汰赛为占位(2A/1B…)。
+  out[String(n)] = {
+    dateUtc: m.DateUtc,
+    localDate: localDateOf(m.DateUtc, city),
+    city,
+    homeTeam: m.HomeTeam ?? null,
+    awayTeam: m.AwayTeam ?? null,
+    venueCity: feedCityOf(m),
+    group: m.Group ?? null,
+    round: m.RoundNumber ?? null
+  };
   if (offsetByCity.has(city)) withCity++;
 }
 

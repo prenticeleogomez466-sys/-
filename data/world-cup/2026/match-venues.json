@@ -12,7 +12,8 @@
     "East Rutherford": "New York/New Jersey",
     "Arlington": "Dallas",
     "Santa Clara": "San Francisco Bay Area",
-    "Miami Gardens": "Miami"
+    "Miami Gardens": "Miami",
+    "BC Place Vancouver": "Vancouver"
   },
   "matchCity": {
     "1": "Mexico City", "2": "Guadalajara", "3": "Atlanta", "4": "Guadalajara", "5": "Mexico City", "6": "Monterrey",

@@ -53,8 +53,40 @@ function load() {
       if (zh[t]) teamGroup.set(zh[t], g);
     }
   }
-  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, matchDatesDoc, matchOddsDoc, venueByCity, teamGroup, zh };
+  // 中文→英文规范名(team_name_zh 反查):把每日竞彩 fixture 的中文队名对上真实赛程(英文)。
+  const zhToEn = {};
+  for (const [en, z] of Object.entries(zh)) zhToEn[z] = en;
+  // 真实对阵 → 承办城市索引(feed 自洽,无序对建键):供 worldCupVenue 解析「只带队名+日期、无场馆字段」
+  //   的每日 fixture 的场馆/海拔/天气。小组赛队名为真;淘汰赛为占位(2A/To be announced…)→ 跳过。
+  const pairCity = new Map();
+  for (const m of Object.values(matchDatesDoc?.matchDate ?? {})) {
+    if (!m?.homeTeam || !m?.awayTeam || !m?.venueCity) continue;
+    const ha = String(m.homeTeam).toLowerCase(), aw = String(m.awayTeam).toLowerCase();
+    if (/^\d/.test(ha.trim()) || /^\d/.test(aw.trim()) || ha.includes("announced") || ha.includes("winner") || ha.includes("runner")) continue;
+    pairCity.set([normTeam(m.homeTeam), normTeam(m.awayTeam)].sort().join("|"), m.venueCity);
+  }
+  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, matchDatesDoc, matchOddsDoc, venueByCity, teamGroup, zh, zhToEn, pairCity };
   return _cache;
+}
+
+// feed 英文 ↔ groups.json 英文 的已知变体别名(2026-06-07 体检核 5 处:USA/科特迪瓦/佛得角/伊朗/刚果金)。
+const WC_TEAM_ALIASES = {
+  "usa": "united states",
+  "cote d'ivoire": "ivory coast",
+  "cabo verde": "cape verde",
+  "ir iran": "iran",
+  "congo dr": "dr congo"
+};
+/** 队名归一:小写 + 去音调符(türkiye→turkiye)+ 变体别名,使中文/feed/groups 三方对阵能对上。 */
+function normTeam(name) {
+  const s = String(name ?? "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  return WC_TEAM_ALIASES[s] ?? s;
+}
+/** 队名(中/英皆可)→ 英文规范名,用于对上真实赛程的英文对阵。 */
+function toEnTeam(name) {
+  if (!name) return "";
+  const s = String(name).trim();
+  return load().zhToEn[s] ?? s;
 }
 
 /**
@@ -189,6 +221,17 @@ export function worldCupVenue(fixture) {
     // 模糊:venue 表里 stadium 名包含
     const byStadium = (venuesDoc?.venues ?? []).find((v) => String(c).toLowerCase().includes(v.stadium.toLowerCase().split(" ")[0]));
     if (byStadium) return byStadium;
+  }
+  // 无显式场馆字段(每日竞彩 fixture 常如此:只带队名+日期)→ 按真实对阵查承办城市 → venue。
+  //   这是世界杯海拔/天气 λ 在每日推荐路径上真正生效的桥(2026-06-07 体检修:此前 venue 恒 null、乘子恒 1)。
+  const { pairCity } = load();
+  const h = normTeam(toEnTeam(fixture.homeTeam)), a = normTeam(toEnTeam(fixture.awayTeam));
+  if (h && a) {
+    const city = pairCity.get([h, a].sort().join("|"));
+    if (city) {
+      const hit = venueByCity.get(String(city).toLowerCase()) ?? venueByCity.get(String(city));
+      if (hit) return hit;
+    }
   }
   return null;
 }
