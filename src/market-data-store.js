@@ -121,6 +121,9 @@ export function normalizeMarketSnapshot(snapshot = {}, fallbackDate, index = 0) 
     halfFullOdds: normalizeHalfFullSet(snapshot.halfFullOdds ?? snapshot.halfFullTop ?? snapshot.hafuOdds),
     // 大小球总进球盘(line + 大/小水位)。之前大小球玩法全靠模型派生,接 ESPN 真实盘后有据可依。
     totals: normalizeTotalsSet(snapshot.totals ?? snapshot.overUnder ?? snapshot.ou),
+    // 总进球数真盘(500.com pl_jqs:进0..7+球赔率→over25/under25/dist)。之前持久化层漏赋值→真盘被丢、
+    // 总进球恒缺。补 passthrough 保留 jqs 分布,让"全赔种全覆盖"名副其实(2026-06-07 修)。
+    totalGoalsOdds: normalizeTotalGoalsSet(snapshot.totalGoalsOdds ?? snapshot.jqs ?? snapshot.goalsOdds),
     source: snapshot.source ?? ""
   };
 }
@@ -230,6 +233,24 @@ function normalizeTotalsPoint(value = {}) {
   const over = Number(value.over ?? value.overWater ?? value.overOdds);
   const under = Number(value.under ?? value.underWater ?? value.underOdds);
   return { line, over: Number.isFinite(over) && over > 1 ? over : null, under: Number.isFinite(under) && under > 1 ? under : null };
+}
+
+// 总进球真盘:保留 { over25, under25, dist:{0..7+}, source }。dist 为各进球数概率(0..1),
+// over25/under25 为聚合大小2.5概率。任一有效数值即保留;全无则 null(标缺不冒充)。
+function normalizeTotalGoalsSet(value) {
+  if (value == null || typeof value !== "object") return null;
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 && n <= 1 ? n : null; };
+  const over25 = num(value.over25 ?? value.over ?? value.o25);
+  const under25 = num(value.under25 ?? value.under ?? value.u25);
+  let dist = null;
+  if (value.dist && typeof value.dist === "object") {
+    const entries = Object.entries(value.dist)
+      .map(([g, p]) => [String(g), num(p)])
+      .filter(([, p]) => p != null);
+    if (entries.length) dist = Object.fromEntries(entries);
+  }
+  if (over25 == null && under25 == null && !dist) return null;
+  return { over25, under25, dist, source: value.source ?? null };
 }
 
 function hasInitialAndLatest(value) {
