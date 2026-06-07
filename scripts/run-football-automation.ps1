@@ -146,6 +146,9 @@ function Run-Daily {
   Invoke-Step "refresh World Cup schedule/match-dates" "npm run sync:wc-schedule" $true
   #   实时夺冠盘(Betfair outright)刷新 team-priors.title_odds → 超算 blend 原生吃最锐市场信号。
   Invoke-Step "refresh World Cup winner outright odds" "npm run sync:wc-winner" $true
+  #   逐场临场 1X2(竞彩单场世界杯)→ match-odds.json → 超算单场市场融合(2026-06-07 体检补:此前无写入方、
+  #   融合层永远休眠跑纯 Elo)。只写真实欧赔、14场胜负彩无欧赔自动跳过、无则不写(诚实不臆造)。AllowFailure。
+  Invoke-Step "ingest World Cup per-match 1X2 odds" "npm run ingest:wc-odds" $true
   Invoke-Step "strict data completeness check" "npm run standard:check -- --date=$Date"
   if ($AllowMissingOdds) {
     Invoke-Step "build offline daily xlsx" "npm run daily:no-web -- --date $Date"

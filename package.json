@@ -19,6 +19,7 @@
     "sync:wc-schedule": "node scripts/sync-worldcup-schedule.mjs",
     "sync:wc-weather": "node scripts/sync-worldcup-weather.mjs",
     "sync:wc-winner": "node scripts/sync-wc-winner-odds.mjs",
+    "ingest:wc-odds": "node scripts/ingest-worldcup-match-odds.mjs",
     "china:sources": "node src/china-web-source-runner.js",
     "china:sources:sync": "node src/china-web-source-runner.js --sync-fixtures",
     "ingest:zgzcw": "node scripts/ingest-zgzcw-odds.mjs",
