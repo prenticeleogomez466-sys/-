@@ -61,6 +61,15 @@ export function marketFavProbOf(prediction) {
   return vals.length ? Math.max(...vals) : null;
 }
 
+/**
+ * 是否有「真实市场盘口」可定档(2026-06-07)。无盘口(如世界杯未开赛)时 selectionTier 用的热门概率
+ *   是行内退回的模型融合概率、非真实市场背书 —— 用此判据让展示层诚实标注,不推翻退回设计。
+ */
+export function hasRealMarketOdds(prediction) {
+  const m = prediction?.marketImpliedProbabilities ?? prediction?.oddsProbabilities ?? null;
+  return Boolean(m && Number.isFinite(Number(m.home)));
+}
+
 /** 一步到位:从 prediction 直接得档位。 */
 export function tierOfPrediction(prediction) {
   return selectionTier(marketFavProbOf(prediction));

@@ -40,7 +40,7 @@ function hfDistribution(lambdaHome, lambdaAway, league) {
 // 负二项过离散 size:仅软赛事/国家队比分矩阵开(49k 国际赛 leak-safe:holdout 精确比分 logloss
 // −0.03,与 DC τ 正交)。俱乐部 DC 自拟合参数,不开(保持泊松)。
 const NB_SIZE_SOFT = 8;
-import { selectionTier } from "./selection-tier.js";
+import { selectionTier, hasRealMarketOdds } from "./selection-tier.js";
 import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
 import { analyzeMatch } from "./match-archetype-analyzer.js";
@@ -856,6 +856,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     rationale: buildReason(fixture, snapshot, ranked[0], ranked[1], risk)
   };
   prediction.bankroll = buildBankrollRisk(prediction, options.env ?? process.env);
+  // 诚实标注(2026-06-07,证伪揪出):完全无真实盘口的场(如世界杯未开赛),selectionTier 的市场热门
+  //   概率退回了模型融合概率(行内 oddsProbabilities ?? probabilities)→ 档位非真实市场背书。
+  //   不推翻退回设计(保留现存测试),只挂 noMarketOdds 让展示层诚实标注「暂无盘口·据模型概率」。
+  if (prediction.selectionTier) prediction.selectionTier.noMarketOdds = !hasRealMarketOdds(prediction);
   // 市场背离置信门(2026-05-31 接生产)—— 实证(signal-crossval 回测):模型与市场分歧越大、市场赢越多,
   //   逆市场押独门=陷阱。此处把 clv-confidence-gate 接进每场预测,**只附加**背离标签 + 建议降档系数,
   //   遵 [[feedback_confidence_not_autosuppress]]:不改 pick、不覆盖 confidence、不抑制玩法,买不买由用户定。
@@ -1855,7 +1859,9 @@ export function buildRenxuan9(source) {
       tier: prediction.selectionTier?.label ?? null,
       tierBacktestHit: prediction.selectionTier?.backtestHit ?? null,
       marketFavProb: prediction.selectionTier?.marketFavProb ?? null,
-      reason: `${prediction.selectionTier ? `${prediction.selectionTier.label}(市场热门${Math.round((prediction.selectionTier.marketFavProb ?? 0) * 100)}%·回测命中~${Math.round((prediction.selectionTier.backtestHit ?? 0) * 100)}%)；` : ""}${singleNote ? singleNote + "；" : ""}${coverageReason}；${prediction.rationale ?? ""}`
+      reason: `${prediction.selectionTier ? (prediction.selectionTier.noMarketOdds
+        ? `${prediction.selectionTier.label}⚠暂无盘口·档位据模型概率仅供参考；`
+        : `${prediction.selectionTier.label}(市场热门${Math.round((prediction.selectionTier.marketFavProb ?? 0) * 100)}%·回测命中~${Math.round((prediction.selectionTier.backtestHit ?? 0) * 100)}%)；`) : ""}${singleNote ? singleNote + "；" : ""}${coverageReason}；${prediction.rationale ?? ""}`
     };
   });
   const legs = ranked.map(({ prediction }) => ({

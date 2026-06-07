@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { selectionTier, marketFavProbOf, tierOfPrediction, SELECTION_TIERS } from "../src/selection-tier.js";
+import { selectionTier, marketFavProbOf, tierOfPrediction, SELECTION_TIERS, hasRealMarketOdds } from "../src/selection-tier.js";
 
 describe("选择分层(市场隐含概率定档 + 回测命中率)", () => {
   it("档位随市场热门概率单调:越高档命中越高", () => {
@@ -35,5 +35,14 @@ describe("选择分层(市场隐含概率定档 + 回测命中率)", () => {
     const t = selectionTier(NaN);
     assert.equal(t.key, SELECTION_TIERS[SELECTION_TIERS.length - 1].key);
     assert.equal(marketFavProbOf({}), null);
+  });
+
+  // 2026-06-07(证伪揪出):无真实盘口场(世界杯未开赛)档位退回模型概率,须诚实标注、非真实市场背书。
+  it("hasRealMarketOdds 仅在有真实盘口时为真(无盘口须标注暂无盘口)", () => {
+    assert.equal(hasRealMarketOdds({ marketImpliedProbabilities: { home: 0.7, draw: 0.2, away: 0.1 } }), true, "有市场隐含→真");
+    assert.equal(hasRealMarketOdds({ oddsProbabilities: { home: 0.5, draw: 0.3, away: 0.2 } }), true, "有去vig欧赔→真");
+    assert.equal(hasRealMarketOdds({ marketImpliedProbabilities: null, probabilities: { home: 0.71, draw: 0.2, away: 0.09 } }), false, "只有模型概率(无盘口)→假");
+    assert.equal(hasRealMarketOdds({}), false, "全缺→假");
+    assert.equal(hasRealMarketOdds(null), false, "null→假");
   });
 });
