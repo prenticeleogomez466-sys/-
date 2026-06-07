@@ -16,7 +16,7 @@
 //        建议把无人值守 cron 的 `npm run daily` 换成本脚本。
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "../src/env.js";
@@ -43,16 +43,25 @@ try {
     // 官方成功(通常是 14 场源漏过反爬),但竞彩源(lottery.gov.cn)常被 567 持续封,
     // 导致竞彩缺席。若当日无竞彩 fixture,用 500 兜底补竞彩并重建报告 —— 官方 14 场 + 兜底竞彩同出一份。
     const hasJingcai = loadFixtures(date).fixtures.some((f) => f.marketType === "jingcai");
-    if (!hasJingcai) {
+    // official 是否真生成了竞彩推荐(源闸可能因早盘赔率不全 skip 推荐,但进程仍 exit 0)。
+    let officialGenerated = false;
+    try { officialGenerated = JSON.parse(readFileSync(join(exportDir, `daily-evolution-status-${date}.json`), "utf8"))?.recommendation?.generated === true; } catch { officialGenerated = false; }
+    // 补救触发(2026-06-07 修数据源bug):①无竞彩 fixture(官方竞彩源被封,原逻辑) 或 ②有竞彩 fixture 但 official
+    //   因源闸跳过了推荐(如早盘盘口未全开、赔率不完整4/18→4场真竞彩被挡,误判0场)。重抓全(盘口现已开),
+    //   ingest 自带全赔种完整性审计,审计过+真出竞彩(jingcai>0)才采纳——数据已补全,非"带病出表"。
+    if (!hasJingcai || !officialGenerated) {
       const ingest = run("node", ["scripts/ingest-500-jingcai-fallback.mjs", `--date=${date}`]);
       if (ingest.status === 0) {
         const merged = loadFixtures(date).fixtures.some((f) => f.marketType === "jingcai");
         if (merged) {
           const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
-          status.mode = "official+500竞彩补充";
-          status.jingcaiFallback = true;
-          status.dailyPath = pkg.dailyPath;
-          status.jingcai = pkg.recommendations.predictions.filter((p) => p.fixture.marketType === "jingcai").length;
+          const jc = pkg.recommendations.predictions.filter((p) => p.fixture.marketType === "jingcai").length;
+          if (jc > 0) {
+            status.mode = hasJingcai ? "official跳过→源闸补救竞彩" : "official+500竞彩补充";
+            status.jingcaiFallback = true;
+            status.dailyPath = pkg.dailyPath;
+            status.jingcai = jc;
+          }
         }
       }
     }

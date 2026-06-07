@@ -284,6 +284,12 @@ export function blendWithOdds(oddsProbabilities, dcResult, opts = {}) {
   // 2026-05-31 删冷启动三折:DC 现在要么是真实拟合(usable)要么 null,不再有 coldStart 噪声档需要打折。
   w = clamp(w, 0, 0.6);
   const dc = dcResult.probabilities;
+  // DC 方向与市场背离时压权贴市场(2026-06-07):记忆 reference_signal_backtest_findings 已证"分歧越大市场越对";
+  //   今天国际赛实证——DC 无拟合数据时方向反(希腊赔率主胜→DC算客胜、克罗地亚主胜算5%),把市场 sharp 预测拉偏甚至反转。
+  //   DC argmax≠市场 argmax → DC 对该场不可信 → w 压到 0.05 信市场。普适(不止国际赛),正常同向场权重不变。
+  const _am = (p) => [["home", p.home ?? 0], ["draw", p.draw ?? 0], ["away", p.away ?? 0]].reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+  const _diverged = _am(dc) !== _am(oddsProbabilities);
+  if (_diverged) w = Math.min(w, 0.05);
   const blended = {};
   for (const key of OUTCOMES) {
     blended[key] = (1 - w) * (oddsProbabilities[key] ?? 1 / 3) + w * (dc[key] ?? 1 / 3);
