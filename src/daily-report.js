@@ -418,14 +418,17 @@ function dcH2h(prediction) {
 //   不独立重排。主选/次选 = 胜负平主选/次选方向直接映射让球标签(同序),保证四市场完美同向。不带概率。
 export function simpleHandicapCell(prediction) {
   const v = coherentHandicapView(prediction);
-  if (!v) return "—";
+  // 缺失诚实标注(2026-06-07):国际比赛周等无竞彩让球盘时不空"—",明示缺(守"绝不兜底",不拿空当干净)。
+  if (!v) return "⚠️无竞彩让球盘";
   const line = v.lineStr ? `（${v.lineStr}）` : "";
-  const lbl = (c) => (c === "3" ? "让球主胜" : c === "0" ? "让球客胜" : "走盘");
-  const p = prediction.probabilities ?? {};
-  const order = [["3", p.home], ["1", p.draw], ["0", p.away]]
-    .filter(([, x]) => Number.isFinite(x)).sort((a, b) => b[1] - a[1]);
-  if (order.length >= 2) return `主选 ${lbl(order[0][0])} / 次选 ${lbl(order[1][0])}${line}`;
-  return `${String(v.headline ?? "").replace(/\s*\d+%.*$/, "").trim()}${line}`;
+  const head = String(v.headline ?? "").trim();
+  if (!head || head === "—") return `⚠️让球盘缺${line}`;
+  // 让球用 coherentHandicapView 已算的"真实让球覆盖概率"(锚 wld、逐场不同),不再用胜负平概率排序冒充——
+  //   旧 bug:让球语义是"受让方过不过盘",非胜负平的主/客两选。headline 已带方向+真实概率+双选提示;附可靠度。
+  const m = head.match(/(\d+)%/);
+  const p = m ? Number(m[1]) / 100 : null;
+  const note = p == null ? "" : v.multi ? "·把握低" : p >= 0.58 ? "·较稳" : p < 0.45 ? "·偏险" : "";
+  return `${head}${note}${line}`;
 }
 
 // 比分极简格(2026-06-06 二次修正·方向统一):用户指出比分/半全场与胜负平方向打架不知信哪个→
@@ -436,7 +439,14 @@ export function simpleScoreCell(prediction) {
   const main = sp.wldConsistent ?? sp.primary;
   if (!main) return "—";
   const sub = sp.wldConsistentSecondary ?? sp.secondary;
-  return sub && sub !== main ? `主选 ${main} / 次选 ${sub}` : `主选 ${main}`;
+  const base = sub && sub !== main ? `主选 ${main} / 次选 ${sub}` : `主选 ${main}`;
+  // 打破"比分千篇一律"(2026-06-07):比分 top1 物理天花板~12%(信息瓶颈,同半全场),死标签骗不了人。
+  //   带真实概率+可靠度,让相同比分逐场不同、诚实暴露这场比分多难猜(投真钱要知道别重注)。
+  const p = Number(sp.wldConsistentProbability);
+  if (!Number.isFinite(p)) return base;
+  const pct = `${Math.round(p * 100)}%`;
+  const note = p >= 0.15 ? "较集中" : p < 0.09 ? "极发散" : "";
+  return note ? `${base}(${pct}·${note})` : `${base}(${pct})`;
 }
 
 // 半全场极简格(方向统一):主选=与胜负平主选同向的半全场路径(真市场盘),次选=次选同向。平局由胜负平体现。
@@ -444,7 +454,14 @@ export function simpleHalfFullCell(prediction) {
   const hp = prediction.halfFullPicks ?? {};
   if (!hp.primary) return "—";
   const sub = hp.secondary;
-  return sub && sub !== hp.primary ? `主选 ${hp.primary} / 次选 ${sub}` : `主选 ${hp.primary}`;
+  const base = sub && sub !== hp.primary ? `主选 ${hp.primary} / 次选 ${sub}` : `主选 ${hp.primary}`;
+  // 打破"半全场千篇一律"(2026-06-07):半全场 argmax 必"wld-wld"(信息瓶颈:每场仅 λ主/客 两数→衍生趋同),
+  //   死标签骗不了人。带真实概率+可靠度,让相同标签逐场不同、诚实暴露这场半全场可不可信(投真钱要知道)。
+  const p = Number(hp.primaryProbability);
+  if (!Number.isFinite(p)) return base;
+  const pct = `${Math.round(p * 100)}%`;
+  const note = p >= 0.40 ? "较可信" : p < 0.30 ? "发散难料" : "";
+  return note ? `${base}(${pct}·${note})` : `${base}(${pct})`;
 }
 
 // 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。
@@ -467,10 +484,15 @@ export function simpleWldCell(prediction) {
   const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
     .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
   if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
-  // 主选+次选,不带概率(2026-06-06 用户)。平局若是前二则自然显示;否则在比分(1-1)/半全场(平-平)里体现。
   // 客胜信号盲区(2026-06-07,317场复盘):中信心主推客胜实测命中仅30.6%、反向主胜35.6%(模型次选才对)→提示别单押客胜。
   const weakAway = (prediction.pick?.code === "0" && Number(prediction.confidence) < 60) ? "·客胜信号弱建议双选" : "";
-  return `${flag}主选 ${outcomeCodeToChinese(arr[0][0])} / 次选 ${outcomeCodeToChinese(arr[1][0])}${weakAway}`;
+  // 带主选真实概率+可靠度(2026-06-07,与比分/半全场/让球四列统一):胜负平主选多高把握逐场不同、
+  //   诚实告诉能不能单押(投真钱要知道)。≥55%较稳、<40%势均建议双选。推翻 2026-06-06"不带概率"(用户嫌降智)。
+  const top = Number(arr[0][1]);
+  const pct = Number.isFinite(top) ? `${Math.round(top * 100)}%` : "";
+  const note = !Number.isFinite(top) ? "" : top >= 0.55 ? "·较稳" : top < 0.40 ? "·势均建议双选" : "";
+  const main = `主选 ${outcomeCodeToChinese(arr[0][0])}${pct ? `(${pct}${note})` : ""}`;
+  return `${flag}${main} / 次选 ${outcomeCodeToChinese(arr[1][0])}${weakAway}`;
 }
 
 function toSimpleJingcaiRow(prediction) {
