@@ -40,6 +40,17 @@ for (const [lg, a] of Object.entries(byLeague)) if (a.length >= 120) profiles[lg
 const allArr = Object.values(byLeague).flat();
 profiles.__global__ = profileOf(allArr);
 
+// SEED 画像(2026-06-06):本地 fixture-store 凑不够 120 场、但复盘里大量出现的联赛,
+// 用可靠外部历史(ESPN 公开 scoreboard 真实赛果,同一"主/客进球比"口径)补先验,避免退回 __global__ 失真。
+// 复盘实证:国际赛占当日推荐大头却无画像→退全局(平率26%),而国际友谊真实平率 30.8%、更闷(场均2.48、大球率44%),
+// 模型据此在情景层提示平局风险(scenario-synthesizer/match-archetype),不改核心概率。来源=ESPN fifa.friendly 非中立 2021-2026 n=600。
+const SEED_PROFILES = {
+  "国际赛": { n: 600, avgGoals: 2.48, homeGoalsAvg: 1.495, awayGoalsAvg: 0.985, homeAdvantage: 1.518, drawRate: 0.308, homeWinRate: 0.44, overRate: 0.44, source: "espn-friendly-6yr-seed" },
+};
+for (const [lg, seed] of Object.entries(SEED_PROFILES)) {
+  if (!profiles[lg]) profiles[lg] = seed; // 仅当 store 自身没拟出该联赛(n<120)才用 seed,store 有真数据优先
+}
+
 const path = join(getExportDir(), "league-profiles.json");
 writeFileSync(path, JSON.stringify({ generatedAt: "2026-05-31", source: "fixture-store", leagues: profiles }, null, 2), "utf8");
 

@@ -142,6 +142,10 @@ function Run-Daily {
   }
   Invoke-Step "sync advanced free data layers" "npm run advanced:sync -- --date=$Date"
   Invoke-Step "sync API-Football team form" "npm run sync:api-football -- --date $Date"
+  # 联赛画像保鲜(2026-06-08):league-profiles.json 此前从没生成进 prod 导出目录(getExportDir)→
+  #   league-profile.js 读不到→所有联赛画像退全局兜底(国际赛平局风险等情景提示静默失效)。
+  #   每天在生成推荐前重建,含国际赛 SEED 先验。AllowFailure:fixture-store 缺时优雅降级不阻塞主线。
+  Invoke-Step "build league profiles (incl. international draw prior)" "npm run build:league-profiles" $true
   # 世界杯特征保鲜(2026-06-06):Open-Meteo 只给 ~16 天预报,要覆盖整届(6/11–7/19)必须每天重拉,
   #   否则 venueLambdaMultiplier 一直用旧预报(开赛前会 stale)。AllowFailure:源挂了不阻塞主线。
   Invoke-Step "refresh World Cup weather forecast (16-day window)" "npm run sync:wc-weather" $true

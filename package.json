@@ -122,6 +122,7 @@
     "model:stage-audit": "node src/model-stage-audit.js",
     "model:capability-audit": "node src/model-capability-registry.js",
     "advanced:sync": "node src/advanced-data-runner.js",
+    "build:league-profiles": "node scripts/build-league-profiles.mjs",
     "standard:check": "node src/data-completeness-standard-runner.js",
     "dc:fit": "node -e \"import('./src/dixon-coles-engine.js').then(m => { const f = m.fitFromFixtureStore(); console.log(JSON.stringify({ usable: f.usable, matches: f.matches, teams: Object.keys(f.teams).length, baseRate: f.baseRate }, null, 2)); })\"",
     "dc:predict": "node -e \"import('./src/dixon-coles-engine.js').then(m => { const f = m.fitFromFixtureStore(); const args = process.argv.slice(2); if (args.length < 2) { console.log('用法: npm run dc:predict -- 主队 客队'); return; } console.log(JSON.stringify(m.predictFromFitted(f, { homeTeam: args[0], awayTeam: args[1] }), null, 2)); })\"",

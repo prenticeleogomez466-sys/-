@@ -27,6 +27,8 @@ const ALIASES = [
   [/瑞超|Allsvenskan|瑞典/i, "瑞超"], [/丹超|Superliga|丹麦/i, "丹超"], [/俄超|Russian|俄罗斯/i, "俄超"],
   [/墨超|Liga\s*MX|墨西哥/i, "墨超"], [/阿甲|阿根廷/i, "阿甲"], [/中超|Chinese|中国/i, "中超"],
   [/芬超|Veikkausliiga|芬兰/i, "芬超"],
+  // 国际赛/友谊赛(非世界杯/非洲际杯赛):画像=ESPN 国际友谊先验,真实平局率高(~31%)、偏闷,供情景层提示平局风险。
+  [/国际赛|国际友谊|友谊赛|International\s*Friendly|Friendly/i, "国际赛"],
   // 洲际杯赛:欧冠↔欧洲冠军联赛同一赛事(欧罗巴/欧协联为独立赛事,各自单变体不并)。
   [/欧冠|欧洲冠军|Champions\s*League/i, "欧冠"],
 ];
