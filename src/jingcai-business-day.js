@@ -40,8 +40,20 @@ export function scopeJingcaiFixtures(date, fixtures) {
     const prefix = sequenceWeekdayPrefix(f.sequence);
     return !targetLabel || !prefix || prefix === targetLabel;
   });
-  if (scoped.some((f) => sequenceWeekdayPrefix(f.sequence))) {
-    scoped = scoped.filter((f) => sequenceWeekdayPrefix(f.sequence));
+  // jingcai-ingest-wc-singles(2026-06-08):旧逻辑——只要存在任一周X前缀场,就整批丢弃所有数字编号场。
+  //   这会把 500 静态 XML 的世界杯单场(数字 matchnum 如 4001 墨西哥vs南非,无周X前缀)在当日同时有
+  //   Playwright 周X 竞彩时静默删掉 → 真钱漏注。改为:数字编号场仅在与某周X场是"同队名跨源重复"时才被丢,
+  //   否则保留(世界杯单场/无周X前缀的真实独立场不再被整批误删)。跨源重复交给下方 byKey 去重(偏好周X)。
+  const weekdayKeys = new Set(
+    scoped.filter((f) => sequenceWeekdayPrefix(f.sequence))
+      .map((f) => `${canonicalTeamName(f.homeTeam)}__${canonicalTeamName(f.awayTeam)}`)
+  );
+  if (weekdayKeys.size) {
+    scoped = scoped.filter((f) => {
+      if (sequenceWeekdayPrefix(f.sequence)) return true; // 周X 场保留
+      // 数字编号场:仅当与某周X场同队名(跨源重复)才丢;独立的世界杯/数字编号单场保留。
+      return !weekdayKeys.has(`${canonicalTeamName(f.homeTeam)}__${canonicalTeamName(f.awayTeam)}`);
+    });
   }
   const byKey = new Map();
   for (const f of scoped) {

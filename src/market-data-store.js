@@ -37,8 +37,14 @@ export function findMarketSnapshot(fixture, snapshotsOrDate = fixture?.date) {
   // 基准优先取 fixtureId 精确匹配的(保官方/主路径基本盘),再用各源补全赔种字段。
   const base = { ...(matches.find((s) => s.fixtureId === fixture.id) ?? matches[0]) };
   const hasData = (v) => v != null && !(Array.isArray(v?.top) && v.top.length === 0) && !(typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);
+  // wc-handicap-line-persist-fix2(2026-06-08):同名同场可能同时存在 verified(已核实真实让球线)
+  //   与非 verified(500 fallback DOM 抓到 0/缺的脏副本)两条快照。让球线 donor 必须优先 verified,
+  //   否则 base 若取到 fixtureId 精确匹配的脏副本(line=0=平手)会误导真钱跟错盘。
+  const verifiedHandicapDonor = matches.find((s) => s.verified === true && hasData(s.jingcaiHandicap));
+  if (verifiedHandicapDonor) base.jingcaiHandicap = verifiedHandicapDonor.jingcaiHandicap;
   const ODDS_FIELDS = ["europeanOdds", "handicapOdds", "asianHandicap", "totals", "scoreOdds", "halfFullOdds", "totalGoalsOdds", "jingcaiHandicap", "jingcaiLetqiu", "handicapOddsLetqiu"];
   for (const f of ODDS_FIELDS) {
+    if (f === "jingcaiHandicap" && verifiedHandicapDonor) continue; // 已优先取 verified,勿被脏副本回填
     if (!hasData(base[f])) { const donor = matches.find((s) => hasData(s[f])); if (donor) base[f] = donor[f]; }
   }
   return base;
@@ -124,6 +130,10 @@ export function normalizeMarketSnapshot(snapshot = {}, fallbackDate, index = 0) 
     // 总进球数真盘(500.com pl_jqs:进0..7+球赔率→over25/under25/dist)。之前持久化层漏赋值→真盘被丢、
     // 总进球恒缺。补 passthrough 保留 jqs 分布,让"全赔种全覆盖"名副其实(2026-06-07 修)。
     totalGoalsOdds: normalizeTotalGoalsSet(snapshot.totalGoalsOdds ?? snapshot.jqs ?? snapshot.goalsOdds),
+    // verified:已 Playwright 实时核对 trade.500.com/jczq DOM 的真实让球线(wc-handicap-line-persist-fix2,
+    //   2026-06-08)。仅透传严格布尔 true,绝不从 source/启发式推断(守脏数据铁律 feedback_no_fallback_absolute):
+    //   仅 add-wc-singles-jingcai.mjs(全仓唯一人工核实路径)可写 true,授权在 cron 重 ingest 后冻结保留该线。
+    verified: snapshot.verified === true,
     source: snapshot.source ?? ""
   };
 }
@@ -163,7 +173,7 @@ export function assessSnapshotFreshness(snapshot) {
   };
 }
 
-function normalizeJingcaiHandicap(value) {
+export function normalizeJingcaiHandicap(value) {
   const line = Number(value?.line);
   if (!Number.isFinite(line)) return null;
   return { line, source: value?.source ?? "500.com-jczq" };

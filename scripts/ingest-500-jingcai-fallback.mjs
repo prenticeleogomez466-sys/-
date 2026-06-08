@@ -15,7 +15,7 @@
 
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import "../src/env.js";
 import { saveFixtures, loadFixtures } from "../src/fixture-store.js";
 import { saveMarketSnapshots, loadMarketSnapshots } from "../src/market-data-store.js";
@@ -35,7 +35,15 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 const args = process.argv.slice(2);
 const date = readArg("--date") ?? todayInShanghai();
 
-main().catch((error) => { console.error(error.stack || error.message); process.exitCode = 1; });
+// 仅在直接执行(node scripts/ingest-500-jingcai-fallback.mjs)时跑 main();被 import(单测引 selectInSale)
+//   时不执行,避免测试触发真实网络抓取与落盘(jingcai-ingest-wc-singles,2026-06-08)。
+const isMain = (() => {
+  try { return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href; }
+  catch { return false; }
+})();
+if (isMain) {
+  main().catch((error) => { console.error(error.stack || error.message); process.exitCode = 1; });
+}
 
 async function main() {
   const [spfXml, nspfXml] = await Promise.all([fetchXml(SPF_URL), fetchXml(NSPF_URL)]);
@@ -53,25 +61,18 @@ async function main() {
     console.error(`全赔种:比分 ${bfByMatchid.size} 场 / 半全场 ${bqcByMatchid.size} 场 / 总进球 ${jqsByMatchid.size} 场`);
   } catch (e) { console.error("比分/半全场/总进球抓取失败,降级标缺:", e.message); }
 
-  // 业务批次 = 竞彩编号系列(6xxx=本批/周六单,7xxx=下一批),与 kickoff 日期无关:
-  //   同一张竞彩单里晚场会跨到次日凌晨开球(如 6014 欧冠决赛/6015 国际赛 kickoff 在 date+1),
-  //   旧逻辑 `m.date === date` 把它们漏掉(15 场只抓到 13)。改为:先取当日场次定位本批系列,
-  //   再纳入该系列全部场次(含次日凌晨开球的同批场)。修复 2026-05-30。
-  const seriesOf = (m) => String(m.matchnum ?? "").slice(0, -3);
-  let anchored = spf.filter((m) => m.date === date);
-  if (!anchored.length && spf.length) {
-    // 国际比赛周无当日场:整批竞彩都是次日凌晨开球(kickoff 日 = date+1),m.date===date 全落空。
-    //   500 XML 只列「当前在售」竞彩 → 无当日场时,最早赛日那批就是今天竞彩单在售的批次。
-    //   取最早赛日定位本批,fixture 仍按业务日 date 落盘(2026-06-01 修:6 场国际赛漏抓归零)。
-    const earliest = spf.map((m) => m.date).filter(Boolean).sort()[0];
-    anchored = spf.filter((m) => m.date === earliest);
-  }
-  if (!anchored.length) {
+  // jingcai-ingest-wc-singles(2026-06-08):去掉"单批锚定"。500 静态 XML 的语义是"当前在售即列出"
+  //   (已下市不在 feed)→ 在售 = feed 里全部场次。旧逻辑按 matchnum 前三位定系列、只取一个系列,
+  //   对世界杯长预售期(matchnum 跨 1/2/.../7 七系列、kickoff 跨 06-09~06-18)会把 4001 墨西哥vs南非
+  //   等世界杯单场整批丢弃 → 竞彩漏出。改为纳入 feed 全部场次(可剔已过 kickoff 的场)。
+  const todays = selectInSale(spf, date);
+  if (!todays.length) {
     console.log(JSON.stringify({ ok: false, date, reason: "500 源无任何竞彩场次", spfTotal: spf.length }, null, 2));
     return;
   }
-  const todaySeries = new Set(anchored.map(seriesOf).filter(Boolean));
-  const todays = spf.filter((m) => todaySeries.has(seriesOf(m)));
+  // 审计:开赛窗口纳入 N 场(spf feed 共 M 场,窗口外远期预售已剔)——便于无人值守察觉异常膨胀。
+  const wcN = todays.filter((m) => String(m.league ?? "").includes("世界杯")).length;
+  console.error(`在售窗口(业务日${date}+${IN_SALE_HORIZON_DAYS}天):纳入 ${todays.length} 场(其中世界杯单场 ${wcN}),feed 共 ${spf.length} 场`);
 
   const nspfByNum = new Map(nspf.map((m) => [m.matchnum, m]));
   const collectedAt = new Date().toISOString();
@@ -225,6 +226,14 @@ async function main() {
   const fixturesSaved = saveFixtures(date, scopedFixtures, { source: mergedSource });
   // 合并既有快照(不破坏其它源),再保存
   const previous = loadMarketSnapshots(date).snapshots.filter((s) => s.source !== "500.com-jczq-fallback");
+  // wc-handicap-line-persist-fix2(2026-06-08):previous 里已核实(verified)的世界杯单场真实让球线天然保留
+  //   (它们 source≠500.com-jczq-fallback,不被上面 filter 剔除;findMarketSnapshot 又优先 verified donor)。
+  //   无人值守流水线留痕:显式审计本次 ingest 保留了多少条已核实让球线,防 verified 静默冻结一条错线无人察觉。
+  const verifiedKept = previous.filter((s) => s.verified === true && Number.isFinite(Number(s.jingcaiHandicap?.line)));
+  if (verifiedKept.length) {
+    console.error(`✅ 保留已核实让球线 ${verifiedKept.length} 条(verified,未被本次 ingest 覆盖):` +
+      verifiedKept.map((s) => `${s.homeTeam} vs ${s.awayTeam} 让${s.jingcaiHandicap.line}`).join("；"));
+  }
   const marketSaved = saveMarketSnapshots(date, [...previous, ...snapshots], { source: mergedSource });
 
   console.log(JSON.stringify({
@@ -290,6 +299,34 @@ function jqsToTotalGoals(attrs) {
   return { over25: round2(over), under25: round2(under), dist: Object.fromEntries(Object.entries(probs).map(([g, p]) => [g, round2(p / sum)])) };
 }
 const round2 = (x) => Math.round(x * 1000) / 1000;
+
+// jingcai-ingest-wc-singles(2026-06-08):在售场次选取(纯函数,便于单测)。
+//   500 静态 XML 只列"当前在售"竞彩 → 在售集 = feed 全部场次,不再按 matchnum 系列单批锚定。
+//   可选剔除已过 kickoff 的场(date 之前赛日的场视为已结束/下市,正常不出现在 feed,这里只做防御)。
+//   fixture 仍统一落业务日 date;kickoff 用 m.date+matchtime 真实赛日。
+// 竞彩日常推荐的开赛窗口(2026-06-08):业务日 + N 天。聚焦临近场 + 最近世界杯比赛日,
+//   不把整届预售(如世界杯 6/12~6/18 全部单场)堆进当日推荐(用户"还有2"=只要最近的,非25场)。
+export const IN_SALE_HORIZON_DAYS = 4;
+function addDaysIso(isoDate, days) {
+  const m = String(isoDate ?? "").match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(isoDate ?? "");
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  dt.setUTCDate(dt.getUTCDate() + Number(days));
+  return dt.toISOString().slice(0, 10);
+}
+
+export function selectInSale(spfMatches, date, horizonDays = IN_SALE_HORIZON_DAYS) {
+  const list = Array.isArray(spfMatches) ? spfMatches : [];
+  // 在售=feed列出且赛日在[业务日, 业务日+horizonDays]窗口内。
+  //   下界:剔除赛日严格早于业务日的已结束场。上界:聚焦临近,不堆整届预售。
+  //   无 m.date 的场保留(不因缺日期丢场)。
+  const horizon = addDaysIso(date, horizonDays);
+  return list.filter((m) => {
+    const d = String(m?.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0];
+    if (!d) return true;
+    return d >= String(date) && d <= horizon;
+  });
+}
 
 function parseMatches(xml) {
   const matches = [];

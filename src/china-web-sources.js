@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getDataSubdir, getExportDir } from "./paths.js";
 import { saveFixtures } from "./fixture-store.js";
-import { loadMarketSnapshots, saveMarketSnapshots } from "./market-data-store.js";
+import { loadMarketSnapshots, saveMarketSnapshots, normalizeJingcaiHandicap } from "./market-data-store.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const registryPath = getDataSubdir("china-web-sources.json");
@@ -676,9 +676,24 @@ function formatOutcome(value) {
   return `${line}胜${value.home}/平${value.draw}/负${value.away}`;
 }
 
-function mergeMarketSnapshots(previous, next) {
+// wc-handicap-line-persist-fix2(2026-06-08):已核实(verified)的世界杯单场真实让球线,在 china 源
+//   重新产出同名场快照时不被无线新快照回退平手。规则——若旧快照 verified:
+//   (a) merged.verified 永不被新源降级;(b) 若新快照未携带有效 jingcaiHandicap,保留旧的已核实线;
+//   (c) 若新快照带有效线,允许更新(不冻结真实变化,只拦无线/null 覆盖)。守 feedback_no_fallback_absolute。
+export function mergeMarketSnapshots(previous, next) {
   const map = new Map(previous.map((snapshot) => [marketKey(snapshot), snapshot]));
-  for (const snapshot of next) map.set(marketKey(snapshot), { ...(map.get(marketKey(snapshot)) ?? {}), ...snapshot });
+  for (const snapshot of next) {
+    const key = marketKey(snapshot);
+    const prev = map.get(key) ?? {};
+    const merged = { ...prev, ...snapshot };
+    if (prev.verified === true) {
+      merged.verified = true; // verified 永不被自动源降级
+      if (!normalizeJingcaiHandicap(snapshot.jingcaiHandicap)) {
+        merged.jingcaiHandicap = prev.jingcaiHandicap; // 无线新快照不抹已核实线
+      }
+    }
+    map.set(key, merged);
+  }
   return [...map.values()];
 }
 

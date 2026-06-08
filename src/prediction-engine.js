@@ -298,6 +298,28 @@ export function coherentHandicapView(prediction) {
   if (side === "push") {
     return { lineStr, headline: `走盘 ${pr(pushP)}`, detail: distStr, multi: false, source: src };
   }
+  // 深让盘 favorite 翻转(handicap-favorite-flip-label-fix-3,2026-06-08):韩国vs捷克式——
+  //   1X2 主推(让1球的强热门),但让球盘上 wld 锚方向的过盘概率反而低,真实最高过盘是相反方向。
+  //   "让1球:赢球未必赢盘"是让球玩法语义,非模型自相矛盾。仅当对侧过盘≥0.50 且严格>本侧时,
+  //   让球主选改取真实最高过盘方向并注明背离;否则(含 borderline 本侧34-46%但对侧<0.50)保持现 wld 锚行为。
+  //   只改显示层 headline,不动 handicapPick.direction(validatePredictionConsistency 靠它锚 wld)。
+  {
+    const opp = side === "home" ? "away" : "home";
+    const oppP = dist[opp] ?? 0;
+    if (oppP >= 0.5 && oppP > sideP) {
+      const oppLabel = opp === "home" ? "让球主胜" : "让球客胜";
+      return {
+        lineStr,
+        headline: `${oppLabel} ${pr(oppP)}`,
+        detail: `${distStr}·深盘与1X2背离属正常(让${Math.abs(line)}球:赢球未必赢盘)`,
+        multi: true,
+        source: src,
+        flipped: true,
+        anchorSide: sideLabel,
+        anchorP: sideP,
+      };
+    }
+  }
   if (sideP >= 0.5) {
     return { lineStr, headline: `${sideLabel} ${pr(sideP)}`, detail: distStr, multi: false, source: src };
   }

@@ -428,7 +428,14 @@ export function simpleHandicapCell(prediction) {
   //   旧 bug:让球语义是"受让方过不过盘",非胜负平的主/客两选。headline 已带方向+真实概率+双选提示;附可靠度。
   const m = head.match(/(\d+)%/);
   const p = m ? Number(m[1]) / 100 : null;
-  const note = p == null ? "" : v.multi ? "·把握低" : p >= 0.58 ? "·较稳" : p < 0.45 ? "·偏险" : "";
+  const note = p == null ? "" : v.multi && !v.flipped ? "·把握低" : p >= 0.58 ? "·较稳" : p < 0.45 ? "·偏险" : "";
+  // 深让盘 favorite 翻转(handicap-favorite-flip-label-fix-3,2026-06-08):主选已=真实最高过盘方向
+  //   (head 取自翻转后的 v.headline),次选改为 wld 锚的主推方向(让球主胜/让球客胜)以保留对1X2方向的指引,
+  //   避免与翻转后主选同向重复。跳过下面 top2WldCodes(c2) 映射(那会与翻转主选同向或矛盾)。
+  if (v.flipped) {
+    const sec = v.anchorSide ? ` / 次选 ${v.anchorSide}${Number.isFinite(v.anchorP) ? `(${Math.round(v.anchorP * 100)}%)` : ""}·跟1X2方向` : "";
+    return `主选 ${head}${note}${line}${sec}`;
+  }
   // 主选+次选(2026-06-08 规格):让球方向跟随胜负平主选/次选。次选映射:平局→走盘(让球退款)、主胜→让球主胜、
   //   客胜→让球客胜;次选概率取真泊松让球三态(handicapWld),与胜负平次选同向,保证四列同向。
   const { c2 } = top2WldCodes(prediction);

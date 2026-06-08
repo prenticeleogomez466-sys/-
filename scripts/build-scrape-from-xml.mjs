@@ -37,11 +37,15 @@ function parseMatches(xml) {
 const spf = parseMatches(readFileSync(spfPath, "utf8"));
 const nspf = parseMatches(readFileSync(nspfPath, "utf8"));
 
-// 不再写死"6 开头周六单":批次编号会变(国际赛周如 320x)。500 pl_spf_2.xml 只列当前在售竞彩,
-// 取最早赛日那批=本期在售单(同时含下批预售时,更晚赛日的自然被排除)。仿 ingest-500-fallback 锚定。
-const _dateOf = (seq) => spf.get(seq)?.meta?.date ?? "9999-99-99";
-const _earliest = [...spf.keys()].map(_dateOf).filter((d) => d !== "9999-99-99").sort()[0];
-const seqs = [...spf.keys()].filter((s) => _dateOf(s) === _earliest).sort();
+// jingcai-ingest-wc-singles(2026-06-08):去掉"最早赛日单批锚定"(与 ingest-500-fallback 同 bug)。
+//   500 pl_spf_2.xml 只列"当前在售"竞彩 → 在售 = feed 全部场次。旧逻辑只取最早赛日那批,会把世界杯
+//   长预售期(matchnum 跨多系列、kickoff 跨多日)的单场(如 4001 墨西哥vs南非)整批丢弃。
+//   改为纳入全部在售场次,只剔赛日严格早于业务日(已结束)的场。
+const _dateOf = (seq) => spf.get(seq)?.meta?.date?.match?.(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+const _bizDate = (date && String(date).match(/\d{4}-\d{2}-\d{2}/)?.[0])
+  || [...spf.keys()].map(_dateOf).filter(Boolean).sort()[0]
+  || "0000-00-00";
+const seqs = [...spf.keys()].filter((s) => { const d = _dateOf(s); return !d || d >= _bizDate; }).sort();
 
 function buildRows(phase) {
   const rows = [];
