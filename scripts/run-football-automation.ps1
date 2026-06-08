@@ -228,6 +228,8 @@ function Run-LineupWatch {
 function Run-MarketRefresh {
   Invoke-Step "refresh free odds (current->near-closing)" "npm run market:crawl:soft -- --date=$Date" $true
   Invoke-Step "china official+500 fallback odds sync" "npm run china:sources -- --date=$Date --no-history" $true
+  # The Odds API 世界杯快照:开盘write-once + 每刷攒异动(替代死掉的 odds.500.com/betexplorer/titan007)。
+  Invoke-Step "snapshot World Cup odds movement (The Odds API)" "npm run sync:oddsapi-wc" $true
 }
 
 Write-Log "Football automation started: Mode=$Mode Date=$Date AllowMissingOdds=$AllowMissingOdds"
