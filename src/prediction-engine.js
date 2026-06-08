@@ -1291,6 +1291,10 @@ function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {
   //   故头条改回"与胜负平方向一致的比分"(coherent),众数降级为 globalMode 小字披露(诚实不藏、仍可见)。
   //   平局/均势 pick(drawLean 触发 code=1)时 wldConsistent 本就是平局比分(1-1/0-0)→ 仍敢报平,不退回旧死锁。
   const globalTop = topScoresWithProb(matrix, 8);
+  // 同向 top3(2026-06-08 修「比分与方向不一致」bug):极简表比分多选必须全部与 pick 方向同向。
+  //   原兜底用 wldConsistentSecondary(=次高胜负平方向的代表比分,主胜场常落平局 1-1)→ 跟主选方向打架。
+  //   这里从真泊松矩阵取「outcome===code」的 top3,无真实市场比分盘时供极简表派生(🔶推断,标注来源)。
+  const coherentTop = topScoresWithProb(matrix, 36).filter((d) => d.outcome === code).slice(0, 3);
   const globalMode = globalTop[0]?.score ?? null;
   const globalModeSecondary = (globalTop[1]?.score && globalTop[1].score !== globalMode)
     ? globalTop[1].score : (globalTop[2]?.score ?? null);
@@ -1302,7 +1306,7 @@ function buildScorePicks(code, secondaryCode, snapshot = null, probabilities = {
   // 数据完整性(2026-06-06):有真实市场比分盘时,展示分布(主选/次选)直接 de-vig 市场盘,
   //   而非 DC 估算(市场盘更准,见 feedback_fetch_all_then_audit)。无市场盘则 enrich 退回 DC 矩阵。
   const marketDistribution = devigScoreDistribution(snapshot);
-  return { primary, secondary, wldConsistent, wldConsistentSecondary, globalMode, globalModeSecondary, source, marketDistribution };
+  return { primary, secondary, wldConsistent, wldConsistentSecondary, coherentTop, globalMode, globalModeSecondary, source, marketDistribution };
 }
 
 // 半全场预测优先级同上:市场比分赔率 → DC/λ 泊松半场联合分布(halfFullFromDcResult 从 expectedGoals 真算)。

@@ -446,11 +446,13 @@ export function simpleScoreCell(prediction) {
     const picks = dist.filter((d) => sameDir(d.score)).slice(0, 3);
     if (picks.length) return picks.map((d) => `${d.score}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
   }
-  // 兜底:无分布时退方向一致的主选(+次选),仍同向。
+  // 无真实市场比分盘:用「同向 top3」真泊松派生(2026-06-08 修方向打架 bug)。绝不退到 wldConsistentSecondary
+  //   ——它是次高胜负平方向的代表比分(主胜场=平局 1-1),会与主选方向矛盾,违反「四列同向」硬规则。
+  const coherent = Array.isArray(sp.coherentTop) ? sp.coherentTop.filter((d) => sameDir(d.score)) : [];
+  if (coherent.length) return coherent.map((d) => `${d.score}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
+  // 末级兜底:只给方向一致的主选(宁少不矛盾)。
   const main = sp.wldConsistent ?? sp.primary;
-  if (!main) return "—";
-  const sub = sp.wldConsistentSecondary ?? sp.secondary;
-  return sub && sub !== main ? `${main} / ${sub}` : main;
+  return main ? main : "—";
 }
 
 // 半全场极简格(方向统一):主选=与胜负平主选同向的半全场路径(真市场盘),次选=次选同向。平局由胜负平体现。
@@ -470,9 +472,18 @@ export function simpleHalfFullCell(prediction) {
     for (const d of same) { if (d.halfFull !== hp.primary && ordered.length < 3) ordered.push(d); }
     if (ordered.length) return ordered.map((d) => `${d.halfFull}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
   }
-  // 兜底:无分布时退方向一致的主选(+次选)。
-  const sub = hp.secondary;
-  return sub && sub !== hp.primary ? `${hp.primary} / ${sub}` : hp.primary;
+  // 无真实半全场盘:用 distribution 按「终场=胜负平方向」过滤(2026-06-08 修方向打架 bug)。
+  //   绝不退到 hp.secondary——它是次高胜负平方向(主胜场=平局-平局),终场方向与主选矛盾,违反「四列同向」。
+  const coh = Array.isArray(hp.distribution) ? hp.distribution.filter((d) => String(d.halfFull).split("-")[1]?.trim() === ftDir) : [];
+  if (coh.length) {
+    const ord = [];
+    const pe = coh.find((d) => d.halfFull === hp.primary);
+    if (pe) ord.push(pe);
+    for (const d of coh) { if (d.halfFull !== hp.primary && ord.length < 3) ord.push(d); }
+    return ord.map((d) => Number.isFinite(d.probability) ? `${d.halfFull}(${Math.round(Number(d.probability) * 100)}%)` : d.halfFull).join(" / ");
+  }
+  // 末级兜底:只给方向一致的主选(宁少不矛盾)。
+  return hp.primary;
 }
 
 // 信心极简格:信心档 + 下注分级(含弱联赛降级⚠️),不再堆 EV/注码。

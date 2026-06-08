@@ -111,4 +111,34 @@ describe("极简表四列方向一致性不变量(simple-table-coherence)", () =
     assert.match(hf, /平局-主胜/);      // 含"同终场不同上半"的真实候选(终场=主胜)
     assert.doesNotMatch(hf, /客胜-客胜/); // 终场≠主胜的不出现
   });
+
+  // 2026-06-08 回归:无真实市场盘时,绝不退到 wldConsistentSecondary(=次高胜负平方向的代表比分,
+  //   主胜场=平局 1-1)/ halfFull secondary(平局-平局)。今天 法国/秘鲁 悬殊盘比分/半全场未开售,
+  //   曾出 "2-0 / 1-1"、"主胜-主胜 / 平局-平局" → 比分/半全场方向与主选打架,违反四列同向硬规则。
+  it("⚠️无市场分布时:比分/半全场不得退到跨方向次选(主胜场不得出现平局比分/平局-平局)", () => {
+    const p = makePrediction("3");
+    // 复现今天数据形态:wldConsistentSecondary 是平局(跨方向),无 marketDistribution,
+    //   但有同向 coherentTop(真泊松派生)与 halfFull distribution。
+    p.scorePicks = {
+      wldConsistent: "2-0", wldConsistentSecondary: "1-1", primary: "2-0", secondary: "1-1",
+      coherentTop: [
+        { score: "2-0", probability: 0.11, outcome: "3" },
+        { score: "1-0", probability: 0.10, outcome: "3" },
+        { score: "3-0", probability: 0.08, outcome: "3" }
+      ]
+    };
+    p.halfFullPicks = {
+      primary: "主胜-主胜", secondary: "平局-平局", primaryProbability: 0.48,
+      distribution: [
+        { halfFull: "主胜-主胜", probability: 0.48 }, { halfFull: "平局-主胜", probability: 0.20 },
+        { halfFull: "平局-平局", probability: 0.10 }, { halfFull: "客胜-客胜", probability: 0.05 }
+      ]
+    };
+    const sc = simpleScoreCell(p);
+    assert.equal(dirOfScore(sc), "home", `比分方向应全主胜,实得 ${sc}`);
+    assert.doesNotMatch(sc, /1-1/);        // 平局比分绝不出现
+    const hf = simpleHalfFullCell(p);
+    assert.equal(dirOfText(hf), "home", `半全场方向应主胜,实得 ${hf}`);
+    assert.doesNotMatch(hf, /平局-平局/);   // 终场=平局的半全场绝不出现
+  });
 });
