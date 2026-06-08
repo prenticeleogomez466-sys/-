@@ -196,6 +196,9 @@ function Run-Weekly {
   Invoke-Step "rebuild per-league data-change profile" "npm run profile:league-datachange" $true
   Invoke-Step "vetted source review" "npm run sources:vet -- --date=$Date"
   Invoke-Step "free source matrix review" "npm run freeodds:audit"
+  # 生产校准档:football-data 全量 walk-forward 训练 isotonic(8900+场,leak-safe),只在 usable 时覆盖+自动备份。
+  # 必须在 evolution backtest 之前——训练档先就位,evolution 的 hasUsableTrainedProfile 守卫即不会用薄账本版刷回(根治冷启动)。
+  Invoke-Step "train production calibration profile (full-history isotonic)" "npm run calibration:train" $true
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
   # 自调优闭环:walk-forward 回测驱动信号权重 + 温度校准自动调参(--apply 内置只在变好时才写护栏)
   Invoke-Step "self-tuning optimize loop" "npm run optimize:loop" $true
