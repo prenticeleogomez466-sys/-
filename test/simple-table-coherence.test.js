@@ -80,11 +80,13 @@ describe("极简表四列方向一致性不变量(simple-table-coherence)", () =
     assert.match(simpleWldCell(p), /未开售/);
   });
 
-  it("胜负平给单一明确方向(=pick.code),不再并列主选/次选(客胜场)", () => {
-    const p = makePrediction("0"); // away 0.55 highest
+  it("胜负平给主选+次选两方向(2026-06-08 规格,客胜场主选=客胜)", () => {
+    const p = makePrediction("0"); // away 0.55 > draw 0.25 > home 0.20
     const cell = simpleWldCell(p);
-    assert.match(cell, /客胜/); // 明确单一方向=最高概率方向=客胜,与比分/半全场同源
-    assert.doesNotMatch(cell, /主选|次选/); // 用户 2026-06-07 要明确方向,不再"主选 X / 次选 Y"并列
+    assert.match(cell, /主选 客胜/); // 主选=最高概率方向=客胜,排首
+    assert.match(cell, /次选 平局/); // 次选=剩余两态更高者=平局(用户要主选+次选)
+    // 主选排首保证主方向清晰(dirOfText 取首段判方向)
+    assert.equal(dirOfText(cell), "away");
   });
 
   it("比分/半全场支持同向多选推荐(有市场分布时给多个候选,且全部同向)", () => {
@@ -112,33 +114,32 @@ describe("极简表四列方向一致性不变量(simple-table-coherence)", () =
     assert.doesNotMatch(hf, /客胜-客胜/); // 终场≠主胜的不出现
   });
 
-  // 2026-06-08 回归:无真实市场盘时,绝不退到 wldConsistentSecondary(=次高胜负平方向的代表比分,
-  //   主胜场=平局 1-1)/ halfFull secondary(平局-平局)。今天 法国/秘鲁 悬殊盘比分/半全场未开售,
-  //   曾出 "2-0 / 1-1"、"主胜-主胜 / 平局-平局" → 比分/半全场方向与主选打架,违反四列同向硬规则。
-  it("⚠️无市场分布时:比分/半全场不得退到跨方向次选(主胜场不得出现平局比分/平局-平局)", () => {
-    const p = makePrediction("3");
-    // 复现今天数据形态:wldConsistentSecondary 是平局(跨方向),无 marketDistribution,
-    //   但有同向 coherentTop(真泊松派生)与 halfFull distribution。
+  // 2026-06-08 规格(用户:四列以「主选+次选」两方向为锚,"有平局就按平局推比分半全场"):
+  //   强热门(主胜)次选=平局时,比分多选应=主选向 top + 平局向(1-1),半全场=FT主胜 + 平局-平局;
+  //   但绝不出第三方向(客胜向 0-1 / 客胜-客胜)。primary 恒排首保证主方向清晰。
+  it("✅主选+次选:次选=平局时比分/半全场带平局向候选,但绝不出第三方向(客胜)", () => {
+    const p = makePrediction("3"); // home0.55 > draw0.25 > away0.20 → c1=主胜,c2=平局
     p.scorePicks = {
-      wldConsistent: "2-0", wldConsistentSecondary: "1-1", primary: "2-0", secondary: "1-1",
-      coherentTop: [
-        { score: "2-0", probability: 0.11, outcome: "3" },
-        { score: "1-0", probability: 0.10, outcome: "3" },
-        { score: "3-0", probability: 0.08, outcome: "3" }
+      wldConsistent: "2-0", primary: "2-0",
+      distribution: [
+        { score: "2-0", probability: 0.18 }, { score: "1-0", probability: 0.14 },
+        { score: "1-1", probability: 0.10 }, { score: "0-1", probability: 0.06 }, { score: "0-2", probability: 0.04 }
       ]
     };
     p.halfFullPicks = {
-      primary: "主胜-主胜", secondary: "平局-平局", primaryProbability: 0.48,
+      primary: "主胜-主胜", primaryProbability: 0.48,
       distribution: [
         { halfFull: "主胜-主胜", probability: 0.48 }, { halfFull: "平局-主胜", probability: 0.20 },
         { halfFull: "平局-平局", probability: 0.10 }, { halfFull: "客胜-客胜", probability: 0.05 }
       ]
     };
     const sc = simpleScoreCell(p);
-    assert.equal(dirOfScore(sc), "home", `比分方向应全主胜,实得 ${sc}`);
-    assert.doesNotMatch(sc, /1-1/);        // 平局比分绝不出现
+    assert.equal(dirOfScore(sc), "home", `比分首选应主胜(主选排首),实得 ${sc}`);
+    assert.match(sc, /1-1/);              // 次选=平局 → 平局比分入选(有平局按平局推)
+    assert.doesNotMatch(sc, /0-1|0-2/);   // 第三方向(客胜)绝不出现
     const hf = simpleHalfFullCell(p);
-    assert.equal(dirOfText(hf), "home", `半全场方向应主胜,实得 ${hf}`);
-    assert.doesNotMatch(hf, /平局-平局/);   // 终场=平局的半全场绝不出现
+    assert.equal(dirOfText(hf), "home", `半全场首选应主胜,实得 ${hf}`);
+    assert.match(hf, /平局-平局/);          // 次选=平局 → FT平局路径入选
+    assert.doesNotMatch(hf, /客胜-客胜/);   // 第三方向(终场客胜)绝不出现
   });
 });

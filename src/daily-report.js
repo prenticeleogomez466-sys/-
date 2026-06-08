@@ -429,60 +429,71 @@ export function simpleHandicapCell(prediction) {
   const m = head.match(/(\d+)%/);
   const p = m ? Number(m[1]) / 100 : null;
   const note = p == null ? "" : v.multi ? "·把握低" : p >= 0.58 ? "·较稳" : p < 0.45 ? "·偏险" : "";
-  return `${head}${note}${line}`;
+  // 主选+次选(2026-06-08 规格):让球方向跟随胜负平主选/次选。次选映射:平局→走盘(让球退款)、主胜→让球主胜、
+  //   客胜→让球客胜;次选概率取真泊松让球三态(handicapWld),与胜负平次选同向,保证四列同向。
+  const { c2 } = top2WldCodes(prediction);
+  const hw = prediction.handicapPick?.handicapWld?.probabilities ?? {};
+  const hLabel = { "3": "让球主胜", "1": "走盘", "0": "让球客胜" };
+  const hProb = { "3": hw.home, "1": hw.push, "0": hw.away };
+  const sec = c2 && hLabel[c2] ? ` / 次选 ${hLabel[c2]}${Number.isFinite(hProb[c2]) ? `(${Math.round(hProb[c2] * 100)}%)` : ""}` : "";
+  return `主选 ${head}${note}${line}${sec}`;
 }
 
-// 比分极简格(2026-06-06 二次修正·方向统一):用户指出比分/半全场与胜负平方向打架不知信哪个→
-//   恢复"四市场同向":比分主选=与胜负平主选同向的最可能比分(真市场盘 scoreFromMarket 出),
-//   次选=与胜负平次选同向的比分。平局由"胜负平本身敢选平/双选"体现,不让比分擅自跳平。不带概率。
+// 胜负平前二方向(2026-06-08 用户规格):四列统一以「主选+次选」两个方向为锚。
+//   主选 = pick.code(最高概率);次选 = 剩余两态里概率更高者(强热门次选常=平局)。
+//   "有平局就按平局推比分/半全场"= 当次选=平局时,比分/半全场多选自动带平局向候选(1-1/平局-平局)。
+function top2WldCodes(prediction) {
+  const p = prediction.probabilities ?? {};
+  const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
+    .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
+  const c1 = prediction.pick?.code ?? arr[0]?.[0] ?? null;
+  const c2 = arr.find(([c]) => c !== c1)?.[0] ?? null;
+  const probOf = (c) => arr.find(([k]) => k === c)?.[1];
+  return { c1, c2, probOf };
+}
+const scoreDirCode = (s) => { const m = String(s).match(/(\d+)-(\d+)/); if (!m) return null; const h = +m[1], a = +m[2]; return h > a ? "3" : h < a ? "0" : "1"; };
+
+// 比分极简格(2026-06-08 规格·主选+次选多选):比分多选 = 主选方向 top3 + 次选方向 top1,
+//   全部与胜负平的「主选/次选」两方向一致(次选=平局时自然带平局比分,这正是"有平局按平局推")。
+//   优先真实市场比分盘(de-vig marketDistribution),无则用真泊松全矩阵分布;绝不出第三方向。
 export function simpleScoreCell(prediction) {
   const sp = prediction.scorePicks ?? {};
-  const code = prediction.pick?.code;
-  // 多选推荐(2026-06-07 用户要"比分根据方向多选"):从真实市场派生的比分分布里筛「与胜负平同向」的 top3,
-  //   带真实概率。比分 top1 物理天花板~12%(信息瓶颈),单押不可靠→给多个同向候选覆盖,诚实暴露发散度。
-  const sameDir = (s) => { const m = String(s).match(/(\d+)-(\d+)/); if (!m) return false; const h = +m[1], a = +m[2]; return code === "3" ? h > a : code === "0" ? h < a : h === a; };
-  const dist = Array.isArray(sp.marketDistribution) ? sp.marketDistribution : null;
-  if (dist) {
-    const picks = dist.filter((d) => sameDir(d.score)).slice(0, 3);
-    if (picks.length) return picks.map((d) => `${d.score}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
+  const { c1, c2 } = top2WldCodes(prediction);
+  const dist = (Array.isArray(sp.marketDistribution) && sp.marketDistribution.length) ? sp.marketDistribution
+    : (Array.isArray(sp.distribution) && sp.distribution.length) ? sp.distribution
+      : (Array.isArray(sp.coherentTop) ? sp.coherentTop : []);
+  const fmt = (d) => Number.isFinite(d.probability) ? `${d.score}(${Math.round(Number(d.probability) * 100)}%)` : d.score;
+  if (dist.length) {
+    const main = dist.filter((d) => scoreDirCode(d.score) === c1).slice(0, 3);
+    const sec = c2 ? dist.filter((d) => scoreDirCode(d.score) === c2).slice(0, 1) : [];
+    const all = [...main, ...sec];
+    if (all.length) return all.map(fmt).join(" / ");
   }
-  // 无真实市场比分盘:用「同向 top3」真泊松派生(2026-06-08 修方向打架 bug)。绝不退到 wldConsistentSecondary
-  //   ——它是次高胜负平方向的代表比分(主胜场=平局 1-1),会与主选方向矛盾,违反「四列同向」硬规则。
-  const coherent = Array.isArray(sp.coherentTop) ? sp.coherentTop.filter((d) => sameDir(d.score)) : [];
-  if (coherent.length) return coherent.map((d) => `${d.score}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
-  // 末级兜底:只给方向一致的主选(宁少不矛盾)。
-  const main = sp.wldConsistent ?? sp.primary;
-  return main ? main : "—";
+  const m = sp.wldConsistent ?? sp.primary;
+  return m ? m : "—";
 }
 
-// 半全场极简格(方向统一):主选=与胜负平主选同向的半全场路径(真市场盘),次选=次选同向。平局由胜负平体现。
+// 半全场极简格(2026-06-08 规格·主选+次选多选):取「终场=胜负平主选方向」top + 「终场=次选方向」top1,
+//   primary 恒排首。次选=平局时自动带"平局-平局"等(=有平局按平局推)。优先真市场盘,无则真泊松 distribution。
+const ftOfHalfFull = (h) => String(h).split("-")[1]?.trim();
 export function simpleHalfFullCell(prediction) {
   const hp = prediction.halfFullPicks ?? {};
   if (!hp.primary) return "—";
-  const code = prediction.pick?.code;
-  const ftDir = code === "3" ? "主胜" : code === "0" ? "客胜" : "平局";
-  // 多选推荐(2026-06-07 用户要"半全场根据方向多选"):取「终场=胜负平方向」的 top3 半全场路径(含 平局-主胜
-  //   这类同终场不同上半场的真实候选),primary 恒排首保证方向清晰;带真实概率,诚实暴露发散度。
-  const dist = Array.isArray(hp.marketDistribution) ? hp.marketDistribution : null;
-  if (dist) {
-    const same = dist.filter((d) => String(d.halfFull).split("-")[1] === ftDir);
-    const ordered = [];
-    const primEntry = same.find((d) => d.halfFull === hp.primary);
-    if (primEntry) ordered.push(primEntry);
-    for (const d of same) { if (d.halfFull !== hp.primary && ordered.length < 3) ordered.push(d); }
-    if (ordered.length) return ordered.map((d) => `${d.halfFull}(${Math.round(Number(d.probability) * 100)}%)`).join(" / ");
+  const { c1, c2 } = top2WldCodes(prediction);
+  const zh = { "3": "主胜", "1": "平局", "0": "客胜" };
+  const ft1 = zh[c1], ft2 = c2 ? zh[c2] : null;
+  const dist = (Array.isArray(hp.marketDistribution) && hp.marketDistribution.length) ? hp.marketDistribution
+    : (Array.isArray(hp.distribution) ? hp.distribution : []);
+  const fmt = (d) => Number.isFinite(d.probability) ? `${d.halfFull}(${Math.round(Number(d.probability) * 100)}%)` : d.halfFull;
+  if (dist.length) {
+    const main = [];
+    const pe = dist.find((d) => d.halfFull === hp.primary && ftOfHalfFull(d.halfFull) === ft1);
+    if (pe) main.push(pe);
+    for (const d of dist) { if (ftOfHalfFull(d.halfFull) === ft1 && d.halfFull !== hp.primary && main.length < 2) main.push(d); }
+    const sec = ft2 ? dist.filter((d) => ftOfHalfFull(d.halfFull) === ft2).slice(0, 1) : [];
+    const all = [...main, ...sec];
+    if (all.length) return all.map(fmt).join(" / ");
   }
-  // 无真实半全场盘:用 distribution 按「终场=胜负平方向」过滤(2026-06-08 修方向打架 bug)。
-  //   绝不退到 hp.secondary——它是次高胜负平方向(主胜场=平局-平局),终场方向与主选矛盾,违反「四列同向」。
-  const coh = Array.isArray(hp.distribution) ? hp.distribution.filter((d) => String(d.halfFull).split("-")[1]?.trim() === ftDir) : [];
-  if (coh.length) {
-    const ord = [];
-    const pe = coh.find((d) => d.halfFull === hp.primary);
-    if (pe) ord.push(pe);
-    for (const d of coh) { if (d.halfFull !== hp.primary && ord.length < 3) ord.push(d); }
-    return ord.map((d) => Number.isFinite(d.probability) ? `${d.halfFull}(${Math.round(Number(d.probability) * 100)}%)` : d.halfFull).join(" / ");
-  }
-  // 末级兜底:只给方向一致的主选(宁少不矛盾)。
   return hp.primary;
 }
 
@@ -508,15 +519,18 @@ export function simpleWldCell(prediction) {
   if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
   // 明确单一方向(2026-06-07 用户硬要求"胜负平和让球都给明确方向"):主方向=pick.code(最高概率,四列同源),
   //   带概率+可靠度;低信心不抑制玩法→附"可双选"提示但主方向仍单一明确(遵 feedback_confidence_not_autosuppress)。
-  const code = prediction.pick?.code ?? arr[0][0];
-  const dir = outcomeCodeToChinese(code);
-  const second = outcomeCodeToChinese(arr[1][0]);
+  // 主选+次选(2026-06-08 用户规格,覆盖 2026-06-07「单一方向」旧规则):主选=pick.code(最高概率),
+  //   次选=剩余两态概率更高者(强热门次选常=平局)。与让球/比分/半全场统一两方向锚,四列完全同向。
+  const { c1, c2, probOf } = top2WldCodes(prediction);
+  const dir = outcomeCodeToChinese(c1);
+  const p1 = probOf(c1); const pct1 = Number.isFinite(p1) ? `${Math.round(p1 * 100)}%` : "";
   const top = Number(arr[0][1]);
-  const pct = Number.isFinite(top) ? `${Math.round(top * 100)}%` : "";
-  // 客胜信号盲区(2026-06-07,317场复盘):中信心主推客胜命中仅30.6%→提示别单押(方向仍明确给客胜)。
-  const weakAway = (code === "0" && Number(prediction.confidence) < 60) ? "·客胜信号弱建议双选" : "";
-  const note = !Number.isFinite(top) ? "" : top >= 0.55 ? "·较稳" : top < 0.40 ? `·势均(可双选 ${dir}/${second})` : `·把握中(可双选 ${dir}/${second})`;
-  return `${flag}${dir}${pct ? `(${pct}${note})` : ""}${weakAway}`;
+  const conf = !Number.isFinite(top) ? "" : top >= 0.55 ? "较稳" : top < 0.40 ? "势均" : "把握中";
+  const weakAway = (c1 === "0" && Number(prediction.confidence) < 60) ? "·客胜信号弱建议双选" : "";
+  if (!c2) return `${flag}主选 ${dir}${pct1 ? `(${pct1})` : ""}${weakAway}`;
+  const dir2 = outcomeCodeToChinese(c2);
+  const p2 = probOf(c2); const pct2 = Number.isFinite(p2) ? `${Math.round(p2 * 100)}%` : "";
+  return `${flag}主选 ${dir}${pct1 ? `(${pct1})` : ""}${conf ? `·${conf}` : ""} / 次选 ${dir2}${pct2 ? `(${pct2})` : ""}${weakAway}`;
 }
 
 function toSimpleJingcaiRow(prediction) {
