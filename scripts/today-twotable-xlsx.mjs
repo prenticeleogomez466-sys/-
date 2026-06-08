@@ -44,8 +44,9 @@ const jcRows = jc.map((p) => [
   dcForm(p), dcH2H(p), dcProfile(p), String(p.confidence ?? ""),
 ]);
 
+const VERIFY_NOTE = "🔴 对抗证伪:今日12注全部三视角一致证伪·建议观望(负EV大热跟随盘,无独立edge;方向多半对但押稳赢不划算)";
 const sheets = [
-  { name: "竞彩", rows: [[`⚡ 神选 · 竞彩 · ${date}`], jcHeaders, ...jcRows] },
+  { name: "竞彩", rows: [[`⚡ 神选 · 竞彩 · ${date}`], [VERIFY_NOTE], jcHeaders, ...jcRows] },
 ];
 if (fourteen.length) {
   sheets.push({

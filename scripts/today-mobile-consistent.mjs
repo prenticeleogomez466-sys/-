@@ -42,6 +42,7 @@ tr:nth-child(even) td{background:#faf8fd}
 .foot{color:#888;font-size:11px;margin:16px 4px 30px}
 </style></head><body><div class="wrap">
 <h1>⚡ 神选 · 足球推荐 · ${date}</h1>
+<div class="note" style="border-color:#d32f2f;background:#ffebee"><b>🔴 对抗证伪(football-signal-verify):今日验证12注 → 12/12 全部三视角一致证伪·建议观望。</b><br>核心=全为<b>负EV大热跟随盘</b>(赔率1.08~1.6、EV-2.5%~-27.6%)、开盘=当前零漂移无CLV、无独立edge。<b>方向多半会对,但当稳赢押负EV不划算。</b>只提示不替你弃赛——买不买你定。</div>
 
 <h2>竞彩 · ${jc.length} 场(今晚国际赛)</h2>
 <div class="note">⚠️ 三场均<b>悬殊盘</b>:竞彩主卖让球(法国/秘鲁vs西班牙胜平负未开售)。让球线均<b>让2球</b>,覆盖把握低(34–46%),非稳赢盘。国际赛无俱乐部画像(标缺)。</div>
