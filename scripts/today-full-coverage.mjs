@@ -21,7 +21,11 @@ const cov = JSON.parse(readFileSync(`D:/football-model-data/coverage/${date}.jso
 const WC_SINGLES = [["墨西哥", "南非"], ["韩国", "捷克"], ["加拿大", "波黑"], ["美国", "巴拉圭"]];
 const isJc = (p) => p.fixture?.marketType === "jingcai";
 const isWcSingle = (p) => WC_SINGLES.some(([h, a]) => (p.fixture.homeTeam || "").includes(h) && (p.fixture.awayTeam || "").includes(a));
-const picked = preds.filter((p) => isJc(p) || isWcSingle(p));
+// 世界杯场(预售6/12+):competition含世界杯 或 在WC单场名单(WC单场现也被ingest标jingcai marketType,故不能靠marketType区分)
+const isWorldCupGame = (p) => String(p.fixture?.competition ?? "").includes("世界杯") || isWcSingle(p);
+// --jconly:只要当天竞彩(即时在售的国际赛场),去掉预售世界杯单场(用户 2026-06-09 指定)
+const JC_ONLY = process.argv.includes("--jconly");
+const picked = preds.filter((p) => (isJc(p) || isWcSingle(p)) && !(JC_ONLY && isWorldCupGame(p)));
 const byMatch = new Map();
 for (const p of picked) {
   const key = `${p.fixture.homeTeam}|${p.fixture.awayTeam}`;
@@ -76,7 +80,7 @@ const ouFilled = rows.filter((r) => /大\d/.test(r.ou)).length;
 let riskNote = "";
 if (coinRows.length) riskNote += `最高风险=${coinRows.map((r) => r.match).join("/")}(硬币档·势均易平),强烈建议不单押。`;
 if (handicapOnly.length) riskNote += `${handicapOnly.map((r) => r.match.split(" vs ")[0]).join("/")}=悬殊盘只卖让球,信心反映"赢球方向"非"让球过盘",勿当胆。`;
-const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。本次按用户铁律补齐:近5场14队全补(ESPN真实战绩)、大小球${ouFilled}/${rows.length}补(The Odds API ${ouFilled}场WC单场de-vig;${rows.length - ouFilled}场友谊赛无friendly源·诚实标墙)、H2H/真xG受免费源墙限已诚实标。${riskNote}模型只给概率+信心,负EV大热不保稳赢,买不买你定。`;
+const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。本次按用户铁律补齐:近5场双方全补(ESPN真实战绩)、大小球${ouFilled}/${rows.length}补(${ouFilled ? `The Odds API ${ouFilled}场WC单场de-vig;` : ""}${rows.length - ouFilled}场友谊赛无friendly源·诚实标墙)、H2H/真xG受免费源墙限已诚实标。${riskNote}模型只给概率+信心,负EV大热不保稳赢,买不买你定。`;
 const NOTE = `⚠️ 让球线均 500.com 实时核实。大小球=The Odds API世界杯totals市场de-vig(2.5线共识),友谊赛无源标缺。近5场/H2H/攻防=ESPN真实战绩(国家队真xG=FBref Cloudflare墙,用近5进失球作攻防代理)。比分/半全场部分模型🔶推断。`;
 
 // ── xlsx(完整列) ──
