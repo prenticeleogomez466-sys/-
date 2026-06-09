@@ -16,6 +16,10 @@ const date = process.argv[2] ?? "2026-06-09";
 const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
 const preds = pkg.recommendations?.predictions ?? [];
 const cov = JSON.parse(readFileSync(`D:/football-model-data/coverage/${date}.json`, "utf8"));
+// 对抗证伪层(football-signal-verify 产,只标注不弃赛;无文件则不渲染该列)
+let advData = null;
+try { advData = JSON.parse(readFileSync(`D:/football-model-data/adversarial/${date}.json`, "utf8")).verdicts || null; } catch { advData = null; }
+const advFor = (p) => advData?.[`${p.fixture.homeTeam}|${p.fixture.awayTeam}`] ?? null;
 
 // 竞彩交付 = jingcai + 已开售WC单场(by name)。
 const WC_SINGLES = [["墨西哥", "南非"], ["韩国", "捷克"], ["加拿大", "波黑"], ["美国", "巴拉圭"]];
@@ -102,6 +106,7 @@ const rows = games.map((p, i) => {
     homeLast5: c ? last5Str(c.home) : "", awayLast5: c ? last5Str(c.away) : "",
     h2h: h2hStr(c), profile: profileStr(c),
     conf: p.confidence, tier: p.selectionTier?.label ?? "",
+    adv: advFor(p),
   };
 });
 
@@ -113,14 +118,17 @@ const ouFilled = rows.filter((r) => /大2\.5球/.test(r.ouReal)).length;
 let riskNote = "";
 if (coinRows.length) riskNote += `最高风险=${coinRows.map((r) => r.match).join("/")}(硬币档·势均易平),强烈建议不单押。`;
 if (handicapOnly.length) riskNote += `${handicapOnly.map((r) => r.match.split(" vs ")[0]).join("/")}=悬殊盘只卖让球,信心反映"赢球方向"非"让球过盘",勿当胆。`;
+const advKilled = rows.filter((r) => r.adv && /证伪/.test(r.adv.label));
+if (advKilled.length) riskNote += `🔴三视角对抗证伪:${advKilled.length}/${rows.length}场被一致证伪(EV全负·模型本质市场跟随器无独立edge),点开看每场致命点;证伪只标注不替你弃赛,买不买你定。`;
 const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。赔率全补:胜平负/让球/比分/半全场/大小球(总进球)=500竞彩真盘${rows.length}/${rows.length}场,亚盘+欧赔(竞彩未开售场)=ESPN/DraftKings真盘补齐;近5场/H2H/攻防=ESPN真实战绩。真缺口仅:国家队真xG(FBref Cloudflare墙)、老H2H(ESPN限近赛季),已⚠️标不编。${riskNote}模型概率由真盘de-vig派生,1X2系统打不过收盘线、本质市场跟随器,买不买你定。`;
 const NOTE = `✅ 赔率全覆盖:①500竞彩静态XML(spf/nspf/bf/bqc/jqs)=胜平负欧赔+让球+比分+半全场+大小球(总进球),比分/半全场为市场de-vig非模型估算;②ESPN/DraftKings=亚盘(pointSpread含让球线+水位+开盘异动)+竞彩未开售场的欧赔(moneyline)。近5场/H2H/攻防=ESPN真实战绩。⚠️真缺:国家队真xG(FBref Cloudflare墙,用近5进失球代理)、老H2H(ESPN仅近赛季窗口)。`;
 
 // ── xlsx(完整列) ──
-const headers = ["#", "开赛", "对阵(赛事)", "胜负平🔶", "胜平负赔率✅", "竞彩让球(模型过盘vs市场)", "竞彩让球赔率✅", "博彩亚盘✅", "比分🔶", "比分赔率✅", "半全场🔶", "半全场赔率✅", "大小球✅", "进球分布✅", "主队近5✅", "客队近5✅", "H2H", "攻防画像", "信心档"];
+const advCell = (r) => r.adv ? `${r.adv.label}${r.adv.ev != null ? ` EV=${r.adv.ev}` : ""} ｜ ${r.adv.kill}` : "—(未审计)";
+const headers = ["#", "开赛", "对阵(赛事)", "胜负平🔶", "胜平负赔率✅", "竞彩让球(模型过盘vs市场)", "竞彩让球赔率✅", "博彩亚盘✅", "比分🔶", "比分赔率✅", "半全场🔶", "半全场赔率✅", "大小球✅", "进球分布✅", "主队近5✅", "客队近5✅", "H2H", "攻防画像", "信心档", "🔴对抗证伪(三视角·只标注不弃赛)"];
 const xrows = rows.map((r) => [String(r.idx), r.ko, `${r.match}(${r.comp})`,
   r.wld, r.euro, r.hcView, r.hc, r.asian, `${r.score}〔${r.scoreSrc}〕`, r.scoreMkt, `${r.halffull}〔${r.hfSrc}〕`, r.hfMkt, r.ouReal, r.dist,
-  `${r.homeRec} ${r.homeLast5}`, `${r.awayRec} ${r.awayLast5}`, r.h2h, r.profile, `${r.tier}(${Math.round(r.conf)})`]);
+  `${r.homeRec} ${r.homeLast5}`, `${r.awayRec} ${r.awayLast5}`, r.h2h, r.profile, `${r.tier}(${Math.round(r.conf)})`, advCell(r)]);
 const sheets = [{ name: "竞彩完整", rows: [[`⚡ 神选 · 竞彩完整覆盖 · ${date}`], [BANNER], headers, ...xrows] }];
 const xlsxTarget = `C:/Users/Administrator/Desktop/神选-竞彩推荐-${date}.xlsx`;
 writeXlsxWorkbook(xlsxTarget, sheets);
@@ -143,8 +151,9 @@ const detail = (r) => `<div class="drow"><b>胜负平</b>${esc(r.wld)}<span clas
   `<div class="drow"><b>大小球</b>${esc(r.ouReal)}<span class="g"> · 进球分布 ${esc(r.dist)}</span></div>` +
   `<div class="drow"><b>近5</b>${esc(r.homeRec)} <span class="g">${esc(r.homeLast5)}</span><br><span class="ind">${esc(r.awayRec)} <span class="g">${esc(r.awayLast5)}</span></span></div>` +
   `<div class="drow"><b>H2H</b>${esc(r.h2h)}</div>` +
-  `<div class="drow"><b>攻防</b>${esc(r.profile)}</div>`;
-const trs = rows.map((r) => `<tr class="r" onclick="tg(this)"><td class="m">${esc(r.match)} <span class="ar">▾</span><i>${esc(r.ko)} · ${esc(r.comp)}</i></td><td><span class="b" style="background:${tierColor(r.tier)}">${Math.round(r.conf)}</span></td><td>${esc(wldS(r.wld))}</td><td>${esc(r.hcP.line)}</td><td>${esc(scoreS(r.score))}</td><td>${esc(hfS(r.halffull))}</td><td>${esc(ouS(r.ouReal))}</td></tr><tr class="d"><td colspan="7">${detail(r)}</td></tr>`).join("");
+  `<div class="drow"><b>攻防</b>${esc(r.profile)}</div>` +
+  (r.adv ? `<div class="adv"><b>${esc(r.adv.label)}${r.adv.ev != null ? ` · EV=${r.adv.ev}` : ""}</b><br>${esc(r.adv.kill)}<br><span class="g">三视角对抗证伪·只标注不弃赛,下不下你定</span></div>` : "");
+const trs = rows.map((r) => `<tr class="r" onclick="tg(this)"><td class="m">${esc(r.match)}${r.adv && /证伪/.test(r.adv.label) ? ' <span class="kx">🔴</span>' : ""} <span class="ar">▾</span><i>${esc(r.ko)} · ${esc(r.comp)}</i></td><td><span class="b" style="background:${tierColor(r.tier)}">${Math.round(r.conf)}</span></td><td>${esc(wldS(r.wld))}</td><td>${esc(r.hcP.line)}</td><td>${esc(scoreS(r.score))}</td><td>${esc(hfS(r.halffull))}</td><td>${esc(ouS(r.ouReal))}</td></tr><tr class="d"><td colspan="7">${detail(r)}</td></tr>`).join("");
 const html = `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>神选·竞彩·${date}</title>
 <style>*{box-sizing:border-box}body{font-family:-apple-system,"Microsoft YaHei",system-ui,sans-serif;margin:0;background:#eef1f5;color:#1c2530;-webkit-text-size-adjust:100%}.wrap{max-width:720px;margin:0 auto;padding:14px 10px 40px}
 .top{background:linear-gradient(135deg,#4A148C,#7b1fa2);color:#fff;border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 6px 18px rgba(74,20,140,.28)}.top h1{font-size:18px;margin:0 0 3px;font-weight:700}.top .sub{font-size:12px;opacity:.88}.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}.legend span{font-size:11px;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:20px}
@@ -157,14 +166,15 @@ table.core th{background:#4A148C;color:#fff;padding:10px 4px;font-weight:600;fon
 .b{display:inline-block;min-width:26px;color:#fff;font-weight:700;font-size:12px;padding:3px 8px;border-radius:12px}
 .core .d{display:none}.core .d.open{display:table-row}.core .d>td{padding:8px 13px 12px;background:#faf9fc}
 .drow{padding:6px 0;font-size:12px;line-height:1.6;border-top:1px solid #efeaf6;color:#37404d}.drow:first-child{border-top:none}.drow b{color:#7e22ce;font-weight:700;margin-right:6px}.drow .g{color:#9aa6b4}.drow .ind{display:inline-block;margin-top:2px}.drow .w2{color:#d97706;font-weight:600}
+.adv{margin-top:8px;background:#fef2f2;border:1px solid #fecaca;border-left:4px solid #d32f2f;border-radius:8px;padding:8px 11px;font-size:11.5px;line-height:1.55;color:#7f1d1d}.adv b{color:#b91c1c;font-weight:700}.adv .g{color:#b08}.kx{display:inline-block;font-size:10px;background:#fde8e8;color:#b91c1c;border:1px solid #f5b5b5;border-radius:8px;padding:1px 6px;font-weight:700;vertical-align:middle}
 .dl{display:block;text-align:center;margin:18px 2px 6px;padding:14px;background:#4A148C;color:#fff;border-radius:13px;text-decoration:none;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(74,20,140,.28)}
 .foot{color:#9aa3af;font-size:11px;margin:12px 6px 0;line-height:1.55}</style></head><body><div class="wrap">
 <div class="top"><h1>⚡ 神选 · 竞彩推荐</h1><div class="sub">${date} · ${rows.length}场${intlN ? ` 国际赛${intlN}` : ""}${wcN ? ` 世界杯${wcN}` : ""} · 5赔种全覆盖</div><div class="legend"><span>✅ 实测真盘</span><span>🔶 模型推断</span><span>⚠️ 缺口标缺不编</span></div></div>
 <div class="risk">${esc(riskNote || "模型只给信心+风险参考,买不买你定。")}</div>
 <div class="hint">👇 点任意一行 = 展开该场全部赔率/近5/H2H/攻防</div>
 <table class="core"><thead><tr><th>对阵 ▾</th><th>信心</th><th>胜负平</th><th>让球</th><th>比分</th><th>半全</th><th>大小</th></tr></thead><tbody>${trs}</tbody></table>
-<a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(19列全字段)</a>
-<div class="foot">真实端到端(${date})。5赔种=500竞彩XML(欧赔/让球/比分/半全场/总进球de-vig),亚盘+未开售场欧赔=ESPN/DraftKings,近5/H2H=ESPN。让球过盘=模型与市场两套数·分歧大以市场为准。缺口(国家队真xG/老H2H)诚实标。多agent审计已核让球线(中-1/匈-2/阿-2)。</div>
+<a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(20列全字段·含对抗证伪)</a>
+<div class="foot">真实端到端(${date})。5赔种=500竞彩XML(欧赔/让球/比分/半全场/总进球de-vig),亚盘+未开售场欧赔=ESPN/DraftKings,近5/H2H=ESPN。让球过盘=模型与市场两套数·分歧大以市场为准。缺口(国家队真xG/老H2H)诚实标。多agent审计已核让球线(中-1/匈-2/阿-2)+三视角对抗证伪(🔴=证伪·只标注不弃赛,展开看致命点)。</div>
 <script>function tg(r){r.nextElementSibling.classList.toggle('open');var a=r.querySelector('.ar');if(a)a.textContent=r.nextElementSibling.classList.contains('open')?'▴':'▾';}</script>
 </div></body></html>`;
 writeFileSync("D:/Temp/webshare_lingdao/今日足球推荐.html", html, "utf8");
@@ -183,7 +193,9 @@ for (const r of rows) {
   console.log(`     半全场🔶: ${r.halffull}〔${r.hfSrc}〕| 赔率✅: ${r.hfMkt}`);
   console.log(`     大小球✅: ${r.ouReal} | 进球分布: ${r.dist}`);
   console.log(`  ④ 近5✅: ${r.homeRec} 〔${r.homeLast5}〕 ‖ ${r.awayRec} 〔${r.awayLast5}〕`);
-  console.log(`     H2H: ${r.h2h} | 攻防: ${r.profile}\n`);
+  console.log(`     H2H: ${r.h2h} | 攻防: ${r.profile}`);
+  if (r.adv) console.log(`  🔴 对抗证伪: ${r.adv.label}${r.adv.ev != null ? ` EV=${r.adv.ev}` : ""} — ${r.adv.kill}`);
+  console.log("");
 }
 console.log(`✅ xlsx: ${xlsxTarget}`);
 console.log(`✅ 手机页: D:/Temp/webshare_lingdao/今日足球推荐.html`);
