@@ -67,6 +67,36 @@ async function teamHistory(team) {
   return games;
 }
 
+// ── ESPN/DraftKings 赔率(亚盘pointSpread + 欧赔moneyline + 大小球total),免费、覆盖国际友谊赛 ──
+const am2dec = (a) => { const n = parseInt(a); return Number.isFinite(n) ? (n > 0 ? +(n / 100 + 1).toFixed(2) : +(100 / -n + 1).toFixed(2)) : null; };
+async function fetchEspnOdds(date) {
+  const d = date.replace(/-/g, "");
+  const d1 = String(Number(d) + 1); // 跨夜场(如6/10开赛)也扫
+  const out = [];
+  for (const lg of LEAGUES) {
+    for (const dd of [d, d1]) {
+      const j = await jget(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lg}/scoreboard?dates=${dd}`);
+      for (const e of j?.events || []) {
+        const c = e.competitions?.[0]; const o = c?.odds?.[0];
+        if (!o || !o.pointSpread) continue;
+        const ps = o.pointSpread, ml = o.moneyline, tot = o.total;
+        const provider = o.provider?.name || "?";
+        out.push({
+          name: e.name, provider,
+          asian: {
+            line: ps.home?.close?.line ?? ps.home?.open?.line ?? null,
+            homeOdds: am2dec(ps.home?.close?.odds), awayOdds: am2dec(ps.away?.close?.odds),
+            openLine: ps.home?.open?.line ?? null,
+          },
+          ml: ml ? { home: am2dec(ml.home?.close?.odds), draw: am2dec(ml.draw?.close?.odds), away: am2dec(ml.away?.close?.odds) } : null,
+          total: { line: o.overUnder ?? null, over: am2dec(tot?.over?.close?.odds), under: am2dec(tot?.under?.close?.odds) },
+        });
+      }
+    }
+  }
+  return out;
+}
+
 // ── Odds API totals(世界杯大小球) ──
 async function fetchWcTotals() {
   if (!KEY) return { ok: false, reason: "无 ODDS_API_KEY" };
@@ -103,6 +133,10 @@ console.error("建 ESPN 队名表…");
 const tmap = await buildTeamMap();
 const findTeam = (re) => Object.values(tmap).find((t) => new RegExp(re, "i").test(t.name));
 
+console.error("抓 ESPN/DraftKings 赔率(亚盘+欧赔+大小球)…");
+const espnOdds = await fetchEspnOdds(DATE);
+console.error(`  ESPN赔率: ${espnOdds.length}场带盘口`);
+
 console.error("抓 Odds API 世界杯大小球…");
 const tot = await fetchWcTotals();
 console.error(`  Odds API totals: ${tot.ok ? `ok, remaining=${tot.remaining}, ${Object.keys(tot.byPair).length}场` : "失败 " + tot.reason}`);
@@ -124,6 +158,8 @@ for (const m of MATCHES) {
     const k = Object.keys(tot.byPair).find((kk) => kk.startsWith(m.oddsHome) && kk.includes(m.oddsAway));
     if (k) ou = tot.byPair[k];
   }
+  // ESPN/DraftKings 盘口(亚盘/欧赔/大小球)按队名匹配(event name = "Away at Home")
+  const espn = espnOdds.find((x) => new RegExp(m.home.re, "i").test(x.name) && new RegExp(m.away.re, "i").test(x.name)) || null;
 
   out.matches.push({
     match: m.zh, comp: m.comp,
@@ -134,6 +170,7 @@ for (const m of MATCHES) {
     h2h,
     overUnder: ou ? { ...ou, source: "The Odds API (eu, 2.5线de-vig)" }
       : { source: m.wc ? "The Odds API 缺该场" : "❌ 无源(友谊赛The Odds API无key + odds.500退役)", line: null },
+    espnOdds: espn ? { ...espn, source: `ESPN/${espn.provider}` } : null,
   });
 }
 
