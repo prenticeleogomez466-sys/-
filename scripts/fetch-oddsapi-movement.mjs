@@ -27,7 +27,7 @@ const openPath = join(dir, `oddsapi-${SPORT}-open.json`);
 const latestPath = join(dir, `oddsapi-${SPORT}-latest.json`);
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8").replace(/^﻿/, "")); } catch { return null; } };
 
-const url = `https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${KEY}&regions=${REGION}&markets=h2h&oddsFormat=decimal`;
+const url = `https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${KEY}&regions=${REGION}&markets=h2h,totals&oddsFormat=decimal`;
 const res = await fetch(url);
 if (res.status !== 200) { console.error(`The Odds API HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`); process.exit(1); }
 const events = await res.json();
@@ -54,11 +54,28 @@ function consensus(ev) {
     pHome: (1 / h) / inv, pDraw: (1 / d) / inv, pAway: (1 / a) / inv, overround: inv };
 }
 
+// 大小球 2.5 线共识 de-vig(补齐覆盖 2026-06-09:此前只存 h2h 致大小球无源头可审计)
+function totalsConsensus(ev, line = 2.5) {
+  const O = [], U = [];
+  for (const bk of ev.bookmakers ?? []) {
+    const m = (bk.markets ?? []).find((x) => x.key === "totals");
+    if (!m) continue;
+    const o = (m.outcomes ?? []).find((x) => /over/i.test(x.name) && x.point === line);
+    const u = (m.outcomes ?? []).find((x) => /under/i.test(x.name) && x.point === line);
+    if (o && u) { O.push(o.price); U.push(u.price); }
+  }
+  const mo = median(O), mu = median(U);
+  if (!mo || !mu) return null;
+  const inv = 1 / mo + 1 / mu;
+  return { line, books: O.length, oddsOver: +mo.toFixed(3), oddsUnder: +mu.toFixed(3),
+    pOver: +((1 / mo) / inv).toFixed(3), pUnder: +((1 / mu) / inv).toFixed(3), overround: +inv.toFixed(4) };
+}
+
 const nowSnap = {};
 for (const ev of Array.isArray(events) ? events : []) {
   const c = consensus(ev);
   if (!c) continue;
-  nowSnap[ev.id] = { id: ev.id, commence: ev.commence_time, home: ev.home_team, away: ev.away_team, ...c };
+  nowSnap[ev.id] = { id: ev.id, commence: ev.commence_time, home: ev.home_team, away: ev.away_team, ...c, ou: totalsConsensus(ev) };
 }
 
 // open 基线:write-once per match

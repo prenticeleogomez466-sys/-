@@ -1,0 +1,159 @@
+// 一场比赛"所有数据 + 所有赔率"覆盖抓取器(免费源,真实端到端,缺标缺不编)。
+// 用户铁律 2026-06-09:必须把所有赔率/数据补齐覆盖后再生成。
+//   · 近5场/H2H = ESPN 隐藏 API(跨 fifa.world/friendly/各预选赛 league 合并,plain HTTP 无反爬)
+//   · 大小球 O/U = The Odds API totals(世界杯单场,14家盘口 de-vig 共识);友谊赛无 sport key→真墙标缺
+//   · 1X2/让球/比分/半全场 = 已由 500 实时进模型快照,本脚本不重复
+// 输出:D:/football-model-data/coverage/<date>.json,供完整交付 + workflow 交叉审计读取。
+import "../src/env.js";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const DATE = process.argv[2] || "2026-06-09";
+const KEY = process.env.ODDS_API_KEY;
+
+// 7 场目标(队名查询正则 + 元信息)。ESPN abbr 与中文名都列,匹配更稳。
+const MATCHES = [
+  { zh: "中国 vs 泰国", comp: "国际赛", home: { zh: "中国", re: "China PR|^China$|China" }, away: { zh: "泰国", re: "Thailand" }, wc: false },
+  { zh: "匈牙利 vs 哈萨克斯坦", comp: "国际赛", home: { zh: "匈牙利", re: "Hungary" }, away: { zh: "哈萨克斯坦", re: "Kazakhstan" }, wc: false },
+  { zh: "阿根廷 vs 冰岛", comp: "国际赛", home: { zh: "阿根廷", re: "Argentina" }, away: { zh: "冰岛", re: "Iceland" }, wc: false },
+  { zh: "墨西哥 vs 南非", comp: "世界杯·单场", home: { zh: "墨西哥", re: "Mexico" }, away: { zh: "南非", re: "South Africa" }, wc: true, oddsHome: "Mexico", oddsAway: "South Africa" },
+  { zh: "韩国 vs 捷克", comp: "世界杯·单场", home: { zh: "韩国", re: "South Korea|Korea Republic|^Korea" }, away: { zh: "捷克", re: "Czech" }, wc: true, oddsHome: "South Korea", oddsAway: "Czech Republic" },
+  { zh: "加拿大 vs 波黑", comp: "世界杯·单场", home: { zh: "加拿大", re: "Canada" }, away: { zh: "波黑", re: "Bosnia" }, wc: true, oddsHome: "Canada", oddsAway: "Bosnia" },
+  { zh: "美国 vs 巴拉圭", comp: "世界杯·单场", home: { zh: "美国", re: "United States|^USA" }, away: { zh: "巴拉圭", re: "Paraguay" }, wc: true, oddsHome: "USA", oddsAway: "Paraguay" },
+];
+
+const LEAGUES = ["fifa.world", "fifa.friendly", "fifa.worldq.uefa", "fifa.worldq.afc", "fifa.worldq.concacaf", "fifa.worldq.conmebol", "fifa.cew", "fifa.nations"];
+const scoreVal = (s) => (s == null ? null : typeof s === "object" ? (s.displayValue ?? s.value ?? null) : s);
+
+async function jget(url) { try { const r = await fetch(url); if (r.status !== 200) return null; return await r.json(); } catch { return null; } }
+
+// 跨 league 建队名→{id, leagues[]}
+async function buildTeamMap() {
+  const map = {};
+  for (const lg of LEAGUES) {
+    const j = await jget(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lg}/teams`);
+    for (const t of j?.sports?.[0]?.leagues?.[0]?.teams || []) {
+      const nm = t.team.displayName;
+      map[nm] = map[nm] || { id: t.team.id, name: nm, abbr: t.team.abbreviation, leagues: [] };
+      if (!map[nm].leagues.includes(lg)) map[nm].leagues.push(lg);
+    }
+  }
+  return map;
+}
+
+// 某队跨其所有 league 的已完赛事(去重 by event id),含对手/比分/主客/结果
+async function teamHistory(team) {
+  const seen = new Set(), games = [];
+  for (const lg of team.leagues) {
+    const sc = await jget(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lg}/teams/${team.id}/schedule`);
+    for (const e of sc?.events || []) {
+      const c = e.competitions?.[0];
+      if (!c?.status?.type?.completed) continue;
+      if (seen.has(e.id)) continue; seen.add(e.id);
+      const me = c.competitors.find((x) => x.team.id === team.id);
+      const opp = c.competitors.find((x) => x.team.id !== team.id);
+      if (!me || !opp) continue;
+      const ms = parseInt(scoreVal(me.score)), os = parseInt(scoreVal(opp.score));
+      if (!Number.isFinite(ms) || !Number.isFinite(os)) continue;
+      games.push({
+        date: e.date?.slice(0, 10), lg,
+        homeAway: me.homeAway, oppName: opp.team.displayName, oppAbbr: opp.team.abbreviation,
+        gf: ms, ga: os, res: ms > os ? "胜" : ms === os ? "平" : "负",
+        score: `${me.homeAway === "home" ? ms : os}-${me.homeAway === "home" ? os : ms}`,
+      });
+    }
+  }
+  games.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  return games;
+}
+
+// ── Odds API totals(世界杯大小球) ──
+async function fetchWcTotals() {
+  if (!KEY) return { ok: false, reason: "无 ODDS_API_KEY" };
+  const url = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
+  const r = await fetch(url);
+  if (r.status !== 200) return { ok: false, reason: `HTTP ${r.status}` };
+  const remaining = r.headers.get("x-requests-remaining");
+  const events = await r.json();
+  const median = (a) => { const s = a.filter((x) => x > 0).sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
+  const byPair = {};
+  for (const ev of Array.isArray(events) ? events : []) {
+    // 取 2.5 线(主流);各家 Over/Under @2.5 取中位 → de-vig
+    const ov = [], un = [];
+    for (const b of ev.bookmakers || []) {
+      const m = (b.markets || []).find((x) => x.key === "totals");
+      if (!m) continue;
+      const o = m.outcomes.find((x) => /over/i.test(x.name) && x.point === 2.5);
+      const u = m.outcomes.find((x) => /under/i.test(x.name) && x.point === 2.5);
+      if (o && u) { ov.push(o.price); un.push(u.price); }
+    }
+    const mo = median(ov), mu = median(un);
+    if (!mo || !mu) continue;
+    const inv = 1 / mo + 1 / mu;
+    byPair[`${ev.home_team}|${ev.away_team}`] = {
+      line: 2.5, books: ov.length, oddsOver: +mo.toFixed(3), oddsUnder: +mu.toFixed(3),
+      pOver: +((1 / mo) / inv).toFixed(3), pUnder: +((1 / mu) / inv).toFixed(3), overround: +inv.toFixed(4),
+    };
+  }
+  return { ok: true, remaining, byPair };
+}
+
+// ── 主流程 ──
+console.error("建 ESPN 队名表…");
+const tmap = await buildTeamMap();
+const findTeam = (re) => Object.values(tmap).find((t) => new RegExp(re, "i").test(t.name));
+
+console.error("抓 Odds API 世界杯大小球…");
+const tot = await fetchWcTotals();
+console.error(`  Odds API totals: ${tot.ok ? `ok, remaining=${tot.remaining}, ${Object.keys(tot.byPair).length}场` : "失败 " + tot.reason}`);
+
+const out = { date: DATE, generatedAt: new Date().toISOString(), oddsApiRemaining: tot.remaining ?? null, matches: [] };
+
+for (const m of MATCHES) {
+  console.error(`抓 ${m.zh} …`);
+  const ht = findTeam(m.home.re), at = findTeam(m.away.re);
+  const hHist = ht ? await teamHistory(ht) : [];
+  const aHist = at ? await teamHistory(at) : [];
+  const last5 = (g) => g.slice(-5).reverse();
+  // H2H:主队历史里筛对手 = 客队(按 abbr 或 名字)
+  const h2h = at ? hHist.filter((g) => g.oppName === at.name || (ht && new RegExp(m.away.re, "i").test(g.oppName))).slice(-5).reverse() : [];
+
+  // 大小球
+  let ou = null;
+  if (m.wc && tot.ok) {
+    const k = Object.keys(tot.byPair).find((kk) => kk.startsWith(m.oddsHome) && kk.includes(m.oddsAway));
+    if (k) ou = tot.byPair[k];
+  }
+
+  out.matches.push({
+    match: m.zh, comp: m.comp,
+    home: { zh: m.home.zh, espn: ht?.name ?? null, abbr: ht?.abbr ?? null,
+      last5: last5(hHist), record5: rec(last5(hHist)) },
+    away: { zh: m.away.zh, espn: at?.name ?? null, abbr: at?.abbr ?? null,
+      last5: last5(aHist), record5: rec(last5(aHist)) },
+    h2h,
+    overUnder: ou ? { ...ou, source: "The Odds API (eu, 2.5线de-vig)" }
+      : { source: m.wc ? "The Odds API 缺该场" : "❌ 无源(友谊赛The Odds API无key + odds.500退役)", line: null },
+  });
+}
+
+function rec(g5) {
+  const w = g5.filter((x) => x.res === "胜").length, d = g5.filter((x) => x.res === "平").length, l = g5.filter((x) => x.res === "负").length;
+  const gf = g5.reduce((s, x) => s + x.gf, 0), ga = g5.reduce((s, x) => s + x.ga, 0);
+  return { w, d, l, gf, ga, n: g5.length };
+}
+
+const dir = "D:/football-model-data/coverage";
+if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+const outPath = join(dir, `${DATE}.json`);
+writeFileSync(outPath, JSON.stringify(out, null, 2), "utf8");
+console.error(`\n写入 ${outPath}`);
+// 控制台摘要
+for (const m of out.matches) {
+  const hr = m.home.record5, ar = m.away.record5;
+  console.log(`\n【${m.match}】(${m.comp})`);
+  console.log(`  ${m.home.zh}近5: ${hr.n ? `${hr.w}胜${hr.d}平${hr.l}负 进${hr.gf}失${hr.ga}` : "❌未取到"} ${m.home.last5.map((x) => x.res + x.score).join(" ")}`);
+  console.log(`  ${m.away.zh}近5: ${ar.n ? `${ar.w}胜${ar.d}平${ar.l}负 进${ar.gf}失${ar.ga}` : "❌未取到"} ${m.away.last5.map((x) => x.res + x.score).join(" ")}`);
+  console.log(`  H2H: ${m.h2h.length ? m.h2h.map((x) => `${x.date} ${x.score}(${x.res})`).join(" | ") : "❌未取到"}`);
+  console.log(`  大小球: ${m.overUnder.line ? `O/U ${m.overUnder.line} 大${(m.overUnder.pOver * 100).toFixed(0)}%/小${(m.overUnder.pUnder * 100).toFixed(0)}% [${m.overUnder.books}家] ${m.overUnder.source}` : m.overUnder.source}`);
+}
