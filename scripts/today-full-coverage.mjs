@@ -127,34 +127,45 @@ writeXlsxWorkbook(xlsxTarget, sheets);
 const subDir = `C:/Users/Administrator/Desktop/足球推荐/${date}`;
 try { mkdirSync(subDir, { recursive: true }); copyFileSync(xlsxTarget, `${subDir}/神选-竞彩推荐-${date}.xlsx`); } catch (e) { console.log("子文件夹副本skip:", e.message); }
 
-// ── 手机页(每场卡片,可读) ──
+// ── 手机页(核心7列表 + 点行展开该场全部细节;用户 2026-06-09 选定"一打开全部看得见") ──
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const tierColor = (t) => /一档|二档/.test(t) ? "#2e7d32" : /三档/.test(t) ? "#f9a825" : /硬币/.test(t) ? "#6b7280" : "#ea580c";
-const kv = (k, v, ext, sub) => `<div class="kv"><span class="k">${esc(k)}</span><span class="v${ext ? " ext" : ""}">${esc(v)}${sub ? ` <i>${esc(sub)}</i>` : ""}</span></div>`;
-const cards = rows.map((r) => `<section class="card">
-<header class="ch"><div class="teams">${esc(r.match)}</div><div class="meta"><span class="comp">${esc(r.comp)}</span><span>${esc(r.ko)} 开赛</span></div><span class="conf" style="background:${tierColor(r.tier)}">${esc(r.tier)} ${Math.round(r.conf)}</span></header>
-<div class="body">
-<div class="blk"><div class="lbl">① 胜负平 1X2</div>${kv("模型", r.wld)}${kv("赔率", r.euro, true)}</div>
-<div class="blk"><div class="lbl">② 让球 / 亚盘 <b>竞彩${esc(r.hcP.line)}</b></div>${kv("模型过盘", r.hcP.model)}${kv("市场de-vig", r.hcP.market)}${r.hcP.diverge ? `<div class="warn">⚠️ 模型与市场分歧大 — 铁律:分歧越大市场越准,以市场为准</div>` : ""}${kv("竞彩赔率", r.hc, true)}${kv("博彩亚盘", r.asian, true)}</div>
-<div class="blk"><div class="lbl">③ 比分 / 半全场 / 大小球</div>${kv("比分", r.score, false, r.scoreSrc)}${kv("比分赔率", r.scoreMkt, true)}${kv("半全场", r.halffull)}${kv("半全场赔率", r.hfMkt, true)}${kv("大小球", r.ouReal, false, r.dist)}</div>
-<div class="blk"><div class="lbl">④ 球队数据(ESPN 真实)</div>${kv("主队近5", r.homeRec, false, r.homeLast5)}${kv("客队近5", r.awayRec, false, r.awayLast5)}${kv("H2H", r.h2h)}${kv("攻防", r.profile)}</div>
-</div></section>`).join("");
+// 核心列短值(从已算显示串解析,避免重复逻辑)
+const wldS = (s) => { if (/未开售/.test(s)) return "未开售"; const m = s.match(/(主胜|平局|客胜)\((\d+)%\)/); return m ? `${m[1][0]}${m[2]}%` : "—"; };
+const scoreS = (s) => { const m = String(s).match(/(\d+)-(\d+)/); return m ? m[0] : "—"; };
+const hfS = (s) => { const m = String(s).match(/(主胜|平局|客胜)-(主胜|平局|客胜)/); return m ? `${m[1][0]}-${m[2][0]}` : "—"; };
+const ouS = (s) => { const m = String(s).match(/大(\d+)%/); return m ? `大${m[1]}` : "—"; };
+const detail = (r) => `<div class="drow"><b>胜负平</b>${esc(r.wld)}<span class="g"> · 欧赔 ${esc(r.euro)}</span></div>` +
+  `<div class="drow"><b>让球${esc(r.hcP.line)}</b>模型 ${esc(r.hcP.model)}<br><span class="ind">市场 ${esc(r.hcP.market)}${r.hcP.diverge ? ` <span class="w2">⚠️以市场为准</span>` : ""}</span></div>` +
+  `<div class="drow"><b>让球赔率</b>${esc(r.hc)}<br><b>博彩亚盘</b>${esc(r.asian)}</div>` +
+  `<div class="drow"><b>比分</b>${esc(r.score)}<span class="g"> · 赔率 ${esc(r.scoreMkt)}</span></div>` +
+  `<div class="drow"><b>半全场</b>${esc(r.halffull)}<span class="g"> · 赔率 ${esc(r.hfMkt)}</span></div>` +
+  `<div class="drow"><b>大小球</b>${esc(r.ouReal)}<span class="g"> · 进球分布 ${esc(r.dist)}</span></div>` +
+  `<div class="drow"><b>近5</b>${esc(r.homeRec)} <span class="g">${esc(r.homeLast5)}</span><br><span class="ind">${esc(r.awayRec)} <span class="g">${esc(r.awayLast5)}</span></span></div>` +
+  `<div class="drow"><b>H2H</b>${esc(r.h2h)}</div>` +
+  `<div class="drow"><b>攻防</b>${esc(r.profile)}</div>`;
+const trs = rows.map((r) => `<tr class="r" onclick="tg(this)"><td class="m">${esc(r.match)} <span class="ar">▾</span><i>${esc(r.ko)} · ${esc(r.comp)}</i></td><td><span class="b" style="background:${tierColor(r.tier)}">${Math.round(r.conf)}</span></td><td>${esc(wldS(r.wld))}</td><td>${esc(r.hcP.line)}</td><td>${esc(scoreS(r.score))}</td><td>${esc(hfS(r.halffull))}</td><td>${esc(ouS(r.ouReal))}</td></tr><tr class="d"><td colspan="7">${detail(r)}</td></tr>`).join("");
 const html = `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>神选·竞彩·${date}</title>
 <style>*{box-sizing:border-box}body{font-family:-apple-system,"Microsoft YaHei",system-ui,sans-serif;margin:0;background:#eef1f5;color:#1c2530;-webkit-text-size-adjust:100%}.wrap{max-width:720px;margin:0 auto;padding:14px 10px 40px}
 .top{background:linear-gradient(135deg,#4A148C,#7b1fa2);color:#fff;border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 6px 18px rgba(74,20,140,.28)}.top h1{font-size:18px;margin:0 0 3px;font-weight:700}.top .sub{font-size:12px;opacity:.88}.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}.legend span{font-size:11px;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:20px}
 .risk{background:#fff;border-left:4px solid #d32f2f;border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:12.5px;line-height:1.55;box-shadow:0 1px 5px rgba(0,0,0,.06)}
-.card{background:#fff;border-radius:16px;margin-bottom:13px;overflow:hidden;box-shadow:0 2px 12px rgba(20,30,50,.08)}
-.ch{position:relative;background:#faf7fd;border-bottom:1px solid #eee9f3;padding:13px 15px}.ch .teams{font-size:16px;font-weight:700;color:#2a1a4a;padding-right:74px}.ch .meta{margin-top:4px;font-size:11.5px;color:#9097a3}.ch .comp{background:#ede7f6;color:#6a1b9a;padding:1px 8px;border-radius:10px;margin-right:7px}.ch .conf{position:absolute;top:13px;right:15px;color:#fff;font-size:12px;font-weight:700;padding:4px 11px;border-radius:20px}
-.body{padding:2px 15px 12px}.blk{padding:10px 0;border-top:1px solid #f1f1f5}.blk:first-child{border-top:none}.lbl{font-size:11.5px;font-weight:700;color:#7e22ce;margin-bottom:7px}.lbl b{color:#1c2530;background:#fef3c7;padding:0 7px;border-radius:5px;margin-left:5px;font-size:12px}
-.kv{display:flex;gap:9px;padding:3px 0;font-size:12.5px;line-height:1.5}.kv .k{flex:0 0 64px;color:#94a0ae;font-size:11.5px}.kv .v{flex:1;color:#1c2530}.kv .v.ext{color:#52606d;font-size:11.5px}.kv .v i{color:#9aa6b4;font-style:normal;font-size:11px}
-.warn{background:#fff4e5;color:#b45309;font-size:11.5px;padding:6px 9px;border-radius:7px;margin:5px 0}
+.hint{font-size:11.5px;color:#8a93a0;margin:0 4px 8px}
+table.core{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(20,30,50,.08);font-size:13px}
+table.core th{background:#4A148C;color:#fff;padding:10px 4px;font-weight:600;font-size:11.5px;text-align:center}table.core th:first-child{text-align:left;padding-left:12px}
+.core .r{cursor:pointer;border-top:1px solid #eef0f3}.core .r td{padding:11px 4px;text-align:center;color:#1c2530;font-weight:600}
+.core .r td.m{text-align:left;padding-left:12px;color:#2a1a4a}.core .r td.m i{display:block;font-style:normal;font-weight:400;color:#9097a3;font-size:10.5px;margin-top:2px}.core .r td.m .ar{color:#9333ea;font-size:11px}
+.b{display:inline-block;min-width:26px;color:#fff;font-weight:700;font-size:12px;padding:3px 8px;border-radius:12px}
+.core .d{display:none}.core .d.open{display:table-row}.core .d>td{padding:8px 13px 12px;background:#faf9fc}
+.drow{padding:6px 0;font-size:12px;line-height:1.6;border-top:1px solid #efeaf6;color:#37404d}.drow:first-child{border-top:none}.drow b{color:#7e22ce;font-weight:700;margin-right:6px}.drow .g{color:#9aa6b4}.drow .ind{display:inline-block;margin-top:2px}.drow .w2{color:#d97706;font-weight:600}
 .dl{display:block;text-align:center;margin:18px 2px 6px;padding:14px;background:#4A148C;color:#fff;border-radius:13px;text-decoration:none;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(74,20,140,.28)}
 .foot{color:#9aa3af;font-size:11px;margin:12px 6px 0;line-height:1.55}</style></head><body><div class="wrap">
-<div class="top"><h1>⚡ 神选 · 竞彩推荐</h1><div class="sub">${date} · ${rows.length}场${intlN ? ` 国际赛${intlN}` : ""}${wcN ? ` 世界杯${wcN}` : ""} · 5赔种全覆盖</div><div class="legend"><span>✅ 实测真盘(500/ESPN)</span><span>🔶 模型推断</span><span>⚠️ 缺口·标缺不编</span></div></div>
-<div class="risk">${esc(riskNote || "各场信心+风险见卡片,模型只给参考、买不买你定。")}</div>
-${cards}
-<a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(19列)</a>
-<div class="foot">真实端到端·三处(xlsx/手机/对话)口径一致(${date})。5赔种=500竞彩静态XML(欧赔/让球/比分/半全场/总进球de-vig),亚盘+未开售场欧赔=ESPN/DraftKings,近5/H2H=ESPN。让球过盘=模型与市场两套数,分歧大以市场为准。缺口(国家队真xG/老H2H)诚实标墙不编。多agent交叉审计已核三场让球线+全赔率(中-1/匈-2/阿-2)。</div>
+<div class="top"><h1>⚡ 神选 · 竞彩推荐</h1><div class="sub">${date} · ${rows.length}场${intlN ? ` 国际赛${intlN}` : ""}${wcN ? ` 世界杯${wcN}` : ""} · 5赔种全覆盖</div><div class="legend"><span>✅ 实测真盘</span><span>🔶 模型推断</span><span>⚠️ 缺口标缺不编</span></div></div>
+<div class="risk">${esc(riskNote || "模型只给信心+风险参考,买不买你定。")}</div>
+<div class="hint">👇 点任意一行 = 展开该场全部赔率/近5/H2H/攻防</div>
+<table class="core"><thead><tr><th>对阵 ▾</th><th>信心</th><th>胜负平</th><th>让球</th><th>比分</th><th>半全</th><th>大小</th></tr></thead><tbody>${trs}</tbody></table>
+<a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(19列全字段)</a>
+<div class="foot">真实端到端(${date})。5赔种=500竞彩XML(欧赔/让球/比分/半全场/总进球de-vig),亚盘+未开售场欧赔=ESPN/DraftKings,近5/H2H=ESPN。让球过盘=模型与市场两套数·分歧大以市场为准。缺口(国家队真xG/老H2H)诚实标。多agent审计已核让球线(中-1/匈-2/阿-2)。</div>
+<script>function tg(r){r.nextElementSibling.classList.toggle('open');var a=r.querySelector('.ar');if(a)a.textContent=r.nextElementSibling.classList.contains('open')?'▴':'▾';}</script>
 </div></body></html>`;
 writeFileSync("D:/Temp/webshare_lingdao/今日足球推荐.html", html, "utf8");
 try { copyFileSync(xlsxTarget, `D:/Temp/webshare_lingdao/神选-竞彩推荐-${date}.xlsx`); copyFileSync(xlsxTarget, `D:/Temp/webshare_lingdao/jingcai-${date}.xlsx`); } catch (e) { console.log("xlsx copy skip:", e.message); }

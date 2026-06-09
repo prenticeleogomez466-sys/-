@@ -147,7 +147,8 @@ async function main() {
     });
 
     // 让球线(竞彩官方,jczq DOM)+ 亚盘水位 + 大小球(odds.xml)
-    const jline = parseJingcaiHandicapLine(hcapByHome[m.home]);
+    // 优先 "主队|客队" 复合键(防同一主队当日两场碰撞,如阿根廷vs冰岛让-2 vs 阿根廷vs阿尔及利亚让-1),兜底主队键。
+    const jline = parseJingcaiHandicapLine(hcapByHome[`${m.home}|${m.away}`] ?? hcapByHome[m.home]);
     const od = oddsByNum.get(m.matchnum);
     let asianHandicap = null;
     if (od?.asian) {

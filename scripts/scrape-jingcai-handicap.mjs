@@ -25,8 +25,14 @@ try {
       const cells = [...tr.querySelectorAll("td")].map((td) => td.innerText.replace(/\s+/g, " ").trim());
       const teamCell = cells[3] || "";
       const hcap = cells[4] || "";
-      const home = teamCell.replace(/\[\d+\]/g, "").split(/VS/i)[0].trim();
-      if (home && /[-+]?\d/.test(hcap)) map[home] = hcap;
+      const parts = teamCell.replace(/\[\d+\]/g, "").split(/VS/i);
+      const home = (parts[0] || "").trim();
+      const away = (parts[1] || "").trim();
+      if (!home || !/[-+]?\d/.test(hcap)) continue;
+      // 防碰撞(2026-06-09 根因修):同一主队当日可能两场(如阿根廷vs冰岛让-2 + 阿根廷vs阿尔及利亚让-1),
+      //   旧 map[home] 后写覆盖前写 → 错拿别场让球线。改 "主队|客队" 唯一键;保留 home 键向后兼容(消费端优先查复合键)。
+      if (away) map[`${home}|${away}`] = hcap;
+      if (!(home in map)) map[home] = hcap;
     }
     return map;
   });
