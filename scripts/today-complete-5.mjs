@@ -29,7 +29,10 @@ for (const p of picked) {
 const five = [...byMatch.values()]
   .sort((a, b) => String(a.fixture.kickoff).localeCompare(String(b.fixture.kickoff)));
 
-const fourteen = pkg.recommendations?.fourteen?.selections ?? [];
+// 14场只在"今日确为14场比赛日"(available===true)时才输出;
+// 仅在售/比赛日在未来(available===false)按用户硬规则"没有14场就只推荐竞彩"→完全不发14场(sheet+手机表都不出)。
+const fourteenAvailable = pkg.recommendations?.fourteen?.available === true;
+const fourteen = fourteenAvailable ? (pkg.recommendations?.fourteen?.selections ?? []) : [];
 const f14note = pkg.recommendations?.fourteen?.note ?? "";
 
 // ── 单一数据模型:5行,三处共用 ──
@@ -96,7 +99,7 @@ const html = `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta n
 <div class="note">${NOTE}</div>
 <table><tr><th>开赛</th><th>对阵</th><th>胜负平</th><th>让胜负平</th><th>比分</th><th>半全场</th><th>信心</th></tr>${mRows}</table>
 ${fourteen.length ? `<h2>14场胜负彩 · ${esc(f14note || "第26085期(世界杯小组赛)")}</h2><div class="note">📌 今天正在售,赛期6/12起,附14腿预测供参考。</div><table><tr><th>#</th><th>对阵</th><th>单关</th><th>胆/双选</th><th>信心</th></tr>${f14Rows}</table>` : ""}
-<a class="dl" href="神选-竞彩推荐-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(两表)</a>
+<a class="dl" href="神选-竞彩推荐-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx${fourteen.length ? "(两表)" : "(竞彩)"}</a>
 <div class="foot">单一数据源生成·三处(xlsx/手机页/对话)口径一致·真实端到端·让球线500实时核(${date})。模型只给信心+风险,买不买由你定。</div>
 </div></body></html>`;
 const mobileOut = "D:/Temp/webshare_lingdao/今日足球推荐.html";
