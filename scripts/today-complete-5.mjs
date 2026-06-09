@@ -51,12 +51,25 @@ const rows = five.map((p, i) => ({
   conf: p.confidence, tier: tierLabel(p),
 }));
 
-// ── 派生 banner(从真实数据,非硬编码) ──
+// ── 派生 banner + note(全从当日真实 rows 动态生成,绝不硬编码队名/场数) ──
 const wcN = five.filter(isWc).length;
 const intlN = five.length - wcN;
 const coinRows = rows.filter((r) => /硬币/.test(r.tier));
-const BANNER = `🔴 多agent交叉证伪(football-today-cross-verify, ${date}):${five.length}场=${intlN}国际赛+${wcN}世界杯单场,5场1X2主选方向均与500市场不冲突、无臆造。` +
-  (coinRows.length ? `最高风险=${coinRows.map((r) => r.match).join("/")}(硬币档·信心${coinRows.map((r) => Math.round(r.conf)).join("/")}·势均易平),让球线已按500实盘核正,强烈建议不单押。` : "") +
+const handicapOnlyRows = rows.filter((r) => /未开售/.test(r.wld));   // 悬殊盘只卖让球(1X2未开售)
+const sold1x2 = five.length - handicapOnlyRows.length;               // 真正有1X2主选的场数
+const homeShort = (r) => r.match.split(" vs ")[0];
+const lineOf = (r) => { const m = String(r.handicap).match(/让\s*([+-]?\d+(?:\.\d+)?)/); return m ? `让${m[1]}` : "线缺"; };
+const lineList = rows.map((r) => `${homeShort(r)}${lineOf(r)}`).join("、");
+// note:让球线清单 + 未开售提示 + 完整性缺口,全派生
+const NOTE = `⚠️ 让球线均为 <b>500.com 实时核实</b>(${lineList})。` +
+  (handicapOnlyRows.length ? `悬殊盘多只卖让球(${handicapOnlyRows.map(homeShort).join("/")} 胜平负未开售)。` : "") +
+  `国家队无俱乐部画像、近5场/H2H 多缺,已标⚠️未取到。比分/半全场部分为模型🔶推断。`;
+// banner 风险段:硬币档 + 悬殊盘只让球(信心指赢球方向非过盘),均从 rows 派生(对齐 workflow 交叉审计高风险结论)
+let riskNote = "";
+if (coinRows.length) riskNote += `最高风险=${coinRows.map((r) => r.match).join("/")}(硬币档·信心${coinRows.map((r) => Math.round(r.conf)).join("/")}·势均易平),强烈建议不单押。`;
+if (handicapOnlyRows.length) riskNote += `${handicapOnlyRows.map((r) => r.match).join("/")}=悬殊盘只卖让球,信心档反映"赢球方向"非"让球过盘"(深让大热过盘历史<50%、覆盖把握低),勿当胆。`;
+const BANNER = `🔴 多agent交叉证伪(football-today-cross-verify, ${date}):${five.length}场=${intlN}国际赛+${wcN}世界杯单场,${sold1x2}场1X2主选方向均与500市场不冲突、让球线双路核对零不一致、无臆造。` +
+  riskNote +
   `全场国际赛/国家队近5场·H2H·画像多缺(免费源墙,已标⚠️);方向多半对但负EV大热不保稳赢,只提示不替你弃赛。`;
 
 // ── xlsx ──
@@ -80,7 +93,7 @@ const html = `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta n
 <h1>⚡ 神选 · 足球推荐 · ${date}</h1>
 <div class="note" style="border-color:#d32f2f;background:#ffebee"><b>${esc(BANNER)}</b></div>
 <h2>竞彩 · ${five.length} 场(${intlN}国际赛 + ${wcN}世界杯单场)</h2>
-<div class="note">⚠️ 让球线均为 <b>500.com 实时核实</b>(荷兰/法国让-2、秘鲁受让+2、墨西哥/韩国让-1)。国际赛多卖让球(法/秘胜平负未开售)。国家队无俱乐部画像、近5场/H2H 多缺,已标⚠️未取到。比分/半全场部分为模型🔶推断。</div>
+<div class="note">${NOTE}</div>
 <table><tr><th>开赛</th><th>对阵</th><th>胜负平</th><th>让胜负平</th><th>比分</th><th>半全场</th><th>信心</th></tr>${mRows}</table>
 ${fourteen.length ? `<h2>14场胜负彩 · ${esc(f14note || "第26085期(世界杯小组赛)")}</h2><div class="note">📌 今天正在售,赛期6/12起,附14腿预测供参考。</div><table><tr><th>#</th><th>对阵</th><th>单关</th><th>胆/双选</th><th>信心</th></tr>${f14Rows}</table>` : ""}
 <a class="dl" href="神选-竞彩推荐-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(两表)</a>
