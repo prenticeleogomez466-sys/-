@@ -82,11 +82,14 @@ function normTeam(name) {
   const s = String(name ?? "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return WC_TEAM_ALIASES[s] ?? s;
 }
+// 500/feed 中文变体 → groups.json 中文规范名(2026-06-10 体检:刚果(金) 致葡萄牙场赔率融合失败)。
+const ZH_TEAM_ALIASES = { "刚果(金)": "刚果民主共和国", "刚果金": "刚果民主共和国" };
 /** 队名(中/英皆可)→ 英文规范名,用于对上真实赛程的英文对阵。 */
 function toEnTeam(name) {
   if (!name) return "";
   const s = String(name).trim();
-  return load().zhToEn[s] ?? s;
+  const z = ZH_TEAM_ALIASES[s] ?? s;
+  return load().zhToEn[z] ?? z;
 }
 
 /**
@@ -137,7 +140,7 @@ export function groupVenueMults() {
 function canonTeam(name) { return String(teamPrior(name)?.en ?? name ?? "").toLowerCase().trim(); }
 function pairKey(a, b) { return [a, b].sort().join("|"); }
 
-let _oddsIdxFor = null, _oddsIdx = null;
+let _oddsIdxFor = Symbol("uninit"), _oddsIdx = null; // Symbol 哨兵:matchOddsDoc=null(文件缺失)时也能正确建空索引而非返回 null
 function oddsIndex() {
   const { matchOddsDoc } = load();
   if (_oddsIdxFor === matchOddsDoc) return _oddsIdx;
@@ -160,7 +163,7 @@ function oddsIndex() {
  */
 export function worldCupMatchOdds(teamA, teamB) {
   const idx = oddsIndex();
-  if (!idx.size) return null;
+  if (!idx?.size) return null;
   const ca = canonTeam(teamA), cb = canonTeam(teamB);
   const rec = idx.get(pairKey(ca, cb));
   if (!rec) return null;
@@ -328,8 +331,9 @@ function loadTeams() {
 export function teamPrior(name) {
   if (!name) return null;
   const { teams } = loadTeams();
-  if (teams[name]) return teams[name];
-  const key = Object.keys(teams).find((k) => teams[k].en && teams[k].en.toLowerCase() === String(name).toLowerCase());
+  const n = ZH_TEAM_ALIASES[String(name).trim()] ?? name;
+  if (teams[n]) return teams[n];
+  const key = Object.keys(teams).find((k) => teams[k].en && teams[k].en.toLowerCase() === String(n).toLowerCase());
   return key ? teams[key] : null;
 }
 
