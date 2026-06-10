@@ -21,6 +21,15 @@
  *     硬闸放行时旧假赛果"复活"再次结算);store 文件同样先备份;
  *   - 打印逐条清洗明细。
  *
+ * 二审修订(2026-06-10 对抗审计 T1):第二步扫描域从"ledger 出现过的日期"改为
+ * fixture store 全部日期文件(listStoreDates)。旧扫描域在 ledger 某日 0 行时该日
+ * store 文件 0 清洗且永不自愈(backfill 跳过已有 result 的场)——实测 2026-06-06.json
+ * 12 条未开赛世界杯场假赛果(kickoff 06-12~06-16,源=06-02 公告不可能含赛果)漏网。
+ * 注意:本口径下"真赛果但 kickoff 仅日期、23:59:59 保守边界未过"的场也会被清
+ * (如 06-09 #2203 阿根廷vs冰岛,ESPN 已核实 3-0 为真)——这是有意为之:
+ * 不变量=未开赛口径下 store 不得有 result,边界过后 backfill/授权源会用真实赛果
+ * 自然回填,宁短暂 pending 勿留任何旁路可消费的"先于开赛的 result"。
+ *
  * 用法:
  *   node scripts/detox-ledger-2026-06-10.mjs --dry   # 只报告不写盘
  *   node scripts/detox-ledger-2026-06-10.mjs         # 实清洗
@@ -30,7 +39,8 @@ import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync } from
 import { join } from "node:path";
 import { getExportDir } from "../src/paths.js";
 import { loadFixtures, fixtureDir } from "../src/fixture-store.js";
-import { kickoffEpochMs, hasKickedOff } from "../src/kickoff-time.js";
+import { kickoffEpochMs } from "../src/kickoff-time.js";
+import { findPrematureResults, listStoreDates } from "../src/result-sanity.js";
 import { findFixtureForLedger, stripSettleFields } from "../src/daily-recap.js";
 
 const dry = process.argv.includes("--dry");
@@ -91,28 +101,32 @@ for (const line of detail) console.log(line);
 console.log(`\nledger 清洗:重置 ${cleaned} 条假 settled,保留 ${keptSettled} 条真 settled,待人工核 ${unjudgeable} 条`);
 
 // ── 第二步:fixture store 未开赛假 result 清除(防开赛后假赛果复活) ──
+// 扫描域 = store 全部日期文件(T1 二审修订),绝不只扫 ledger 出现过的日期。
+const storeDates = listStoreDates(fixtureDir);
+console.log(`\nstore 扫描域:${storeDates.length} 个日期文件(全目录,非 ledger 日期)`);
 let storeCleaned = 0;
-for (const d of dates) {
+for (const d of storeDates) {
   const filePath = join(fixtureDir, `${d}.json`);
   if (!existsSync(filePath)) continue;
   const payload = JSON.parse(readFileSync(filePath, "utf8"));
   const fixtures = Array.isArray(payload) ? payload : payload.fixtures ?? [];
-  const poisoned = fixtures.filter((f) => f.result && !hasKickedOff(f, now));
+  const poisoned = findPrematureResults(fixtures, now);
   if (!poisoned.length) continue;
+  const poisonedSet = new Set(poisoned);
   for (const f of poisoned) {
-    console.log(`🧹 store ${d}: 清除未开赛假 result ${f.sequence ?? ""} ${f.homeTeam} vs ${f.awayTeam} kickoff=${JSON.stringify(f.kickoff ?? "")} 假score=${f.result.home}-${f.result.away}`);
+    console.log(`🧹 store ${d}: 清除未开赛 result ${f.sequence ?? ""} ${f.homeTeam} vs ${f.awayTeam} kickoff=${JSON.stringify(f.kickoff ?? "")} score=${f.result.home}-${f.result.away}(开赛前不可信,开赛后由 backfill 真实回填)`);
     storeCleaned++;
   }
   if (!dry) {
     copyFileSync(filePath, join(backupDir, `fixtures-${d}.backup-${stamp}.json`));
-    const cleanedFixtures = fixtures.map((f) => (f.result && !hasKickedOff(f, now) ? { ...f, result: null } : f));
+    const cleanedFixtures = fixtures.map((f) => (poisonedSet.has(f) ? { ...f, result: null } : f));
     const nextPayload = Array.isArray(payload)
       ? cleanedFixtures
-      : { ...payload, fixtures: cleanedFixtures, detoxedAt: new Date().toISOString(), detoxNote: "2026-06-10 去毒:未开赛场假 result 清除" };
+      : { ...payload, fixtures: cleanedFixtures, detoxedAt: new Date().toISOString(), detoxNote: "2026-06-10 去毒:未开赛场 result 清除(开赛前无赛果不变量)" };
     writeFileSync(filePath, `${JSON.stringify(nextPayload, null, 2)}\n`, "utf8");
   }
 }
-console.log(`\nfixture store 清洗:清除 ${storeCleaned} 个未开赛假 result(已备份原文件到 ${backupDir})`);
+console.log(`\nfixture store 清洗:清除 ${storeCleaned} 个未开赛 result(扫描 ${storeDates.length} 个日期文件,已备份改动文件到 ${backupDir})`);
 
 if (!dry) {
   writeFileSync(ledgerPath, `${JSON.stringify(nextLedger, null, 2)}\n`, "utf8");
