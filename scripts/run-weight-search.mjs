@@ -5,7 +5,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runWeightSearch } from "../src/walkforward-backtest.js";
-import { getExportDir } from "../src/paths.js";
+import { getProfilesDir } from "../src/paths.js";
 
 const args = process.argv.slice(2);
 const getNum = (flag, def) => { const i = args.indexOf(flag); return i >= 0 && args[i + 1] ? Number(args[i + 1]) : def; };
@@ -82,7 +82,8 @@ if (apply) {
     dcBaseline: { accuracy: res.dc.accuracy, brier: res.dc.brier },
     fusionBaseline: { accuracy: baseline.accuracy, brier: baseline.brier }
   };
-  const dir = getExportDir();
+  // 2026-06-10 缺陷#6:profile 迁出 exports 根(16:01 计划任务清空史)→ 持久 profiles 目录。
+  const dir = getProfilesDir();
   mkdirSync(dir, { recursive: true });
   const p = join(dir, "fusion-signal-weights.json");
   writeFileSync(p, `${JSON.stringify(profile, null, 2)}\n`, "utf8");

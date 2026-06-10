@@ -1,5 +1,5 @@
 import { loadFixtures } from "./fixture-store.js";
-import { isWeakLeague } from "./league-reliability.js";
+import { isWeakLeague, loadLeagueReliability } from "./league-reliability.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
@@ -155,10 +155,22 @@ export function recommendFixtures(date) {
     try { p.teamProfile = teamProfiles ? profileForFixture(p.fixture, teamProfiles) : null; } catch { p.teamProfile = null; }
   }
   const multimodalSummary = summarizeMultimodal(predictions);
+  // 缺陷#6#14(2026-06-10):两份生产 profile 的健康状态随产物输出——缺失=显式降级标注,绝不静默。
+  const fusionProfile = loadFusionWeightProfile();
+  const leagueReliability = loadLeagueReliability();
+  const profileStatus = {
+    fusionWeights: fusionProfile?.degraded
+      ? { ok: false, degraded: `profile缺失(${fusionProfile.degradedReason}),4害信号已硬禁兜底` }
+      : { ok: true, chosen: fusionProfile?.chosen ?? null },
+    leagueReliability: leagueReliability
+      ? { ok: true, leagues: Object.keys(leagueReliability.leagues ?? {}).length }
+      : { ok: false, degraded: "league-reliability profile缺失,弱联赛『不当胆』护栏失效(isWeakLeague恒false)" }
+  };
   return {
     date: fixtureSet.date,
     generatedAt: new Date().toISOString(),
     fixtures: predictions.length,
+    profileStatus,
     unpredictable,
     predictions,
     multimodalSummary,
@@ -523,6 +535,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       : {});
   const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext, fusionOpts);
   probabilityAdjustment.fusionGatedOff = gateFusionOff;
+  // 缺陷#6(2026-06-10):权重 profile 缺失时 loadFusionWeightProfile 返回 degraded 兜底
+  //   (4 害硬禁、其余权重 1)——这里把降级状态写进产物,展示/审计层据此标注,不静默。
+  probabilityAdjustment.fusionProfileDegraded = weightProfile?.degraded
+    ? `fusion-signal-weights profile 缺失(${weightProfile.degradedReason}),已硬禁4害信号兜底运行`
+    : null;
   probabilityAdjustment.fusion = fusion;
   // 温度软化层已删除(2026-05-31 用户铁律「删掉所有兜底」):温度只在 isotonic 缺失的冷启动兜底才生效,
   //   生产两条路径(市场先验 / 模型 isotonic)本就不走它。校准统一交给下面数据驱动的 isotonic

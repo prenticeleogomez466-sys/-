@@ -17,17 +17,10 @@ const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
 const ledgerPath = join(exportDir, "recommendation-ledger.json");
 
-// 联赛可信度 profile(由 build-league-reliability.mjs 写);进程内缓存。
-let _leagueReliabilityCache;
-export function loadLeagueReliability() {
-  if (_leagueReliabilityCache !== undefined) return _leagueReliabilityCache;
-  try {
-    const p = join(exportDir, "league-reliability.json");
-    _leagueReliabilityCache = existsSync(p) ? JSON.parse(readFileSync(p, "utf8")) : null;
-  } catch { _leagueReliabilityCache = null; }
-  return _leagueReliabilityCache;
-}
-export function _resetLeagueReliabilityCache() { _leagueReliabilityCache = undefined; }
+// 联赛可信度 profile:统一走 league-reliability.js 单一读取源(2026-06-10 缺陷#14:
+// 此处原是独立副本、读 exports 根旧路径;profile 已迁 data\profiles\,副本会静默读不到 → 删副本只 re-export)。
+export { loadLeagueReliability, _resetLeagueReliabilityCache } from "./league-reliability.js";
+import { loadLeagueReliability } from "./league-reliability.js";
 
 export function buildDailyRecommendationPackage(date, options = {}) {
   mkdirSync(exportDir, { recursive: true });

@@ -46,7 +46,7 @@ import { computeSetPieceProfile } from "./set-piece-model.js";
 import { analyzeAsianHandicapWater, analyzeMultipleBookmakers } from "./asian-handicap-water.js";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { getExportDir } from "./paths.js";
+import { getExportDir, getProfilesDir } from "./paths.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 const LR_MIN = 0.5;
@@ -57,19 +57,58 @@ function round(v) {
   return Math.round(v * 10000) / 10000;
 }
 
+// ── 4 害信号代码级硬禁清单(缺陷#6 兜底,2026-06-10)─────────────────────
+// 消融实证(06-07 周日志:弃 4 害 Brier 0.6273→0.6178)这 4 个信号害校准,
+// 每周重训(run-weight-search.mjs HURTS4)写进 profile.disabledSignals 是单一事实源;
+// 本清单只做 profile **缺失** 时的兜底——绝不允许 profile 被删后 4 害全权重裸跑。
+// profile 存在时以 profile 为准(它应已弃用这 4 个;若没有,加载时打警告)。
+export const HARD_DISABLED_SIGNALS = Object.freeze(["home-away-split", "time-decay-form", "h2h", "derby"]);
+
 // 回测学到的融合信号权重 profile(由 npm run weights:search --apply 写)。
+// 路径:D:\football-model-data\profiles\fusion-signal-weights.json(2026-06-10 自 exports 根迁出,
+//   exports 根有 16:01 计划任务清空史);旧 exports 根路径保留为只读兼容回退。
 // 进程内缓存一次,避免每场预测都读盘;生产路径据此弱化/剔除害校准的信号。
+// 加载失败 fail-loud:不再静默 null 裸跑,返回 degraded 兜底 profile(仅禁 4 害,其余权重 1)
+//   并打显著错误日志,供产物/状态层标注降级。
 let _weightProfileCache;
+function degradedFusionProfile(reason) {
+  console.error(
+    `\n🔴🔴🔴 [signal-fusion-layer] fusion-signal-weights.json 加载失败(${reason})!\n` +
+    `   查找路径: ${join(getProfilesDir(), "fusion-signal-weights.json")}(及旧 exports 根回退)\n` +
+    `   降级运行: 4 害信号(${HARD_DISABLED_SIGNALS.join("/")})已代码级硬禁,其余信号权重=1(未经本周回测调权)。\n` +
+    `   修复: npm run weights:search -- --apply 重产 profile。\n`
+  );
+  return {
+    degraded: true,
+    degradedReason: reason,
+    signalWeights: {},
+    disabledSignals: [...HARD_DISABLED_SIGNALS],
+    chosen: null,
+    temperature: null
+  };
+}
 export function loadFusionWeightProfile() {
   if (_weightProfileCache !== undefined) return _weightProfileCache;
   try {
-    const p = join(getExportDir(), "fusion-signal-weights.json");
-    if (!existsSync(p)) { _weightProfileCache = null; return null; }
+    const candidates = [
+      join(getProfilesDir(), "fusion-signal-weights.json"),   // 新持久路径(权威)
+      join(getExportDir(), "fusion-signal-weights.json")      // 旧 exports 根(只读兼容,会被16:01清空)
+    ];
+    const p = candidates.find((c) => existsSync(c));
+    if (!p) { _weightProfileCache = degradedFusionProfile("文件不存在"); return _weightProfileCache; }
     const profile = JSON.parse(readFileSync(p, "utf8"));
-    _weightProfileCache = profile?.usable
-      ? { signalWeights: profile.signalWeights ?? {}, disabledSignals: profile.disabledSignals ?? [], chosen: profile.chosen, temperature: Number.isFinite(profile.temperature) ? profile.temperature : null }
-      : null;
-  } catch { _weightProfileCache = null; }
+    if (!profile?.usable) { _weightProfileCache = degradedFusionProfile(`profile 不可用(usable=${profile?.usable})@${p}`); return _weightProfileCache; }
+    const loaded = { signalWeights: profile.signalWeights ?? {}, disabledSignals: profile.disabledSignals ?? [], chosen: profile.chosen, temperature: Number.isFinite(profile.temperature) ? profile.temperature : null };
+    // 单一事实源一致性哨兵:profile 若没弃用 4 害(既不在 disabledSignals 也非 0 权重),只警告不改写
+    //   ——以每周重训结论为准,但人肉/异常改动要被看见。
+    const notBanned = HARD_DISABLED_SIGNALS.filter((s) => !loaded.disabledSignals.includes(s) && Number(loaded.signalWeights[s] ?? 1) > 0);
+    if (notBanned.length) {
+      console.warn(`⚠️ [signal-fusion-layer] profile(${p})未弃用已证伪害信号: ${notBanned.join(", ")} —— 以 profile 为准,但请核对每周重训是否被篡改。`);
+    }
+    _weightProfileCache = loaded;
+  } catch (err) {
+    _weightProfileCache = degradedFusionProfile(`读取/解析异常: ${err.message}`);
+  }
   return _weightProfileCache;
 }
 // 测试/重载用

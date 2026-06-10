@@ -5,7 +5,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runWalkForwardBacktest } from "../src/walkforward-backtest.js";
-import { getExportDir } from "../src/paths.js";
+import { getProfilesDir } from "../src/paths.js";
 
 const args = process.argv.slice(2);
 const getNum = (flag, def) => { const i = args.indexOf(flag); return i >= 0 && args[i + 1] ? Number(args[i + 1]) : def; };
@@ -23,8 +23,9 @@ const profile = {
   weakThreshold: 0.42, // 可靠且命中<此值 → 弱联赛(降级)
   leagues
 };
-mkdirSync(getExportDir(), { recursive: true });
-const p = join(getExportDir(), "league-reliability.json");
+// 2026-06-10 缺陷#14:profile 迁出 exports 根(16:01 计划任务清空史)→ 持久 profiles 目录。
+mkdirSync(getProfilesDir(), { recursive: true });
+const p = join(getProfilesDir(), "league-reliability.json");
 writeFileSync(p, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
 
 console.log(`\n✅ 已写 → ${p}`);
