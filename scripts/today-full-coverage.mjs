@@ -174,7 +174,8 @@ writeXlsxWorkbook(xlsxTarget, sheets);
 // 固定文件名防回退(2026-06-10):webshare 现页若已是更新日期(并行会话先交付了明日表),
 // 重出旧日期绝不顶掉 —— 改写日期命名副本 足球推荐-<date>.html / football-<date>.html,固定URL保最新。
 const readIfExists = (p) => { try { return readFileSync(p, "utf8"); } catch { return null; } };
-const html = renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot });
+// 头条副标题=逐赔种真计数 + 降级句进头条(2026-06-10 审计确认缺陷:禁硬编码"5赔种全覆盖"假声明,三面同口径)。
+const html = renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, counts, degradeNote });
 let htmlTarget = outBase ? `${outBase}/今日足球推荐.html` : "D:/Temp/webshare_lingdao/今日足球推荐.html";
 if (!outBase) {
   const mob = resolveHtmlWriteTarget({
