@@ -193,19 +193,28 @@ test("venueLambdaMultiplier 边界:极端高原↑、露天高温↓、顶棚中
   assert.equal(venueLambdaMultiplier(null).mult, 1); // 无 venue 中性
 });
 
-test("matchVenueMult 真实赛号映射:墨西哥城场↑、蒙特雷场↓、温和城中性", { skip: !HAS_BRACKET }, () => {
-  assert.equal(matchVenueMult(1), 1.06);  // 小组赛 A 组开幕墨西哥城
-  assert.equal(matchVenueMult(79), 1.06); // R32 墨西哥城
-  assert.equal(matchVenueMult(6), 0.95);  // 小组赛 A 组蒙特雷
-  assert.equal(matchVenueMult(104), 1);   // 决赛 East Rutherford 温和中性
+test("matchVenueMult 真实赛号映射:墨城海拔恒↑、低海拔城落在合法高温档位", { skip: !HAS_BRACKET }, () => {
+  // 2026-06-10 修:开赛进 Open-Meteo 16 天预报窗后,高温乘子用真实预报(1/0.97/0.95 随天气浮动),
+  //   写死气候均温档位会随天气假红。守护不变量=赛号→城市映射 + 海拔加成方向 + 乘子有界。
+  const HEAT = [1, 0.97, 0.95]; // venueLambdaMultiplier 高温乘子的全部合法档位
+  for (const n of [1, 79]) { // 墨西哥城 2240m:必带 ×1.06 海拔加成 → 恒 >1
+    const m = matchVenueMult(n);
+    assert.ok(m > 1, `墨城场${n} 应>1,实得 ${m}`);
+    assert.ok(HEAT.some((h) => Math.abs(m - Number((1.06 * h).toFixed(4))) < 1e-9), `墨城场${n}=${m} 应为 1.06×{1,0.97,0.95}`);
+  }
+  for (const [n, city] of [[6, "蒙特雷"], [104, "决赛East Rutherford"]]) { // 低海拔:无海拔加成 → ∈{1,0.97,0.95}
+    const m = matchVenueMult(n);
+    assert.ok(HEAT.includes(m), `${city}场${n}=${m} 应∈{1,0.97,0.95}`);
+  }
 });
 
-test("groupVenueMults A 组对齐真实赛程(赛号1-6,墨城两场+蒙特雷一场)", { skip: !HAS_BRACKET }, () => {
+test("groupVenueMults A 组对齐真实赛程(赛号1-6逐场一致,墨城两场海拔加成)", { skip: !HAS_BRACKET }, () => {
   const g = groupVenueMults();
   const a = g["A"] ?? Object.values(g)[0];
   assert.equal(a.length, 6);
-  assert.equal(a.filter((m) => m === 1.06).length, 2); // 赛号1、5 墨西哥城
-  assert.equal(a.filter((m) => m === 0.95).length, 1); // 赛号6 蒙特雷
+  assert.deepEqual(a, [1, 2, 3, 4, 5, 6].map((n) => matchVenueMult(n))); // 组数组与赛号1-6逐场对齐
+  assert.ok(a[0] > 1 && a[4] > 1, `赛号1、5 墨西哥城海拔加成应>1,实得 ${a[0]}/${a[4]}`); // 墨城两场
+  assert.ok(a[5] <= 1, `赛号6 蒙特雷无海拔加成应≤1,实得 ${a[5]}`);
 });
 
 // ── 每日竞彩 fixture(只带中文队名+日期、无场馆字段)按真实对阵解析场馆 → 海拔/天气 λ 真生效 ──
