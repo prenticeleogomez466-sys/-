@@ -1,30 +1,15 @@
-// 今天竞彩完整推荐(所有维度,对齐标准)+ 存进不被计划任务清的稳定子文件夹。
-import { buildDailyRecommendationPackage, simpleWldCell, simpleHandicapCell, simpleScoreCell, simpleHalfFullCell } from "../src/daily-report.js";
-import { copyFileSync, mkdirSync, existsSync } from "node:fs";
+// 薄壳转发(2026-06-10 输出层单写者收敛,缺陷#7#16):本脚本曾是旁路写者——
+// 多脚本各写 同名xlsx/今日足球推荐.html/英文页,实测三面三个日期(xlsx=06-10/手机页=06-09/英文页=06-08)。
+// 现输出一律收敛到唯一出口 scripts/today-full-coverage.mjs(xlsx 20列专业版 + 手机页 + 英文固定URL页,
+// 三面同源同日期,渲染在 src/today-delivery-lib.js)。保留本文件仅防老调用路径 break,不再自带任何渲染。
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join, basename } from "node:path";
 
-const date = process.argv[2] ?? "2026-06-07";
-const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
-const jc = (pkg.recommendations?.predictions ?? []).filter((p) => p.fixture?.marketType === "jingcai");
-
-// 按神选标准存桌面根(和 神选复盘.xlsx 并列;桌面根不被清,只 exports 根被计划任务清——别建子文件夹)
-void mkdirSync;
-const target = `C:/Users/Administrator/Desktop/神选-竞彩推荐-${date}.xlsx`;
-if (pkg.dailyPath && existsSync(pkg.dailyPath)) { copyFileSync(pkg.dailyPath, target); console.log("✅ xlsx 已按神选标准存桌面根:", target); }
-
-const j = (x, n = 100) => { try { return JSON.stringify(x).slice(0, n); } catch { return String(x).slice(0, n); } };
-console.log(`\n今天 ${date} 竞彩 ${jc.length} 场 · 完整推荐(全维度)\n`);
-for (const p of jc) {
-  console.log(`========== ${p.fixture.homeTeam} vs ${p.fixture.awayTeam} ==========`);
-  console.log("  胜负平 :", simpleWldCell(p));
-  console.log("  让球   :", simpleHandicapCell(p));
-  console.log("  比分   :", simpleScoreCell(p));
-  console.log("  半全场 :", simpleHalfFullCell(p));
-  const ou = p.extendedMarkets?.overUnder ?? p._ouFusion ?? p.extendedMarkets?.totals;
-  console.log("  大小球 :", ou ? j(ou, 80) : "未抓到/未参与");
-  const dc = p.deepContext;
-  console.log("  近5场  :", (dc?.home?.form ?? "未取到") + " / " + (dc?.away?.form ?? "未取到"));
-  console.log("  H2H    :", dc?.h2h ?? "无记录");
-  console.log("  画像   :", p.teamProfile ? j(p.teamProfile, 110) : "未取到");
-  console.log("  情景   :", p.scenario?.narrative ?? (p.scenario ? j(p.scenario, 120) : "无"));
-  console.log("  信心   :", p.confidence, "·", p.selectionTier?.label ?? "");
-}
+const args = process.argv.slice(2);
+const readArg = (n) => { const pre = args.find((a) => a.startsWith(`${n}=`)); if (pre) return pre.slice(n.length + 1); const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
+const date = readArg("--date") ?? args.find((a) => /^\d{4}-\d{2}-\d{2}$/.test(a)); // 缺省由唯一出口取本机UTC+8当日
+const target = join(dirname(fileURLToPath(import.meta.url)), "today-full-coverage.mjs");
+console.log(`↪ [薄壳] ${basename(fileURLToPath(import.meta.url))} 已收敛到唯一输出出口 today-full-coverage.mjs,转发执行(date=${date ?? "(当日)"} --jconly)…`);
+const r = spawnSync(process.execPath, [target, ...(date ? [date] : []), "--jconly"], { stdio: "inherit" });
+process.exit(r.status ?? 1);

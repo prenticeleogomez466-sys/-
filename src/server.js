@@ -6,7 +6,7 @@ import "./env.js";
 import { getDataSubdir, getExportDir } from "./paths.js";
 import { buildCredentialStatus } from "./source-credentials.js";
 import { recommendFixtures } from "./prediction-engine.js";
-import { renderTodayMobileHtml } from "./today-mobile-view.js";
+// renderTodayMobileHtml(today-mobile-view)已摘除:/today 改回放唯一出口静态页,不再独立装配(2026-06-10)。
 import { getWechatConfig, handleWechatQuery } from "./wechat-channel.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -22,8 +22,19 @@ export function createFootballServer() {
       if (request.method === "GET" && url.pathname === "/") return send(response, renderDashboard(), 200, "text/html; charset=utf-8");
       if (request.method === "GET" && url.pathname === "/framework") return send(response, renderFramework(), 200, "text/html; charset=utf-8");
       if (request.method === "GET" && url.pathname === "/today") {
-        const date = url.searchParams.get("date") ?? todayInShanghai();
-        return send(response, renderTodayMobileHtml(recommendFixtures(date), date), 200, "text/html; charset=utf-8");
+        // 2026-06-10 输出层单写者收敛(缺陷#7):/today 不再独立装配(renderTodayMobileHtml 旁路曾致
+        // 实时页与 xlsx/手机静态页 口径分叉、三面三个日期),改为直接回放唯一出口 today-full-coverage 写出的静态页。
+        const canonical = "D:/Temp/webshare_lingdao/今日足球推荐.html";
+        if (!existsSync(canonical)) {
+          return send(response, `当日交付页未生成(唯一出口未跑)。先跑:node scripts/today-full-coverage.mjs ${todayInShanghai()} --jconly`, 503, "text/plain; charset=utf-8");
+        }
+        const page = readFileSync(canonical, "utf8");
+        const wantDate = url.searchParams.get("date");
+        const pageDate = page.match(/神选·竞彩·(\d{4}-\d{2}-\d{2})/)?.[1] ?? null;
+        if (wantDate && pageDate && wantDate !== pageDate) {
+          return send(response, `请求日期=${wantDate},但当前交付页日期=${pageDate}(本路由不再独立装配、不冒充)。重出:node scripts/today-full-coverage.mjs ${wantDate} --jconly`, 409, "text/plain; charset=utf-8");
+        }
+        return send(response, page, 200, "text/html; charset=utf-8");
       }
       if (url.pathname === "/api/health") return send(response, { status: "ok", service: "football-ai-copilot" });
       if (url.pathname === "/api/credentials") return send(response, await buildCredentialStatus());

@@ -71,31 +71,19 @@ const staged = stageJingcaiIntoStore(date, captures, asian);
 // 3) 出推荐包(skip 闸门:竞彩官方源不可达,数据来自 500.com 兜底)
 const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
 
-// 4) 美化 xlsx(openpyxl 加表头/条件格式/列宽/边框 — daily-report 写 XML 时只能基础样式)
+// 4) 交付收敛唯一出口(2026-06-10 缺陷#7根修):
+//    旧步骤 = openpyxl polish-xlsx.py 美化 daily-report 10列旧表 + copy 桌面根 —— 这条旁路曾把
+//    桌面 06-10 专业版20列交付顶替成10列旧表(定标准一天即失守),已整体删除(polish-xlsx.py 一并删)。
+//    现统一:先补 coverage(近5/H2H/大小球),再走 today-full-coverage(xlsx20列+手机页+英文页三面同源)。
 import { spawnSync } from "node:child_process";
-import { existsSync as exists2 } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const polishScript = join(__dirname, "polish-xlsx.py");
-let polishStatus = "skipped";
-if (exists2(polishScript) && exists2(pkg.dailyPath)) {
-  const proc = spawnSync("python", [polishScript, pkg.dailyPath], { encoding: "utf8" });
-  polishStatus = proc.status === 0 ? "ok" : `failed:${proc.stderr?.trim() ?? proc.status}`;
-}
-
-// 5) Copy 到桌面(用户硬性偏好"输出到桌面")
-import { copyFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename } from "node:path";
-const desktopPath = join(homedir(), "Desktop", basename(pkg.dailyPath));
-let desktopStatus = "skipped";
-try {
-  copyFileSync(pkg.dailyPath, desktopPath);
-  desktopStatus = "ok";
-} catch (err) {
-  desktopStatus = `failed:${err.message}`;
-}
+const cover = spawnSync(process.execPath, [join(__dirname, "fetch-match-coverage.mjs"), date], { stdio: "inherit", timeout: 600000 });
+if (cover.status !== 0) console.error("⚠️ coverage 抓取非0退出——交付表近5/H2H/亚盘列将诚实标缺(不阻断)");
+const delivery = spawnSync(process.execPath, [join(__dirname, "today-full-coverage.mjs"), date, "--jconly"], { stdio: "inherit", timeout: 600000 });
+const deliveryStatus = delivery.status === 0 ? "ok" : `failed:${delivery.status}`;
+if (delivery.status !== 0) process.exitCode = 1; // 交付出口失败必须响(真钱管线,不静默)
 
 const jingcai = pkg.recommendations.predictions.filter((p) => p.fixture.marketType === "jingcai").length;
 console.log(JSON.stringify({
@@ -106,7 +94,9 @@ console.log(JSON.stringify({
   recommendations: { jingcai, fourteen: pkg.recommendations.fourteen.selections.length },
   audit: pkg.audit.summary,
   dailyPath: pkg.dailyPath,
-  desktopPath: desktopStatus === "ok" ? desktopPath : null,
-  polishStatus,
-  desktopStatus,
+  delivery: {
+    exit: "today-full-coverage(唯一输出出口:xlsx20列+手机页+英文页)",
+    coverage: cover.status === 0 ? "ok" : `failed:${cover.status}`,
+    status: deliveryStatus,
+  },
 }, null, 2));

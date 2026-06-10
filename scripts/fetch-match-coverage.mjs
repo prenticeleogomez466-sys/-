@@ -9,8 +9,12 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadFixtures } from "../src/fixture-store.js";
 import { buildCoverageTargets, loadZhToEn } from "../src/coverage-targets.js";
+import { resolveDeliveryDate } from "../src/today-delivery-lib.js";
 
-const DATE = process.argv[2] || "2026-06-09";
+// 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(2026-06-10 缺陷#20:废写死历史日期默认)。
+let DATE;
+try { DATE = resolveDeliveryDate(process.argv[2]); }
+catch (e) { console.error(`❌ ${e.message}`); process.exit(1); }
 const KEY = process.env.ODDS_API_KEY;
 
 // 抓取目标动态生成(2026-06-10,审计rank2):废 7 场硬编码——从当日 fixtures store 收

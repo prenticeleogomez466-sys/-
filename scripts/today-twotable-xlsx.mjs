@@ -1,66 +1,15 @@
-// 今天完整两表 xlsx:竞彩(四列+近5场/H2H/画像/信心) + 14场胜负彩(正在售的期,即使赛日在未来)。
-// 用户硬规则:有 14 场就出两张表;固定完整维度;真实可追溯。
-import {
-  buildDailyRecommendationPackage,
-  simpleWldCell, simpleHandicapCell, simpleScoreCell, simpleHalfFullCell,
-  simpleFourteenHeaders, toSimpleFourteenRow,
-} from "../src/daily-report.js";
-import { writeXlsxWorkbook } from "../src/xlsx-writer.js";
-import { copyFileSync, existsSync } from "node:fs";
+// 薄壳转发(2026-06-10 输出层单写者收敛,缺陷#7#16):本脚本曾是旁路写者——
+// 多脚本各写 同名xlsx/今日足球推荐.html/英文页,实测三面三个日期(xlsx=06-10/手机页=06-09/英文页=06-08)。
+// 现输出一律收敛到唯一出口 scripts/today-full-coverage.mjs(xlsx 20列专业版 + 手机页 + 英文固定URL页,
+// 三面同源同日期,渲染在 src/today-delivery-lib.js)。保留本文件仅防老调用路径 break,不再自带任何渲染。
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join, basename } from "node:path";
 
-const date = process.argv[2] ?? "2026-06-08";
-const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });
-const preds = pkg.recommendations?.predictions ?? [];
-const jc = preds.filter((p) => p.fixture?.marketType === "jingcai")
-  .sort((a, b) => String(a.fixture.kickoff).localeCompare(String(b.fixture.kickoff)));
-const fourteen = pkg.recommendations?.fourteen?.selections ?? [];
-const f14note = pkg.recommendations?.fourteen?.note ?? "";
-
-const dcForm = (p) => {
-  const dc = p.deepContext;
-  if (!dc) return "未取到";
-  const h = dc.home?.form, a = dc.away?.form;
-  if (!h && !a) return "未取到";
-  return `${h ?? "—"} / ${a ?? "—"}`;
-};
-const dcH2H = (p) => p.deepContext?.h2h ?? "无记录";
-const dcProfile = (p) => {
-  const tp = p.teamProfile;
-  if (!tp || (!tp.home && !tp.away)) return "未取到(国际赛无俱乐部画像)";
-  const parts = [];
-  if (tp.home?.ppg > 0) parts.push(`主综合${tp.home.ppg}`);
-  if (tp.away?.ppg > 0) parts.push(`客综合${tp.away.ppg}`);
-  return parts.length ? parts.join(" / ") : "未取到";
-};
-const kickoff = (p) => {
-  const ko = p.fixture?.kickoff;
-  return ko && /\d{2}:\d{2}/.test(ko) ? ko.slice(5, 16) : (ko?.slice(5, 10) ?? "");
-};
-
-const jcHeaders = ["开赛", "对阵", "胜负平", "让胜负平", "比分", "半全场", "近5场", "H2H交锋", "实力·主客场画像", "信心"];
-const jcRows = jc.map((p) => [
-  kickoff(p), `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
-  simpleWldCell(p), simpleHandicapCell(p), simpleScoreCell(p), simpleHalfFullCell(p),
-  dcForm(p), dcH2H(p), dcProfile(p), String(p.confidence ?? ""),
-]);
-
-const VERIFY_NOTE = "🔴 对抗证伪:今日12注全部三视角一致证伪·建议观望(负EV大热跟随盘,无独立edge;方向多半对但押稳赢不划算)";
-const sheets = [
-  { name: "竞彩", rows: [[`⚡ 神选 · 竞彩 · ${date}`], [VERIFY_NOTE], jcHeaders, ...jcRows] },
-];
-if (fourteen.length) {
-  sheets.push({
-    name: "14场",
-    rows: [
-      [`⚡ 神选 · 14场胜负彩 · ${date}`],
-      [f14note || "第26085期 世界杯小组赛"],
-      simpleFourteenHeaders(),
-      ...fourteen.map(toSimpleFourteenRow),
-    ],
-  });
-}
-
-const target = `C:/Users/Administrator/Desktop/神选-竞彩推荐-${date}.xlsx`;
-writeXlsxWorkbook(target, sheets);
-console.log("✅ 两表 xlsx 已存:", target);
-console.log("   竞彩", jcRows.length, "场 · 14场", fourteen.length, "腿");
+const args = process.argv.slice(2);
+const readArg = (n) => { const pre = args.find((a) => a.startsWith(`${n}=`)); if (pre) return pre.slice(n.length + 1); const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
+const date = readArg("--date") ?? args.find((a) => /^\d{4}-\d{2}-\d{2}$/.test(a)); // 缺省由唯一出口取本机UTC+8当日
+const target = join(dirname(fileURLToPath(import.meta.url)), "today-full-coverage.mjs");
+console.log(`↪ [薄壳] ${basename(fileURLToPath(import.meta.url))} 已收敛到唯一输出出口 today-full-coverage.mjs,转发执行(date=${date ?? "(当日)"} --jconly)…`);
+const r = spawnSync(process.execPath, [target, ...(date ? [date] : []), "--jconly"], { stdio: "inherit" });
+process.exit(r.status ?? 1);

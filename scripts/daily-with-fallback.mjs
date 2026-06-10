@@ -85,6 +85,14 @@ try {
     // marketCheck.ok 分支会投,官方源被封走 500 兜底的日子(06-09/06-10)出了表 outbox 却停在 06-08。
     status.wechat = await deliverWechatSafely(pkg);
   }
+  // 每日链统一交付出口(2026-06-10 缺陷#5#7根修):无论 official / 补救 / 500兜底哪条路成功,
+  // 都必须刷新唯一输出出口 —— fetch-match-coverage(近5/H2H/大小球补全层)+ today-full-coverage --jconly
+  // (xlsx20列专业版→桌面+桌面\足球推荐\<date>\稳定子文件夹 + 手机页 + 英文页,三面同源同日期)。
+  // 此前每日链只出 exports 的 daily-report 简表,coverage/adversarial/手机页整层没人跑(06-10三面三个日期的根因)。
+  if (status.ok) {
+    status.deliveryRefresh = refreshUnifiedDelivery(date);
+    if (!status.deliveryRefresh.ok) process.exitCode = 1; // 交付层失败必须响(监控可见),不掩盖
+  }
 } catch (error) {
   status.error = (status.error ? status.error + " | " : "") + (error.message || String(error));
   process.exitCode = 1;
@@ -97,6 +105,17 @@ try {
 
 function run(cmd, cmdArgs) {
   return spawnSync(cmd, cmdArgs, { cwd: rootDir, stdio: "inherit", shell: false });
+}
+
+// 唯一交付出口刷新(缺陷#5#7):coverage 失败只降级标缺不阻断;today-full-coverage 失败=交付层事故(ok=false)。
+function refreshUnifiedDelivery(d) {
+  const out = { ok: false, coverage: null, fullCoverage: null };
+  const cover = run("node", ["scripts/fetch-match-coverage.mjs", d]);
+  out.coverage = cover.status === 0 ? "ok" : `failed:${cover.status}(交付表近5/H2H/亚盘列将标⚠️缺,不编)`;
+  const full = run("node", ["scripts/today-full-coverage.mjs", d, "--jconly"]);
+  out.fullCoverage = full.status === 0 ? "ok" : `failed:${full.status}`;
+  out.ok = full.status === 0;
+  return out;
 }
 
 // 微信投递(缺陷#18):投递失败绝不掩盖"已成功出表"的事实 —— 只如实记录投递结果,
