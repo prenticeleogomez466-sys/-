@@ -11,10 +11,13 @@
 // 建议挂计划任务每天 06:00 跑(冻结前一日)。
 
 import { loadMarketSnapshots, saveMarketSnapshots } from "../src/market-data-store.js";
+import { shanghaiDateOf } from "../src/kickoff-time.js";
 
+// 时区根修(缺陷#9 姊妹脚本补刀,2026-06-10):旧手算式 `(8*60 - getTimezoneOffset())*60000`
+// 在本机 UTC+8 下双重 +8h(实际 +16h),本地 16:00 后运行会把"昨天/今天"算成 +1 天,
+// 冻结错业务日的 final;统一改走 src/kickoff-time.js 的 shanghaiDateOf(机器时区无关)。
 function shanghaiDate(offsetDays = 0) {
-  const now = new Date(Date.now() + (8 * 60 - new Date().getTimezoneOffset()) * 60000 + offsetDays * 864e5);
-  return now.toISOString().slice(0, 10);
+  return shanghaiDateOf(Date.now(), offsetDays);
 }
 
 function freezeOne(snap) {
