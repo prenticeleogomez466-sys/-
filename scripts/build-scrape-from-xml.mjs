@@ -6,6 +6,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { scrapeFilePath } from "../src/jingcai-fivehundred-stage.js";
+import { orientRowMaps, ORIENT_A_IS_1X2, ORIENT_UNCERTAIN } from "../src/spf-orientation.js";
 
 const args = process.argv.slice(2);
 const readArg = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
@@ -40,25 +41,20 @@ const feedB = parseMatches(readFileSync(nspfPath, "utf8"));  // 文件名 --nspf
 // 2026-06-09 修关键对调 bug:500 的 pl_spf_2 / pl_nspf_2 两个 XML 内容会互换(命名不可信)。
 //   若硬按文件名假设 spf=1X2,会把胜平负与让球赔率喂反(如匈牙利 1X2 1.17 大热被当让球 →
 //   europeanOdds 拿到让球值 → 主推从主胜翻成客胜,全表错)。今天实测正是 pl_spf=让球、pl_nspf=1X2。
-//   改为**数据驱动自动定向**(不靠脆弱命名假设,500 翻回去也自适应):悬殊/大热场 1X2 三项赔率的
-//   离散度(max/min)远大于让球盘(匈牙利 1X2 1.17/5.35/11.5 比≈9.8 vs 让-2 3.11/3.36/1.96 比≈1.7),
-//   逐场比两 feed 离散度投票,多数票判哪个 feed 是 1X2;平票/无样本保守按文件名(feedA=1X2)。
-const tripleRatio = (row) => {
-  if (!row) return null;
-  const v = [+row.win, +row.draw, +row.lost].filter((x) => x > 0);
-  return v.length === 3 ? Math.max(...v) / Math.min(...v) : null;
-};
-let voteA = 0, voteB = 0;
-for (const seq of feedA.keys()) {
-  const a = tripleRatio(feedA.get(seq)?.current), b = tripleRatio(feedB.get(seq)?.current);
-  if (a == null || b == null) continue;
-  if (a > b * 1.3) voteA++;        // feedA 更离散 → feedA 是 1X2
-  else if (b > a * 1.3) voteB++;   // feedB 更离散 → feedB 是 1X2
+//   改为**数据驱动自动定向**(不靠脆弱命名假设,500 翻回去也自适应)。
+// 2026-06-10(缺陷#3):定向逻辑抽到共享模块 src/spf-orientation.js,与每日主链
+//   ingest-500-jingcai-fallback / 收盘冻结 capture-closing-live 共用同一实现;
+//   平票/无样本不再"保守按文件名"硬猜——uncertain 即标⚠️人工复核并阻断落盘(铁律:绝不兜底)。
+const rowMapOf = (feed) => new Map([...feed].map(([seq, entry]) => [seq, entry?.current ?? null]));
+const orient = orientRowMaps(rowMapOf(feedA), rowMapOf(feedB));
+if (orient.orientation === ORIENT_UNCERTAIN) {
+  console.error(`⚠️ spf/nspf 方向离散度投票不确定(A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})——绝不按文件名硬猜,阻断落盘,请人工复核两份 XML 内容后重跑`);
+  process.exit(2);
 }
-const aIs1x2 = voteA >= voteB;     // 平票保守按文件名(--spf=1X2)
+const aIs1x2 = orient.orientation === ORIENT_A_IS_1X2;
 const spf = aIs1x2 ? feedA : feedB;    // spf 变量名沿用 = 1X2(胜平负)feed
 const nspf = aIs1x2 ? feedB : feedA;   // nspf = 让球胜平负 feed
-console.log(`[orient] 1X2 feed = ${aIs1x2 ? "--spf(pl_spf)" : "--nspf(pl_nspf)"}  (离散度投票 A=${voteA} / B=${voteB})`);
+console.log(`[orient] 1X2 feed = ${aIs1x2 ? "--spf(pl_spf)" : "--nspf(pl_nspf)"}  (离散度投票 A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})`);
 
 // jingcai-ingest-wc-singles(2026-06-08):去掉"最早赛日单批锚定"。改为纳入全部在售场次,只剔赛日早于业务日的场。
 // 2026-06-09:遍历两 feed **并集**(只卖让球的悬殊场只在让球 feed 出现,如阿根廷vs冰岛 → 必须保留并标 1X2 未开售)。

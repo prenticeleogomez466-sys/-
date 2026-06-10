@@ -21,6 +21,7 @@ import { saveFixtures, loadFixtures } from "../src/fixture-store.js";
 import { saveMarketSnapshots, loadMarketSnapshots } from "../src/market-data-store.js";
 import { scopeJingcaiFixtures } from "../src/jingcai-business-day.js";
 import { parseJingcaiHandicapLine } from "../src/jingcai-fivehundred-stage.js";
+import { orientRowMaps, swapGuardViolation, ORIENT_A_IS_1X2, ORIENT_B_IS_1X2, ORIENT_UNCERTAIN } from "../src/spf-orientation.js";
 
 const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
 const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml";
@@ -47,8 +48,29 @@ if (isMain) {
 
 async function main() {
   const [spfXml, nspfXml] = await Promise.all([fetchXml(SPF_URL), fetchXml(NSPF_URL)]);
-  const spf = parseMatches(spfXml);
-  const nspf = parseMatches(nspfXml);
+  const spfFeed = parseMatches(spfXml);   // pl_spf 文件内容(命名不可信,方向待定)
+  const nspfFeed = parseMatches(nspfXml); // pl_nspf 文件内容(命名不可信,方向待定)
+
+  // ===== 方向定向(缺陷#3,2026-06-10):500 两 XML 内容会互换,文件名不可信 =====
+  // 06-09 真钱事故:本脚本按文件名硬映射(euro←pl_nspf / 让球←pl_spf),互换日把胜平负与让球喂反,
+  //   匈牙利 1.17 大热被推客胜。改接共享离散度投票定向(与 build-scrape-from-xml 同一实现);
+  //   投票不确定 = 方向不可证 → 标⚠️人工复核 + exitCode≠0 + 阻断一切落盘(铁律:绝不硬猜兜底)。
+  const orient = orientIngestFeeds(spfFeed, nspfFeed);
+  if (orient.orientation === ORIENT_UNCERTAIN) {
+    console.error(`⚠️ spf/nspf 方向离散度投票不确定(A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})——方向不可证,阻断落盘,请人工复核两份 XML 内容`);
+    console.log(JSON.stringify({ ok: false, date, reason: "spf/nspf 方向投票不确定,需人工复核,未落盘", votes: { A: orient.voteA, B: orient.voteB, sampled: orient.sampled } }, null, 2));
+    process.exitCode = 2;
+    return;
+  }
+  console.error(`[orient] 1X2 feed = ${orient.euroFile}  让球 feed = ${orient.hcFile}(离散度投票 A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})`);
+  const euroByNum = new Map(orient.euroList.map((m) => [m.matchnum, m]));
+  const hcByNum = new Map(orient.hcList.map((m) => [m.matchnum, m]));
+  // 遍历两 feed 并集(让球 feed 为基,补 1X2 独有场):只卖让球的悬殊场只在让球 feed 出现,
+  //   旧代码固定遍历 pl_spf 文件,互换日会整批漏掉悬殊场。
+  const unionList = [...orient.hcList];
+  const seenNums = new Set(unionList.map((m) => m.matchnum));
+  for (const m of orient.euroList) if (!seenNums.has(m.matchnum)) { unionList.push(m); seenNums.add(m.matchnum); }
+  const spf = unionList;  // 下游变量名沿用:在售选取基准(两 feed 并集)
 
   // 比分/半全场/总进球 真实市场盘(按 matchid 索引;失败降级该赔种=空,审计闸会标缺)。
   const bfByMatchid = new Map(), bqcByMatchid = new Map(), jqsByMatchid = new Map();
@@ -74,7 +96,6 @@ async function main() {
   const wcN = todays.filter((m) => String(m.league ?? "").includes("世界杯")).length;
   console.error(`在售窗口(业务日${date}+${IN_SALE_HORIZON_DAYS}天):纳入 ${todays.length} 场(其中世界杯单场 ${wcN}),feed 共 ${spf.length} 场`);
 
-  const nspfByNum = new Map(nspf.map((m) => [m.matchnum, m]));
   const collectedAt = new Date().toISOString();
 
   // ---- odds.xml 全盘口接入(2026-06-03):亚盘水位 + 大小球,补 ingest 链路缺口 ----
@@ -110,25 +131,21 @@ async function main() {
 
   const fixtures = [];
   const snapshots = [];
+  const swapViolations = [];
 
   for (const m of todays) {
     const fixtureId = `jc500-${date}-${m.matchnum}-${safeName(m.home)}-${safeName(m.away)}`;
-    // ⚠️ 2026-06-02 修正重大映射错误(4角度对抗证伪+百家欧赔佐证):
-    //   500 的 pl_spf_2.xml 实际是【让球胜平负】、pl_nspf_2.xml 才是【胜平负(不让球)】——
-    //   与文件名直觉相反。旧代码把 spf(让球)当胜平负喂模型 → 1X2 方向系统性错(把客队让球盘当成主队胜平负)。
-    //   实测:克罗地亚vs比利时 真胜平负=2.57/2.85/2.57(势均,百家欧赔2.59/3.34/2.57佐证),
-    //         让球盘(主-1)=5.50/4.48/1.38(1.38是让球客胜非比利时大热)。
-    const nspfEntry = nspfByNum.get(m.matchnum);
-    const euro = nspfEntry ? oddsSet(nspfEntry, "win", "draw", "lost") : null;  // 胜平负 ← pl_nspf
-    const handicap = oddsSet(m, "win", "draw", "lost");                          // 让球胜平负 ← pl_spf
-    // 一致性守护:胜平负热门方(min赔)的让球盘赔率应更高(让1球更难cover);若反了说明仍喂反,告警。
-    if (euro && handicap) {
-      const favSide = euro.latest ? ["win","draw","lost"].reduce((b,k)=> (euro.latest[k]??9)<(euro.latest[b]??9)?k:b,"win") : null;
-      if (favSide && euro.latest && handicap.latest && Number(euro.latest[favSide]) > Number(handicap.latest[favSide]) + 0.3) {
-        console.error(`⚠️ 赔率一致性告警 ${m.home} vs ${m.away}:胜平负热门方赔率(${euro.latest[favSide]})高于让球(${handicap.latest[favSide]}),疑似 spf/nspf 仍喂反,请核查!`);
-      }
-    }
-    const goalLine = nspfByNum.get(m.matchnum)?.latest?.goalline ?? "";
+    // 2026-06-10(缺陷#3):不再按文件名硬映射(旧注释"pl_nspf 才是胜平负"在 06-09 互换日恰好反过来,
+    //   把匈牙利 1.17 大热喂反)。胜平负/让球一律取上方离散度投票定向后的 feed。
+    const euroEntry = euroByNum.get(m.matchnum);
+    const hcEntry = hcByNum.get(m.matchnum);
+    const euro = euroEntry ? oddsSet(euroEntry, "win", "draw", "lost") : null;  // 胜平负(1X2)
+    const handicap = hcEntry ? oddsSet(hcEntry, "win", "draw", "lost") : null;  // 让球胜平负
+    // 逐场互换残留守护(缺陷#13):旧守护读 oddsSet 不存在的 .latest 字段=死代码,且只告警不阻断。
+    //   改用共享 swapGuardViolation(读 .current);命中即记违例,循环后统一 exitCode≠0 阻断落盘。
+    const violation = swapGuardViolation(euro, handicap);
+    if (violation) swapViolations.push(`${m.matchnum} ${m.home} vs ${m.away}: ${violation}`);
+    const goalLine = euroEntry?.latest?.goalline ?? "";
 
     fixtures.push({
       id: fixtureId,
@@ -194,6 +211,16 @@ async function main() {
     });
   }
 
+  // ===== 互换阻断闸(缺陷#13,2026-06-10):方向可疑的数据绝不写进 market 文件 =====
+  // 旧行为=只 console.error 不设 exitCode 不阻断 → 喂反数据照样落盘进真钱管线。
+  if (swapViolations.length) {
+    console.error(`\n⛔ 逐场互换残留守护命中 ${swapViolations.length} 场,方向可疑,阻断落盘(fixtures/market 均不写),请人工复核:`);
+    for (const v of swapViolations) console.error(`  ${v}`);
+    console.log(JSON.stringify({ ok: false, date, reason: "spf/nspf 互换残留守护命中,方向可疑,未落盘", violations: swapViolations }, null, 2));
+    process.exitCode = 2;
+    return;
+  }
+
   // 合并既有 fixture(保留官方 14 场/其它源),只替换 500 兜底竞彩 —— 不破坏官方数据。
   const keepFixtures = loadFixtures(date).fixtures.filter((f) => f.source !== "500.com-jczq-fallback");
   const mergedSource = keepFixtures.length
@@ -201,27 +228,20 @@ async function main() {
     : "500.com-jczq-fallback";
   // 按业务日覆盖式落盘:对合并后的竞彩限当日 + 跨源去重(周六 vs 6001 重复 / 周日次日),
   // 避免反复兜底把场次越叠越多(17→35→48)。14 场/其它源原样保留。
-  // ===== 数据完整性审计闸(2026-06-06 用户铁律"抓完先审计核查再走下一步")=====
-  // 逐赔种核查覆盖率;缺失场如实告警(不静默用 DC 估算冒充市场盘)。覆盖严重不足时显著告警。
-  const audit = { 胜平负: 0, 让球: 0, 比分: 0, 半全场: 0, 大小球: 0, 总进球: 0, gaps: [] };
-  for (const s of snapshots) {
-    if (s.europeanOdds) audit.胜平负++;
-    if (s.handicapOdds) audit.让球++;
-    if (s.scoreOdds?.top?.length) audit.比分++;
-    if (s.halfFullOdds?.top?.length) audit.半全场++;
-    if (s.totals) audit.大小球++;
-    if (s.totalGoalsOdds?.over25 != null) audit.总进球++;
-    const miss = [];
-    if (!s.scoreOdds?.top?.length) miss.push("比分");
-    if (!s.halfFullOdds?.top?.length) miss.push("半全场");
-    if (s.totalGoalsOdds?.over25 == null && !s.totals) miss.push("大小球/总进球");
-    if (miss.length) audit.gaps.push(`${s.homeTeam} vs ${s.awayTeam}: 缺 ${miss.join("/")}`);
+  // ===== 数据完整性审计闸·真值化(缺陷#4,2026-06-10)=====
+  // 旧 gaps 判定只看 比分/半全场/(大小球|总进球替身):胜平负/让球缺失不进 gaps,jqs 有值还遮蔽
+  //   totals 全 NULL → 06-10 实测"胜平负 8/10 · 大小球 0/10"仍打"✅全赔种全覆盖"(假✅)。
+  // 改为六项(胜平负/让球/比分bf/半全场bqc/总进球jqs/大小球totals)逐项独立真实计数,
+  //   任一项任一场缺失即禁打✅,并明确列出缺哪种缺几场(如实标缺,不冒充、不替身)。
+  const audit = auditSnapshots(snapshots);
+  console.error(`\n=== 数据完整性审计(${audit.total}场)===`);
+  console.error(AUDIT_KINDS.map((k) => `${k} ${audit.counts[k]}/${audit.total}`).join(" · "));
+  if (audit.fullCoverage) {
+    console.error("✅ 全赔种全覆盖(六项逐项核验)");
+  } else {
+    console.error(`⚠️ 赔种缺口(将如实标缺、不冒充,禁打全覆盖✅):${audit.missingKinds.join(" · ")}`);
+    if (audit.gaps.length) console.error(`⚠️ 逐场缺口:\n  ` + audit.gaps.join("\n  "));
   }
-  const n = snapshots.length || 1;
-  console.error(`\n=== 数据完整性审计(${snapshots.length}场)===`);
-  console.error(`胜平负 ${audit.胜平负}/${snapshots.length} · 让球 ${audit.让球}/${snapshots.length} · 比分 ${audit.比分}/${snapshots.length} · 半全场 ${audit.半全场}/${snapshots.length} · 大小球 ${audit.大小球}/${snapshots.length} · 总进球 ${audit.总进球}/${snapshots.length}`);
-  if (audit.gaps.length) console.error(`⚠️ 缺口(将如实标缺、不冒充):\n  ` + audit.gaps.join("\n  "));
-  else console.error("✅ 全赔种全覆盖");
 
   const scopedFixtures = scopeJingcaiFixtures(date, [...keepFixtures, ...fixtures]);
   const fixturesSaved = saveFixtures(date, scopedFixtures, { source: mergedSource });
@@ -244,7 +264,13 @@ async function main() {
     snapshots: snapshots.length,
     fixturePath: `data/fixtures/${date}.json`,
     marketPath: marketSaved.path,
-    sample: todays.map((m) => { const n = nspfByNum.get(m.matchnum)?.latest; return `${m.matchnum} ${m.league} ${m.home} vs ${m.away} 胜平负=${n?`${n.win}/${n.draw}/${n.lost}`:"?"} 让球=${m.latest.win}/${m.latest.draw}/${m.latest.lost}`; })
+    orientation: { euroFile: orient.euroFile, hcFile: orient.hcFile, votes: { A: orient.voteA, B: orient.voteB, sampled: orient.sampled } },
+    auditMissing: audit.missingKinds,
+    sample: todays.map((m) => {
+      const e = euroByNum.get(m.matchnum)?.latest;
+      const h = hcByNum.get(m.matchnum)?.latest;
+      return `${m.matchnum} ${m.league} ${m.home} vs ${m.away} 胜平负=${e ? `${e.win}/${e.draw}/${e.lost}` : "未开售"} 让球=${h ? `${h.win}/${h.draw}/${h.lost}` : "?"}`;
+    })
   }, null, 2));
 }
 
@@ -327,6 +353,44 @@ export function selectInSale(spfMatches, date, horizonDays = IN_SALE_HORIZON_DAY
     if (!d) return true;
     return d >= String(date) && d <= horizon;
   });
+}
+
+// ===== 方向定向(缺陷#3,纯函数便于单测)=====
+// 输入:pl_spf / pl_nspf 两份 parseMatches 结果(文件名不可信)。
+// 输出:离散度投票后的 1X2 / 让球 feed 归属;uncertain 时 euroList/hcList = null(调用方必须阻断)。
+export function orientIngestFeeds(spfList, nspfList) {
+  const toRowMap = (list) => new Map((list ?? []).map((m) => [m.matchnum, m.latest]));
+  const o = orientRowMaps(toRowMap(spfList), toRowMap(nspfList));
+  if (o.orientation === ORIENT_A_IS_1X2) {
+    return { ...o, euroList: spfList, hcList: nspfList, euroFile: "pl_spf", hcFile: "pl_nspf" };
+  }
+  if (o.orientation === ORIENT_B_IS_1X2) {
+    return { ...o, euroList: nspfList, hcList: spfList, euroFile: "pl_nspf", hcFile: "pl_spf" };
+  }
+  return { ...o, euroList: null, hcList: null, euroFile: null, hcFile: null };
+}
+
+// ===== 审计闸真值化(缺陷#4,纯函数便于单测)=====
+// 六项逐项独立计数:总进球(jqs)绝不替身大小球(totals),胜平负/让球缺失同样计入缺口。
+export const AUDIT_KINDS = ["胜平负", "让球", "比分", "半全场", "总进球", "大小球"];
+export function auditSnapshots(snapshots) {
+  const list = Array.isArray(snapshots) ? snapshots : [];
+  const counts = Object.fromEntries(AUDIT_KINDS.map((k) => [k, 0]));
+  const gaps = [];
+  for (const s of list) {
+    const miss = [];
+    const tally = (kind, present) => { if (present) counts[kind] += 1; else miss.push(kind); };
+    tally("胜平负", Boolean(s.europeanOdds));
+    tally("让球", Boolean(s.handicapOdds));
+    tally("比分", Boolean(s.scoreOdds?.top?.length));
+    tally("半全场", Boolean(s.halfFullOdds?.top?.length));
+    tally("总进球", s.totalGoalsOdds?.over25 != null);
+    tally("大小球", Boolean(s.totals));
+    if (miss.length) gaps.push(`${s.homeTeam} vs ${s.awayTeam}: 缺 ${miss.join("/")}`);
+  }
+  const total = list.length;
+  const missingKinds = AUDIT_KINDS.filter((k) => counts[k] < total).map((k) => `${k} 缺${total - counts[k]}/${total}`);
+  return { counts, gaps, missingKinds, total, fullCoverage: total > 0 && missingKinds.length === 0 };
 }
 
 function parseMatches(xml) {

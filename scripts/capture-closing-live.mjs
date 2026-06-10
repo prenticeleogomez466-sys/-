@@ -7,9 +7,11 @@
 import "../src/env.js";
 import { loadFixtures } from "../src/fixture-store.js";
 import { loadMarketSnapshots, saveMarketSnapshots, findMarketSnapshot } from "../src/market-data-store.js";
+import { orientRowMaps, swapGuardViolation, ORIENT_A_IS_1X2, ORIENT_UNCERTAIN } from "../src/spf-orientation.js";
 
-const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";   // 让球胜平负
-const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml"; // 胜平负
+// ⚠️ 两 XML 内容会互换,文件名不可信(06-09 真钱事故)——方向由 src/spf-orientation.js 离散度投票定向。
+const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
+const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml";
 const REFERER = "https://trade.500.com/jczq/";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -54,21 +56,44 @@ async function main() {
   if (!due.length) { console.log(`[capture-closing-live] ${date}: 无临场场次(窗口${windowMin}分),跳过`); return; }
   console.log(`[capture-closing-live] ${date}: ${due.length} 场临场,重抓真盘冻结收盘...`);
   const [spfXml, nspfXml] = await Promise.all([fetchXml(SPF_URL), fetchXml(NSPF_URL)]);
-  const spf = parseLatest(spfXml), nspf = parseLatest(nspfXml);
+  const feedA = parseLatest(spfXml), feedB = parseLatest(nspfXml);
+  // 方向定向(缺陷#3,2026-06-10):旧代码按文件名硬解析(euro←nspf/让球←spf),互换日会把喂反的
+  //   赔率冻结成"真收盘线"毒化 CLV 与概率锚。改接共享离散度投票;uncertain = 方向不可证 → 阻断不写。
+  const orient = orientRowMaps(feedA, feedB);
+  if (orient.orientation === ORIENT_UNCERTAIN) {
+    console.error(`⚠️ spf/nspf 方向离散度投票不确定(A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})——方向不可证,阻断收盘冻结,请人工复核两份 XML`);
+    process.exitCode = 2;
+    return;
+  }
+  const euroRows = orient.orientation === ORIENT_A_IS_1X2 ? feedA : feedB; // 胜平负(1X2)
+  const hcRows = orient.orientation === ORIENT_A_IS_1X2 ? feedB : feedA;   // 让球胜平负
+  console.log(`[orient] 1X2 feed = ${orient.orientation === ORIENT_A_IS_1X2 ? "pl_spf" : "pl_nspf"}(离散度投票 A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})`);
   const set = loadMarketSnapshots(date);
   let frozen = 0;
+  const swapViolations = [];
   for (const f of due) {
     const num = String(f.sequence ?? f.matchnum ?? "");
-    const spfRow = spf.get(num), nspfRow = nspf.get(num);
-    if (!spfRow && !nspfRow) continue;
+    const euroRow = euroRows.get(num), hcRow = hcRows.get(num);
+    if (!euroRow && !hcRow) continue;
+    // 逐场互换残留守护(缺陷#13):定向后该场两套赔率仍可疑 → 记违例,统一阻断(绝不冻结可疑收盘线)。
+    const violation = swapGuardViolation(
+      euroRow ? { current: devig(euroRow) } : null,
+      hcRow ? { current: devig(hcRow) } : null
+    );
+    if (violation) { swapViolations.push(`${num} ${f.homeTeam ?? ""} vs ${f.awayTeam ?? ""}: ${violation}`); continue; }
     for (const s of set.snapshots) {
       if (String(s.sequence) !== num) continue;
-      // 胜平负 ← nspf;让球 ← spf。把最新即时价写成 current 并冻结 final(=真收盘)。
-      if (nspfRow && s.europeanOdds) { s.europeanOdds.current = devig(nspfRow); s.europeanOdds.final = devig(nspfRow); }
-      if (spfRow && s.handicapOdds) { s.handicapOdds.current = devig(spfRow); s.handicapOdds.final = devig(spfRow); }
+      // 把最新即时价写成 current 并冻结 final(=真收盘)。
+      if (euroRow && s.europeanOdds) { s.europeanOdds.current = devig(euroRow); s.europeanOdds.final = devig(euroRow); }
+      if (hcRow && s.handicapOdds) { s.handicapOdds.current = devig(hcRow); s.handicapOdds.final = devig(hcRow); }
       s.closingLiveCapturedAt = new Date().toISOString();
       frozen++;
     }
+  }
+  if (swapViolations.length) {
+    console.error(`⛔ 互换残留守护命中 ${swapViolations.length} 场,方向可疑,本轮不落盘:\n  ` + swapViolations.join("\n  "));
+    process.exitCode = 2;
+    return;
   }
   if (frozen) saveMarketSnapshots(date, set.snapshots, { source: `${set.source}+closing-live` });
   console.log(`完成:冻结 ${frozen} 场真收盘线(临场重抓)。CLV 现在对真收盘打分。`);
