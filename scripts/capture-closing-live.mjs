@@ -119,9 +119,12 @@ async function main() {
       const euroRow = euroRows.get(num), hcRow = hcRows.get(num);
       if (!euroRow && !hcRow) continue;
       // 逐场互换残留守护(缺陷#13):定向后该场两套赔率仍可疑 → 记违例,统一阻断(绝不冻结可疑收盘线)。
+      // 2026-06-10 洞1:此链拿不到竞彩让球线,统一用真互换形态阈值 ×5(06-09 事故实测比值≈5.8-6.5,
+      //   均势整数线误报≈2.3-3.5)——误报代价=整轮收盘冻结被阻断,远大于残留漏网(feed 级投票仍兜底)。
       const violation = swapGuardViolation(
         euroRow ? { current: devig(euroRow) } : null,
-        hcRow ? { current: devig(hcRow) } : null
+        hcRow ? { current: devig(hcRow) } : null,
+        { factor: 5 }
       );
       if (violation) { swapViolations.push(`${num} ${f.homeTeam ?? ""} vs ${f.awayTeam ?? ""}: ${violation}`); continue; }
       let touched = false;

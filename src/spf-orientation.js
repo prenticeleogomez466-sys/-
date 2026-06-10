@@ -69,15 +69,19 @@ export function orientRowMaps(mapA, mapB, opts) {
  * @returns {string|null} 命中返回告警文案,否则 null。euro=null 悬殊场无从逐场比对,
  *   返回 null(其方向已由 feed 级离散度投票覆盖,不算绕过)。
  */
-export function swapGuardViolation(euro, handicap, { factor = 2 } = {}) {
+export function swapGuardViolation(euro, handicap, { factor = 2, line = null } = {}) {
   const e = euro?.current ?? null;
   const h = handicap?.current ?? null;
   if (!e || !h) return null;
   const re = tripleRatio(e);
   const rh = tripleRatio(h);
   if (re == null || rh == null) return null;
-  if (rh > re * factor) {
-    return `让球三项离散度(${rh.toFixed(2)})显著高于胜平负(${re.toFixed(2)},阈值×${factor}),疑似 spf/nspf 互换残留`;
+  // 2026-06-10 世界杯审计洞1:均势场+竞彩整数深让球线(|线|≥1)让球离散天然高(实测 4002 韩捷 4.11/1.17=3.5、
+  //   7011 科厄 2.3,页面证实为正确定向非互换),×2 必误报且整日阻断落盘;真互换形态比值≈5.8-6.5(06-09 事故实测)。
+  //   |线|≥1 时阈值提至 ×5:两侧均有余量;让0/未知线保持 ×2 原灵敏度。feed 级离散度投票仍是第一道闸不受影响。
+  const eff = line != null && Math.abs(Number(line)) >= 1 ? Math.max(factor, 5) : factor;
+  if (rh > re * eff) {
+    return `让球三项离散度(${rh.toFixed(2)})显著高于胜平负(${re.toFixed(2)},阈值×${eff}),疑似 spf/nspf 互换残留`;
   }
   return null;
 }

@@ -150,7 +150,9 @@ async function main() {
     const handicap = hcEntry ? oddsSet(hcEntry, "win", "draw", "lost") : null;  // 让球胜平负
     // 逐场互换残留守护(缺陷#13):旧守护读 oddsSet 不存在的 .latest 字段=死代码,且只告警不阻断。
     //   改用共享 swapGuardViolation(读 .current);命中即记违例,循环后统一 exitCode≠0 阻断落盘。
-    const violation = swapGuardViolation(euro, handicap);
+    //   2026-06-10 洞1:传竞彩让球线,|线|≥1 整数深线提阈到 ×5 防均势场误报(韩捷/科厄实测假阳致整日断供)。
+    const guardLine = parseJingcaiHandicapLine(hcapByHome[`${m.home}|${m.away}`] ?? hcapByHome[m.home]);
+    const violation = swapGuardViolation(euro, handicap, { line: guardLine });
     if (violation) swapViolations.push(`${m.matchnum} ${m.home} vs ${m.away}: ${violation}`);
     const goalLine = euroEntry?.latest?.goalline ?? "";
 
@@ -177,7 +179,7 @@ async function main() {
 
     // 让球线(竞彩官方,jczq DOM)+ 亚盘水位 + 大小球(odds.xml)
     // 优先 "主队|客队" 复合键(防同一主队当日两场碰撞,如阿根廷vs冰岛让-2 vs 阿根廷vs阿尔及利亚让-1),兜底主队键。
-    const jline = parseJingcaiHandicapLine(hcapByHome[`${m.home}|${m.away}`] ?? hcapByHome[m.home]);
+    const jline = guardLine;
     const od = oddsByNum.get(m.matchnum);
     let asianHandicap = null;
     if (od?.asian) {
