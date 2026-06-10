@@ -170,6 +170,13 @@ function Run-Recap {
   # 赛果回填(2026-05-31 用户"数据不全 全补上去"):授权源覆盖不全(国际赛/北欧/日职/欧冠等),
   # 用 ESPN 全联赛单日赛果按 canonical 主队锚定补进 store,大幅提升结算率。$true 失败不阻塞。
   Invoke-Step "backfill real results from ESPN" "npm run recap:backfill -- --date=$Date" $true
+  # 旧业务日 pending 自愈(2026-06-10 审计缺陷修复):上一步恒带 --date=昨天,跨日开赛的场
+  # (如 06-09 业务日 2202 匈牙利场实际 06-10 凌晨踢,date-only kickoff 被开赛闸按 23:59:59 宁晚
+  # 判定)在"昨天"那次被正确拦下后,旧业务日文件再无任何计划任务重访 → 永久 pending。
+  # 无 --date 即 pendingDates 模式:扫 ledger 近 10 天(与 recap rescanPendingLedgerRows 同窗)
+  # 仍 pending 的旧业务日逐日重抓 ESPN 回填;hasKickedOff 闸 + strict 双边匹配原样生效,
+  # 未开赛/配不上的照旧留 pending(宁缺勿假)。随后 recap:daily 的 rescan 即可结算。$true 失败不阻塞。
+  Invoke-Step "self-heal pending results on older business dates (ledger sweep)" "npm run recap:backfill" $true
   # 半场比分回填(2026-06-04 用户"半全场睁眼"):ESPN 不带 HT、Sofascore 反爬,用 football-data.org
   # 免费档 score.halfTime 补世界杯+五大联赛+巴甲+欧冠的半场,让半全场玩法可结算/学习。无 token 优雅跳过。$true 失败不阻塞。
   Invoke-Step "backfill half-time scores from football-data.org" "npm run recap:backfill-ht -- --date=$Date" $true

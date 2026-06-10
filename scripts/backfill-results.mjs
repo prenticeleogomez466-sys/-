@@ -11,13 +11,19 @@
  * 全免费、Node 直连、不触付费源(遵 free-only)。
  *
  * 用法:
- *   node scripts/backfill-results.mjs --dry            # 扫 ledger 所有 pending 过去日期,只报告
- *   node scripts/backfill-results.mjs                  # 实写 store(过去日期,排除今天/未来)
+ *   node scripts/backfill-results.mjs --dry            # 扫 ledger 近10天 pending 过去日期,只报告
+ *   node scripts/backfill-results.mjs                  # 实写 store(近10天 pending 过去日期,排除今天/未来)
+ *   node scripts/backfill-results.mjs --days all       # 人工全量:不设回看窗
  *   node scripts/backfill-results.mjs --date 2026-05-29
+ *
+ * 无 --date 的 ledger 扫描模式即"旧业务日 pending 自愈"(2026-06-10 审计缺陷修复):
+ * 调度链恒带 --date=昨天,跨日开赛的场(06-09 业务日 2202 实际 06-10 凌晨踢)在昨天那次被
+ * 开赛闸正确拦下后旧文件再无人重访 → 永久 pending。Run-Recap 现额外跑一次本模式补旧日期。
  */
 import "../src/env.js";
 import { loadFixtures, saveFixtures } from "../src/fixture-store.js";
 import { hasKickedOff, fixtureMatchDate } from "../src/kickoff-time.js";
+import { pendingBackfillDates, PENDING_BACKFILL_WINDOW_DAYS, espnPoolDays, poolDayCapDays } from "../src/pending-backfill-dates.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
 import { getExportDir } from "../src/paths.js";
 import { readFileSync } from "node:fs";
@@ -55,6 +61,17 @@ if (loose) {
   console.warn("⚠️⚠️ 仅限人工核对场景;自动化任务一律默认 strict。\n");
 }
 const dateArg = (() => { const i = args.indexOf("--date"); return i >= 0 ? args[i + 1] : null; })();
+// 无 --date 模式的回看窗:默认近 PENDING_BACKFILL_WINDOW_DAYS 天(与 recap rescan 同窗);
+// --days all / --days 0 = 不设窗(人工全量补历史用)。
+const windowDays = (() => {
+  const i = args.indexOf("--days");
+  if (i < 0) return PENDING_BACKFILL_WINDOW_DAYS;
+  const v = String(args[i + 1] ?? "").trim().toLowerCase();
+  if (v === "all") return 0;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) { console.error(`--days 取值无效:${v}(应为非负整数或 all)`); process.exit(2); }
+  return n;
+})();
 const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
 
 // 国家队英→中补充(team-aliases 没收国家队;ESPN 友谊赛/世预赛用得上)。
@@ -133,8 +150,10 @@ function nearest(list, targetIso) {
   return list.slice().sort((a, b) => Math.abs(Date.parse(a.d + "T00:00:00Z") - t) - Math.abs(Date.parse(b.d + "T00:00:00Z") - t))[0];
 }
 
-// 抓单日单联赛完赛赛果(含半场,若 linescores 提供)
+// 抓单日单联赛完赛赛果(含半场,若 linescores 提供)。dIso=该 scoreboard 日(ISO),
+// 写进每条赛果供 nearest/日距闸用(此前 nearest 引用 m.d 但从未赋值 → 排序恒 NaN 失效,顺修)。
 async function fetchLeagueDay(league, yyyymmdd) {
+  const dIso = `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
   const out = [];
   try {
     const r = await fetch(`${BASE}/${league}/scoreboard?dates=${yyyymmdd}`, { headers: UA });
@@ -153,7 +172,7 @@ async function fetchLeagueDay(league, yyyymmdd) {
       const hHalf = Number(home.linescores?.[0]?.value);
       const aHalf = Number(away.linescores?.[0]?.value);
       out.push({
-        league,
+        league, d: dIso,
         home: home.team?.displayName ?? home.team?.name,
         away: away.team?.displayName ?? away.team?.name,
         hg, ag,
@@ -177,15 +196,10 @@ async function fetchAllForDay(yyyymmdd) {
   return all;
 }
 
-// 决定要处理的日期集合
+// 决定要处理的日期集合(无 --date:扫 ledger pending 旧业务日,窗口/排除规则见 src/pending-backfill-dates.js)
 function pendingDates() {
   const led = JSON.parse(readFileSync(join(getExportDir(), "recommendation-ledger.json"), "utf8"));
-  const set = new Set();
-  for (const r of led) {
-    const done = r.actualStatus === "settled" || (r.actual && r.actual !== "");
-    if (!done && r.date && r.date < todayIso) set.add(r.date); // 排除今天/未来(没踢完)
-  }
-  return [...set].sort();
+  return pendingBackfillDates(led, { todayIso, windowDays });
 }
 
 const dates = dateArg ? [dateArg] : pendingDates();
@@ -197,7 +211,6 @@ let grandMatched = 0, grandPending = 0;
 const stillMissing = [];
 
 for (const date of dates) {
-  const yyyymmdd = date.replaceAll("-", "");
   const store = loadFixtures(date);
   const fixtures = store.fixtures;
   // 开赛闸(2026-06-10 缺陷#1#2):未开赛(kickoff>now)或 kickoff 不可解析的场绝不回填——
@@ -211,19 +224,36 @@ for (const date of dates) {
   }
   if (!need.length) { console.log(`${date}: 无已开赛且缺 result 的场,跳过`); continue; }
 
-  // ESPN 赛果索引:覆盖 ±2 天(竞彩业务日常比实际开赛日早 1-2 天,实测 5-21 预测→5-23 实际)
+  // ESPN 赛果索引(审计③扩窗,2026-06-11):基础窗=业务日±3 天(竞彩业务日常比实际开赛日
+  // 早 1-2 天,实测 5-21 预测→5-23 实际)∪ 每个待回填场真实比赛日±1 天——否则 06-07 业务日的
+  // 世界杯场(真开赛 06-12~06-16)开赛后回访时池里永远没有真比赛日。
+  const poolDays = espnPoolDays(date, need);
   const results = [];
-  for (const delta of [0, -1, 1, -2, 2, -3, 3]) {
-    results.push(...await fetchAllForDay(shiftDay(yyyymmdd, delta)));
+  for (const dIso of poolDays) {
+    results.push(...await fetchAllForDay(dIso.replaceAll("-", "")));
   }
   // 预算 ESPN 池的 canonical 主客名
   const pool = results.map((m) => ({ ...m, ch: ck(m.home), ca: ck(m.away) }));
+
+  // 单场匹配:先按"候选日距该场真实比赛日 ≤ poolDayCapDays"过滤池(防扩窗后跨期错配——
+  // 世界杯小组赛当日 ESPN 抓取失败时,绝不能让池里早几天的同对阵热身赛顶上),再走 strict 双边。
+  function matchFixture(f) {
+    const target = fixtureMatchDate(f) ?? date;
+    const t = Date.parse(`${target}T00:00:00Z`);
+    if (!Number.isFinite(t)) return null; // 连业务日都解析不了:不猜,留 pending
+    const capMs = poolDayCapDays(f) * 86400000;
+    const sub = pool.filter((m) => {
+      const md = Date.parse(`${m.d}T00:00:00Z`);
+      return Number.isFinite(md) && Math.abs(md - t) <= capMs;
+    });
+    return findEspn(sub, ck(f.homeTeam), ck(f.awayTeam), target);
+  }
 
   let matched = 0;
   const howCount = { strict: 0, "home-anchored": 0, "away-anchored": 0, "home-nearest": 0 };
   const updated = fixtures.map((f) => {
     if (f.result || !hasKickedOff(f)) return f; // 未开赛绝不写 result(同 need 闸,双保险)
-    const hit = findEspn(pool, ck(f.homeTeam), ck(f.awayTeam), fixtureMatchDate(f) ?? date);
+    const hit = matchFixture(f);
     if (!hit) return f;
     const m = hit.m;
     matched++; howCount[hit.how] = (howCount[hit.how] ?? 0) + 1;
@@ -233,7 +263,7 @@ for (const date of dates) {
   });
 
   for (const f of need) {
-    if (!findEspn(pool, ck(f.homeTeam), ck(f.awayTeam), fixtureMatchDate(f) ?? date)) {
+    if (!matchFixture(f)) {
       stillMissing.push(`${date} ${f.competition ?? ""} ${f.homeTeam} vs ${f.awayTeam}  [canon ${ck(f.homeTeam)}|${ck(f.awayTeam)}]`);
     }
   }
@@ -253,10 +283,4 @@ if (stillMissing.length) {
   console.log(`\n仍缺(匹配不上 ESPN,留 pending):`);
   for (const s of stillMissing.slice(0, 60)) console.log("  -", s);
   if (stillMissing.length > 60) console.log(`  …还有 ${stillMissing.length - 60} 场`);
-}
-
-function shiftDay(yyyymmdd, delta) {
-  const y = Number(yyyymmdd.slice(0, 4)), m = Number(yyyymmdd.slice(4, 6)), d = Number(yyyymmdd.slice(6, 8));
-  const dt = new Date(Date.UTC(y, m - 1, d + delta));
-  return `${dt.getUTCFullYear()}${String(dt.getUTCMonth() + 1).padStart(2, "0")}${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
