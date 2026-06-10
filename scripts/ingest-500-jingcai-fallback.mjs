@@ -22,6 +22,7 @@ import { saveMarketSnapshots, loadMarketSnapshots } from "../src/market-data-sto
 import { scopeJingcaiFixtures } from "../src/jingcai-business-day.js";
 import { parseJingcaiHandicapLine } from "../src/jingcai-fivehundred-stage.js";
 import { orientRowMaps, swapGuardViolation, ORIENT_A_IS_1X2, ORIENT_B_IS_1X2, ORIENT_UNCERTAIN } from "../src/spf-orientation.js";
+import { kickoffTimeFromDomCell, domKickoffCellFor } from "../src/kickoff-time.js";
 
 const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
 const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml";
@@ -121,6 +122,12 @@ async function main() {
     if (r.status === 0) { hcapByHome = JSON.parse((await import("node:fs")).readFileSync(tmp, "utf8")); console.error(`官方让球数: ${Object.keys(hcapByHome).length} 场`); }
     else { console.error("让球数抓取失败,降级 line=0:", (r.stderr || "").slice(0, 120)); }
   } catch (e) { console.error("让球数抓取异常,降级 line=0:", e.message); }
+  // DOM 开球时刻(缺陷#9 配套,2026-06-10):500 静态 XML 无 matchtime → fixture.kickoff 只有日期,
+  //   临场收盘捕获(capture-closing-live)判不了"距开赛 N 分钟"= 永远 0 捕获。jczq DOM 含
+  //   "MM-DD HH:MM",由 scrape-jingcai-handicap 一并捕获挂 __kickoffs__。拿不到=如实留日期(不猜时刻)。
+  const domKickoffs = (hcapByHome && typeof hcapByHome.__kickoffs__ === "object" && hcapByHome.__kickoffs__) || {};
+  if (Object.keys(domKickoffs).length) console.error(`DOM 开球时刻: ${Object.keys(domKickoffs).length} 场`);
+  else console.error("⚠️ DOM 开球时刻 0 场(让球数抓取失败或页面改版)——kickoff 将只有日期,临场捕获对这些场跳过");
 
   // 盘口词/数字 → 数值(平手0 半球0.5 一球1 球半1.5;"2/2.5"→2.25)
   const HW = { "平手": 0, "平手/半球": 0.25, "半球": 0.5, "半球/一球": 0.75, "一球": 1, "一球/球半": 1.25, "球半": 1.5, "球半/两球": 1.75, "两球": 2, "两球/两球半": 2.25, "两球半": 2.5, "两球半/三球": 2.75, "三球": 3 };
@@ -147,11 +154,16 @@ async function main() {
     if (violation) swapViolations.push(`${m.matchnum} ${m.home} vs ${m.away}: ${violation}`);
     const goalLine = euroEntry?.latest?.goalline ?? "";
 
+    // kickoff = 真实赛日 + 开球时刻:XML matchtime 优先(若有),否则 DOM __kickoffs__
+    //   (kickoffTimeFromDomCell 校验 DOM MM-DD 与 XML 赛日一致才采信,防错场);都没有 → 只日期,如实标缺。
+    const kickoffTime = String(m.matchtime ?? "").trim()
+      || kickoffTimeFromDomCell(m.date, domKickoffCellFor(domKickoffs, m.home, m.away))
+      || "";
     fixtures.push({
       id: fixtureId,
       date,
       sequence: m.matchnum,
-      kickoff: `${m.date} ${m.matchtime ?? ""}`.trim(),
+      kickoff: `${m.date} ${kickoffTime}`.trim(),
       competition: m.league || "竞彩足球",
       homeTeam: m.home,
       awayTeam: m.away,

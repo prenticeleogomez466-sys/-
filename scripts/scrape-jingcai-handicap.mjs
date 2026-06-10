@@ -21,23 +21,33 @@ try {
   const data = await page.evaluate(() => {
     const rows = [...document.querySelectorAll("tr")].filter((tr) => /周[一二三四五六日]\d{3}/.test(tr.innerText));
     const map = {};
+    // 开球时刻(缺陷#9 配套,2026-06-10):500 静态 XML 无 matchtime,jczq DOM 是免费唯一含
+    //   "MM-DD HH:MM" 开球时刻的现成源。随让球数一并捕获,供 fixtures 摄入链补 kickoff HH:mm
+    //   (临场收盘捕获靠它判窗口)。挂保留键 __kickoffs__,与让球 map 同文件,消费端按复合键查。
+    const kickoffs = {};
     for (const tr of rows) {
       const cells = [...tr.querySelectorAll("td")].map((td) => td.innerText.replace(/\s+/g, " ").trim());
+      const koCell = cells[2] || "";
       const teamCell = cells[3] || "";
       const hcap = cells[4] || "";
       const parts = teamCell.replace(/\[\d+\]/g, "").split(/VS/i);
       const home = (parts[0] || "").trim();
       const away = (parts[1] || "").trim();
-      if (!home || !/[-+]?\d/.test(hcap)) continue;
+      if (!home) continue;
+      const ko = (koCell.match(/\d{2}-\d{2}\s+\d{1,2}:\d{2}/) || [])[0] || "";
+      if (away && ko) kickoffs[`${home}|${away}`] = ko;
+      if (!/[-+]?\d/.test(hcap)) continue;
       // 防碰撞(2026-06-09 根因修):同一主队当日可能两场(如阿根廷vs冰岛让-2 + 阿根廷vs阿尔及利亚让-1),
       //   旧 map[home] 后写覆盖前写 → 错拿别场让球线。改 "主队|客队" 唯一键;保留 home 键向后兼容(消费端优先查复合键)。
       if (away) map[`${home}|${away}`] = hcap;
       if (!(home in map)) map[home] = hcap;
     }
+    if (Object.keys(kickoffs).length) map.__kickoffs__ = kickoffs;
     return map;
   });
   writeFileSync(out, JSON.stringify(data, null, 2), "utf8");
-  console.log(JSON.stringify({ ok: true, count: Object.keys(data).length, out, data }, null, 2));
+  const hcapCount = Object.keys(data).filter((k) => k !== "__kickoffs__").length;
+  console.log(JSON.stringify({ ok: true, count: hcapCount, kickoffCount: Object.keys(data.__kickoffs__ ?? {}).length, out, data }, null, 2));
 } catch (error) {
   console.error("抓取失败:", error.message);
   process.exitCode = 1;

@@ -217,27 +217,54 @@ function espnDateParam(date) {
 }
 
 /**
+ * ESPN scoreboard 查询日窗(缺陷#15,2026-06-10):北京业务日的场按 UTC 落在前一天
+ * (北京 02:00 开球 = UTC 前日 18:00),只查日历当日双重漏。扩成日历日 ±window 天合并。
+ * 纯函数,固定断言可测。@returns {string[]} YYYYMMDD 参数列表(升序)
+ */
+export function espnDateWindow(date, window = 1) {
+  const m = String(date ?? "").match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return [espnDateParam(date)].filter(Boolean);
+  const base = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const out = [];
+  for (let d = -window; d <= window; d++) {
+    out.push(new Date(base + d * 86400000).toISOString().slice(0, 10).replace(/-/g, ""));
+  }
+  return out;
+}
+
+/**
  * 为当日 fixtures 抓 ESPN 免费首发:遍历 ESPN 覆盖联赛 scoreboard → 匹配 fixture → 抓 summary 首发。
  * 只对**匹配上且已挂首发**的场返回数据;其余正常跳过(赛前过早/非 ESPN 联赛)。
+ * scoreboard 按日历日 ±1 天扩窗合并(event id 去重),堵跨 UTC 日漏匹配。
  * @returns {{ fixtureData: Record<string,object>, count: number, source: string }}
  */
 export async function fetchEspnLineupsForFixtures(date, fixtures, opts = {}) {
   const fetchImpl = opts.fetch ?? globalThis.fetch;
   const leagues = opts.leagues ?? Object.keys(ESPN_LEAGUES);
-  const dates = espnDateParam(date);
+  const dateParams = espnDateWindow(date, opts.dateWindow ?? 1);
   const fixtureData = {};
   let count = 0;
-  // 先各联赛 scoreboard 一次,建 event 索引,避免逐 fixture 重复抓。
+  // 先各联赛 scoreboard(±1 天各一次),建 event 索引,避免逐 fixture 重复抓。
   const leagueEvents = {};
   await Promise.all(leagues.map(async (lg) => {
-    try {
-      const r = await fetchImpl(`${ESPN_BASE}/${lg}/scoreboard?dates=${dates}`, { headers: UA });
-      if (!r.ok) return;
-      const j = await r.json();
-      leagueEvents[lg] = Array.isArray(j?.events) ? j.events : [];
-    } catch {
-      // 单联赛失败不影响其它
-    }
+    const merged = [];
+    const seenIds = new Set();
+    await Promise.all(dateParams.map(async (dates) => {
+      try {
+        const r = await fetchImpl(`${ESPN_BASE}/${lg}/scoreboard?dates=${dates}`, { headers: UA });
+        if (!r.ok) return;
+        const j = await r.json();
+        for (const ev of Array.isArray(j?.events) ? j.events : []) {
+          const id = String(ev?.id ?? "");
+          if (id && seenIds.has(id)) continue;
+          if (id) seenIds.add(id);
+          merged.push(ev);
+        }
+      } catch {
+        // 单联赛/单日失败不影响其它
+      }
+    }));
+    leagueEvents[lg] = merged;
   }));
   for (const fixture of fixtures) {
     let matched = null;
@@ -260,15 +287,21 @@ export async function fetchEspnLineupsForFixtures(date, fixtures, opts = {}) {
  * 把"哪些是新首发 / 更新已上报状态 / 是否触发"的逻辑从 lineup-watch-gate(混 I/O)抽成纯函数,
  * 便于回归测试,防去重逻辑被改坏导致漏推或刷屏。
  *
- * @param {Object} prevState  watch-state.json 内容:{ "YYYY-MM-DD": [已上报 fixtureId...] }
- * @param {string} date       当日
- * @param {string[]} withLineupIds  当前已挂首发的 fixtureId 列表
+ * @param {Object} prevState  watch-state.json 内容:{ "YYYY-MM-DD": [已上报 key...] }
+ * @param {string} date       当日(业务日,新上报记到这个键下)
+ * @param {string[]} withLineupIds  当前已挂首发的稳定键/ID 列表
+ * @param {{extraSeenDates?:string[]}} [opts]  额外参与"已上报"判定的业务日(2026-06-10 缺陷#10:
+ *   今天+昨天双业务日合并盯防后,昨天键下已上报的场今天再次出现不得重复推送)。
  * @returns {{ fresh:string[], nextState:object, shouldTrigger:boolean }}
  *   fresh=本轮新出现(未上报过)的场;nextState=合并后的状态(去重、保序);shouldTrigger=有新首发。
  */
-export function computeLineupWatch(prevState, date, withLineupIds) {
+export function computeLineupWatch(prevState, date, withLineupIds, opts = {}) {
   const state = prevState && typeof prevState === "object" ? prevState : {};
-  const seen = new Set(Array.isArray(state[date]) ? state[date] : []);
+  const seenToday = [...new Set(Array.isArray(state[date]) ? state[date] : [])];
+  const seen = new Set(seenToday);
+  for (const d of Array.isArray(opts.extraSeenDates) ? opts.extraSeenDates : []) {
+    for (const id of Array.isArray(state[d]) ? state[d] : []) seen.add(String(id));
+  }
   const fresh = [];
   const freshSeen = new Set();
   for (const id of Array.isArray(withLineupIds) ? withLineupIds : []) {
@@ -278,6 +311,7 @@ export function computeLineupWatch(prevState, date, withLineupIds) {
     freshSeen.add(key);
     fresh.push(key);
   }
-  const nextState = { ...state, [date]: [...seen, ...fresh] };
+  // 只往"当日"键追加(昨天键不动):跨业务日去重靠 extraSeenDates 读,不靠把昨天数据搬进今天。
+  const nextState = { ...state, [date]: [...seenToday, ...fresh] };
   return { fresh, nextState, shouldTrigger: fresh.length > 0 };
 }

@@ -7,6 +7,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { scrapeFilePath } from "../src/jingcai-fivehundred-stage.js";
 import { orientRowMaps, ORIENT_A_IS_1X2, ORIENT_UNCERTAIN } from "../src/spf-orientation.js";
+import { kickoffTimeFromDomCell, domKickoffCellFor } from "../src/kickoff-time.js";
 
 const args = process.argv.slice(2);
 const readArg = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
@@ -75,7 +76,10 @@ function buildRows(phase) {
     const h = nspf.get(seq)?.[phase] ?? null;  // 让球胜平负
     if (!e && !h) continue;
     const league = meta.league;
-    const kickoff = `${meta.date.slice(5)}`;   // MM-DD(XML 无开赛时刻)
+    // MM-DD + DOM 开球时刻(缺陷#9 配套,2026-06-10):XML 无开赛时刻,jczq DOM 的 "MM-DD HH:MM"
+    //   由 scrape-jingcai-handicap 挂 __kickoffs__ 注入;拿不到=只日期,如实留空(不猜)。
+    const domTime = kickoffTimeFromDomCell(meta.date, domKickoffCellFor(hcap.__kickoffs__, meta.home, meta.away));
+    const kickoff = domTime ? `${meta.date.slice(5)} ${domTime}` : `${meta.date.slice(5)}`;
     const teamCell = `${meta.home} VS ${meta.away}`;
     // 只卖让球的悬殊场(1X2 未开售):用"未开售"标记 + 让球三项,匹配 parseOdds 的 /未开/ 分支(euro=null)。
     const oddsCell = (!e && h)

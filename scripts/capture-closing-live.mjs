@@ -5,9 +5,14 @@
 // 用法:node scripts/capture-closing-live.mjs [--date=YYYY-MM-DD] [--window=20]
 //   建议挂计划任务每 ~10 分钟跑一次(白天/赛前时段),自动逮住每场临近开赛的收盘价。
 import "../src/env.js";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { loadFixtures } from "../src/fixture-store.js";
 import { loadMarketSnapshots, saveMarketSnapshots, findMarketSnapshot } from "../src/market-data-store.js";
 import { orientRowMaps, swapGuardViolation, ORIENT_A_IS_1X2, ORIENT_UNCERTAIN } from "../src/spf-orientation.js";
+import { shanghaiDateOf, minutesToKickoff } from "../src/kickoff-time.js";
+import { nextCaptureState, assessCaptureHealth, CAPTURE_STATE_FILENAME } from "../src/closing-capture-health.js";
+import { getDataDir } from "../src/paths.js";
 
 // ⚠️ 两 XML 内容会互换,文件名不可信(06-09 真钱事故)——方向由 src/spf-orientation.js 离散度投票定向。
 const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
@@ -17,14 +22,29 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 
 const args = process.argv.slice(2);
 const arg = (k, d) => { const a = args.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
-const date = arg("date", shanghaiDate());
+// 时区根修(缺陷#9,2026-06-10):旧 shanghaiDate()/nowShanghai() 按"机器=UTC"手算 +8h 偏移,
+//   本机已是 UTC+8 → 双重 +8h(17:16 打出明天日期、minsToKickoff 恒差 24h,0 次真实捕获)。
+//   一律改 epoch 绝对时间 + Intl 显式 Asia/Shanghai(src/kickoff-time.js),机器时区无关。
+// 业务日(缺陷#10 同根):未显式 --date 时盯【今天+昨天】两个业务日文件——跨午夜开球
+//   (世界杯 02:00/03:00 场)归前一业务日文件,且当日文件 03:01 才生成,只盯今天永远漏。
+const dateArg = arg("date", null);
+const bizDates = dateArg ? [dateArg] : [shanghaiDateOf(), shanghaiDateOf(Date.now(), -1)];
 const windowMin = Number(arg("window", 20)); // 开赛前多少分钟内算"临场"
+const statePath = join(getDataDir(), CAPTURE_STATE_FILENAME);
 
-function shanghaiDate(off = 0) {
-  const n = new Date(Date.now() + (8 * 60 - new Date().getTimezoneOffset()) * 60000 + off * 864e5);
-  return n.toISOString().slice(0, 10);
+function loadCaptureState() {
+  try { return existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : null; } catch { return null; }
 }
-function nowShanghai() { return new Date(Date.now() + (8 * 60 - new Date().getTimezoneOffset()) * 60000); }
+function persistHealth({ eligibleCount, frozenCount }) {
+  const state = nextCaptureState(loadCaptureState(), { eligibleCount, frozenCount });
+  try { writeFileSync(statePath, JSON.stringify(state, null, 2), "utf8"); } catch (e) { console.error(`⚠️ 捕获状态文件写入失败:${e.message}`); }
+  const health = assessCaptureHealth(state);
+  if (health.red) {
+    console.error(`🔴 收盘捕获红灯:${health.reason}(状态文件 ${statePath})`);
+    if (!process.exitCode) process.exitCode = 1; // 红灯必须非零退出,计划任务面板可见
+  }
+  return health;
+}
 async function fetchXml(url) {
   const r = await fetch(url, { headers: { Referer: REFERER, "User-Agent": UA } });
   if (!r.ok) throw new Error(`HTTP ${r.status} ${url}`);
@@ -40,21 +60,40 @@ function parseLatest(xml) {
   }
   return byNum;
 }
-// 解析开赛时间(fixture.kickoff 形如 "2026-06-06 14:00"),返回距开赛分钟数(可负=已开赛)
-function minsToKickoff(fixture) {
-  const m = String(fixture.kickoff ?? "").match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})/);
-  if (!m) return null;
-  const ko = new Date(`${m[1]}T${m[2]}:${m[3]}:00+08:00`);
-  return (ko.getTime() - nowShanghai().getTime() - 8 * 3600000) / 60000 + 0; // 已按上海校正
-}
-
 async function main() {
-  const { fixtures } = loadFixtures(date);
-  const jc = fixtures.filter((f) => f.marketType === "jingcai");
-  // 临场窗口:开赛前 windowMin 分钟内、或刚开赛 <10 分钟(盘口收盘瞬间)
-  const due = jc.filter((f) => { const t = minsToKickoff(f); return t != null && t <= windowMin && t >= -10; });
-  if (!due.length) { console.log(`[capture-closing-live] ${date}: 无临场场次(窗口${windowMin}分),跳过`); return; }
-  console.log(`[capture-closing-live] ${date}: ${due.length} 场临场,重抓真盘冻结收盘...`);
+  // 距开赛分钟(src/kickoff-time.js minutesToKickoff):纯 epoch 差 + 显式 +08:00,
+  //   kickoff 无显式 HH:mm → null(摄入链拿不到开球时刻的场如实跳过并打⚠️,绝不猜)。
+  const nowMs = Date.now();
+  const dueByDate = new Map(); // 业务日 → 该日文件里的临场场次(快照按业务日分文件,必须分日落盘)
+  const noTime = [];
+  const seenDue = new Set(); // 同一场可能同时出现在今天+昨天两个业务日文件(在售窗口重叠),只计一次
+  let totalJc = 0;
+  for (const d of bizDates) {
+    const jc = loadFixtures(d).fixtures.filter((f) => f.marketType === "jingcai");
+    totalJc += jc.length;
+    for (const f of jc) {
+      const t = minutesToKickoff(f, nowMs);
+      if (t === null) { noTime.push(`${d}#${f.sequence ?? "?"} ${f.homeTeam} vs ${f.awayTeam}(kickoff="${f.kickoff ?? ""}")`); continue; }
+      // 临场窗口:开赛前 windowMin 分钟内、或刚开赛 <10 分钟(盘口收盘瞬间)
+      if (t <= windowMin && t >= -10) {
+        if (!dueByDate.has(d)) dueByDate.set(d, []);
+        dueByDate.get(d).push(f);
+        seenDue.add(`${f.sequence ?? ""}|${f.kickoff ?? ""}|${f.homeTeam}|${f.awayTeam}`);
+      }
+    }
+  }
+  if (noTime.length) {
+    const head = noTime.slice(0, 6);
+    const more = noTime.length > head.length ? `\n  …等共 ${noTime.length} 场` : "";
+    console.error(`⚠️ ${noTime.length} 场 kickoff 无开球时刻(HH:mm),无法判临场,跳过(摄入链需补时刻):\n  ` + head.join("\n  ") + more);
+  }
+  const eligibleCount = seenDue.size;
+  if (!eligibleCount) {
+    console.log(`[capture-closing-live] ${bizDates.join("+")}: 无临场场次(窗口${windowMin}分,共${totalJc}场竞彩),跳过`);
+    persistHealth({ eligibleCount: 0, frozenCount: 0 });
+    return;
+  }
+  console.log(`[capture-closing-live] ${bizDates.join("+")}: ${eligibleCount} 场临场,重抓真盘冻结收盘...`);
   const [spfXml, nspfXml] = await Promise.all([fetchXml(SPF_URL), fetchXml(NSPF_URL)]);
   const feedA = parseLatest(spfXml), feedB = parseLatest(nspfXml);
   // 方向定向(缺陷#3,2026-06-10):旧代码按文件名硬解析(euro←nspf/让球←spf),互换日会把喂反的
@@ -63,40 +102,50 @@ async function main() {
   if (orient.orientation === ORIENT_UNCERTAIN) {
     console.error(`⚠️ spf/nspf 方向离散度投票不确定(A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})——方向不可证,阻断收盘冻结,请人工复核两份 XML`);
     process.exitCode = 2;
+    persistHealth({ eligibleCount, frozenCount: 0 });
     return;
   }
   const euroRows = orient.orientation === ORIENT_A_IS_1X2 ? feedA : feedB; // 胜平负(1X2)
   const hcRows = orient.orientation === ORIENT_A_IS_1X2 ? feedB : feedA;   // 让球胜平负
   console.log(`[orient] 1X2 feed = ${orient.orientation === ORIENT_A_IS_1X2 ? "pl_spf" : "pl_nspf"}(离散度投票 A=${orient.voteA} / B=${orient.voteB},样本${orient.sampled})`);
-  const set = loadMarketSnapshots(date);
-  let frozen = 0;
+  let frozenMatches = 0;
   const swapViolations = [];
-  for (const f of due) {
-    const num = String(f.sequence ?? f.matchnum ?? "");
-    const euroRow = euroRows.get(num), hcRow = hcRows.get(num);
-    if (!euroRow && !hcRow) continue;
-    // 逐场互换残留守护(缺陷#13):定向后该场两套赔率仍可疑 → 记违例,统一阻断(绝不冻结可疑收盘线)。
-    const violation = swapGuardViolation(
-      euroRow ? { current: devig(euroRow) } : null,
-      hcRow ? { current: devig(hcRow) } : null
-    );
-    if (violation) { swapViolations.push(`${num} ${f.homeTeam ?? ""} vs ${f.awayTeam ?? ""}: ${violation}`); continue; }
-    for (const s of set.snapshots) {
-      if (String(s.sequence) !== num) continue;
-      // 把最新即时价写成 current 并冻结 final(=真收盘)。
-      if (euroRow && s.europeanOdds) { s.europeanOdds.current = devig(euroRow); s.europeanOdds.final = devig(euroRow); }
-      if (hcRow && s.handicapOdds) { s.handicapOdds.current = devig(hcRow); s.handicapOdds.final = devig(hcRow); }
-      s.closingLiveCapturedAt = new Date().toISOString();
-      frozen++;
+  const toSave = []; // [date, set] —— 互换守护通过后统一落盘(可疑则全部不写)
+  for (const [d, due] of dueByDate) {
+    const set = loadMarketSnapshots(d);
+    let dirty = false;
+    for (const f of due) {
+      const num = String(f.sequence ?? f.matchnum ?? "");
+      const euroRow = euroRows.get(num), hcRow = hcRows.get(num);
+      if (!euroRow && !hcRow) continue;
+      // 逐场互换残留守护(缺陷#13):定向后该场两套赔率仍可疑 → 记违例,统一阻断(绝不冻结可疑收盘线)。
+      const violation = swapGuardViolation(
+        euroRow ? { current: devig(euroRow) } : null,
+        hcRow ? { current: devig(hcRow) } : null
+      );
+      if (violation) { swapViolations.push(`${num} ${f.homeTeam ?? ""} vs ${f.awayTeam ?? ""}: ${violation}`); continue; }
+      let touched = false;
+      for (const s of set.snapshots) {
+        if (String(s.sequence) !== num) continue;
+        // 把最新即时价写成 current 并冻结 final(=真收盘)。
+        if (euroRow && s.europeanOdds) { s.europeanOdds.current = devig(euroRow); s.europeanOdds.final = devig(euroRow); }
+        if (hcRow && s.handicapOdds) { s.handicapOdds.current = devig(hcRow); s.handicapOdds.final = devig(hcRow); }
+        s.closingLiveCapturedAt = new Date().toISOString();
+        touched = true; dirty = true;
+      }
+      if (touched) frozenMatches++;
     }
+    if (dirty) toSave.push([d, set]);
   }
   if (swapViolations.length) {
     console.error(`⛔ 互换残留守护命中 ${swapViolations.length} 场,方向可疑,本轮不落盘:\n  ` + swapViolations.join("\n  "));
     process.exitCode = 2;
+    persistHealth({ eligibleCount, frozenCount: 0 });
     return;
   }
-  if (frozen) saveMarketSnapshots(date, set.snapshots, { source: `${set.source}+closing-live` });
-  console.log(`完成:冻结 ${frozen} 场真收盘线(临场重抓)。CLV 现在对真收盘打分。`);
+  for (const [d, set] of toSave) saveMarketSnapshots(d, set.snapshots, { source: `${set.source}+closing-live` });
+  console.log(`完成:冻结 ${frozenMatches} 场真收盘线(临场重抓,业务日 ${bizDates.join("+")})。CLV 现在对真收盘打分。`);
+  persistHealth({ eligibleCount, frozenCount: frozenMatches });
 }
 // 500 row 的水位字段 → 标准 {home,draw,away}(欧赔)
 function devig(row) {

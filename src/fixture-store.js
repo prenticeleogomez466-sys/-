@@ -48,6 +48,37 @@ export function saveFixtures(date, fixtures, metadata = {}) {
   return payload;
 }
 
+/**
+ * 同一场比赛跨业务日文件的**稳定键**(2026-06-10 缺陷#10):
+ * 同场在今天/昨天两个业务日文件里 id 不同(id 内嵌业务日,如 jc-2026-06-09-4001 vs
+ * jc500-2026-06-10-4001),按 id 去重必失效。改用"真实赛日(kickoff 内嵌日期优先)+主客队"。
+ */
+export function stableFixtureKey(fixture) {
+  const kickoff = String(fixture?.kickoff ?? "").trim();
+  const matchDate = kickoff.match(/\d{4}-\d{2}-\d{2}/)?.[0]
+    ?? (String(fixture?.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? "");
+  return `${matchDate}|${String(fixture?.homeTeam ?? "").trim()}|${String(fixture?.awayTeam ?? "").trim()}`;
+}
+
+/**
+ * 合并多个业务日的 fixtures 并按稳定键去重(先到先得,调用方把更新的业务日放前面)。
+ * 用途:跨午夜开球场归前一业务日文件 → 首发盯防/临场捕获需今天+昨天合并视图;
+ * 在售窗口重叠时同一场出现在两个文件,稳定键去重防双推/双捕。
+ */
+export function mergeFixtureLists(...lists) {
+  const seen = new Set();
+  const out = [];
+  for (const list of lists) {
+    for (const f of Array.isArray(list) ? list : []) {
+      const key = stableFixtureKey(f);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(f);
+    }
+  }
+  return out;
+}
+
 export function listFixtureDates() {
   ensureFixtureDir();
   return readdirSync(fixtureDir).filter((file) => file.endsWith(".json")).map((file) => file.replace(/\.json$/, "")).sort().reverse();

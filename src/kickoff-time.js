@@ -38,6 +38,102 @@ export function hasKickedOff(fixture, now = Date.now()) {
   return epoch !== null && epoch <= now;
 }
 
+// ───────────────── 时区根修(缺陷#9#10,2026-06-10)─────────────────
+// 旧 capture-closing-live 用 `Date.now() + (8*60 - getTimezoneOffset())*60000` 手算上海时间:
+// 该式假设"机器是 UTC",在本机(已是 UTC+8,getTimezoneOffset()=-480)上变成双重 +8h →
+// 17:16 打出明天日期、minsToKickoff 恒差 24h,上线以来 0 次真实捕获。
+// 根修:一律 epoch 绝对时间算术 + Intl 显式 timeZone "Asia/Shanghai",与机器时区彻底解耦
+// (UTC 机器与 UTC+8 机器结果逐位相同;上海无夏令时,偏移恒 +08:00)。
+
+/**
+ * 上海(北京时间)业务日 YYYY-MM-DD。纯 epoch 输入 + Intl 显式时区,机器时区无关。
+ * @param {number} nowMs    epoch 毫秒(默认当前)
+ * @param {number} offsetDays 业务日偏移(-1=昨天)。上海无 DST,按 86400000ms/天精确。
+ */
+export function shanghaiDateOf(nowMs = Date.now(), offsetDays = 0) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date(nowMs + offsetDays * 86400000));
+  const v = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${v.year}-${v.month}-${v.day}`;
+}
+
+/** ISO 日期加减天数(UTC 算术,无时区歧义)。无效输入原样返回。 */
+export function isoAddDays(isoDate, days) {
+  const m = String(isoDate ?? "").match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(isoDate ?? "");
+  const dt = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  dt.setUTCDate(dt.getUTCDate() + Number(days));
+  return dt.toISOString().slice(0, 10);
+}
+
+/**
+ * 严格开赛时刻(epoch ms):必须有显式 HH:mm 才返回,只有日期 → null。
+ * 供临场捕获用——23:59 兜底对结算安全(宁晚判),对"临场窗口"是毒(会在错误时刻假捕获),
+ * 铁律:拿不到真实开球时刻就如实返回 null,调用方标⚠️跳过。
+ */
+export function kickoffEpochMsStrict(fixture) {
+  const kickoff = String(fixture?.kickoff ?? "").trim();
+  if (!kickoff) return null;
+  const time = kickoff.match(/(\d{1,2}):(\d{2})/);
+  if (!time) return null;
+  const embeddedDate = kickoff.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+  const date = embeddedDate ?? (String(fixture?.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null);
+  if (!date) return null;
+  const epoch = new Date(`${date}T${time[1].padStart(2, "0")}:${time[2]}:00+08:00`).getTime();
+  return Number.isFinite(epoch) ? epoch : null;
+}
+
+/**
+ * 距开赛分钟数(可负=已开赛)。kickoff 无显式 HH:mm → null(调用方跳过,不猜)。
+ * 纯 epoch 差,UTC 机器与 UTC+8 机器结果相同。
+ */
+export function minutesToKickoff(fixture, nowMs = Date.now()) {
+  const epoch = kickoffEpochMsStrict(fixture);
+  if (epoch === null) return null;
+  return (epoch - nowMs) / 60000;
+}
+
+/**
+ * 从 500 jczq DOM 开赛单元格("MM-DD HH:mm")提取 HH:mm,供 fixtures 摄入链补开球时刻。
+ * 防错配:DOM 的 MM-DD 必须与 XML 赛日(YYYY-MM-DD)一致才采信;带日期但不一致/无法解析 → null
+ * (如实留空,绝不拿可疑时间冒充)。
+ */
+/**
+ * 在 DOM __kickoffs__ 映射({"主队|客队": "MM-DD HH:mm"})里查某场的开球单元格。
+ * 500 jczq DOM 会截断长队名(哥斯达黎加→哥斯达)→ 精确复合键会漏;容错规则:
+ * 主/客名前缀互含(截断方向不定)且**全表唯一**才采信,有歧义宁可返回 null(绝不猜场)。
+ */
+export function domKickoffCellFor(map, home, away) {
+  if (!map || typeof map !== "object") return null;
+  const h = String(home ?? "").trim();
+  const a = String(away ?? "").trim();
+  if (!h || !a) return null;
+  const exact = map[`${h}|${a}`];
+  if (exact != null && exact !== "") return exact;
+  const affine = (x, y) => x && y && x.length >= 2 && y.length >= 2 && (x.startsWith(y) || y.startsWith(x));
+  const hits = [];
+  for (const [key, cell] of Object.entries(map)) {
+    const [dh, da] = String(key).split("|");
+    if (affine(dh, h) && affine(da, a)) hits.push(cell);
+  }
+  return hits.length === 1 ? hits[0] : null; // 0=没有;≥2=歧义,都不猜
+}
+
+export function kickoffTimeFromDomCell(xmlDate, domCell) {
+  const cell = String(domCell ?? "").trim();
+  if (!cell) return null;
+  const time = cell.match(/(\d{1,2}):(\d{2})/);
+  if (!time) return null;
+  const hhmm = `${time[1].padStart(2, "0")}:${time[2]}`;
+  const md = cell.match(/(\d{2})-(\d{2})/);
+  if (md) {
+    const xmlMd = String(xmlDate ?? "").match(/\d{4}-(\d{2}-\d{2})/)?.[1] ?? null;
+    if (!xmlMd || `${md[1]}-${md[2]}` !== xmlMd) return null; // 日期不一致 = 可能错场,弃用
+  }
+  return hhmm;
+}
+
 /**
  * 该场的"真实比赛日"(YYYY-MM-DD):kickoff 内嵌日期优先,否则 fixture.date。
  * 供跨源对阵匹配做 ±N 天日期约束(同名对阵的世界杯小组赛 vs 热身赛不得视为同一场)。
