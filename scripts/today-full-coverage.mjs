@@ -14,9 +14,16 @@ import { writeXlsxWorkbook } from "../src/xlsx-writer.js";
 import {
   resolveDeliveryDate, buildOddsFillCounts, buildDegradeNote, buildOddsCoverageLine,
   buildAuditFoot, buildXlsxSheets, renderMobileHtml, renderEnglishHtml, resolveHtmlWriteTarget,
+  // 2026-06-11 渲染层升级(用户裁决①②③④):世界杯先验列组/让球真实裁决/串关安全度/数据审计/14场闸裁决
+  wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
+  renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
+  auditCell, buildAuditSheet, buildFourteenSheetRows,
 } from "../src/today-delivery-lib.js";
 import { writeFileSync, copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { worldCupContextLine } from "../src/worldcup-context.js";
+import { worldCupMatchPrior } from "../src/world-cup-priors.js";
+import { buildFourteenPlan } from "../src/prediction-engine.js";
+import { loadFixtures } from "../src/fixture-store.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(缺陷#20:绝不再默认写死历史日期)。
 let date;
@@ -78,8 +85,17 @@ const profileStr = (c) => {
 };
 
 // ── 真实赔率提取(全从 500 快照,5赔种;有=✅500真盘 缺=⚠️标缺,绝不用模型冒充市场) ──
+// 欧赔回退链(2026-06-11):500欧赔 → ESPN/DK ml → titan007 外盘百家平均(🔶仅方向参考)→ ⚠️未开售
 const trip = (o) => o ? `${o.home}/${o.draw}/${o.away}` : null;
-const euroStr = (s, eo) => { const e = s.europeanOdds; if (e && e.current) { const cur = trip(e.current), ini = trip(e.initial); return `${cur}${ini && ini !== cur ? `(初${ini})` : ""} ✅500欧赔`; } if (eo?.ml) return `竞彩未开售;ESPN/${eo.provider} ${eo.ml.home}/${eo.ml.draw}/${eo.ml.away} ✅`; return "⚠️未开售(竞彩只卖让球)"; };
+const euroStr = (s, c) => {
+  const e = s.europeanOdds;
+  if (e && e.current) { const cur = trip(e.current), ini = trip(e.initial); return `${cur}${ini && ini !== cur ? `(初${ini})` : ""} ✅500欧赔`; }
+  const eo = c?.espnOdds;
+  if (eo?.ml) return `竞彩未开售;ESPN/${eo.provider} ${eo.ml.home}/${eo.ml.draw}/${eo.ml.away} ✅`;
+  const ref = renderEuroRefCell(c?.euroRef);
+  if (ref) return `竞彩未开售;${ref}`;
+  return "⚠️未开售(竞彩只卖让球)";
+};
 const hcStr = (p, s) => { const line = s.jingcaiHandicap?.line ?? p.handicapPick?.line; const h = s.handicapOdds; if (!h || !h.current) return `让${line}(赔率⚠️缺)`; const cur = trip(h.current), ini = trip(h.initial); return `让${line} ${cur}${ini && ini !== cur ? `(初${ini})` : ""} ✅500让球`; };
 const ouRealStr = (s) => { const t = s.totalGoalsOdds; if (!t || t.over25 == null) return "⚠️未取到"; return `大2.5球 大${Math.round(t.over25 * 100)}%/小${Math.round(t.under25 * 100)}% ✅500总进球`; };
 const distStr = (s) => { const d = s.totalGoalsOdds?.dist; if (!d) return ""; return Object.entries(d).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([g, pp]) => `${g}球${Math.round(pp * 100)}%`).join(" "); };
@@ -98,39 +114,97 @@ const hcParts = (p, s) => {
   const model = cb.home != null
     ? `${home}${line}过盘${Math.round(cb.home * 100)}% · 走盘${Math.round(cb.push * 100)}% · ${away}+${absL}过盘${Math.round(cb.away * 100)}%`
     : "缺";
-  let market = "缺", mkHome = null;
-  if (hc) { const ss = 1 / hc.home + 1 / hc.draw + 1 / hc.away; mkHome = (1 / hc.home) / ss; market = `${home}过盘${Math.round((1 / hc.home) / ss * 100)}% · 走盘${Math.round((1 / hc.draw) / ss * 100)}% · ${away}+${absL}过盘${Math.round((1 / hc.away) / ss * 100)}%`; }
+  let market = "缺", mkHome = null, mkDist = null;
+  if (hc) {
+    const ss = 1 / hc.home + 1 / hc.draw + 1 / hc.away;
+    mkHome = (1 / hc.home) / ss;
+    mkDist = { home: (1 / hc.home) / ss, push: (1 / hc.draw) / ss, away: (1 / hc.away) / ss };
+    market = `${home}过盘${Math.round(mkDist.home * 100)}% · 走盘${Math.round(mkDist.push * 100)}% · ${away}+${absL}过盘${Math.round(mkDist.away * 100)}%`;
+  }
   const diverge = (cb.home != null && mkHome != null && Math.abs(cb.home - mkHome) > 0.15);
-  return { line: `让${line}`, model, market, diverge };
+  return { line: `让${line}`, lineNum: line, model, market, diverge, mkDist };
 };
 const hcViewStr = (p, s) => { const h = hcParts(p, s); return `${h.line} ‖ 模型:${h.model} ‖ 市场de-vig:${h.market}${h.diverge ? " ⚠️模型与市场分歧大(市场更准·谨慎)" : ""}`; };
+
+// ── 数据审计矩阵(2026-06-11 ④):每格=三标签+值+来源+抓取时间,缺标缺不兜底 ──
+const tCov = cov?.generatedAt ?? null;
+const auditFor = (p, s, c, prior, wcCtx) => {
+  const t500 = s.collectedAt ?? null;
+  const MISS = (why) => `⚠️缺(${why},标缺不编)`;
+  const euro = s.europeanOdds?.current ? auditCell("✅实测", trip(s.europeanOdds.current), "500竞彩XML(spf)", t500)
+    : c?.espnOdds?.ml ? auditCell("✅实测", `${c.espnOdds.ml.home}/${c.espnOdds.ml.draw}/${c.espnOdds.ml.away}`, `ESPN/${c.espnOdds.provider}`, tCov)
+      : MISS("竞彩未开售且ESPN无ml");
+  const ec = p.experienceContext;
+  return {
+    "欧赔": euro,
+    "让球": s.handicapOdds?.current ? auditCell("✅实测", `让${s.jingcaiHandicap?.line ?? p.handicapPick?.line} ${trip(s.handicapOdds.current)}`, "500竞彩XML(nspf)", t500) : MISS("500让球赔率未抓到"),
+    "比分": s.scoreOdds?.top?.length ? auditCell("✅实测", `top${s.scoreOdds.top.length}档`, "500竞彩XML(bf)", t500) : MISS("500比分盘未开售/未抓到"),
+    "半全场": s.halfFullOdds?.top?.length ? auditCell("✅实测", `top${s.halfFullOdds.top.length}档`, "500竞彩XML(bqc)", t500) : MISS("500半全场未开售/未抓到"),
+    "大小球": s.totalGoalsOdds?.over25 != null ? auditCell("✅实测", `大2.5=${Math.round(s.totalGoalsOdds.over25 * 100)}%`, "500竞彩XML(jqs de-vig)", t500) : MISS("500总进球未抓到"),
+    "亚盘DK": c?.asianHandicap?.dk ? auditCell("✅实测", `${c.asianHandicap.dk.line} 主${c.asianHandicap.dk.homeOdds}/客${c.asianHandicap.dk.awayOdds}`, c.asianHandicap.dk.source ?? "ESPN/DraftKings", tCov) : MISS(cov ? "ESPN/DK无该场亚盘" : "coverage缺"),
+    "亚盘titan007": c?.asianHandicap?.titan007 ? auditCell("✅实测", `即时主让${c.asianHandicap.titan007.live?.line}(${c.asianHandicap.titan007.companiesCount}家)`, "vip.titan007.com即时盘", c.asianHandicap.titan007.fetchedAt) : MISS(cov ? "titan007无该场" : "coverage缺"),
+    "欧赔参考(外盘)": c?.euroRef?.value ? auditCell("🔶推断(外盘均值,仅方向参考)", `${c.euroRef.value.home}/${c.euroRef.value.draw}/${c.euroRef.value.away}(${c.euroRef.companies}家)`, "titan007 1x2百家平均", c.euroRef.fetchedAt)
+      : (s.europeanOdds?.current ? "—(竞彩已开售,无需外盘参考)" : MISS(cov ? "外盘参考也未抓到" : "coverage缺")),
+    "近5": c?.home?.record5?.n ? auditCell("✅实测", `主${c.home.record5.n}场/客${c.away?.record5?.n ?? 0}场`, "ESPN跨league真实战绩", tCov) : MISS(cov ? "ESPN未取到该场近5" : "coverage缺"),
+    "H2H": c?.h2h ? (Array.isArray(c.h2h)
+      ? auditCell("✅实测", `${c.h2h.length}次(近赛季)`, "ESPN", tCov)
+      : (c.h2h.meetings?.length
+        ? auditCell("✅实测", `${c.h2h.meetings.length}次交锋`, c.h2h.source ?? "本地49k历史库", cov?.h2hLocalUpdatedAt ?? tCov)
+        : auditCell("⚠️零交锋(已查证为缺,非未查)", "0次", c.h2h.source ?? "本地49k历史库", cov?.h2hLocalUpdatedAt ?? tCov)))
+      : MISS(cov ? "该场无H2H记录" : "coverage缺"),
+    "国际赛画像": ec ? auditCell("✅实测", `同情境n=${ec.n ?? "?"}·平局率${Number.isFinite(ec.historicalDrawRate) ? Math.round(ec.historicalDrawRate * 100) + "%" : "?"}`, ec.source ?? "经验库", "经验库预构建") : MISS("无同情境经验样本"),
+    "世界杯先验": isWc(p)
+      ? (prior ? auditCell("✅实测", `eloDiff${prior.eloDiff >= 0 ? "+" : ""}${prior.eloDiff}·confed${prior.confedAdj >= 0 ? "+" : ""}${prior.confedAdj}·λ×${wcCtx?.lambdaMult ?? "?"}`, "team-priors.json+world-cup-priors", "本次运行实时计算") : "⚠️Elo先验缺(48强名单未收录)")
+      : "—(非世界杯场)",
+  };
+};
 
 const rows = games.map((p, i) => {
   const c = covFor(p);
   const s = p.marketSnapshot || {};
   const scoreMkt = !!(s.scoreOdds?.top?.length), hfMkt = !!(s.halfFullOdds?.top?.length);
+  const hcP = hcParts(p, s);
+  // ① 世界杯模型先验透明列组(Elo先验=worldCupMatchPrior 实时算;λ=prediction 已算好的 worldCup 上下文,不重算)
+  const wcCtx = p.probabilityAdjustment?.worldCup ?? null;
+  const prior = isWc(p) ? worldCupMatchPrior(p.fixture.homeTeam, p.fixture.awayTeam, { hostHome: true }) : null;
+  const wcLine = isWc(p) ? worldCupContextLine(p.fixture.homeTeam, p.fixture.awayTeam, p.fixture.competition) : "";
+  const wcCells = wcPriorCells({ isWc: isWc(p), prior, lambdaCtx: wcCtx, wcLine });
+  // ② 让球方向=模型真实裁决(handicapWld argmax,可与胜平负不同向,不同向注逻辑)
+  const hv = handicapVerdictParts({
+    line: s.jingcaiHandicap?.line ?? p.handicapPick?.line,
+    wldCode: p.pick?.code, wldLabel: p.pick?.label,
+    hw: p.handicapPick?.handicapWld ?? null, marketDist: hcP.mkDist,
+  });
+  const adv = advFor(p);
   return {
     idx: i + 1, ko: ko(p), comp: compTag(p),
     match: `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
     // 模型方向概率(🔶,由500真盘de-vig+DC推得)
-    wld: simpleWldCell(p), handicap: simpleHandicapCell(p), hcView: hcViewStr(p, s), hcP: hcParts(p, s),
+    wld: simpleWldCell(p), handicap: simpleHandicapCell(p), hcView: hcViewStr(p, s), hcP,
     score: simpleScoreCell(p), halffull: simpleHalfFullCell(p),
     scoreSrc: scoreMkt ? "✅500真盘" : "🔶DC", hfSrc: hfMkt ? "✅500真盘" : "🔶DC",
-    // 真实赔率(✅500实测 + ESPN/DraftKings亚盘/欧赔补;coverage 缺 → 诚实标缺不编)
-    euro: (s.europeanOdds?.current || cov) ? euroStr(s, c?.espnOdds) : COV_MISS,
-    asian: cov ? asianStr(c?.espnOdds) : COV_MISS, hc: hcStr(p, s),
+    // 真实赔率(✅500实测 + ESPN/DK与titan007双源亚盘 + 外盘欧赔参考;coverage 缺 → 诚实标缺不编)
+    euro: (s.europeanOdds?.current || cov) ? euroStr(s, c) : COV_MISS,
+    asian: cov ? (c?.asianHandicap ? renderAsianDualCell(c.asianHandicap) : asianStr(c?.espnOdds)) : COV_MISS,
+    hc: hcStr(p, s),
     ouReal: ouRealStr(s), dist: distStr(s),
     scoreMkt: scoreMktStr(s), hfMkt: hfMktStr(s),
     // ESPN 补全(coverage 文件缺 → ⚠️未补全;文件在但该场没抓到 → ❌未取到)
     homeRec: c ? `${c.home.zh} ${recStr(c.home)}` : (cov ? "❌未取到" : COV_MISS),
     awayRec: c ? `${c.away.zh} ${recStr(c.away)}` : (cov ? "❌未取到" : COV_MISS),
     homeLast5: c ? last5Str(c.home) : "", awayLast5: c ? last5Str(c.away) : "",
-    h2h: c ? h2hStr(c) : (cov ? "❌未取到" : COV_MISS),
+    // H2H:新版=本地49k历史库(零交锋⚠️如实标);旧 coverage 数组形状兼容
+    h2h: c ? renderH2hCell(c.h2h, c.home.zh) : (cov ? "❌未取到" : COV_MISS),
     profile: c ? profileStr(c) : (cov ? "❌未取到" : COV_MISS),
     conf: p.confidence, tier: p.selectionTier?.label ?? "",
-    // 🏆赛会行(2026-06-10 自检②回补:单写者收敛时丢了 wcLine——世界杯场带超算 出线/夺冠%;
-    //   非世界杯/无超算json → ""自动休眠,数据源=exports/worldcup-supercomputer.json 真实超算产物)
-    wcLine: isWc(p) ? worldCupContextLine(p.fixture.homeTeam, p.fixture.awayTeam, p.fixture.competition) : "",
+    // 🏆赛会(出线/夺冠%)= 世界杯模型超算产物;另入专属列 wcTourney
+    wcLine,
+    wcElo: wcCells.elo, wcLambda: wcCells.lambda, wcTourney: wcCells.tourney,
+    hv,
+    // ③ 串关安全度(信心档+risk+证伪标签;只标注不替弃赛)
+    parlay: parlaySafety({ tier: p.selectionTier?.label ?? "", risk: p.risk, advLabel: adv?.label ?? "" }),
+    // 双选触发(复盘"接住率"口径的赛前依据)
+    dc: p.doubleChance?.recommended ? { pick: p.doubleChance.pick, shortCode: p.doubleChance.shortCode } : null,
     // 情景研判一行(自检⑥:scenario-synthesizer 现成 headline,逐场不同,不重算不编造)
     scen: p.scenario?.headline ?? "",
     // 平局画像(2026-06-10 审计rank13:读现成 scenario.dims.draw / experienceContext 字段,不重算;
@@ -138,9 +212,62 @@ const rows = games.map((p, i) => {
     drawRate: p.scenario?.dims?.draw?.prob ?? p.experienceContext?.historicalDrawRate ?? null,
     drawAlert: p.experienceContext?.drawAlert
       ?? ((Number(p.scenario?.dims?.draw?.prob) >= 0.28 && p.pick?.code !== "1") ? (p.scenario.dims.draw.note ?? "平局风险偏高") : null),
-    adv: advFor(p),
+    adv,
+    // ④ 数据审计矩阵行
+    audit: auditFor(p, s, c, prior, wcCtx),
   };
 });
+
+// ── 14场/任选9(2026-06-11 ③):26085 期腿在历日 store 标 shengfucai,当日 store 为竞彩孪生。
+//    从近7天 store 找停售未过的恰14腿期次,映射到今日预测(同对阵同模型),跑 buildFourteenPlan 闸如实裁决;
+//    胆位护栏 isLowSampleWorldCup 在 buildFourteenPlan 内部生效(世界杯样本<20不当胆)。 ──
+const addDaysIso = (iso, k) => {
+  const d = new Date(`${iso}T12:00:00+08:00`);
+  d.setDate(d.getDate() + k);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+};
+let fourteen = null, fourteenFacts = [], fourteenLegs = null, fourteenStoreDate = null;
+try {
+  for (let k = 0; k <= 6 && !fourteenLegs; k++) {
+    const dd = addDaysIso(date, -k);
+    let fx = [];
+    try { fx = loadFixtures(dd).fixtures ?? []; } catch { fx = []; }
+    const legs = fx.filter((f) => f.marketType === "shengfucai" && /第\d+期/.test(f.notes ?? ""));
+    if (legs.length !== 14) continue;
+    const stopIso = (legs[0].notes ?? "").match(/停售=([0-9T:.\-Z]+)/)?.[1] ?? null;
+    const stopDate = stopIso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(stopIso)) : null;
+    if (stopDate && stopDate < date) continue; // 过期期次不算(诚实跳过)
+    fourteenLegs = legs; fourteenStoreDate = dd;
+  }
+  if (fourteenLegs) {
+    const periodLabel = (fourteenLegs[0].notes ?? "").match(/第\d+期/)?.[0] ?? "本期";
+    const stopIso = (fourteenLegs[0].notes ?? "").match(/停售=([0-9T:.\-Z]+)/)?.[1] ?? null;
+    const stopBj = stopIso ? new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "short" }).format(new Date(stopIso)) : "未知";
+    const views = []; const missing = [];
+    for (const leg of fourteenLegs) {
+      const pred = byMatch.get(`${leg.homeTeam}|${leg.awayTeam}`);
+      if (!pred) { missing.push(`${leg.homeTeam} vs ${leg.awayTeam}`); continue; }
+      // 视图包装:模型预测原样(同场同模型),fixture 换成胜负彩腿元数据(期号/停售/marketType)供闸读取——非编造
+      views.push({ ...pred, fixture: { ...pred.fixture, marketType: "shengfucai", notes: leg.notes, tags: leg.tags ?? pred.fixture.tags, sequence: leg.sequence } });
+    }
+    if (missing.length) {
+      fourteenFacts.push(["期次事实", `${periodLabel}(store=${fourteenStoreDate})14腿中 ${missing.length} 腿未映射到今日预测:${missing.join("/")}——不硬凑,不发`]);
+    } else {
+      fourteen = buildFourteenPlan(views, date);
+      const kos = fourteenLegs.map((l) => String(l.kickoff ?? "").slice(0, 10)).filter(Boolean).sort();
+      const matchOnDate = kos.includes(date);
+      fourteenFacts.push(
+        ["期次事实", `${periodLabel}·14/14腿已从 store(${fourteenStoreDate})映射到今日模型预测·停售(北京)${stopBj}·腿开赛${kos[0] ?? "?"}~${kos[kos.length - 1] ?? "?"}`],
+        ["闸明细", `恰14腿=✅ ｜ 停售未过(${date})=✅ ｜ matchOnDate(当日有腿开赛)=${matchOnDate ? "✅" : `⛔(所有腿开赛日均晚于业务日${date},闸防"把未来期混进今日单";本期停售${stopBj}=今日实际为最后购买日,如需放行属口径修改须用户裁决,本次按闸如实判定)`}`],
+        ["胆护栏", "世界杯样本<20一律不当胆(isLowSampleWorldCup,2026-06-10审计rank11):本期14腿全为世界杯场→即便发也0胆只作多选,护栏在buildFourteenPlan内部生效"],
+      );
+    }
+  } else {
+    fourteenFacts.push(["期次事实", `近7天 store 未找到停售未过的恰14腿胜负彩期次(${date}回看至${addDaysIso(date, -6)}),如实不发`]);
+  }
+} catch (e) {
+  fourteenFacts.push(["期次事实", `14场期次装配失败(${e.message}),如实不发,不硬凑`]);
+}
 
 // ── banner / note 派生(真实数据) ──
 const wcN = rows.filter((r) => /世界杯/.test(r.comp)).length, intlN = rows.length - wcN;
@@ -159,13 +286,40 @@ if (advKilled.length) riskNote += `🔴三视角对抗证伪:${advKilled.length}
 //   绝不写"n/n 全覆盖";任一赔种降级即 banner 显著⚠️(缺陷#12)。
 const counts = buildOddsFillCounts(rows);
 const degradeNote = buildDegradeNote(counts, !cov);
-const covNote = cov ? "近5场/H2H/攻防=ESPN真实战绩" : `近5场/H2H/攻防=⚠️未补全(coverage缺,先跑 fetch-match-coverage)`;
-const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、老H2H(ESPN限近赛季),已⚠️标不编。${riskNote}模型概率由真盘de-vig派生,1X2系统打不过收盘线、本质市场跟随器,买不买你定。`;
+const covNote = cov ? "近5场/H2H/攻防=ESPN真实战绩+本地49k历史库H2H" : `近5场/H2H/攻防=⚠️未补全(coverage缺,先跑 fetch-match-coverage)`;
+// ── 2026-06-11 新口径段:三列同向自检(让球列放行真实裁决)+ 不同向场清单 + 串关排序说明 + 14场闸裁决 ──
+const coh = threeColumnCoherence(rows);
+const hvDiverge = rows.filter((r) => r.hv?.sameDir === false);
+const cohNote = `让球新口径(2026-06-11用户裁决):让球方向=模型真实裁决可与胜平负不同向${hvDiverge.length ? `,本次${hvDiverge.length}场不同向已逐场注逻辑(${hvDiverge.map((r) => r.match.split(" vs ")[0]).join("/")})` : ",本次全部同向"};胜负平/比分/半全场三列仍同向(自检${coh.checked}场${coh.ok ? "全过" : `⚠️违例:${coh.violations.join(";")}`}${coh.skipped ? `,${coh.skipped}场未开售跳过` : ""})。`;
+const parlayCount = { g: rows.filter((r) => r.parlay?.grade === "🟢").length, y: rows.filter((r) => r.parlay?.grade === "🟡").length, b: rows.filter((r) => r.parlay?.grade === "⛔").length };
+const parlayNote = `串关安全度:🟢${parlayCount.g}/🟡${parlayCount.y}/⛔${parlayCount.b}。${PARLAY_ORDER_NOTE}`;
+const fourteenNote = fourteen?.available
+  ? `14场/任选9:本期可发(见"14场·任选9"工作表,世界杯腿一律不当胆)。`
+  : `14场/任选9:今日不发——${fourteen?.note ?? (fourteenFacts[0]?.[1] ?? "无本期映射")}(详见"数据审计"表内容审计区)。`;
+const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、零交锋场H2H(49k历史库已查证为缺),已⚠️标不编。${cohNote}${parlayNote}${fourteenNote}${riskNote}模型概率由真盘de-vig派生,1X2系统打不过收盘线、本质市场跟随器,买不买你定。`;
 // 审计背书(缺陷#17修):全部从本次 rows + adversarial/<date>.json 动态生成;无当日审计文件 → 不写"已审计"背书句。
 const auditFoot = buildAuditFoot({ rows, advData });
 
-// ── xlsx(20列专业版,经 xlsx-writer:深紫FF4A148C表头/banner跨列合并/内容感知行高/冻结筛选) ──
-const sheets = buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length) });
+// ── 内容审计区(数据审计表末尾,2026-06-11 ④) ──
+const advAudited = rows.filter((r) => r.adv).length;
+const dcRows = rows.filter((r) => r.dc);
+const contentAudit = [
+  ["三列同向自检(胜负平/比分/半全场)", coh.ok ? `✅ ${coh.checked}场核验全同向${coh.skipped ? `(另${coh.skipped}场未开售无方向,跳过)` : ""}` : `⚠️违例:${coh.violations.join(" ; ")}`, "让球列按2026-06-11新口径放行真实裁决,不再纳入同向硬约束"],
+  ["让球真实裁决·与胜平负不同向场", hvDiverge.length ? hvDiverge.map((r) => `${r.match}:${r.hv.verdict}(${r.hv.note})`).join(" ║ ") : "无(本次让球裁决全部与胜平负同向)"],
+  ["双选触发场(复盘'接住率'口径=任一兑现)", dcRows.length ? dcRows.map((r) => `${r.match} ${r.dc.pick}(${r.dc.shortCode})`).join(" ║ ") : "无"],
+  ["证伪标签汇总", `🔴证伪${advKilled.length}场 / 已审计${advAudited}场 / 未审计${rows.length - advAudited}场(未审计≠通过,串关列按"证伪未覆盖"降🟡)`],
+  ["串关安全度汇总", `🟢${parlayCount.g}·🟡${parlayCount.y}·⛔${parlayCount.b}`, PARLAY_ORDER_NOTE],
+  ["14场/任选9闸裁决", fourteen?.available ? "✅可发(见14场·任选9工作表)" : `⛔不发:${fourteen?.note ?? "无本期映射"}`],
+  ...fourteenFacts,
+  ["三处口径一致", `xlsx/手机页/英文页由同次运行同源渲染(today-delivery-lib 单写者,T4架构),日期=${date}·行数=${rows.length},生成后另跑 Grep 终检`],
+];
+
+// ── xlsx(25列专业版 + 数据审计 + 14场闸裁决,经 xlsx-writer:深紫FF4A148C表头/banner跨列合并/内容感知行高/冻结筛选) ──
+const sheets = [
+  ...buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length) }),
+  buildAuditSheet({ date, rows, contentAudit }),
+  { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
+];
 if (outBase) mkdirSync(outBase, { recursive: true });
 const xlsxTarget = outBase ? `${outBase}/神选-竞彩推荐-${date}.xlsx` : `C:/Users/Administrator/Desktop/神选-竞彩推荐-${date}.xlsx`;
 writeXlsxWorkbook(xlsxTarget, sheets);
@@ -214,14 +368,16 @@ if (!outBase) {
 // ── 对话(完整) ──
 console.log(`\n## ⚡ 今日竞彩完整覆盖交付 · ${date} · ${rows.length}场\n`);
 for (const r of rows) {
-  console.log(`### ${r.idx}. ${r.match}(${r.comp})· ${r.ko} · ${r.tier}${Math.round(r.conf)}`);
+  console.log(`### ${r.idx}. ${r.match}(${r.comp})· ${r.ko} · ${r.tier}${Math.round(r.conf)} · ${r.parlay?.text ?? ""}`);
   if (r.wcLine) console.log(`  🏆 赛会: ${r.wcLine}`);
+  if (r.wcElo && r.wcElo !== "—") console.log(`  🌍 世界杯模型: Elo先验 ${r.wcElo} | 场馆λ ${r.wcLambda}`);
   if (r.scen) console.log(`  🎬 情景: ${r.scen}`);
   console.log(`  ① 胜负平🔶: ${r.wld}`);
   console.log(`     胜平负赔率✅: ${r.euro}`);
-  console.log(`  ② 竞彩让球🔶: ${r.hcView}`);
+  console.log(`  ② 让球真实裁决🔶: ${String(r.hv?.text ?? "⚠️缺").replace(/\n/g, " ")}`);
+  console.log(`     竞彩让球🔶: ${r.hcView}`);
   console.log(`     竞彩让球赔率✅: ${r.hc}`);
-  console.log(`     博彩亚盘✅: ${r.asian}`);
+  console.log(`     博彩亚盘✅: ${String(r.asian).replace(/\n/g, " ")}`);
   console.log(`  ③ 比分🔶: ${r.score}〔${r.scoreSrc}〕| 赔率✅: ${r.scoreMkt}`);
   console.log(`     半全场🔶: ${r.halffull}〔${r.hfSrc}〕| 赔率✅: ${r.hfMkt}`);
   console.log(`     大小球✅: ${r.ouReal} | 进球分布: ${r.dist}`);
@@ -230,7 +386,18 @@ for (const r of rows) {
   if (r.adv) console.log(`  🔴 对抗证伪: ${r.adv.label}${r.adv.ev != null ? ` EV=${r.adv.ev}` : ""} — ${r.adv.kill}`);
   console.log("");
 }
-console.log(`✅ xlsx: ${xlsxTarget}`);
+// ── 14场/任选9 闸裁决(对话口径与 xlsx"14场·任选9"表一致) ──
+console.log(`\n## 🎯 14场/任选9 闸裁决`);
+if (fourteen?.available) {
+  console.log(`✅ 本期可发:单式串 ${fourteen.singleLine}`);
+  console.log(`   复式串 ${fourteen.compoundLine}`);
+} else {
+  console.log(`⛔ 今日不发14场段(任选9同闸):${fourteen?.note ?? "无本期映射"}`);
+}
+for (const f of fourteenFacts) console.log(`   ${f[0]}: ${f[1] ?? ""}`);
+console.log(`\n## 🔍 内容审计区摘要`);
+for (const ca of contentAudit) console.log(`   ${ca[0]}: ${ca[1] ?? ""}`);
+console.log(`\n✅ xlsx: ${xlsxTarget}`);
 console.log(`✅ 手机页: ${htmlTarget}`);
 console.log(`✅ 英文页: ${enTarget}`);
 console.log(`\nBANNER: ${BANNER}`);

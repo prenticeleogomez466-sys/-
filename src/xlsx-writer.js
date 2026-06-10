@@ -135,8 +135,15 @@ function chooseColumnWidths(sheetName, headers, count) {
 }
 
 function guessWidth(sheetName, header, index) {
+  // 数据审计表(2026-06-11):每格=三标签+值+来源+抓取时间,维度列统一加宽
+  if (/数据审计/.test(sheetName) && index >= 2) return 38;
   // 足球专业版长文本列(放最前·优先级最高,配合内容感知行高,长串少切行少堆高)
   if (/对抗证伪/.test(header)) return 50;
+  if (/真实裁决/.test(header)) return 42;
+  if (/世界杯模型.*Elo|场馆λ/.test(header)) return 40;
+  if (/出线.*夺冠/.test(header)) return 34;
+  if (/串关/.test(header)) return 24;
+  if (/titan007|双源/.test(header)) return 44;
   if (/模型过盘|过盘.*市场|让球.*模型/.test(header)) return 46;
   if (/近5|近五/.test(header)) return 40;
   if (/攻防/.test(header)) return 32;

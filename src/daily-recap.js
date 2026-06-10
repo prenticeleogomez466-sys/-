@@ -10,7 +10,7 @@ import { syncAuthorizedFixturesAndResults } from "./authorized-fixtures.js";
 import { syncFootballArtifacts } from "./artifact-sync.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 import { appendDailyMetrics, recapTrendRows } from "./daily-metrics-trend.js";
-import { attributeRecap } from "./recap-attribution.js";
+import { attributeRecap, attributionHeadline } from "./recap-attribution.js";
 import { kickoffEpochMs, hasKickedOff } from "./kickoff-time.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -97,7 +97,8 @@ function buildSelfcheck(date, rows, syncResults) {
 export function recapAttributionRows(attr) {
   if (!attr || !attr.settled) return [["复盘归因", "暂无已结算场次(等赛果回填)", "", ""]];
   const rows = [
-    ["⚡ 复盘归因 · 累计", `结算 ${attr.settled} · 命中 ${attr.hit}(${attr.accuracy}%)`, "", ""],
+    // 2026-06-11 用户裁决:单选命中为主 + 接住率为辅(双选触发场任一兑现),口径在 attributionHeadline 注明。
+    ["⚡ 复盘归因 · 累计", attributionHeadline(attr), "", ""],
     [],
     ["类别分布", ...Object.entries(attr.byCategory).map(([k, v]) => `${k}:${v}`)],
     [],

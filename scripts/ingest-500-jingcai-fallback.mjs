@@ -36,6 +36,9 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 
 const args = process.argv.slice(2);
 const date = readArg("--date") ?? todayInShanghai();
+// --horizon N:在售窗口天数覆盖(默认 IN_SALE_HORIZON_DAYS=4)。胜负彩期次腿跨度>4天时(如26085期腿12-14在6/16)
+//   临时放宽抓全期腿;只影响窗口纳入,不改任何赔率解析口径(2026-06-10)。
+const horizonOverride = Number(readArg("--horizon")) || null;
 
 // 仅在直接执行(node scripts/ingest-500-jingcai-fallback.mjs)时跑 main();被 import(单测引 selectInSale)
 //   时不执行,避免测试触发真实网络抓取与落盘(jingcai-ingest-wc-singles,2026-06-08)。
@@ -88,7 +91,7 @@ async function main() {
   //   (已下市不在 feed)→ 在售 = feed 里全部场次。旧逻辑按 matchnum 前三位定系列、只取一个系列,
   //   对世界杯长预售期(matchnum 跨 1/2/.../7 七系列、kickoff 跨 06-09~06-18)会把 4001 墨西哥vs南非
   //   等世界杯单场整批丢弃 → 竞彩漏出。改为纳入 feed 全部场次(可剔已过 kickoff 的场)。
-  const todays = selectInSale(spf, date);
+  const todays = selectInSale(spf, date, horizonOverride ?? IN_SALE_HORIZON_DAYS);
   if (!todays.length) {
     console.log(JSON.stringify({ ok: false, date, reason: "500 源无任何竞彩场次", spfTotal: spf.length }, null, 2));
     return;

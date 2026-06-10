@@ -90,6 +90,14 @@ export function attributeRecap(rows) {
     for (const l of attr.lessons) lessonCount[l] = (lessonCount[l] ?? 0) + 1;
   }
   const hit = items.filter((x) => x.attr.hit).length;
+  // 接住率(2026-06-10 用户定口径"单选为主+接住率为辅"):单选中 或 模型主动标双选的场任一双选方向兑现。
+  //   只认 doubleChanceRecommended===true 的场(模型赛前主动提示),不放宽到事后任意次选,防口径注水。
+  const jc = (label) => (label === "主胜" ? "3" : label === "平局" ? "1" : label === "客胜" ? "0" : String(label ?? ""));
+  const caught = items.filter((x) =>
+    x.attr.hit || (x.row.doubleChanceRecommended === true
+      && Array.isArray(x.row.doubleChanceCodes ?? null)
+      && x.row.doubleChanceCodes.map(String).includes(jc(x.row.actual)))
+  ).length;
   // 提炼 top 改进项:出现≥2 次的教训 + 命中率最差(样本≥2)的联赛
   const topImprovements = [
     ...Object.entries(lessonCount).filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).map(([l, c]) => `${l}(${c}场)`),
@@ -99,9 +107,23 @@ export function attributeRecap(rows) {
     settled: settled.length,
     hit,
     accuracy: settled.length ? Math.round(hit / settled.length * 1000) / 10 : null,
+    caught,
+    caughtRate: settled.length ? Math.round(caught / settled.length * 1000) / 10 : null,
     byCategory,
     byLeague,
     items: items.map((x) => ({ match: x.row.match, competition: x.row.competition, hit: x.attr.hit, category: x.attr.category, why: x.attr.why })),
     topImprovements,
   };
+}
+
+/**
+ * 复盘看板头行(2026-06-11 用户裁决③:复盘=单选命中为主+接住率为辅)。
+ * 口径注明:接住率=单选中 或 双选触发场任一方向兑现(只认赛前 doubleChanceRecommended===true,防注水)。
+ */
+export function attributionHeadline(attr) {
+  if (!attr?.settled) return "暂无已结算场次(等赛果回填)";
+  const caught = attr.caughtRate != null
+    ? ` · 接住 ${attr.caught}(${attr.caughtRate}%)〔接住率=单选中或双选触发场任一兑现·辅助指标〕`
+    : "";
+  return `结算 ${attr.settled} · 命中 ${attr.hit}(${attr.accuracy}%)${caught}`;
 }
