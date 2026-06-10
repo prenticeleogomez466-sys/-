@@ -120,6 +120,31 @@ export function domKickoffCellFor(map, home, away) {
   return hits.length === 1 ? hits[0] : null; // 0=没有;≥2=歧义,都不猜
 }
 
+/**
+ * 沿用本店先前已捕获的开球时刻(HH:mm)——开球时刻不降级(T5,2026-06-10)。
+ * 背景:DOM 抓取偶发 net::ERR_TIMED_OUT(同晚实测 2 次里挂 1 次)。ingest 重写 fixtures 时若
+ * DOM 失败,旧逻辑把已捕获 HH:mm 的场降级回"只有日期" → 当晚临场收盘捕获全灭。
+ * 这是保留先前同场真实捕获值,不是兜底猜测:匹配键=编号+主客队全同,且先前 kickoff 内嵌赛日
+ * 与本次 XML 赛日一致才沿用(赛日改期 → 旧时刻不可信,弃);从无捕获 → null,如实留日期。
+ * 调用方必须把本函数排在 XML matchtime / DOM 新鲜值之后(拿到新时刻一律以新为准)。
+ */
+export function preservedKickoffTime(prevFixtures, { sequence, home, away, date } = {}) {
+  const seq = String(sequence ?? "").trim();
+  const h = String(home ?? "").trim();
+  const a = String(away ?? "").trim();
+  const d = String(date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+  if (!seq || !h || !a || !d) return null;
+  for (const f of Array.isArray(prevFixtures) ? prevFixtures : []) {
+    if (String(f?.sequence ?? "").trim() !== seq) continue;
+    if (String(f?.homeTeam ?? "").trim() !== h || String(f?.awayTeam ?? "").trim() !== a) continue;
+    const m = String(f?.kickoff ?? "").trim().match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})$/);
+    if (!m) continue;          // 先前也没有时刻 → 无可沿用
+    if (m[1] !== d) continue;  // 赛日改期 → 绝不拿旧时刻冒充
+    return m[2];
+  }
+  return null;
+}
+
 export function kickoffTimeFromDomCell(xmlDate, domCell) {
   const cell = String(domCell ?? "").trim();
   if (!cell) return null;

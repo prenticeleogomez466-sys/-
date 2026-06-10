@@ -7,7 +7,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  shanghaiDateOf, isoAddDays, kickoffEpochMsStrict, minutesToKickoff, kickoffTimeFromDomCell, domKickoffCellFor
+  shanghaiDateOf, isoAddDays, kickoffEpochMsStrict, minutesToKickoff, kickoffTimeFromDomCell, domKickoffCellFor, preservedKickoffTime
 } from "../src/kickoff-time.js";
 import { nextCaptureState, assessCaptureHealth } from "../src/closing-capture-health.js";
 import { mergeFixtureLists, stableFixtureKey } from "../src/fixture-store.js";
@@ -92,6 +92,34 @@ test("domKickoffCellFor: 500 DOM 截断长队名(哥斯达黎加→哥斯达)→
   const amb2 = { "阿根廷|冰岛队A": "06-10 02:00", "阿根廷|冰岛队B": "06-10 06:00" };
   assert.equal(domKickoffCellFor(amb2, "阿根廷", "冰岛"), null);
   assert.equal(domKickoffCellFor(null, "a", "b"), null);
+});
+
+// ───────────── 开球时刻不降级(T5:DOM 偶发超时不得抹掉已捕获 HH:mm)─────────────
+
+test("preservedKickoffTime: DOM 失败轮沿用本店同场(编号+主客+赛日全同)先前捕获的 HH:mm", () => {
+  const prev = [
+    { sequence: "4001", homeTeam: "墨西哥", awayTeam: "南非", source: "500.com-jczq-fallback", kickoff: "2026-06-12 03:00" },
+    { sequence: "3201", homeTeam: "葡萄牙", awayTeam: "尼日利亚", source: "500.com-jczq-fallback", kickoff: "2026-06-11 03:45" }
+  ];
+  assert.equal(preservedKickoffTime(prev, { sequence: "4001", home: "墨西哥", away: "南非", date: "2026-06-12" }), "03:00");
+  assert.equal(preservedKickoffTime(prev, { sequence: "3201", home: "葡萄牙", away: "尼日利亚", date: "2026-06-11" }), "03:45");
+});
+
+test("preservedKickoffTime: 赛日改期/对阵不同/先前无时刻 → null,绝不拿旧时刻冒充", () => {
+  const prev = [
+    { sequence: "4001", homeTeam: "墨西哥", awayTeam: "南非", kickoff: "2026-06-12 03:00" },
+    { sequence: "4002", homeTeam: "韩国", awayTeam: "捷克", kickoff: "2026-06-12" } // 先前也只有日期
+  ];
+  // 赛日改期(XML 新赛日 06-13 ≠ 先前捕获 06-12)→ 旧时刻不可信
+  assert.equal(preservedKickoffTime(prev, { sequence: "4001", home: "墨西哥", away: "南非", date: "2026-06-13" }), null);
+  // 同编号不同对阵(编号复用)→ 不得错配
+  assert.equal(preservedKickoffTime(prev, { sequence: "4001", home: "巴西", away: "摩洛哥", date: "2026-06-12" }), null);
+  // 先前就没有 HH:mm → 无可沿用
+  assert.equal(preservedKickoffTime(prev, { sequence: "4002", home: "韩国", away: "捷克", date: "2026-06-12" }), null);
+  // 防御:空/缺参
+  assert.equal(preservedKickoffTime(null, { sequence: "4001", home: "墨西哥", away: "南非", date: "2026-06-12" }), null);
+  assert.equal(preservedKickoffTime(prev, {}), null);
+  assert.equal(preservedKickoffTime(prev), null);
 });
 
 // ───────────── 连续24h零捕获红灯 ─────────────

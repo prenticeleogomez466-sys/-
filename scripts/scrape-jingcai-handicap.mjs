@@ -16,7 +16,21 @@ const out = readArg("--out", "D:/Temp/claude/handicap.json");
 const browser = await chromium.launch({ channel: "chrome", headless: true });
 try {
   const page = await browser.newPage({ userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" });
-  await page.goto("https://trade.500.com/jczq/", { waitUntil: "domcontentloaded", timeout: 60000 });
+  // 重试加固(T5,2026-06-10):trade.500.com 偶发 net::ERR_TIMED_OUT(同晚实测 2 次里挂 1 次),
+  //   单次 60s goto 失败 = 让球数 + 开球时刻整轮丢失(上游 ingest 的 kickoff 会缺 HH:mm)。
+  //   改 3 次 × 22s(总预算 ≈70s,守住上游 spawnSync 90s 闸);全部失败仍 fail-loud 退出 ≠0,绝不造数据。
+  let gotoError = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await page.goto("https://trade.500.com/jczq/", { waitUntil: "domcontentloaded", timeout: 22000 });
+      gotoError = null;
+      break;
+    } catch (e) {
+      gotoError = e;
+      console.error(`goto 第 ${attempt}/3 次失败: ${String(e.message).split("\n")[0]}`);
+    }
+  }
+  if (gotoError) throw gotoError;
   await page.waitForTimeout(3500); // 等 JS 渲染对阵表
   const data = await page.evaluate(() => {
     const rows = [...document.querySelectorAll("tr")].filter((tr) => /周[一二三四五六日]\d{3}/.test(tr.innerText));
