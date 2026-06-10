@@ -14,8 +14,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const CSV_PATH = 'D:/football-model/data/intl-results/results.csv';
-const FIXTURES_PATH = 'D:/football-model-data/fixtures/2026-06-11.json';
-const COVERAGE_PATH = 'D:/football-model-data/coverage/2026-06-11.json';
+// --date 参数化(2026-06-11):原写死 06-11,世界杯期间每日链(run-wc-pro-delivery)按当日跑。
+const DATE = (() => { const i = process.argv.indexOf('--date'); const v = i > -1 ? process.argv[i + 1] : (process.argv.find(a => a.startsWith('--date=')) || '').slice(7); return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date()); })();
+const FIXTURES_PATH = `D:/football-model-data/fixtures/${DATE}.json`;
+const COVERAGE_PATH = `D:/football-model-data/coverage/${DATE}.json`;
 const TEMP_DIR = 'D:/Temp/wc-rec-0611';
 const SOURCE_TAG = 'martj42-intl-results-local(截至2026-06-03)';
 
@@ -150,8 +152,8 @@ function h2hFor(rows, teamA, teamB) {
 function main() {
   // 1) 输入
   const fixtures = JSON.parse(fs.readFileSync(FIXTURES_PATH, 'utf8')).fixtures;
-  if (!Array.isArray(fixtures) || fixtures.length !== 14) {
-    throw new Error(`fixtures 数量异常: ${fixtures && fixtures.length}, 期望14`);
+  if (!Array.isArray(fixtures) || !fixtures.length) {
+    throw new Error(`fixtures 为空: ${FIXTURES_PATH}(原14场断言已放开——在售窗口场数随期次浮动)`);
   }
   const rows = loadResults();
   console.log(`[load] results.csv 共 ${rows.length} 场国际赛`);
