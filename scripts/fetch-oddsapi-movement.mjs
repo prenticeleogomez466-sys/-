@@ -13,25 +13,39 @@ import "../src/env.js";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "../src/paths.js";
+import { fetchOddsApiRotating, listOddsApiKeys } from "../src/odds-api-rotation.js";
 
 const args = process.argv.slice(2);
 const arg = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
 const SPORT = arg("--sport", "soccer_fifa_world_cup");
 const REGION = arg("--region", "eu");
-const KEY = process.env.ODDS_API_KEY;
-if (!KEY) { console.error("缺 ODDS_API_KEY(见记忆 reference_integrable_api_keys)"); process.exit(1); }
+if (!listOddsApiKeys().length) { console.error("缺 ODDS_API_KEY(免费多 key 可配 ODDS_API_KEYS / ODDS_API_KEY_2..9,见记忆 reference_integrable_api_keys)"); process.exit(1); }
 
 const dir = getDataSubdir("market");
 if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 const openPath = join(dir, `oddsapi-${SPORT}-open.json`);
 const latestPath = join(dir, `oddsapi-${SPORT}-latest.json`);
+const quotaStatusPath = join(dir, "oddsapi-quota-status.json");
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8").replace(/^﻿/, "")); } catch { return null; } };
 
-const url = `https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${KEY}&regions=${REGION}&markets=h2h,totals&oddsFormat=decimal`;
-const res = await fetch(url);
-if (res.status !== 200) { console.error(`The Odds API HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`); process.exit(1); }
-const events = await res.json();
-const used = res.headers.get("x-requests-used"), remaining = res.headers.get("x-requests-remaining");
+// 缺陷#11(2026-06-10):多免费 key 轮换;配额全军覆没(401/429)= 优雅降级:
+//   不刷新 open/latest(保持上次【真实】快照原样,绝不编数据)、落 quota 状态文件如实标注
+//   "外盘缺失",exit 0 —— 配额耗尽是已知月度约束,不该把计划任务打成 0x1 假故障。
+//   其他错误(网络/4xx/5xx)仍 fail-loud exit 1。
+const rot = await fetchOddsApiRotating((key) => `https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${key}&regions=${REGION}&markets=h2h,totals&oddsFormat=decimal`);
+if (!rot.ok) {
+  if (rot.quotaExhausted) {
+    writeFileSync(quotaStatusPath, JSON.stringify({ exhaustedAt: new Date().toISOString(), sport: SPORT, keyCount: rot.attempts.length, attempts: rot.attempts, note: "外盘缺失:The Odds API 免费配额耗尽,本轮未刷新异动(open/latest 保持上次真实快照),等待月度重置;可在 local.env 加 ODDS_API_KEYS/ODDS_API_KEY_2..9 免费 key 轮换" }, null, 2), "utf8");
+    console.error(`⚠️ ${rot.error}`);
+    console.error(`   状态已落盘:${quotaStatusPath}(open/latest 未动,无伪造)`);
+    process.exit(0);
+  }
+  console.error(rot.error);
+  process.exit(1);
+}
+if (existsSync(quotaStatusPath)) { try { writeFileSync(quotaStatusPath, JSON.stringify({ recoveredAt: new Date().toISOString(), sport: SPORT, remaining: rot.remaining }, null, 2), "utf8"); } catch {} }
+const events = await rot.response.json();
+const used = rot.used, remaining = rot.remaining;
 
 // 中位数共识 + de-vig。每场聚合所有盘口的 home/draw/away 十进制赔率取中位,再归一成概率。
 const median = (a) => { const s = a.filter((x) => x > 0).sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };

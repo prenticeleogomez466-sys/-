@@ -32,7 +32,6 @@
     "backtest:walkforward": "node scripts/run-walkforward-backtest.mjs",
     "backtest:ablation": "node scripts/run-signal-ablation.mjs",
     "weights:search": "node scripts/run-weight-search.mjs",
-    "calibration:temperature": "node scripts/run-temperature-fit.mjs",
     "optimize:loop": "node scripts/run-optimize-loop.mjs",
     "recommend:coverage": "node scripts/run-selective-coverage.mjs",
     "recommend:league-reliability": "node scripts/build-league-reliability.mjs",

@@ -124,12 +124,48 @@ export async function deliverWechatPayload(payload, env = process.env) {
   return { mode: "webhook", ok: false, ...last, path: outbox.latestPath };
 }
 
+// outbox 新鲜度判定(缺陷#18,2026-06-10 纯函数可单测):
+//   背景:daily-with-fallback 的 fallback/补救路径成功出表却不投递 → outbox 停在 06-08,
+//   而 06-09/06-10 的推荐 xlsx 都在,健康检查却只看"outbox 文件存在"完全发现不了。
+//   规则:outbox 最新投递日期落后业务日 >1 天(容忍一天合法无可推之盘)即不健康;
+//   若期间已有更新的推荐表落盘(出了表却没投)→ error 级显著告警;否则 warning(可能连续无盘,如实标注)。
+export function assessOutboxFreshness({ outboxDate, businessDate, latestReportDate } = {}) {
+  if (!outboxDate) return { ok: false, level: "warning", lagDays: null, detail: "outbox 尚未有过任何投递记录" };
+  const outboxMs = Date.parse(String(outboxDate).slice(0, 10));
+  const businessMs = Date.parse(String(businessDate ?? "").slice(0, 10));
+  if (!Number.isFinite(outboxMs) || !Number.isFinite(businessMs)) {
+    return { ok: false, level: "warning", lagDays: null, detail: `outbox 日期不可解析(outbox=${outboxDate} / 业务日=${businessDate})` };
+  }
+  const lagDays = Math.round((businessMs - outboxMs) / 86400000);
+  if (lagDays <= 1) return { ok: true, level: "ok", lagDays, detail: `outbox 最新投递 ${String(outboxDate).slice(0, 10)},滞后 ${lagDays} 天(正常)` };
+  const reportNewer = Boolean(latestReportDate && String(latestReportDate) > String(outboxDate).slice(0, 10));
+  if (reportNewer) {
+    return { ok: false, level: "error", lagDays, detail: `🔴 outbox 停更:最新投递 ${String(outboxDate).slice(0, 10)} 落后业务日 ${String(businessDate).slice(0, 10)} 共 ${lagDays} 天,且 ${latestReportDate} 已出推荐表却未投递(疑 fallback 路径漏投,缺陷#18)` };
+  }
+  return { ok: false, level: "warning", lagDays, detail: `⚠️ outbox 最新投递 ${String(outboxDate).slice(0, 10)} 落后业务日 ${lagDays} 天;期间无更新推荐表(可能连续无可推之盘,如实标注)` };
+}
+
+// 扫描导出目录里最新一张推荐表(神选-竞彩推荐-YYYY-MM-DD.xlsx)的日期,供 outbox 新鲜度对账。
+function latestRecommendationReportDate() {
+  try {
+    const dates = readdirSync(exportDir)
+      .map((name) => name.match(/^神选-竞彩推荐-(\d{4}-\d{2}-\d{2})\.xlsx$/)?.[1])
+      .filter(Boolean)
+      .sort();
+    return dates.at(-1) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function buildWechatChannelHealth(date = todayInShanghai(), env = process.env) {
   const config = getWechatConfig(env);
   const latestOutbox = join(exportDir, "wechat-outbox-latest.json");
   const latestReport = join(exportDir, `football-recommendations-${date}.xlsx`);
   const gateStatus = readRealtimeGateStatus(date, env);
   const webhookCheck = validateWebhookUrl(config.webhookUrl);
+  const outboxPayload = readJsonIfExists(latestOutbox);
+  const outboxFreshness = assessOutboxFreshness({ outboxDate: outboxPayload?.date ?? null, businessDate: date, latestReportDate: latestRecommendationReportDate() });
   const checks = [
     { name: "微信查询入口鉴权令牌", ok: Boolean(config.queryToken), level: config.queryToken ? "ok" : "error", detail: config.queryToken ? "已配置" : "缺少 WECHAT_QUERY_TOKEN" },
     { name: "微信查询令牌强度", ok: config.queryToken.length >= 24, level: config.queryToken.length >= 24 ? "ok" : "warning", detail: config.queryToken.length >= 24 ? "长度合格" : "建议至少 24 位随机字符" },
@@ -139,6 +175,7 @@ export function buildWechatChannelHealth(date = todayInShanghai(), env = process
     { name: "浏览器跨域限制", ok: config.corsOrigin !== "*", level: config.corsOrigin === "*" ? "warning" : "ok", detail: config.corsOrigin ? `允许来源：${config.corsOrigin}` : "默认不开放跨域" },
     { name: "Webhook 地址", ok: !config.webhookUrl || webhookCheck.ok, level: webhookCheck.ok ? "ok" : "warning", detail: config.webhookUrl ? maskUrl(config.webhookUrl) : "未配置，使用本地 outbox" },
     { name: "出站 outbox", ok: existsSync(latestOutbox), level: existsSync(latestOutbox) ? "ok" : "warning", detail: existsSync(latestOutbox) ? latestOutbox : "尚未生成" },
+    { name: "outbox 新鲜度", ok: outboxFreshness.ok, level: outboxFreshness.level, detail: outboxFreshness.detail },
     { name: "今日 XLSX", ok: existsSync(latestReport), level: existsSync(latestReport) ? "ok" : "warning", detail: existsSync(latestReport) ? latestReport : "尚未生成" },
     { name: "实时数据闸门", ok: gateStatus.ok, level: gateStatus.ok ? "ok" : "warning", detail: gateStatus.detail }
   ];

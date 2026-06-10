@@ -6,6 +6,7 @@ import { loadFixtures } from "./fixture-store.js";
 import { findMarketSnapshot, loadMarketSnapshots, normalizeMarketSnapshot, saveMarketSnapshots } from "./market-data-store.js";
 import { backfillFromStabilityCache, updateStabilityCache } from "./odds-stability-cache.js";
 import { crawlEspnScoreboardOdds } from "./espn-odds-source.js";
+import { fetchOddsApiRotating, listOddsApiKeys, oddsApiMarketsForDate, oddsApiSportsForDate } from "./odds-api-rotation.js";
 import { getDataSubdir, getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -18,10 +19,18 @@ export async function crawlMarketData(date, options = {}) {
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const candidates = [];
   const sources = [];
-  if (process.env.ODDS_API_KEY) {
-    const rows = await crawlTheOddsApi(date, fetchImpl);
-    candidates.push(...rows);
-    sources.push({ name: "The Odds API", fetched: rows.length, ok: true });
+  if (listOddsApiKeys().length) {
+    // 缺陷#11(2026-06-10):此前这是全部源里唯一没包 try/catch 的分支 —— 免费层配额耗尽
+    // 返回 401 时直接把整个 crawlMarketData 打崩(主链任务 0x1)。改与其余源同款优雅降级:
+    // 失败如实记 sources(外盘缺失标注随 odds-crawler-<date>.json 落盘),主链继续走
+    // 500.com 等合法免费源,绝不编数据。轮换/市场分级见 src/odds-api-rotation.js。
+    try {
+      const rows = await crawlTheOddsApi(date, fetchImpl);
+      candidates.push(...rows);
+      sources.push({ name: "The Odds API", fetched: rows.length, ok: true });
+    } catch (error) {
+      sources.push({ name: "The Odds API", fetched: 0, ok: false, error: `外盘缺失:${error.message}` });
+    }
   } else {
     sources.push({ name: "The Odds API", fetched: 0, ok: false, error: "缺少 ODDS_API_KEY" });
   }
@@ -233,19 +242,28 @@ function hasAnyFreeOddsSource() {
 
 async function crawlTheOddsApi(date, fetchImpl) {
   if (typeof fetchImpl !== "function") throw new Error("当前 Node 环境不支持 fetch");
-  const sports = String(process.env.ODDS_API_SPORTS || "soccer_epl,soccer_spain_la_liga,soccer_germany_bundesliga,soccer_italy_serie_a,soccer_france_ligue_one,soccer_portugal_primeira_liga,soccer_norway_eliteserien").split(",").map((item) => item.trim()).filter(Boolean);
+  // 免费档 500 credits/月,成本=regions×markets/次。默认仅 eu 区(含 Betfair 交易所/Pinnacle/1xBet/
+  //   Marathonbet 等 sharp 盘,聚合成共识收盘线足够 sharp);eu,uk,us 三区会 3 倍烧额度→几天耗尽致闸门缺赔率。
+  //   需更广覆盖再用 ODDS_API_REGIONS 覆盖。
+  // 缺陷#11 配额分级(2026-06-10):世界杯窗口默认只拉 soccer_fifa_world_cup × h2h,totals
+  //   (调用 7→1/轮,俱乐部赛季休赛、竞彩俱乐部盘主源是 500.com);平时俱乐部列表 × h2h,spreads。
+  //   多免费 key 轮换 + 401/429 处置见 src/odds-api-rotation.js。
+  const sports = oddsApiSportsForDate(date);
+  const markets = oddsApiMarketsForDate(date);
   const rows = [];
   for (const sport of sports) {
-    const url = new URL(`https://api.the-odds-api.com/v4/sports/${sport}/odds`);
-    url.searchParams.set("apiKey", process.env.ODDS_API_KEY);
-    // 免费档 500 credits/月,成本=regions×markets/次。默认仅 eu 区(含 Betfair 交易所/Pinnacle/1xBet/
-    //   Marathonbet 等 sharp 盘,聚合成共识收盘线足够 sharp);eu,uk,us 三区会 3 倍烧额度→几天耗尽致闸门缺赔率。
-    //   需更广覆盖再用 ODDS_API_REGIONS 覆盖。eu×(h2h,spreads)=2 credits/联赛/次。
-    url.searchParams.set("regions", process.env.ODDS_API_REGIONS || "eu");
-    url.searchParams.set("markets", "h2h,spreads");
-    url.searchParams.set("oddsFormat", "decimal");
-    url.searchParams.set("dateFormat", "iso");
-    const events = await fetchJson(fetchImpl, url);
+    const result = await fetchOddsApiRotating((key) => {
+      const url = new URL(`https://api.the-odds-api.com/v4/sports/${sport}/odds`);
+      url.searchParams.set("apiKey", key);
+      url.searchParams.set("regions", process.env.ODDS_API_REGIONS || "eu");
+      url.searchParams.set("markets", markets);
+      url.searchParams.set("oddsFormat", "decimal");
+      url.searchParams.set("dateFormat", "iso");
+      return url;
+    }, { fetch: fetchImpl });
+    if (!result.ok) throw new Error(result.error);
+    if (result.keyIndex > 0) console.warn(`⚠️ The Odds API 已轮换到第 ${result.keyIndex + 1} 个免费 key(前 ${result.keyIndex} 个 401/429),remaining=${result.remaining ?? "?"}`);
+    const events = await result.response.json();
     if (!Array.isArray(events)) continue;
     rows.push(...events.filter((event) => String(event.commence_time || "").slice(0, 10) === date).map(oddsApiEventToSnapshot).filter(Boolean));
   }
@@ -871,8 +889,31 @@ export function parseSinaShengfucaiMacauHtml(html, fixtures, date, sourceUrl = "
 function oddsApiEventToSnapshot(event) {
   const h2h = aggregateMarket(event, "h2h", event.home_team, event.away_team);
   const spread = aggregateSpread(event, event.home_team, event.away_team);
-  if (!h2h && !spread) return null;
-  return normalizeMarketSnapshot({ date: String(event.commence_time).slice(0, 10), homeTeam: event.home_team, awayTeam: event.away_team, competition: event.sport_title, collectedAt: latestBookmakerUpdate(event.bookmakers) ?? new Date().toISOString(), europeanOdds: h2h ? { current: h2h } : null, asianHandicap: spread ? { current: spread } : null, source: "The Odds API" }, String(event.commence_time).slice(0, 10));
+  // 缺陷#11(2026-06-10):世界杯窗口拉的是 h2h,totals —— totals 必须真入快照,
+  // 否则这部分配额就白烧(只取众数线,各家 Over/Under 取均值;无 totals 盘则为 null,不臆造)。
+  const totals = aggregateTotals(event);
+  if (!h2h && !spread && !totals) return null;
+  return normalizeMarketSnapshot({ date: String(event.commence_time).slice(0, 10), homeTeam: event.home_team, awayTeam: event.away_team, competition: event.sport_title, collectedAt: latestBookmakerUpdate(event.bookmakers) ?? new Date().toISOString(), europeanOdds: h2h ? { current: h2h } : null, asianHandicap: spread ? { current: spread } : null, totals: totals ? { current: totals } : null, source: "The Odds API" }, String(event.commence_time).slice(0, 10));
+}
+
+// The Odds API totals → { line, over, under }:取各家盘口里出现最多的 point(众数线),
+// 该线上的 Over/Under 价取均值。真实抓到才返回,否则 null。
+function aggregateTotals(event) {
+  const byLine = new Map();
+  for (const bookmaker of event.bookmakers ?? []) {
+    const market = bookmaker.markets?.find((item) => item.key === "totals");
+    if (!market) continue;
+    const over = market.outcomes?.find((outcome) => /over/i.test(outcome.name));
+    const under = market.outcomes?.find((outcome) => /under/i.test(outcome.name) && outcome.point === over?.point);
+    if (!over || !under || !Number.isFinite(Number(over.point))) continue;
+    const line = Number(over.point);
+    if (!(Number(over.price) > 1 && Number(under.price) > 1)) continue;
+    if (!byLine.has(line)) byLine.set(line, []);
+    byLine.get(line).push({ over: Number(over.price), under: Number(under.price) });
+  }
+  if (!byLine.size) return null;
+  const [line, points] = [...byLine.entries()].sort((a, b) => b[1].length - a[1].length)[0];
+  return { line, over: avg(points.map((item) => item.over)), under: avg(points.map((item) => item.under)) };
 }
 
 function parseFootballDataCoUkCsv(text, date, sourceUrl) {

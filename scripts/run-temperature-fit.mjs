@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// ⚠️⚠️ 僵尸警告(缺陷#19,2026-06-10):温度软化层 2026-05-31 按删兜底铁律从
+//   prediction-engine 有意删除,生产链路【无任何消费点】会读 profile.temperature。
+//   本脚本已从 optimize:loop / package.json 调度链摘除,仅保留作离线诊断;
+//   --apply 写入的 temperature 字段不影响任何在线概率,别被"✅已写"日志误导。
+//   铁律:绝不把 temperature 接回消费点(test/temperature-zombie-guard.test.mjs 守护)。
+//
 // 温度校准:从 walk-forward 收集生产模型融合后概率,按时间 70/30 切分
 // (前70%拟合 T、后30%验证,防泄漏),对比 T=1 vs 拟合 T 的 Brier/命中/强热门偏差。
 // 诚实:温度缩放是单调变换,不改 argmax → 命中率几乎不变;它治的是过度自信(Brier/置信度)。
@@ -85,7 +91,8 @@ if (apply) {
   profile.temperatureFit = { trainN: train.length, testN: test.length, brierBefore: base.brier, brierAfter: cal.brier, favBiasBefore: base.favBias, favBiasAfter: cal.favBias, diagnosis: fit.diagnosis };
   mkdirSync(getExportDir(), { recursive: true });
   writeFileSync(profPath, `${JSON.stringify(profile, null, 2)}\n`, "utf8");
-  console.log(`\n✅ 已写 temperature=${T} → ${profPath}`);
+  console.log(`\n已写 temperature=${T} → ${profPath}`);
+  console.log("⚠️ 注意:生产链路无温度消费点(2026-05-31 按铁律有意删除),该字段仅离线诊断留档,不影响任何在线概率。");
 } else {
   console.log("\n(只读;加 --apply 在 Brier 改善且命中不掉时写 T)");
 }

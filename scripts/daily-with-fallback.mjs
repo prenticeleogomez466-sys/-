@@ -23,6 +23,7 @@ import "../src/env.js";
 import { getExportDir } from "../src/paths.js";
 import { buildDailyRecommendationPackage } from "../src/daily-report.js";
 import { loadFixtures } from "../src/fixture-store.js";
+import { deliverDailyReportToWechat } from "../src/wechat-delivery.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -61,6 +62,9 @@ try {
             status.jingcaiFallback = true;
             status.dailyPath = pkg.dailyPath;
             status.jingcai = jc;
+            // 缺陷#18(2026-06-10):补救路径重建了报告(此前 official 没投或投的是缺竞彩的旧包),
+            // 必须同 daily-evolution 主链一样投递微信 outbox,否则 outbox 停更、手机端拿不到当日表。
+            status.wechat = await deliverWechatSafely(pkg);
           }
         }
       }
@@ -77,6 +81,9 @@ try {
     status.fourteenAvailable = pkg.recommendations.fourteen.available === true;
     status.ok = pkg.audit.ok && status.jingcai > 0;
     if (!status.ok) throw new Error("兜底模式未能产出有效竞彩推荐");
+    // 缺陷#18(2026-06-10 根修):fallback 成功出表也必须投递微信 —— 此前只有 daily-evolution 的
+    // marketCheck.ok 分支会投,官方源被封走 500 兜底的日子(06-09/06-10)出了表 outbox 却停在 06-08。
+    status.wechat = await deliverWechatSafely(pkg);
   }
 } catch (error) {
   status.error = (status.error ? status.error + " | " : "") + (error.message || String(error));
@@ -90,6 +97,17 @@ try {
 
 function run(cmd, cmdArgs) {
   return spawnSync(cmd, cmdArgs, { cwd: rootDir, stdio: "inherit", shell: false });
+}
+
+// 微信投递(缺陷#18):投递失败绝不掩盖"已成功出表"的事实 —— 只如实记录投递结果,
+// 不让投递异常把出表打成失败(表已真实落盘);deliverDailyReportToWechat 自身已含
+// webhook 重试 + 本地 outbox 落盘双通道。
+async function deliverWechatSafely(pkg) {
+  try {
+    return await deliverDailyReportToWechat(pkg);
+  } catch (error) {
+    return { ok: false, error: error.message || String(error) };
+  }
 }
 
 function readArg(name) {

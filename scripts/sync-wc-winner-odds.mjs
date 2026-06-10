@@ -14,6 +14,7 @@
 import "../src/env.js";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { fetchOddsApiRotating } from "../src/odds-api-rotation.js";
 
 const DRY = process.argv.includes("--dry");
 const DATA = "D:/football-model-data/world-cup/2026";
@@ -29,15 +30,14 @@ const ALIAS = {
 };
 
 async function fetchOdds() {
-  const key = process.env.ODDS_API_KEY;
-  if (!key) return null;
-  const url = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup_winner/odds?apiKey=${key}&regions=eu,uk&markets=outrights&oddsFormat=decimal`;
+  // 缺陷#11(2026-06-10):多免费 key 轮换(401/429 自动切),配额尽 → 回退已存盘(真实旧快照,
+  //   如实标注,不编数据)。本就只有夺冠盘失败回退路径,轮换只是多给几次免费机会。
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(40000) });
-    if (!r.ok) { console.log(`拉取失败 HTTP ${r.status} → 回退已存盘`); return null; }
-    const j = await r.json();
+    const rot = await fetchOddsApiRotating((key) => `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup_winner/odds?apiKey=${key}&regions=eu,uk&markets=outrights&oddsFormat=decimal`, { timeoutMs: 40000 });
+    if (!rot.ok) { console.log(`拉取失败(${rot.error})→ 回退已存盘(外盘缺失如实标注)`); return null; }
+    const j = await rot.response.json();
     writeFileSync(ODDS_FILE, JSON.stringify(j, null, 1));
-    console.log(`✅ 实时拉取夺冠盘,剩余配额 ${r.headers.get("x-requests-remaining") ?? "?"}`);
+    console.log(`✅ 实时拉取夺冠盘,剩余配额 ${rot.remaining ?? "?"}${rot.keyIndex > 0 ? `(已轮换到第 ${rot.keyIndex + 1} 个免费 key)` : ""}`);
     return j;
   } catch (e) { console.log(`拉取异常 ${e.message} → 回退已存盘`); return null; }
 }
