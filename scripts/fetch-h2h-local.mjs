@@ -53,6 +53,23 @@ const ZH_TO_CSV = {
   '尼日利亚': 'Nigeria',
   '英格兰': 'England',
   '哥斯达黎加': 'Costa Rica',
+  // 2026-06-11 新增 6/16-17 批次8场16队(英文名已逐一对 csv 实测验证存在, 运行时仍强校验)
+  '西班牙': 'Spain',
+  '佛得角': 'Cape Verde',
+  '比利时': 'Belgium',
+  '埃及': 'Egypt',
+  '沙特阿拉伯': 'Saudi Arabia',
+  '乌拉圭': 'Uruguay',
+  '伊朗': 'Iran',
+  '新西兰': 'New Zealand',
+  '法国': 'France',
+  '塞内加尔': 'Senegal',
+  '伊拉克': 'Iraq',
+  '挪威': 'Norway',
+  '阿根廷': 'Argentina',
+  '阿尔及利亚': 'Algeria',
+  '奥地利': 'Austria',
+  '约旦': 'Jordan',
 };
 
 // ---------- 最小引号感知 CSV 解析(city 可能含逗号) ----------
