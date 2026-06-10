@@ -11,6 +11,7 @@ import { syncFootballArtifacts } from "./artifact-sync.js";
 import { writeXlsxWorkbook } from "./xlsx-writer.js";
 import { appendDailyMetrics, recapTrendRows } from "./daily-metrics-trend.js";
 import { attributeRecap } from "./recap-attribution.js";
+import { kickoffEpochMs, hasKickedOff } from "./kickoff-time.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -115,9 +116,18 @@ function mirrorRecapExports(date, summaryPath, masterPath) {
   return { dSummaryPath, dMasterPath };
 }
 
-function updateLedgerRow(row, fixtures, snapshots = []) {
+export function updateLedgerRow(row, fixtures, snapshots = []) {
   const fixture = findFixtureForLedger(row, fixtures);
   if (!fixture?.result) return { ...row, actualStatus: "pending-result", pendingReason: inferPendingReason(row, fixture) };
+  // 结算硬闸(2026-06-10 缺陷#1):未开赛的场绝不结算——即便 store 里被错误回填了 result
+  //   (世界杯 kickoff="2026-06-12" 的场曾被热身赛假赛果污染 42 条)。kickoff 缺失/不可解析
+  //   同样拒绝结算(铁律:不兜底,宁 pending 勿假)。
+  if (!hasKickedOff(fixture)) {
+    const reason = kickoffEpochMs(fixture) === null
+      ? "开赛时间缺失/不可解析,拒绝结算(防假赛果,铁律:不兜底)"
+      : `比赛未开赛(开赛 ${String(fixture.kickoff ?? "").trim() || fixture.date}),拒绝结算疑似错配赛果`;
+    return { ...stripSettleFields(row), actualStatus: "pending-result", pendingReason: reason };
+  }
   const actualCode = resultCode(fixture.result);
   const actualScore = `${fixture.result.home}-${fixture.result.away}`;
   const actualHalfFull = halfFullFromResult(fixture.result);
@@ -378,18 +388,29 @@ function inferPendingReason(row, fixture) {
   return isEspnBlind ? `免费源(${league || "该联赛"})暂无该场赛果` : "免费源暂无该场赛果";
 }
 
-// 判断 fixture 是否尚未开赛:kickoff 形如 "HH:mm" 或日期;结合 date 推断比赛时刻是否在当前之后。
+// 判断 fixture 是否尚未开赛。2026-06-10 改走共享 kickoff-time(kickoff 内嵌日期优先):
+//   旧实现一律用 fixture.date 拼时刻,世界杯 kickoff="2026-06-12"/date="2026-06-07" 的未来场
+//   被误判"已过期" → 假赛果得以结算(缺陷#1 根因之一)。
 function isKickoffFuture(fixture) {
-  const date = String(fixture.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0];
-  if (!date) return false;
-  const kickoff = String(fixture.kickoff ?? "").trim();
-  const time = kickoff.match(/(\d{1,2}):(\d{2})/);
-  const iso = time ? `${date}T${time[1].padStart(2, "0")}:${time[2]}:00+08:00` : `${date}T23:59:59+08:00`;
-  const kickAt = new Date(iso).getTime();
-  return Number.isFinite(kickAt) && kickAt > Date.now();
+  const kickAt = kickoffEpochMs(fixture);
+  return kickAt !== null && kickAt > Date.now();
 }
 
-function findFixtureForLedger(row, fixtures) {
+// 重置一行的全部结算产物字段(保留 pick 本身)。用于结算硬闸拒绝时清掉历史假结算残留,
+//   防止 stale actual/hit 字段让该行继续被统计口径(actualStatus==="settled" || row.actual)误认已结算。
+const SETTLE_FIELDS = [
+  "actual", "actualCode", "actualScore", "actualHalfFull", "actualHandicap", "actualHandicapCode",
+  "hit", "secondaryHit", "scoreHit", "scoreSecondaryHit", "scoreModeHit",
+  "halfFullHit", "halfFullSecondaryHit", "handicapWldHit", "doubleChanceHit",
+  "settledAt", "closingOdds", "clv", "clvVerdict", "clvMeasured"
+];
+export function stripSettleFields(row) {
+  const next = { ...row };
+  for (const key of SETTLE_FIELDS) delete next[key];
+  return next;
+}
+
+export function findFixtureForLedger(row, fixtures) {
   const [home, away] = splitMatch(row.match);
   return fixtures.find((fixture) => {
     const sequenceMatch = String(fixture.sequence) === String(row.sequence);

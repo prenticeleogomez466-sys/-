@@ -17,6 +17,7 @@
  */
 import "../src/env.js";
 import { loadFixtures, saveFixtures } from "../src/fixture-store.js";
+import { hasKickedOff, fixtureMatchDate } from "../src/kickoff-time.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
 import { getExportDir } from "../src/paths.js";
 import { readFileSync } from "node:fs";
@@ -42,10 +43,17 @@ const LEAGUES = [
 
 const args = process.argv.slice(2);
 const dry = args.includes("--dry");
-// --strict: 只写双边(主↔主且客↔客)匹配,丢弃单边锚定(home/away-anchored/nearest)。
-// 单边锚定靠"窗口内该队唯一"猜对家,队名映射不全时易把比分写到错的场(HJK→火花教训)。
-// 禁假编场景默认带上 --strict, 宁缺勿错。
-const strictOnly = args.includes("--strict");
+// 匹配模式(2026-06-10 缺陷#2 收紧):默认 strict——只写双边(主↔主且客↔客)匹配,
+// 丢弃单边锚定(home/away-anchored/nearest)。单边锚定靠"窗口内该队唯一"猜对家,
+// 队名映射不全时易把比分写到错的场(HJK→火花教训;06-10 审计:42 条未开赛世界杯场
+// 被单边锚定喂了热身赛假赛果)。仅显式 --loose 才允许单边锚定,且打醒目告警。
+const loose = args.includes("--loose");
+const strictOnly = !loose;
+if (loose) {
+  console.warn("⚠️⚠️ --loose:已启用单边锚定匹配(home/away-anchored/nearest)。");
+  console.warn("⚠️⚠️ 该模式靠'窗口内该队唯一'猜对家,可能把别场比分写进 fixture(06-10 假赛果事故根因)。");
+  console.warn("⚠️⚠️ 仅限人工核对场景;自动化任务一律默认 strict。\n");
+}
 const dateArg = (() => { const i = args.indexOf("--date"); return i >= 0 ? args[i + 1] : null; })();
 const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai" }).format(new Date());
 
@@ -192,8 +200,16 @@ for (const date of dates) {
   const yyyymmdd = date.replaceAll("-", "");
   const store = loadFixtures(date);
   const fixtures = store.fixtures;
-  const need = fixtures.filter((f) => !f.result);
-  if (!need.length) { console.log(`${date}: store 全部已有 result,跳过`); continue; }
+  // 开赛闸(2026-06-10 缺陷#1#2):未开赛(kickoff>now)或 kickoff 不可解析的场绝不回填——
+  // 没踢的比赛不存在真实赛果,任何"命中"都是错配(42 条世界杯假赛果事故根因之一)。
+  const noResult = fixtures.filter((f) => !f.result);
+  const notKickedOff = noResult.filter((f) => !hasKickedOff(f));
+  const need = noResult.filter((f) => hasKickedOff(f));
+  if (notKickedOff.length) {
+    console.log(`${date}: 跳过 ${notKickedOff.length} 场未开赛/开赛时刻不可判定的场(绝不回填):`);
+    for (const f of notKickedOff) console.log(`    ⏳ ${f.sequence ?? ""} ${f.homeTeam} vs ${f.awayTeam}  kickoff=${JSON.stringify(f.kickoff ?? "")}`);
+  }
+  if (!need.length) { console.log(`${date}: 无已开赛且缺 result 的场,跳过`); continue; }
 
   // ESPN 赛果索引:覆盖 ±2 天(竞彩业务日常比实际开赛日早 1-2 天,实测 5-21 预测→5-23 实际)
   const results = [];
@@ -206,8 +222,8 @@ for (const date of dates) {
   let matched = 0;
   const howCount = { strict: 0, "home-anchored": 0, "away-anchored": 0, "home-nearest": 0 };
   const updated = fixtures.map((f) => {
-    if (f.result) return f;
-    const hit = findEspn(pool, ck(f.homeTeam), ck(f.awayTeam), f.date ?? date);
+    if (f.result || !hasKickedOff(f)) return f; // 未开赛绝不写 result(同 need 闸,双保险)
+    const hit = findEspn(pool, ck(f.homeTeam), ck(f.awayTeam), fixtureMatchDate(f) ?? date);
     if (!hit) return f;
     const m = hit.m;
     matched++; howCount[hit.how] = (howCount[hit.how] ?? 0) + 1;
@@ -217,7 +233,7 @@ for (const date of dates) {
   });
 
   for (const f of need) {
-    if (!findEspn(pool, ck(f.homeTeam), ck(f.awayTeam), f.date ?? date)) {
+    if (!findEspn(pool, ck(f.homeTeam), ck(f.awayTeam), fixtureMatchDate(f) ?? date)) {
       stillMissing.push(`${date} ${f.competition ?? ""} ${f.homeTeam} vs ${f.awayTeam}  [canon ${ck(f.homeTeam)}|${ck(f.awayTeam)}]`);
     }
   }

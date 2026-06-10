@@ -6,6 +6,7 @@ import { getDataSubdir, getExportDir } from "./paths.js";
 import { loadFixtures, saveFixtures } from "./fixture-store.js";
 import { canonicalTeamName } from "./team-aliases.js";
 import { loadEspnResults, ESPN_LEAGUES } from "./espn-results-source.js";
+import { withinDays } from "./kickoff-time.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -190,7 +191,11 @@ function sameFixture(left, right) {
   // 2026-05-31:改用全量别名表 canonicalTeamName(中英互通),让 ESPN 英文赛果能匹配中文预测名。
   //   旧 normalizeName 只硬编码拜仁/斯图加特两条别名 → 跨语言赛果匹配恒失败 → 复盘拿不到赛果。
   const cn = (x) => canonicalTeamName(x) || normalizeName(x);
-  return cn(left.homeTeam) === cn(right.homeTeam) && cn(left.awayTeam) === cn(right.awayTeam);
+  if (cn(left.homeTeam) !== cn(right.homeTeam) || cn(left.awayTeam) !== cn(right.awayTeam)) return false;
+  // ±2 天日期约束(2026-06-10 缺陷#2):仅队名匹配会把"同对阵不同日期"的两场当同一场——
+  //   06-09 墨西哥vs南非热身赛赛果被写进 kickoff=06-12 的世界杯小组赛 fixture。
+  //   真实比赛日(kickoff 内嵌日期优先)相差 >2 天即判不同场;任一方无日期则不收紧(防误杀)。
+  return withinDays(left, right, 2);
 }
 
 function kickoffTime(value) {
