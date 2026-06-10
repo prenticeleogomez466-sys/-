@@ -6,7 +6,7 @@ import { getDataSubdir, getExportDir } from "./paths.js";
 import { loadFixtures, saveFixtures } from "./fixture-store.js";
 import { canonicalTeamName } from "./team-aliases.js";
 import { loadEspnResults, ESPN_LEAGUES } from "./espn-results-source.js";
-import { withinDays } from "./kickoff-time.js";
+import { withinDays, hasKickedOff } from "./kickoff-time.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -111,6 +111,7 @@ export async function fetchFootballDataOrgMatches(date, fetchImpl, token) {
 }
 
 export function mergeAuthorizedFixtures(existingFixtures, authorizedFixtures, options = {}) {
+  const now = options.now ?? Date.now();
   const next = existingFixtures.map((fixture) => ({ ...fixture }));
   let matched = 0;
   let updated = 0;
@@ -118,8 +119,17 @@ export function mergeAuthorizedFixtures(existingFixtures, authorizedFixtures, op
     const index = next.findIndex((fixture) => sameFixture(fixture, authorized));
     if (index < 0) continue;
     matched += 1;
-    const merged = { ...next[index], kickoff: next[index].kickoff || authorized.kickoff, competition: next[index].competition || authorized.competition, round: next[index].round || authorized.round, source: mergeSource(next[index].source, authorized.source), officialStatus: authorized.officialStatus, officialFixtureId: authorized.officialFixtureId, result: authorized.result ?? next[index].result ?? null };
-    if (JSON.stringify(merged) !== JSON.stringify(next[index])) updated += 1;
+    const base = next[index];
+    const mergedKickoff = base.kickoff || authorized.kickoff;
+    // 开赛闸(2026-06-10 审计缺陷):store"开赛前无赛果"不变量必须由 merge 路径自身保证——
+    //   此前只有 backfill/detox 单方面清洗,detox 清完 1-2 分钟即被本路径重写复活
+    //   (实测 06-09 #2203 阿根廷vs冰岛 kickoff=date-only 未到 23:59,api-football FT 赛果照写)。
+    //   未开赛的场即便 authorized.result 存在(可能是日期约束内错配的同对阵另一场)也绝不写入;
+    //   闸口径与结算/backfill/detox 同源 hasKickedOff(date-only 取 23:59 宁晚判),
+    //   真赛果开赛后由下一轮 sync / backfill 自然回填,绝不提前。
+    const kicked = hasKickedOff({ ...base, kickoff: mergedKickoff }, now);
+    const merged = { ...base, kickoff: mergedKickoff, competition: base.competition || authorized.competition, round: base.round || authorized.round, source: mergeSource(base.source, authorized.source), officialStatus: authorized.officialStatus, officialFixtureId: authorized.officialFixtureId, result: kicked ? (authorized.result ?? base.result ?? null) : (base.result ?? null) };
+    if (JSON.stringify(merged) !== JSON.stringify(base)) updated += 1;
     next[index] = merged;
   }
   let added = 0;
@@ -192,10 +202,12 @@ function sameFixture(left, right) {
   //   旧 normalizeName 只硬编码拜仁/斯图加特两条别名 → 跨语言赛果匹配恒失败 → 复盘拿不到赛果。
   const cn = (x) => canonicalTeamName(x) || normalizeName(x);
   if (cn(left.homeTeam) !== cn(right.homeTeam) || cn(left.awayTeam) !== cn(right.awayTeam)) return false;
-  // ±2 天日期约束(2026-06-10 缺陷#2):仅队名匹配会把"同对阵不同日期"的两场当同一场——
-  //   06-09 墨西哥vs南非热身赛赛果被写进 kickoff=06-12 的世界杯小组赛 fixture。
-  //   真实比赛日(kickoff 内嵌日期优先)相差 >2 天即判不同场;任一方无日期则不收紧(防误杀)。
-  return withinDays(left, right, 2);
+  // ±1 天日期约束(2026-06-10 缺陷#2 立约 ≤2,同日审计收紧为 ≤1):仅队名匹配会把
+  //   "同对阵不同日期"的两场当同一场——06-09 墨西哥vs南非热身赛赛果曾被写进 kickoff=06-12
+  //   的世界杯小组赛 fixture。跨源同场比赛日最大合法漂移=时区差 1 天(欧美晚场=北京次日凌晨),
+  //   ≤2 会放行"恰差 2 天的同对阵热身赛 vs 正赛"错配 → 收紧为 ≤1;改期 ≥2 天的场宁 pending 勿错配。
+  //   任一方无日期则不收紧(防误杀)。
+  return withinDays(left, right, 1);
 }
 
 function kickoffTime(value) {
