@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { nationalEloFor, eloToLambdas } from "../src/national-elo-source.js";
+import { writeFileSync, utimesSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { nationalEloFor, eloToLambdas, loadNationalElo } from "../src/national-elo-source.js";
 
 describe("国家队 Elo 源", () => {
   const mem = { elo: { "挪威": 1912, "瑞典": 1719, "保加利亚": 1475, "黑山": 1439 } };
@@ -34,5 +37,36 @@ describe("国家队 Elo 源", () => {
     const lo = eloToLambdas(1700, 1700, { totalGoals: 2.0 });
     const hi = eloToLambdas(1700, 1700, { totalGoals: 3.4 });
     assert.ok((hi.home + hi.away) > (lo.home + lo.away));
+  });
+});
+
+describe("national-elo 保鲜检查(2026-06-10 审计rank8:ageH 恒 null 死代码→真实 mtime)", () => {
+  const withWarnCapture = (fn) => {
+    const warns = [];
+    const orig = console.warn;
+    console.warn = (m) => warns.push(String(m));
+    try { return { result: fn(), warns }; } finally { console.warn = orig; }
+  };
+
+  it(">7 天未刷新:console ⚠️ 提醒,但仍返回数据(提示不替用户弃数据)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "elo-stale-"));
+    const p = join(dir, "national-elo.json");
+    writeFileSync(p, JSON.stringify({ builtAt: "2026-05-01T00:00:00Z", count: 1, elo: { "西班牙": 2100 } }), "utf8");
+    const oldSec = (Date.now() - 8 * 86400e3) / 1000; // mtime 拨回 8 天前
+    utimesSync(p, oldSec, oldSec);
+    const { result, warns } = withWarnCapture(() => loadNationalElo(p));
+    rmSync(dir, { recursive: true, force: true });
+    assert.equal(result?.elo?.["西班牙"], 2100, "过期数据仍可用,不阻断");
+    assert.ok(warns.some((w) => w.includes("未刷新")), "发出 ⚠️ 陈旧提醒");
+  });
+
+  it("7 天内新鲜文件:不发提醒", () => {
+    const dir = mkdtempSync(join(tmpdir(), "elo-fresh-"));
+    const p = join(dir, "national-elo.json");
+    writeFileSync(p, JSON.stringify({ builtAt: new Date().toISOString(), count: 1, elo: { "西班牙": 2100 } }), "utf8");
+    const { result, warns } = withWarnCapture(() => loadNationalElo(p));
+    rmSync(dir, { recursive: true, force: true });
+    assert.equal(result?.elo?.["西班牙"], 2100);
+    assert.equal(warns.length, 0, "新鲜文件不应告警");
   });
 });

@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getExportDir, getProfilesDir } from "./paths.js";
 import { canonicalLeague } from "./league-profile.js";
+import { isWorldCup2026 } from "./world-cup-priors.js";
 
 let _cache;
 export function loadLeagueReliability() {
@@ -46,4 +47,18 @@ export function isWeakLeague(league, prof = loadLeagueReliability()) {
   const canon = canonicalLeague(league);
   const lg = prof.leagues[canon] ?? prof.leagues[league];
   return Boolean(lg?.reliable && Number.isFinite(lg.accuracy) && lg.accuracy < (prof.weakThreshold ?? 0.42));
+}
+
+/** 世界杯"样本不足不当胆"护栏(2026-06-10 审计 rank11)。
+ *  实测 profile『世界杯』={accuracy:0.4,total:5,reliable:false} → reliable 要求样本≥20,
+ *  isWeakLeague 恒 false,世界杯场照样能进 14场/任选9 胆位(0.4 命中当胆=真钱风险)。
+ *  单向保守规则:世界杯赛事 且 该档样本 total<20(或 profile 缺失=样本未知,不臆断可靠)
+ *  → 不当胆、只作多选(语义同弱联赛,绝不自动弃赛,只影响胆位)。
+ *  样本≥20 后本函数退场,交还常规 isWeakLeague(reliable+accuracy)判定。 */
+export function isLowSampleWorldCup(league, date, prof = loadLeagueReliability()) {
+  if (!isWorldCup2026(league, date)) return false;
+  const canon = canonicalLeague(league);
+  const lg = prof?.leagues?.[canon] ?? prof?.leagues?.[league];
+  const total = Number(lg?.total);
+  return !(Number.isFinite(total) && total >= 20);
 }

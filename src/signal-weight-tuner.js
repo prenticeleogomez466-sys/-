@@ -27,6 +27,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getExportDir } from "./paths.js";
+import { isSoftCompetition } from "./competition-soft-recalibration.js";
 
 const exportDir = getExportDir();
 const ledgerPath = join(exportDir, "recommendation-ledger.json");
@@ -52,7 +53,11 @@ export function buildSignalWeightsProfile(opts = {}) {
   const inertia = opts.inertia ?? 0.5;
 
   const rows = existsSync(ledgerPath) ? JSON.parse(readFileSync(ledgerPath, "utf8")) : [];
-  const settled = rows.filter((row) => row.actual && hasProbabilities(row));
+  // 学习域隔离(2026-06-10 审计rank12):世界杯/国际赛(含友谊/世预)行不得进俱乐部信号权重学习
+  //   ——口径复用 competition-soft-recalibration 的 SOFT_RE(全仓唯一软赛事判定,不造第三套)。
+  const clubRows = rows.filter((row) => !isSoftCompetition(row.competition));
+  const excludedSoftRows = rows.length - clubRows.length;
+  const settled = clubRows.filter((row) => row.actual && hasProbabilities(row));
 
   if (settled.length < minSamples) {
     // 冷启动:样本不足时不学习,但把 baseline 显式落到 profile,
@@ -70,6 +75,8 @@ export function buildSignalWeightsProfile(opts = {}) {
       coldStart: true,
       reason: `已结赛场次不足：${settled.length}/${minSamples}`,
       samples: settled.length,
+      domain: "club-only",
+      excludedSoftRows,
       signals: baselineSignals,
       generatedAt: new Date().toISOString(),
     });
@@ -130,6 +137,8 @@ export function buildSignalWeightsProfile(opts = {}) {
     usable: true,
     reason: "ok",
     samples: settled.length,
+    domain: "club-only",
+    excludedSoftRows,
     baselineBrier: round(baselineBrier),
     signals: signalAnalysis,
     generatedAt: new Date().toISOString(),

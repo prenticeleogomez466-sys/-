@@ -36,7 +36,12 @@ export async function runDailyRecap(date, options = {}) {
   } catch {
     snapshotPool = [];
   }
-  const nextLedger = ledger.map((row) => (row.date === targetDate ? updateLedgerRow(row, fixturePool, snapshotPool) : row));
+  const mappedLedger = ledger.map((row) => (row.date === targetDate ? updateLedgerRow(row, fixturePool, snapshotPool) : row));
+  // 结算孤儿重扫(2026-06-10 审计rank3):主路径只在 row.date===targetDate 当次访问一次,
+  //   WC 场 kickoff 纯日期判 23:59:59 才算已开赛、recap 固定业务日+1 的 11:10 跑 → 永远早于
+  //   判定线,之后无人重访 → pending 永久(实证 99/102)。每次运行额外重扫近10天窗 pending 行。
+  const pendingRescan = rescanPendingLedgerRows(mappedLedger, targetDate);
+  const nextLedger = pendingRescan.rows;
   writeFileSync(ledgerPath, `${JSON.stringify(nextLedger, null, 2)}\n`, "utf8");
   const targetRows = nextLedger.filter((row) => row.date === targetDate);
   const summary = buildRecapSummary(targetDate, targetRows, syncResults);
@@ -48,7 +53,8 @@ export async function runDailyRecap(date, options = {}) {
   const selfcheck = buildSelfcheck(targetDate, targetRows, syncResults);
   const summaryPath = join(exportDir, `daily-recap-${targetDate}.json`);
   const masterPath = join(exportDir, "football-recap-master.xlsx");
-  writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, attribution, selfcheck, rows: targetRows }, null, 2)}\n`, "utf8");
+  const pendingRescanReport = { rescanned: pendingRescan.rescanned, settled: pendingRescan.settled, window: pendingRescan.window };
+  writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, attribution, selfcheck, pendingRescan: pendingRescanReport, rows: targetRows }, null, 2)}\n`, "utf8");
   const dailyMetrics = appendDailyMetrics(targetDate, targetRows);
   writeXlsxWorkbook(masterPath, [
     { name: "复盘汇总", rows: [...recapSummaryRows(summary), ...recapTrendRows()] },
@@ -62,7 +68,7 @@ export async function runDailyRecap(date, options = {}) {
   //   未硬接的客观原因:其 eventsround 按"整轮"返回(非单日),需 leagueId 注册表+季次推断+整季逐轮抓取再按
   //   日期过滤,且返回 shape 为 homeGoals/awayGoals(非 result),非 <15 行轻接;按要求不破坏现有同步,本次不动。
   const backupSourceNote = "建议接入 TheSportsDB 作 ESPN 盲区备源,但本次未动:其按整轮(非单日)返回,需 leagueId 注册表+季次推断+shape 适配,非轻量接入,硬接有破坏现有同步风险。";
-  return { ok: true, date: targetDate, summary, attribution, selfcheck, backupSourceNote, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+  return { ok: true, date: targetDate, summary, attribution, selfcheck, pendingRescan: pendingRescanReport, backupSourceNote, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
 }
 
 // 结尾【自检】对象:逐项核对 daily-recap-system-prompt 的 5 条 output 要求(诚实返回真值,不强行报✓)。
@@ -157,6 +163,52 @@ export function updateLedgerRow(row, fixtures, snapshots = []) {
     settledAt: new Date().toISOString()
   };
   return enrichSettledWithCLV(settled, fixture, snapshots);
+}
+
+// 结算孤儿重扫窗口(天)。窗口下限=targetDate-10;上限=targetDate+1(recap 默认业务日+1 跑,
+//   targetDate=昨天,"今天"的行也要进扫描域——由 hasKickedOff 硬闸保证未开赛绝不结算)。
+export const PENDING_RESCAN_DAYS = 10;
+
+/**
+ * 重扫 ledger 全部 pending 行中 date 落在近 PENDING_RESCAN_DAYS 天窗内的:
+ * fixture 已开赛(hasKickedOff===true)的走既有 updateLedgerRow 结算逻辑(strict 双边匹配、
+ * 未开赛硬闸、CLV enrich 原样生效);无 fixture 或未开赛的行原样保留 pending,不碰。
+ * row.date===targetDate 的行由主路径处理,这里跳过避免重复结算。
+ * @param {Array} ledger 已经过主路径 map 的 ledger 行
+ * @param {string} targetDate YYYY-MM-DD
+ * @param {Object} deps 仅测试注入:loadFixturesFn(date)=>fixtures[]、loadSnapshotsFn(date)=>snapshots[]
+ */
+export function rescanPendingLedgerRows(ledger, targetDate, deps = {}) {
+  const loadFixturesFn = deps.loadFixturesFn ?? ((date) => loadFixtures(date).fixtures);
+  const loadSnapshotsFn = deps.loadSnapshotsFn ?? ((date) => {
+    try { return loadMarketSnapshots(date).snapshots; } catch { return []; }
+  });
+  const minDate = addDays(targetDate, -PENDING_RESCAN_DAYS);
+  const maxDate = addDays(targetDate, 1);
+  const fixtureCache = new Map();
+  const snapshotCache = new Map();
+  const cached = (cache, date, loader) => {
+    if (!cache.has(date)) cache.set(date, loader(date) ?? []);
+    return cache.get(date);
+  };
+  let rescanned = 0;
+  let settled = 0;
+  const rows = ledger.map((row) => {
+    if (row.date === targetDate) return row; // 主路径当次已处理
+    if (row.actualStatus === "settled" || row.actual) return row; // 已结算不重访
+    const date = String(row.date ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) return row;
+    // 同主路径口径:fixture 可能落在业务日或次日(kickoff 跨日)。
+    const pool = [...cached(fixtureCache, date, loadFixturesFn), ...cached(fixtureCache, addDays(date, 1), loadFixturesFn)];
+    const fixture = findFixtureForLedger(row, pool);
+    if (!fixture || !hasKickedOff(fixture)) return row; // 未开赛/无 fixture → 留 pending 不碰
+    rescanned += 1;
+    const snapshots = [...cached(snapshotCache, date, loadSnapshotsFn), ...cached(snapshotCache, addDays(date, 1), loadSnapshotsFn)];
+    const next = updateLedgerRow(row, pool, snapshots);
+    if (next.actualStatus === "settled") settled += 1;
+    return next;
+  });
+  return { rows, rescanned, settled, window: { from: minDate, to: maxDate } };
 }
 
 // 取某选项(3=主/1=平/0=客)在欧赔里的小数赔率。

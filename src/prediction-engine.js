@@ -1,10 +1,10 @@
 import { loadFixtures } from "./fixture-store.js";
-import { isWeakLeague, loadLeagueReliability } from "./league-reliability.js";
+import { isWeakLeague, isLowSampleWorldCup, loadLeagueReliability } from "./league-reliability.js";
 import { findMarketSnapshot, loadMarketSnapshots } from "./market-data-store.js";
 import { buildAdvancedFixtureFeatures } from "./advanced-football-features.js";
 import { loadAdvancedData } from "./advanced-data-store.js";
 import { buildMonteCarloSimulation, lambdaTotalFromMarket } from "./monte-carlo-simulator.js";
-import { worldCupLambdaContext, worldCupMatchPrior } from "./world-cup-priors.js";
+import { worldCupLambdaContext, worldCupMatchPrior, teamPrior, confederationEloAdjustment } from "./world-cup-priors.js";
 import { getExperienceBaseline } from "./experience-library-store.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull, handicapLadder, totalGoalsBands, halfFullDepth } from "./derived-score-model.js";
 import { analyzeUpsetTrap } from "./upset-trap-detector.js";
@@ -434,15 +434,22 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   if (!dcResult?.probabilities && options.nationalElo) {
     const eh = nationalEloFor(options.nationalElo, fixture.homeTeam);
     const ea = nationalEloFor(options.nationalElo, fixture.awayTeam);
+    // 洲际 Elo 校正(2026-06-10 leak-safe OOS 回测裁决:严格 OOS 后 40% n=2589 命中 +1.08pp
+    //   CI[+0.12,+2.09]、Brier −0.0083 CI[−0.0131,−0.0036],双指标超噪声带 → PASS 采用)。
+    //   仅 48 强洲际对阵生效(teamPrior 查无 → 0,俱乐部/普通竞彩路径零影响);与 worldCupMatchPrior
+    //   兜底分支互斥(本分支命中则不走 :47x 兜底),不会双重叠加。
+    //   诚实裁决:同回测的「中立场 homeAdv 35→0」FAIL(n=4461 +0.22pp CI[−0.40,+0.90] 含 0)不采用,homeAdv 保持默认 35。
+    const _hp = teamPrior(fixture.homeTeam), _ap = teamPrior(fixture.awayTeam);
+    const _confedAdj = (_hp?.en && _ap?.en) ? confederationEloAdjustment(_hp.en, _ap.en) : 0;
     const lam = (Number.isFinite(eh) && Number.isFinite(ea))
-      ? eloToLambdas(eh, ea, { totalGoals: Number.isFinite(_ouLineHint) ? _ouLineHint : undefined })
+      ? eloToLambdas(eh + _confedAdj, ea, { totalGoals: Number.isFinite(_ouLineHint) ? _ouLineHint : undefined })
       : null;
     if (lam) {
       const eloModel = buildDerivedScoreModel(lam.home, lam.away, { nbSize: NB_SIZE_SOFT });
       if (eloModel) {
         eloModel.source = "national-elo";
         dcResult = eloModel;
-        nationalEloUsed = { home: eh, away: ea, supremacy: lam.supremacy, eloDiff: lam.eloDiff };
+        nationalEloUsed = { home: eh, away: ea, supremacy: lam.supremacy, eloDiff: lam.eloDiff, confedAdj: _confedAdj };
       }
     }
   }
@@ -1674,6 +1681,9 @@ export function buildFourteenPlan(predictions, date = null) {
       // 弱联赛(回测可靠且命中<阈值,如阿甲/墨超~37%)不得当胆 —— 仍可作多选覆盖,
       // 但不被抬成高置信单关(避免把 37% 命中的场押成 6 胆里的一翻车整票完)。
       if (isWeakLeague(item.prediction.fixture?.competition)) return false;
+      // 世界杯样本<20 不当胆(2026-06-10 审计rank11):『世界杯』档实测 total=5 → reliable:false
+      //   逃过上面弱联赛闸,WC 场可进胆。单向保守:只挡胆位仍作多选,绝不自动弃赛。
+      if (isLowSampleWorldCup(item.prediction.fixture?.competition, fixtureKickoffDate(item.prediction.fixture))) return false;
       // 客胜信号盲区(2026-06-07,317场live复盘):中信心(<60)主推客胜命中仅30.6%、实际35.6%反向主胜
       //   (模型次选才对)=平局盲区客侧孪生;14场绝不当胆,≥60客胜健康(68.8%)放行。
       if (item.prediction.pick?.code === "0" && item.prediction.confidence < 60) return false;
@@ -1859,6 +1869,8 @@ export function buildRenxuan9(source) {
                      && prediction.risk !== "高" && singleCode !== "1"
                      && prediction.selectionTier?.bankerEligible === true
                      && !isWeakLeague(prediction.fixture?.competition)
+                     // 世界杯样本<20 不当胆(2026-06-10 审计rank11):同 14 场闸,只挡胆位仍作多选,绝不弃赛。
+                     && !isLowSampleWorldCup(prediction.fixture?.competition, fixtureKickoffDate(prediction.fixture))
                      // 客胜信号盲区(2026-06-07,317场live复盘):中信心(<60)主推客胜命中仅30.6%、
                      //   实际35.6%反向是主胜(模型次选才对)=平局盲区客侧孪生;绝不当胆,≥60客胜健康(68.8%)放行。
                      && !(singleCode === "0" && prediction.confidence < 60);

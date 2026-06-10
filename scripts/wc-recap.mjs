@@ -47,6 +47,29 @@ export function computeWcRecap(baseRows, played, canon = (x) => String(x)) {
   return { playedCount: played.length, groupDone, advanceBrier: brierN ? brierSum / brierN : null, aliveMass, champion, champRow, busts, hits, stageDist };
 }
 
+/**
+ * 收集 2026 世界杯已踢场。窗口按【比赛日】(kickoff 内嵌日期)过滤而非 store 文件名日期:
+ * 首批 WC 场存在 2026-06-10 业务日 store(kickoff 6/12),按文件名过滤会漏;
+ * 同对阵可跨 store 重复(胜负彩+竞彩单场),按 对阵+比赛日 去重。
+ */
+export function collectWcPlayed(dates, loadFn, canon = (x) => String(x)) {
+  const played = [], seen = new Set();
+  for (const d of dates) {
+    if (d < "2026-06-08" || d > WC_END) continue; // 业务日可早于开赛 2-3 天(预售),宽进严出按比赛日过滤
+    for (const f of loadFn(d).fixtures) {
+      const isWC = (f.tags || []).includes("worldcup") || /世界杯|World Cup/i.test(f.competition || "");
+      if (!isWC || !f.result) continue;
+      const matchDate = String(f.kickoff || "").slice(0, 10) || f.localDate || d;
+      if (matchDate < WC_START || matchDate > WC_END) continue;
+      const key = [canon(f.homeTeam), canon(f.awayTeam)].sort().join("|") + "@" + matchDate;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      played.push({ date: matchDate, stage: STAGE(f.localDate || matchDate), home: f.homeTeam, away: f.awayTeam, hg: f.result.home, ag: f.result.away });
+    }
+  }
+  return played;
+}
+
 function runMain() {
 // 1) 冻结/载入赛前预测基线
 if (!existsSync(BASELINE)) {
@@ -58,15 +81,7 @@ if (!existsSync(BASELINE)) {
 const base = JSON.parse(readFileSync(BASELINE, "utf8"));
 
 // 2) 载入 2026 世界杯真实赛果(开赛前应为空)
-const played = []; // {date,stage,home,away,hg,ag}
-for (const d of listFixtureDates()) {
-  if (d < WC_START || d > WC_END) continue;
-  for (const f of loadFixtures(d).fixtures) {
-    const isWC = (f.tags || []).includes("worldcup") || /世界杯|World Cup/i.test(f.competition || "");
-    if (!isWC || !f.result) continue;
-    played.push({ date: d, stage: STAGE(f.localDate || d), home: f.homeTeam, away: f.awayTeam, hg: f.result.home, ag: f.result.away });
-  }
-}
+const played = collectWcPlayed(listFixtureDates(), loadFixtures, canonicalTeamName);
 
 console.log(`\n=== 2026 世界杯赛果复盘校准(基线 N=${base.n}, ${played.length}/104 场已踢)===`);
 if (!played.length) {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { STAGE, computeWcRecap } from "../scripts/wc-recap.mjs";
+import { STAGE, computeWcRecap, collectWcPlayed } from "../scripts/wc-recap.mjs";
 
 test("STAGE 按 FIFA2026 真实赛程日期分阶段", () => {
   assert.equal(STAGE("2026-06-11"), "group");
@@ -43,4 +43,29 @@ test("computeWcRecap:小组赛未完时不算 Brier", () => {
   const r = computeWcRecap(base, [{ stage: "group", home: "A", away: "B", hg: 1, ag: 0 }], (x) => String(x));
   assert.equal(r.groupDone, false);
   assert.equal(r.advanceBrier, null);
+});
+
+// ── 2026-06-10 体检:窗口按比赛日过滤+对阵去重(collectWcPlayed)──
+test("collectWcPlayed: 06-10店内kickoff=6/12的WC场不漏", () => {
+  const store = { "2026-06-10": { fixtures: [
+    { homeTeam: "墨西哥", awayTeam: "南非", competition: "世界杯", kickoff: "2026-06-12", result: { home: 2, away: 0 } },
+  ] } };
+  const played = collectWcPlayed(Object.keys(store), (d) => store[d]);
+  assert.equal(played.length, 1);
+  assert.equal(played[0].date, "2026-06-12");
+  assert.equal(played[0].stage, "group");
+});
+test("collectWcPlayed: 同对阵跨store去重+比赛日窗口外剔除", () => {
+  const store = {
+    "2026-06-10": { fixtures: [
+      { homeTeam: "墨西哥", awayTeam: "南非", competition: "世界杯", kickoff: "2026-06-12", result: { home: 2, away: 0 } },
+      { homeTeam: "葡萄牙", awayTeam: "尼日利亚", competition: "国际赛", kickoff: "2026-06-11", result: { home: 3, away: 0 } },
+    ] },
+    "2026-06-11": { fixtures: [
+      { homeTeam: "南非", awayTeam: "墨西哥", competition: "World Cup", kickoff: "2026-06-12", result: { home: 0, away: 2 } },
+      { homeTeam: "巴西", awayTeam: "摩洛哥", competition: "世界杯", kickoff: "2026-06-09", result: { home: 1, away: 0 } },
+    ] },
+  };
+  const played = collectWcPlayed(Object.keys(store), (d) => store[d]);
+  assert.equal(played.length, 1, "墨南去重为1场;国际赛非WC剔除;6/09窗口外剔除");
 });

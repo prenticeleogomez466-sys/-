@@ -513,10 +513,22 @@ export function simpleWldCell(prediction) {
   if (lq && lq.sfcSold === false) return "⛔ 未开售(只让球)";
   const line = Number(prediction.handicapPick?.line);
   const flag = (lq && lq.sfcSold !== true && Number.isFinite(line) && line !== 0) ? "⚠️直胜仅参考 " : "";
+  // 双选可见(2026-06-10 审计rank13):主推双选(doubleChance.recommended)以前只在完整表/0.70阈值层,
+  //   极简格看不见 → 均势场(如世界杯揭幕批 conf<60)用户只见单选误当胆。前缀"双选X/Y(1X)",
+  //   主推方向排首(保四列同向不变量:dirOfText 取最左方向词判方向)。
+  const dc = prediction.doubleChance;
+  let dcPrefix = "";
+  if (dc?.recommended === true && Array.isArray(dc.codes) && dc.codes.length === 2) {
+    const L = { "3": "主胜", "1": "平局", "0": "客胜" };
+    const S = { "3": "1", "1": "X", "0": "2" };
+    const main = prediction.pick?.code;
+    const ordered = dc.codes.includes(main) ? [main, dc.codes.find((c) => c !== main)] : dc.codes;
+    dcPrefix = `双选${ordered.map((c) => L[c] ?? c).join("/")}(${ordered.map((c) => S[c] ?? "?").join("")}) `;
+  }
   const p = prediction.probabilities ?? {};
   const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
     .filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
-  if (arr.length < 2) return `${flag}${outcomeCodeToChinese(prediction.pick?.code)}`;
+  if (arr.length < 2) return `${flag}${dcPrefix}${outcomeCodeToChinese(prediction.pick?.code)}`;
   // 明确单一方向(2026-06-07 用户硬要求"胜负平和让球都给明确方向"):主方向=pick.code(最高概率,四列同源),
   //   带概率+可靠度;低信心不抑制玩法→附"可双选"提示但主方向仍单一明确(遵 feedback_confidence_not_autosuppress)。
   // 主选+次选(2026-06-08 用户规格,覆盖 2026-06-07「单一方向」旧规则):主选=pick.code(最高概率),
@@ -527,10 +539,10 @@ export function simpleWldCell(prediction) {
   const top = Number(arr[0][1]);
   const conf = !Number.isFinite(top) ? "" : top >= 0.55 ? "较稳" : top < 0.40 ? "势均" : "把握中";
   const weakAway = (c1 === "0" && Number(prediction.confidence) < 60) ? "·客胜信号弱建议双选" : "";
-  if (!c2) return `${flag}主选 ${dir}${pct1 ? `(${pct1})` : ""}${weakAway}`;
+  if (!c2) return `${flag}${dcPrefix}主选 ${dir}${pct1 ? `(${pct1})` : ""}${weakAway}`;
   const dir2 = outcomeCodeToChinese(c2);
   const p2 = probOf(c2); const pct2 = Number.isFinite(p2) ? `${Math.round(p2 * 100)}%` : "";
-  return `${flag}主选 ${dir}${pct1 ? `(${pct1})` : ""}${conf ? `·${conf}` : ""} / 次选 ${dir2}${pct2 ? `(${pct2})` : ""}${weakAway}`;
+  return `${flag}${dcPrefix}主选 ${dir}${pct1 ? `(${pct1})` : ""}${conf ? `·${conf}` : ""} / 次选 ${dir2}${pct2 ? `(${pct2})` : ""}${weakAway}`;
 }
 
 function toSimpleJingcaiRow(prediction) {

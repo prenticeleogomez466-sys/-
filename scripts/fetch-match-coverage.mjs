@@ -7,20 +7,21 @@
 import "../src/env.js";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { loadFixtures } from "../src/fixture-store.js";
+import { buildCoverageTargets, loadZhToEn } from "../src/coverage-targets.js";
 
 const DATE = process.argv[2] || "2026-06-09";
 const KEY = process.env.ODDS_API_KEY;
 
-// 7 场目标(队名查询正则 + 元信息)。ESPN abbr 与中文名都列,匹配更稳。
-const MATCHES = [
-  { zh: "中国 vs 泰国", comp: "国际赛", home: { zh: "中国", re: "China PR|^China$|China" }, away: { zh: "泰国", re: "Thailand" }, wc: false },
-  { zh: "匈牙利 vs 哈萨克斯坦", comp: "国际赛", home: { zh: "匈牙利", re: "Hungary" }, away: { zh: "哈萨克斯坦", re: "Kazakhstan" }, wc: false },
-  { zh: "阿根廷 vs 冰岛", comp: "国际赛", home: { zh: "阿根廷", re: "Argentina" }, away: { zh: "冰岛", re: "Iceland" }, wc: false },
-  { zh: "墨西哥 vs 南非", comp: "世界杯·单场", home: { zh: "墨西哥", re: "Mexico" }, away: { zh: "南非", re: "South Africa" }, wc: true, oddsHome: "Mexico", oddsAway: "South Africa" },
-  { zh: "韩国 vs 捷克", comp: "世界杯·单场", home: { zh: "韩国", re: "South Korea|Korea Republic|^Korea" }, away: { zh: "捷克", re: "Czech" }, wc: true, oddsHome: "South Korea", oddsAway: "Czech Republic" },
-  { zh: "加拿大 vs 波黑", comp: "世界杯·单场", home: { zh: "加拿大", re: "Canada" }, away: { zh: "波黑", re: "Bosnia" }, wc: true, oddsHome: "Canada", oddsAway: "Bosnia" },
-  { zh: "美国 vs 巴拉圭", comp: "世界杯·单场", home: { zh: "美国", re: "United States|^USA" }, away: { zh: "巴拉圭", re: "Paraguay" }, wc: true, oddsHome: "USA", oddsAway: "Paraguay" },
-];
+// 抓取目标动态生成(2026-06-10,审计rank2):废 7 场硬编码——从当日 fixtures store 收
+//   竞彩在售(jingcai)+ 世界杯场(shengfucai),对阵去重;中文→英文用 groups.json 反查 +
+//   静态译名表,查不到 → re=null,下面诚实标"⚠️无英文映射"不编。
+const MATCHES = buildCoverageTargets(loadFixtures(DATE).fixtures, loadZhToEn());
+if (!MATCHES.length) console.error(`⚠️ ${DATE} fixtures store 无竞彩/世界杯场——无目标可抓(核 D:/football-model-data/fixtures/${DATE}.json)`);
+for (const m of MATCHES) {
+  const miss = [m.home, m.away].filter((t) => !t.re).map((t) => t.zh);
+  if (miss.length) console.error(`⚠️ ${m.zh}:中文→英文映射缺(${miss.join("/")}),该侧近5/H2H/赔率将标未取到,不编`);
+}
 
 const LEAGUES = ["fifa.world", "fifa.friendly", "fifa.worldq.uefa", "fifa.worldq.afc", "fifa.worldq.concacaf", "fifa.worldq.conmebol", "fifa.cew", "fifa.nations"];
 const scoreVal = (s) => (s == null ? null : typeof s === "object" ? (s.displayValue ?? s.value ?? null) : s);
@@ -145,21 +146,25 @@ const out = { date: DATE, generatedAt: new Date().toISOString(), oddsApiRemainin
 
 for (const m of MATCHES) {
   console.error(`抓 ${m.zh} …`);
-  const ht = findTeam(m.home.re), at = findTeam(m.away.re);
+  // re=null(无英文映射)→ 不查 ESPN/Odds API,诚实落空,绝不模糊猜队
+  const ht = m.home.re ? findTeam(m.home.re) : null, at = m.away.re ? findTeam(m.away.re) : null;
   const hHist = ht ? await teamHistory(ht) : [];
   const aHist = at ? await teamHistory(at) : [];
   const last5 = (g) => g.slice(-5).reverse();
   // H2H:主队历史里筛对手 = 客队(按 abbr 或 名字)
-  const h2h = at ? hHist.filter((g) => g.oppName === at.name || (ht && new RegExp(m.away.re, "i").test(g.oppName))).slice(-5).reverse() : [];
+  const h2h = at ? hHist.filter((g) => g.oppName === at.name || (ht && m.away.re && new RegExp(m.away.re, "i").test(g.oppName))).slice(-5).reverse() : [];
 
-  // 大小球
+  // 大小球(The Odds API 队名按变体正则匹配,替代旧 oddsHome/oddsAway 硬名单)
   let ou = null;
-  if (m.wc && tot.ok) {
-    const k = Object.keys(tot.byPair).find((kk) => kk.startsWith(m.oddsHome) && kk.includes(m.oddsAway));
+  if (m.wc && tot.ok && m.home.re && m.away.re) {
+    const hRe = new RegExp(m.home.re, "i"), aRe = new RegExp(m.away.re, "i");
+    const k = Object.keys(tot.byPair).find((kk) => { const [h, a] = kk.split("|"); return hRe.test(h) && aRe.test(a); });
     if (k) ou = tot.byPair[k];
   }
   // ESPN/DraftKings 盘口(亚盘/欧赔/大小球)按队名匹配(event name = "Away at Home")
-  const espn = espnOdds.find((x) => new RegExp(m.home.re, "i").test(x.name) && new RegExp(m.away.re, "i").test(x.name)) || null;
+  const espn = (m.home.re && m.away.re)
+    ? espnOdds.find((x) => new RegExp(m.home.re, "i").test(x.name) && new RegExp(m.away.re, "i").test(x.name)) || null
+    : null;
 
   out.matches.push({
     match: m.zh, comp: m.comp,

@@ -11,7 +11,7 @@ import { canonicalTeamName } from "./team-aliases.js";
 
 const TSV_URL = "https://www.eloratings.net/World.tsv";
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-const CACHE_TTL_HOURS = 24;
+const STALE_WARN_DAYS = 7; // 超过即 console ⚠️ 提醒(不阻断 —— 铁律:提示不替用户弃数据)
 
 // ISO 2 字母代码 → 中文国家队名(竞彩常见 + eloratings 代码)。team-aliases 再归一中文短名。
 const ISO_CN = {
@@ -44,12 +44,20 @@ function parseTsv(text) {
   return map;
 }
 
-// 读缓存;过期/缺失则返回 null(由 sync 脚本刷新,预测路径只读不抓网)。
+// 读缓存;缺失返回 null(由 sync 脚本刷新,预测路径只读不抓网)。
+// 2026-06-10 审计rank8:原 `ageH = (Date.now ? null : null)` 恒 null 死代码,TTL 从未生效、
+// Elo 陈旧无人知;改真实 mtime 检查,>STALE_WARN_DAYS 天只 console ⚠️ 提醒不阻断(提示不替用户弃数据)。
 export function loadNationalElo(path) {
   try {
     const p = path ?? eloCachePath();
     if (!existsSync(p)) return null;
-    const ageH = (Date.now ? null : null); // Date.now 在 workflow 不可用,这里普通运行可用
+    const ageH = (Date.now() - statSync(p).mtimeMs) / 36e5;
+    if (ageH > STALE_WARN_DAYS * 24) {
+      console.warn(
+        `⚠️ [national-elo] national-elo.json 已 ${(ageH / 24).toFixed(1)} 天未刷新(>${STALE_WARN_DAYS}天),` +
+        `Elo 先验可能过期;跑 node scripts/sync-national-elo.mjs 刷新(不阻断,仍使用)。`
+      );
+    }
     const obj = JSON.parse(readFileSync(p, "utf8"));
     return obj && obj.elo ? obj : null;
   } catch { return null; }

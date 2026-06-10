@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildCalibrationProfileFromRows } from "./model-calibration.js";
 import { buildSignalWeightsProfile, signalWeightsSummary } from "./signal-weight-tuner.js";
+import { isSoftCompetition } from "./competition-soft-recalibration.js";
 import { getExportDir } from "./paths.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -33,7 +34,11 @@ export function runEvolutionBacktest() {
   const hit = settled.filter((row) => row.hit === true).length;
   const probabilistic = settled.filter((row) => probabilitySet(row));
   const probabilityMetrics = probabilistic.length ? buildProbabilityMetrics(probabilistic) : null;
-  const calibrationProfile = buildCalibrationProfileFromRows(settled);
+  // 学习域隔离(2026-06-10 审计rank12):ledger 校准档只学俱乐部行,世界杯/国际赛(含友谊/世预)
+  //   行排除——口径复用 competition-soft-recalibration.isSoftCompetition(不造第三套判定)。
+  //   summary 统计口径(total/settled/命中率)保持全量,仅"学习"路径拆域。
+  const clubSettled = settled.filter((row) => !isSoftCompetition(row.competition));
+  const calibrationProfile = buildCalibrationProfileFromRows(clubSettled);
   const summary = {
     total: rows.length,
     settled: settled.length,
@@ -45,6 +50,8 @@ export function runEvolutionBacktest() {
     calibration: {
       usable: calibrationProfile.usable,
       samples: calibrationProfile.samples,
+      domain: "club-only",
+      excludedSoftSettled: settled.length - clubSettled.length,
       global: calibrationProfile.global,
       buckets: calibrationProfile.buckets
     }
