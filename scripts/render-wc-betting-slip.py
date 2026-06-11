@@ -80,7 +80,7 @@ ws.auto_filter.ref = f"A3:{get_column_letter(len(H1))}{ws.max_row}"
 # ── Sheet2 14场·任选9 ──
 F = S.get("fourteen")
 ws2 = wb.create_sheet("14场·任选9裁决")
-H2 = ["腿", "对阵", "开赛", "主/平/客%", "单选", "复选建议", "胆评级", "防平", "爆冷", "若爆冷后果", "全数据归因"]
+H2 = ["腿", "对阵", "开赛", "主/平/客%", "单选", "复选建议", "胆评级", "防平", "冷向", "防冷裁决", "全数据归因"]
 period = F.get("period", "") if F else ""
 banner(ws2, f"🎯 14场胜负彩 {period} · 逐腿裁决(胆/防平/爆冷) · 世界杯模型全因素", len(H2))
 ws2.append(H2)
@@ -94,8 +94,8 @@ if F and not F.get("error"):
         ws2.append([l["leg"], l["match"], l["kickoff"],
                     f"{pr['home']*100:.0f}/{pr['draw']*100:.0f}/{pr['away']*100:.0f}",
                     l["pick"], l["combo"], l["banker"], l["drawGuard"] or "—",
-                    f"{l['upset']}({l['upsetProb']*100:.0f}%·{l.get('upsetDir','')})",
-                    l.get("upsetConsequence", "—"), l["reasons"]])
+                    l.get("upsetText") or f"{l.get('upsetDir','')}{l.get('upsetDirProb',0)*100:.0f}%",
+                    l.get("guardVerdict", "—"), l["reasons"]])
         row = ws2.max_row
         if l["banker"] == "🎯可胆":
             for c in range(1, len(H2) + 1):
@@ -112,18 +112,16 @@ if F and not F.get("error"):
         f"任选9: {' '.join(r9['picks'])} | 9腿全中概率={r9['combinedProb']*100:.2f}%({r9['note']})",
     ]
     if r9.get("riskLegs"):
-        summary.append(f"⚠️ 任选9命门腿(冷向概率最高,炸一腿票即死): {' ║ '.join(r9['riskLegs'])}")
+        summary.append(f"⚠️ 任选9换腿建议: {' ║ '.join(r9['riskLegs'])}")
     U = F.get("upsetScenario")
     if U:
         st, ct = U["singleTicket"], U["comboTicket"]
         summary.append("")
-        summary.append("💣 爆冷情景推演(" + U["assumption"] + ")")
+        summary.append("💣 防冷裁决(" + U["assumption"] + ")")
         summary.append(f"  单选票: 全中率={st['pAllHit']*100:.3f}% · ≥13中={st['pAtLeast13']*100:.2f}% · 期望命中={st['expHits']}腿({st['note']})")
         summary.append(f"  复选票(按建议买): 全中率={ct['pAllHit']*100:.2f}% · {ct['tickets']}注={ct['costYuan']}元({ct['note']})")
         for t in U["topUpsetLegs"]:
-            summary.append(f"  🔥第{t['leg']}腿 {t['match']} | 冷向={t['dir']}({t['prob']*100:.0f}%) | 依据: {t['reasons']} | 后果: {t['consequence']}")
-        for p in U["topColdPairs"]:
-            summary.append(f"  💥双冷组合: 第{p['legs'][0]}+{p['legs'][1]}腿({p['matches']}) 联合概率{p['prob']*100:.1f}%")
+            summary.append(f"  🔥第{t['leg']}腿 {t['match']} | 冷={t['dir']} | {t['verdict']} | 依据: {t['reasons']}")
     for s in summary:
         ws2.append([s])
         ws2.merge_cells(start_row=ws2.max_row, start_column=1, end_row=ws2.max_row, end_column=len(H2))

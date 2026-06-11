@@ -172,18 +172,23 @@ try {
     const prefer = sortable.filter((l) => l.banker !== "✖不胆").sort((a, b) => b.pickProb - a.pickProb);
     const rest = sortable.filter((l) => l.banker === "✖不胆").sort((a, b) => b.pickProb - a.pickProb);
     const nine = [...prefer, ...rest].slice(0, 9);
-    // ── 爆冷情景推演(2026-06-11 用户追问"爆冷会出现在哪场/为什么/根据什么/什么后果")──
-    // 🔶推断:全部由上方✅世界杯模型逐腿真实概率派生(腿间独立假设,如实标注);零兜底,标缺腿不进推演。
+    // ── 防冷裁决(2026-06-11 用户裁决:不要"后果"废话,只答——哪场最可能爆/冷向是主平客/重点防哪些/
+    //    防不住→全包或弃[弃=不当胆不进任选9])。冷向=主选之外概率最高方向,平局算冷。
     const okLegs = legsOut.filter((l) => !l.error);
     const probOfSign = (l, s) => (s === "3" ? l.probs.home : s === "1" ? l.probs.draw : l.probs.away);
+    const SIGN_LABEL = { "3": "主胜", "1": "平局", "0": "客胜" };
     for (const l of okLegs) {
-      // 冷门方向=主/客中概率更低者(平局走"防平"通道,不算爆冷)
-      const cold = l.probs.home <= l.probs.away ? ["主胜", "3", l.probs.home] : ["客胜", "0", l.probs.away];
-      l.upsetDir = cold[0]; l.upsetSign = cold[1]; l.upsetDirProb = cold[2];
-      const covered = l.comboSigns.includes(cold[1]);
-      l.upsetConsequence = covered
-        ? `复选已护住冷向(${l.combo})`
-        : `复选未含${cold[0]}——该腿爆冷则单选/复选票全死`;
+      const pickSign = l.pick.includes("(3)") ? "3" : l.pick.includes("(1)") ? "1" : "0";
+      const others = ["3", "1", "0"].filter((s) => s !== pickSign)
+        .map((s) => ({ s, p: probOfSign(l, s) })).sort((a, b) => b.p - a.p);
+      const [t1, t2] = others;
+      l.upsetDir = SIGN_LABEL[t1.s]; l.upsetSign = t1.s; l.upsetDirProb = t1.p;
+      // 冷向并显(第二威胁≥20%):回答"冷是胜还是负还是平"——可能不止一个方向有戏
+      l.upsetText = t2.p >= 0.20 ? `${SIGN_LABEL[t1.s]}${Math.round(t1.p * 100)}%+${SIGN_LABEL[t2.s]}${Math.round(t2.p * 100)}%` : `${SIGN_LABEL[t1.s]}${Math.round(t1.p * 100)}%`;
+      if (t1.p >= 0.27 && t2.p >= 0.22) l.guardVerdict = `🚨防不住→全包(任选9弃此腿,不当胆):双威胁${SIGN_LABEL[t1.s]}${Math.round(t1.p * 100)}%+${SIGN_LABEL[t2.s]}${Math.round(t2.p * 100)}%`;
+      else if (t1.p >= 0.27) l.guardVerdict = `🛡重点防:双选 ${l.pick.slice(0, 2)}/${SIGN_LABEL[t1.s]}`;
+      else if (t1.p >= 0.24) l.guardVerdict = `⚠️建议防:双选 ${l.pick.slice(0, 2)}/${SIGN_LABEL[t1.s]}`;
+      else l.guardVerdict = `可单选(冷向${SIGN_LABEL[t1.s]}仅${Math.round(t1.p * 100)}%)`;
     }
     // Poisson-binomial 精确命中分布(DP):单选票(每腿只买主选)
     const hitDist = (ps) => { let d = [1]; for (const p of ps) { const n = new Array(d.length + 1).fill(0); for (let k = 0; k < d.length; k++) { n[k] += d[k] * (1 - p); n[k + 1] += d[k] * p; } d = n; } return d; };
@@ -194,15 +199,12 @@ try {
     const coverPs = okLegs.map((l) => Math.min(1, l.comboSigns.reduce((s, g) => s + probOfSign(l, g), 0)));
     const comboAll = coverPs.reduce((s, p) => s * p, 1);
     const comboTickets = okLegs.reduce((s, l) => s * l.comboSigns.length, 1);
-    // 最可能爆冷腿(按冷向真实概率排序)+ 最可能双冷组合(联合概率)
+    // 最可能爆冷腿(按冷向真实概率排序,带防冷裁决)
     const topUpset = [...okLegs].sort((a, b) => b.upsetDirProb - a.upsetDirProb).slice(0, 5)
-      .map((l) => ({ leg: l.leg, match: l.match, dir: l.upsetDir, prob: Number(l.upsetDirProb.toFixed(3)), reasons: l.reasons, consequence: l.upsetConsequence }));
-    const pairs = [];
-    for (let i = 0; i < okLegs.length; i++) for (let j = i + 1; j < okLegs.length; j++) pairs.push({ legs: [okLegs[i].leg, okLegs[j].leg], matches: `${okLegs[i].match} + ${okLegs[j].match}`, prob: okLegs[i].upsetDirProb * okLegs[j].upsetDirProb });
-    const topPairs = pairs.sort((a, b) => b.prob - a.prob).slice(0, 3).map((p) => ({ ...p, prob: Number(p.prob.toFixed(4)) }));
-    // 任选9 风险腿=入九名单里冷向概率最高的两腿(任选9不可换腿,这两腿是票的命门)
-    const nineRisk = [...nine].sort((a, b) => (b.upsetDirProb ?? 0) - (a.upsetDirProb ?? 0)).slice(0, 2)
-      .map((l) => `${l.leg}腿 ${l.match}(冷向${l.upsetDir}${((l.upsetDirProb ?? 0) * 100).toFixed(0)}%)`);
+      .map((l) => ({ leg: l.leg, match: l.match, dir: l.upsetText ?? l.upsetDir, prob: Number(l.upsetDirProb.toFixed(3)), reasons: l.reasons, verdict: l.guardVerdict }));
+    // 任选9 换腿建议=入九名单里防冷裁决达"重点防/全包"级的腿(任选9无双选可防,建议换更稳腿)
+    const nineRisk = [...nine].filter((l) => l.guardVerdict && (l.guardVerdict.startsWith("🚨") || l.guardVerdict.startsWith("🛡")))
+      .map((l) => `${l.leg}腿 ${l.match}(冷=${l.upsetText},无双选可防→建议换腿)`);
 
     fourteen = {
       period: sfRows[0]?.officialFixtureId?.split("-")[0] ?? "",
@@ -218,7 +220,7 @@ try {
         note: "9腿全中概率=连乘(诚实小数字),复选加保按预算自定",
       },
       upsetScenario: {
-        assumption: "🔶推断:由世界杯模型逐腿真实概率派生(腿间独立假设);爆冷=主/客中概率更低方向胜出,平局风险走防平通道",
+        assumption: "🔶推断:由世界杯模型逐腿真实概率派生(腿间独立假设);冷向=主选之外概率最高方向(平局算冷)",
         singleTicket: {
           pAllHit: Number((singleDist[nLegs] ?? 0).toFixed(5)),
           pAtLeast13: Number(((singleDist[nLegs] ?? 0) + (singleDist[nLegs - 1] ?? 0)).toFixed(5)),
@@ -232,7 +234,6 @@ try {
           note: "按逐腿复选建议(单选/双选/全包)投注的全中率与注数成本",
         },
         topUpsetLegs: topUpset,
-        topColdPairs: topPairs,
       },
     };
   }
