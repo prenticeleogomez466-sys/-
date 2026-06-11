@@ -36,9 +36,9 @@ const enOf = Object.fromEntries(Object.entries(groups.team_name_zh).map(([en, zh
 const snapOf = new Map(snaps.map((s) => [`${s.homeTeam}|${s.awayTeam}`, s]));
 const CODE = { 主胜: "home", 平局: "draw", 客胜: "away" };
 const rows = [], skipped = [];
-// 晨对抗审计裁决的是【旧每日模型】的推荐(0611已切世界杯模型),只作参考标注,
-// 不再用它筛串关/定红场——本单红场判定以实时自评EV(模型概率×竞彩现价)为准,防张冠李戴。
-const morningRef = (h, a) => { const v = adv[`${h}|${a}`]; return v && /🔴/.test(v.label) ? v : null; };
+// 对抗审计标注来源感知: vintage='当期(wc-match-model)'=对本单决策源的实时三视角证伪;
+// 旧版vintage=对每日模型picks的参考。两者都只标注不筛单(红场保留是用户裁决)。
+const advRef = (h, a) => { const v = adv[`${h}|${a}`]; return v && /🔴|🟠/.test(v.label) ? v : null; };
 const kickoffOf = (h, a) => {
   const eh = enOf[h], ea = enOf[a];
   const m = Object.values(md).find((x) => (x.homeTeam === eh && x.awayTeam === ea) || (x.homeTeam === ea && x.awayTeam === eh));
@@ -55,10 +55,12 @@ const evNote = (ev, agree) => {
 for (const r of pred.results) {
   const key = `${r.home}|${r.away}`;
   const s = snapOf.get(key);
-  const red = morningRef(r.home, r.away);
+  const red = advRef(r.home, r.away);
   const kick = kickoffOf(r.home, r.away);
   const baseFlags = [];
-  if (red) baseFlags.push(`🔶晨审计参考(对旧模型,EV${(red.ev * 100).toFixed(1)}%)`);
+  if (red) baseFlags.push(red.vintage?.includes("当期")
+    ? `${(red.label || "").split("(")[0].trim()}·当期证伪(EV${(red.ev * 100).toFixed(1)}%)·临场你定`
+    : `🔶旧版审计参考(EV${(red.ev * 100).toFixed(1)}%)`);
   if (r.market?.agree === false) baseFlags.push(`⚠️与市场分歧${(r.market.divergence * 100).toFixed(0)}pp`);
   if (!s) { skipped.push(`${key}: 竞彩快照缺(未开售/未抓到),整场不上单`); continue; }
 
