@@ -173,10 +173,17 @@ export function backfillFromStabilityCache(date, snapshots, fixtures, nowIso = n
       for (const { field, quality } of MARKETS) {
         const cached = entry.markets[field];
         if (!cached) continue;
+        // fetch-gate-500-1 刀②(2026-06-11):"明确未开售"≠"抓取失败"。ingest 成功且 1X2 feed
+        //   无此场时快照带 euroUnsold=true,绝不回填 last-good 欧赔 —— 06-08 新浪机构赔率曾借此
+        //   复活成"在售1X2"绕过⛔未开售闸(6005卡塔尔/1013西班牙真钱事故)。
+        if (field === "europeanOdds" && snapshot.euroUnsold === true) continue;
         const liveQ = quality(snapshot[field], snapshot.source);
         if (cached.quality > liveQ) {
           patched[field] = cached.value;
-          patched.collectedAt = snapshot.collectedAt ?? cached.collectedAt;
+          // 时间戳如实标龄(fetch-gate-500-1 刀②):回填陈旧值后 collectedAt 取更旧者(缓存采集时间),
+          //   绝不给陈旧值盖新鲜时间戳冒充实时 —— 下游 freshness 闸必须能看见真实年龄。
+          const cachedAt = cached.collectedAt ?? nowIso;
+          if (!patched.collectedAt || cachedAt < patched.collectedAt) patched.collectedAt = cachedAt;
           patched.source = mergeSource(snapshot.source, `稳定缓存(${cached.source || "last-good"})`);
           backfilled += 1;
           details.push({ fixtureId: snapshot.fixtureId, market: field, from: "stability-cache", quality: cached.quality, replacedQuality: liveQ });

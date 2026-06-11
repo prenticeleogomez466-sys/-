@@ -13,7 +13,10 @@ import { getExportDir } from "../src/paths.js";
 const here = dirname(fileURLToPath(import.meta.url));
 const date = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai" }).format(new Date()); // YYYY-MM-DD 北京口径
 const steps = [
-  ["ingest(全期次腿)", ["scripts/ingest-500-jingcai-fallback.mjs", `--date=${date}`, "--horizon", "6"]],
+  // fetch-gate-500-2(2026-06-11):--horizon 6 覆盖不到 date+7 的在售腿(06-11 时 3021~3024 在 06-18)。
+  //   改为不带 --horizon:ingest 在世界杯窗口内默认动态 7(defaultIngestHorizonDays),
+  //   且窗口外既有未开赛场已由 preserveOutOfWindowFixtures 保留,不再整批覆盖删除。
+  ["ingest(全期次腿)", ["scripts/ingest-500-jingcai-fallback.mjs", `--date=${date}`]],
   ["coverage(ESPN近5/DK)", ["scripts/fetch-match-coverage.mjs", date]],
   ["H2H(本地历史库)", ["scripts/fetch-h2h-local.mjs", `--date=${date}`]],
   ["亚盘/欧赔参考(titan007)", ["scripts/fetch-asian-titan007.mjs", `--date=${date}`]],

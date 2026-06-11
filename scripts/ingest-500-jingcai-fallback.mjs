@@ -23,6 +23,7 @@ import { scopeJingcaiFixtures } from "../src/jingcai-business-day.js";
 import { parseJingcaiHandicapLine } from "../src/jingcai-fivehundred-stage.js";
 import { orientRowMaps, swapGuardViolation, ORIENT_A_IS_1X2, ORIENT_B_IS_1X2, ORIENT_UNCERTAIN } from "../src/spf-orientation.js";
 import { kickoffTimeFromDomCell, domKickoffCellFor, preservedKickoffTime } from "../src/kickoff-time.js";
+import { isWorldCupWindow } from "../src/odds-api-rotation.js";
 
 const SPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_spf_2.xml";
 const NSPF_URL = "https://trade.500.com/static/public/jczq/newxml/pl/pl_nspf_2.xml";
@@ -91,14 +92,18 @@ async function main() {
   //   (已下市不在 feed)→ 在售 = feed 里全部场次。旧逻辑按 matchnum 前三位定系列、只取一个系列,
   //   对世界杯长预售期(matchnum 跨 1/2/.../7 七系列、kickoff 跨 06-09~06-18)会把 4001 墨西哥vs南非
   //   等世界杯单场整批丢弃 → 竞彩漏出。改为纳入 feed 全部场次(可剔已过 kickoff 的场)。
-  const todays = selectInSale(spf, date, horizonOverride ?? IN_SALE_HORIZON_DAYS);
+  // fetch-gate-500-2/output-threeway-6/automation-chain-3(2026-06-11):无 --horizon 的调用方
+  //   (daily:fallback / jingcai-daily / LineupWatch→Run-Daily)曾按默认+4天窗口整批替换,把 store
+  //   里已在售的 6/16+ 世界杯竞彩腿每天静默删除。世界杯窗口内默认窗口动态抬到 7(覆盖整批在售腿)。
+  const effectiveHorizon = horizonOverride ?? defaultIngestHorizonDays(date);
+  const todays = selectInSale(spf, date, effectiveHorizon);
   if (!todays.length) {
     console.log(JSON.stringify({ ok: false, date, reason: "500 源无任何竞彩场次", spfTotal: spf.length }, null, 2));
     return;
   }
   // 审计:开赛窗口纳入 N 场(spf feed 共 M 场,窗口外远期预售已剔)——便于无人值守察觉异常膨胀。
   const wcN = todays.filter((m) => String(m.league ?? "").includes("世界杯")).length;
-  console.error(`在售窗口(业务日${date}+${IN_SALE_HORIZON_DAYS}天):纳入 ${todays.length} 场(其中世界杯单场 ${wcN}),feed 共 ${spf.length} 场`);
+  console.error(`在售窗口(业务日${date}+${effectiveHorizon}天):纳入 ${todays.length} 场(其中世界杯单场 ${wcN}),feed 共 ${spf.length} 场`);
 
   const collectedAt = new Date().toISOString();
 
@@ -222,6 +227,11 @@ async function main() {
       awayTeam: m.away,
       collectedAt,
       europeanOdds: euro,
+      // fetch-gate-500-1 刀②(2026-06-11):显式建模"未开售"≠"抓取失败"。本次两 feed 均成功抓到
+      //   (失败会在 main 顶部抛错终止),1X2 feed 无此场 = 竞彩明确只卖让球未开售胜平负。
+      //   带上 euroUnsold=true 后,odds-stability-cache 绝不对它回填 last-good 欧赔,
+      //   findMarketSnapshot 也绝不让陈旧副本 donor 复活(06-08新浪机构赔率冒充在售1X2的真钱事故)。
+      euroUnsold: !euro,
       handicapOdds: handicap,
       jingcaiHandicap: jline != null ? { line: jline, source: "500.com-jczq" } : null,
       asianHandicap,
@@ -245,7 +255,17 @@ async function main() {
   }
 
   // 合并既有 fixture(保留官方 14 场/其它源),只替换 500 兜底竞彩 —— 不破坏官方数据。
-  const keepFixtures = loadFixtures(date).fixtures.filter((f) => f.source !== "500.com-jczq-fallback");
+  const prevAllFixtures = loadFixtures(date).fixtures;
+  const keepFixtures = prevAllFixtures.filter((f) => f.source !== "500.com-jczq-fallback");
+  // fetch-gate-500-2/automation-chain-3 根修(2026-06-11):窗口外既有本店未开赛场原样保留,
+  //   绝不被"整批替换"静默删除(此前默认+4窗口的无--horizon调用方每天把 6/16+ 在售腿从 store 抹掉,
+  //   6/16-17 腿无预测、14场不发)。不变量:ingest 后已存在的未停售竞彩行不得变少。
+  const preservedFuture = preserveOutOfWindowFixtures(
+    prevAllFixtures.filter((f) => f.source === "500.com-jczq-fallback"), fixtures, date, effectiveHorizon);
+  if (preservedFuture.length) {
+    console.error(`✅ 保留窗口外既有远期预售场 ${preservedFuture.length} 场(不整批覆盖删除):` +
+      preservedFuture.map((f) => `${f.sequence} ${f.homeTeam} vs ${f.awayTeam}(${String(f.kickoff).slice(0, 10)})`).join("；"));
+  }
   const mergedSource = keepFixtures.length
     ? `merged:${[...new Set(keepFixtures.map((f) => f.source).filter(Boolean))].join("+")}+500.com-jczq-fallback`
     : "500.com-jczq-fallback";
@@ -266,10 +286,14 @@ async function main() {
     if (audit.gaps.length) console.error(`⚠️ 逐场缺口:\n  ` + audit.gaps.join("\n  "));
   }
 
-  const scopedFixtures = scopeJingcaiFixtures(date, [...keepFixtures, ...fixtures]);
+  const scopedFixtures = scopeJingcaiFixtures(date, [...keepFixtures, ...fixtures, ...preservedFuture]);
   const fixturesSaved = saveFixtures(date, scopedFixtures, { source: mergedSource });
-  // 合并既有快照(不破坏其它源),再保存
-  const previous = loadMarketSnapshots(date).snapshots.filter((s) => s.source !== "500.com-jczq-fallback");
+  // 合并既有快照(不破坏其它源),再保存。
+  // fetch-gate-500-1 刀①(2026-06-11):本店旧副本剔除改"包含"判 —— odds-stability-cache 回填会把
+  //   source 改写成 "500.com-jczq-fallback+稳定缓存(…)",旧精确比较 !== 永远剔不掉这种副本,
+  //   06-08 新浪陈旧欧赔借尸还魂冒充在售1X2(6005卡塔尔/1013西班牙)。verified 与窗口外保留场的快照不剔。
+  const preservedIds = new Set(preservedFuture.map((f) => f.id));
+  const previous = loadMarketSnapshots(date).snapshots.filter((s) => keepPreviousSnapshot(s, preservedIds));
   // wc-handicap-line-persist-fix2(2026-06-08):previous 里已核实(verified)的世界杯单场真实让球线天然保留
   //   (它们 source≠500.com-jczq-fallback,不被上面 filter 剔除;findMarketSnapshot 又优先 verified donor)。
   //   无人值守流水线留痕:显式审计本次 ingest 保留了多少条已核实让球线,防 verified 静默冻结一条错线无人察觉。
@@ -357,6 +381,37 @@ const round2 = (x) => Math.round(x * 1000) / 1000;
 // 竞彩日常推荐的开赛窗口(2026-06-08):业务日 + N 天。聚焦临近场 + 最近世界杯比赛日,
 //   不把整届预售(如世界杯 6/12~6/18 全部单场)堆进当日推荐(用户"还有2"=只要最近的,非25场)。
 export const IN_SALE_HORIZON_DAYS = 4;
+// 世界杯预售期在售腿跨度 7 天(实测 06-11 feed 列出 06-12~06-18 共24场全部在售),
+//   默认+4窗口会把 6/16+ 在售腿主动丢弃 → 世界杯窗口(2026-06-11~07-19)内默认抬到 7。
+export const WC_IN_SALE_HORIZON_DAYS = 7;
+export function defaultIngestHorizonDays(date) {
+  return isWorldCupWindow(date) ? WC_IN_SALE_HORIZON_DAYS : IN_SALE_HORIZON_DAYS;
+}
+
+// fetch-gate-500-2/automation-chain-3(纯函数便于单测):窗口外既有本店未开赛场保留清单。
+//   窗口内的场以本次抓取为准(feed 没列出=已下市);已过赛日的场不保;
+//   本次新批已含同场(编号+主客同)则以新抓为准不重复。
+export function preserveOutOfWindowFixtures(previousOwn, newFixtures, date, horizonDays) {
+  const horizon = addDaysIso(date, horizonDays);
+  const idKey = (f) => `${f.sequence}|${f.homeTeam ?? f.home}|${f.awayTeam ?? f.away}`;
+  const seen = new Set((newFixtures ?? []).map(idKey));
+  return (previousOwn ?? []).filter((f) => {
+    const d = String(f.kickoff ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0];
+    if (!d || d < String(date) || d <= horizon) return false;
+    return !seen.has(idKey(f));
+  });
+}
+
+// fetch-gate-500-1 刀①(纯函数便于单测):既有快照保留判定。
+//   - verified=true(人工核实让球线)永远保留;
+//   - 窗口外保留场(preservedFixtureIds)的本店快照保留(保场必须保赔,否则远期预售场失盘);
+//   - 其余只要 source 含 "500.com-jczq-fallback"(含被稳定缓存改写过的副本)一律剔除,以本次新抓为准。
+export function keepPreviousSnapshot(snapshot, preservedFixtureIds = new Set()) {
+  if (snapshot?.verified === true) return true;
+  if (preservedFixtureIds.has(snapshot?.fixtureId)) return true;
+  return !String(snapshot?.source ?? "").includes("500.com-jczq-fallback");
+}
+
 function addDaysIso(isoDate, days) {
   const m = String(isoDate ?? "").match(/(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return String(isoDate ?? "");

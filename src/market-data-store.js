@@ -35,7 +35,11 @@ export function findMarketSnapshot(fixture, snapshotsOrDate = fixture?.date) {
   const matches = snapshots.filter(sameMatch);
   if (!matches.length) return null;
   // 基准优先取 fixtureId 精确匹配的(保官方/主路径基本盘),再用各源补全赔种字段。
-  const base = { ...(matches.find((s) => s.fixtureId === fixture.id) ?? matches[0]) };
+  // fetch-gate-500-1(2026-06-11):同 fixtureId 可能并存多条(新抓 + 稳定缓存改写过 source 的陈旧副本),
+  //   旧 .find 取数组先出现者 = 顺序依赖,陈旧条(index 4)压过新条(index 32)。改按 collectedAt 取最新。
+  const freshest = (list) => list.reduce((a, b) => (String(b.collectedAt ?? "") > String(a.collectedAt ?? "") ? b : a));
+  const exact = matches.filter((s) => s.fixtureId === fixture.id);
+  const base = { ...(exact.length ? freshest(exact) : freshest(matches)) };
   const hasData = (v) => v != null && !(Array.isArray(v?.top) && v.top.length === 0) && !(typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);
   // wc-handicap-line-persist-fix2(2026-06-08):同名同场可能同时存在 verified(已核实真实让球线)
   //   与非 verified(500 fallback DOM 抓到 0/缺的脏副本)两条快照。让球线 donor 必须优先 verified,
@@ -45,6 +49,9 @@ export function findMarketSnapshot(fixture, snapshotsOrDate = fixture?.date) {
   const ODDS_FIELDS = ["europeanOdds", "handicapOdds", "asianHandicap", "totals", "scoreOdds", "halfFullOdds", "totalGoalsOdds", "jingcaiHandicap", "jingcaiLetqiu", "handicapOddsLetqiu"];
   for (const f of ODDS_FIELDS) {
     if (f === "jingcaiHandicap" && verifiedHandicapDonor) continue; // 已优先取 verified,勿被脏副本回填
+    // fetch-gate-500-1 刀②(2026-06-11):基快照明确标注 1X2 未开售(只卖让球)时,
+    //   绝不让同场陈旧副本把欧赔 donor 回来 —— 否则⛔未开售闸被 06-08 陈旧机构赔率绕过。
+    if (f === "europeanOdds" && base.euroUnsold === true) continue;
     if (!hasData(base[f])) { const donor = matches.find((s) => hasData(s[f])); if (donor) base[f] = donor[f]; }
   }
   return base;
@@ -134,8 +141,22 @@ export function normalizeMarketSnapshot(snapshot = {}, fallbackDate, index = 0) 
     //   2026-06-08)。仅透传严格布尔 true,绝不从 source/启发式推断(守脏数据铁律 feedback_no_fallback_absolute):
     //   仅 add-wc-singles-jingcai.mjs(全仓唯一人工核实路径)可写 true,授权在 cron 重 ingest 后冻结保留该线。
     verified: snapshot.verified === true,
+    // euroUnsold:竞彩"明确未开售1X2"(只卖让球)的显式状态(fetch-gate-500-1 刀②,2026-06-11)。
+    //   仅 ingest-500-jingcai-fallback 在两 feed 均成功抓到且 1X2 feed 无此场时写 true;
+    //   与"抓取失败"(europeanOdds=null 且无此标)严格区分:未开售绝不允许稳定缓存/donor 回填欧赔。
+    euroUnsold: snapshot.euroUnsold === true,
     source: snapshot.source ?? ""
   };
+}
+
+// fetch-gate-500-1 刀③(2026-06-11):交付层"✅500欧赔/✅实测"标签必须从快照来源派生。
+//   见值即打✅会把稳定缓存回填的陈旧值(如 06-08 新浪胜负彩机构赔率)冒充本次 500 实抓。
+//   stale=来源含"稳定缓存"(last-good 回填,非本次实抓);from500=纯 500 竞彩源实抓。
+export function snapshotEuroProvenance(snapshot) {
+  const source = String(snapshot?.source ?? "");
+  const stale = source.includes("稳定缓存");
+  const from500 = !stale && /500\.com-jczq/.test(source);
+  return { stale, from500, source, collectedAt: snapshot?.collectedAt ?? null };
 }
 
 export function assessSnapshotCompleteness(snapshot, fixture = null) {

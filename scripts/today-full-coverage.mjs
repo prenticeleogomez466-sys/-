@@ -24,6 +24,9 @@ import { worldCupContextLine } from "../src/worldcup-context.js";
 import { worldCupMatchPrior } from "../src/world-cup-priors.js";
 import { buildFourteenPlan } from "../src/prediction-engine.js";
 import { loadFixtures } from "../src/fixture-store.js";
+// fetch-gate-500-1 刀③(2026-06-11):✅500欧赔/✅实测标签从快照来源派生,见值即打✅是缺陷
+//   (稳定缓存回填的 06-08 新浪陈旧赔率曾被标"✅500欧赔/✅实测·500竞彩XML(spf)"进真钱交付)。
+import { snapshotEuroProvenance } from "../src/market-data-store.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(缺陷#20:绝不再默认写死历史日期)。
 let date;
@@ -89,7 +92,13 @@ const profileStr = (c) => {
 const trip = (o) => o ? `${o.home}/${o.draw}/${o.away}` : null;
 const euroStr = (s, c) => {
   const e = s.europeanOdds;
-  if (e && e.current) { const cur = trip(e.current), ini = trip(e.initial); return `${cur}${ini && ini !== cur ? `(初${ini})` : ""} ✅500欧赔`; }
+  if (e && e.current) {
+    const cur = trip(e.current), ini = trip(e.initial);
+    const body = `${cur}${ini && ini !== cur ? `(初${ini})` : ""}`;
+    const prov = snapshotEuroProvenance(s);
+    if (prov.stale) return `${body} ⚠️稳定缓存回填(采集${String(prov.collectedAt ?? "").slice(0, 16) || "时间缺"}),非本次500实抓·勿当在售实时盘`;
+    return `${body} ${prov.from500 ? "✅500欧赔" : `✅${(prov.source || "来源未标").slice(0, 24)}`}`;
+  }
   const eo = c?.espnOdds;
   if (eo?.ml) return `竞彩未开售;ESPN/${eo.provider} ${eo.ml.home}/${eo.ml.draw}/${eo.ml.away} ✅`;
   const ref = renderEuroRefCell(c?.euroRef);
@@ -131,7 +140,12 @@ const tCov = cov?.generatedAt ?? null;
 const auditFor = (p, s, c, prior, wcCtx) => {
   const t500 = s.collectedAt ?? null;
   const MISS = (why) => `⚠️缺(${why},标缺不编)`;
-  const euro = s.europeanOdds?.current ? auditCell("✅实测", trip(s.europeanOdds.current), "500竞彩XML(spf)", t500)
+  // 刀③:标签由来源派生 —— 稳定缓存回填的陈旧值标"⚠️存疑",绝不冒充"✅实测·500竞彩XML(spf)"。
+  const prov = snapshotEuroProvenance(s);
+  const euro = s.europeanOdds?.current
+    ? (prov.stale
+      ? auditCell("⚠️存疑(稳定缓存回填陈旧值,非本次实抓)", trip(s.europeanOdds.current), prov.source.slice(0, 60) || "来源未标", t500)
+      : auditCell("✅实测", trip(s.europeanOdds.current), prov.from500 ? "500竞彩XML(spf)" : (prov.source.slice(0, 40) || "来源未标"), t500))
     : c?.espnOdds?.ml ? auditCell("✅实测", `${c.espnOdds.ml.home}/${c.espnOdds.ml.draw}/${c.espnOdds.ml.away}`, `ESPN/${c.espnOdds.provider}`, tCov)
       : MISS("竞彩未开售且ESPN无ml");
   const ec = p.experienceContext;
