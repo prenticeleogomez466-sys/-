@@ -124,3 +124,10 @@ else {
   }
   if (newOpens === out.length) console.log("⚠️ 首次跑:全部为开盘基线,open==cur 无异动(诚实)。跨日多次刷新后才攒出真异动+收盘CLV。");
 }
+// 缺陷②(2026-06-11):落盘+输出已全部完成,显式退出。
+//   原因:本脚本走原生 fetch(undici)keep-alive,Windows 下进程自然退出时残留 libuv async
+//   句柄会触发 Assertion `!(handle->flags & UV_HANDLE_CLOSING)`(src\win\async.c:94)→ 进程以
+//   0xC0000409 崩溃,污染 CaptureClosing(run-capture-closing.cmd 末步)退出码,把已成功的
+//   收盘捕获打成假故障。数据此刻已 writeFileSync 落盘无损;此处同步 exit(0) 在 libuv teardown
+//   之前结束进程,既保住正确退出码又不丢数据(绝不兜底/绝不编造)。
+process.exit(0);
