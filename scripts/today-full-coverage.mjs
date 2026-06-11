@@ -375,7 +375,11 @@ const sheets = [
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
 if (outBase) mkdirSync(outBase, { recursive: true });
-const xlsxTarget = outBase ? `${outBase}/神选-竞彩推荐-${date}.xlsx` : `C:/Users/Administrator/Desktop/神选-竞彩推荐-${date}.xlsx`;
+// 权威产物=桌面稳定子文件夹(2026-06-11 EBUSY 根修:用户常开着桌面根 xlsx 在看,WPS/Excel 文件锁
+//   不该让整条交付链第一步就崩死)。先写子文件夹权威份,桌面根/手机站副本降级 best-effort。
+const stableDir = outBase ?? `C:/Users/Administrator/Desktop/足球推荐/${date}`;
+mkdirSync(stableDir, { recursive: true });
+const xlsxTarget = `${stableDir}/神选-竞彩推荐-${date}.xlsx`;
 writeXlsxWorkbook(xlsxTarget, sheets);
 
 // ── 手机页(核心7列表 + 点行展开该场全部细节;用户 2026-06-09 选定"一打开全部看得见") ──
@@ -408,14 +412,11 @@ if (!outBase) {
 }
 writeFileSync(enTarget, enHtml, "utf8");
 
-// ── 副本落位:桌面稳定子文件夹(16:01清exports根,持久产物只认这里)+ webshare 下载副本 ──
+// ── 副本落位(全部 best-effort,锁住/占用只警告不崩链;权威份已在稳定子文件夹) ──
 if (!outBase) {
-  const subDir = `C:/Users/Administrator/Desktop/足球推荐/${date}`;
-  try {
-    mkdirSync(subDir, { recursive: true });
-    copyFileSync(xlsxTarget, `${subDir}/神选-竞彩推荐-${date}.xlsx`);
-    writeFileSync(`${subDir}/今日足球推荐.html`, html, "utf8");
-  } catch (e) { console.log("子文件夹副本skip:", e.message); }
+  try { writeFileSync(`${stableDir}/今日足球推荐.html`, html, "utf8"); } catch (e) { console.log("子文件夹html副本skip:", e.message); }
+  try { copyFileSync(xlsxTarget, `C:/Users/Administrator/Desktop/神选-竞彩推荐-${date}.xlsx`); }
+  catch (e) { console.log(`⚠️ 桌面根副本被占用未更新(多半是表格软件开着旧表,关掉后重跑即可刷新):${e.message}`); }
   try { copyFileSync(xlsxTarget, `D:/Temp/webshare_lingdao/神选-竞彩推荐-${date}.xlsx`); copyFileSync(xlsxTarget, `D:/Temp/webshare_lingdao/jingcai-${date}.xlsx`); } catch (e) { console.log("xlsx copy skip:", e.message); }
 }
 
