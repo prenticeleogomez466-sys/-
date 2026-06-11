@@ -285,6 +285,9 @@ if (ONLY.includes("s4")) {
       const slip = JSON.parse(readFileSync(slipPath, "utf8"));
       const errs = [];
       if (slip.source?.model !== "wc-match-model") errs.push(`决策源=${slip.source?.model}≠wc-match-model(违反0611铁律)`);
+      // 赔率新鲜度: 单子引用的竞彩价超10h=陈价,真钱下注前必须重抓重出单(0611挑毛病新增)
+      const oddsAge = hours(NOW - Date.parse(slip.source?.jingcaiOddsAt || 0));
+      if (!Number.isFinite(oddsAge) || oddsAge > 10) errs.push(`下注单竞彩价${Number.isFinite(oddsAge) ? oddsAge + "h" : "无时间戳"}陈旧(>10h),重抓market后重跑 build-wc-betting-slip`);
       const badEv = (slip.rows || []).filter((r) => Math.abs(r.ev - (r.modelProb * r.odds - 1)) > 0.005);
       if (badEv.length) errs.push(`${badEv.length}行EV算术不符`);
       if (!(slip.rows || []).length) errs.push("下注单0行");
