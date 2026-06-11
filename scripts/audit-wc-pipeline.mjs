@@ -277,6 +277,26 @@ if (ONLY.includes("s4")) {
       }
     }
   }
+  // 实盘下注单一致性(存在才查): 决策源必须=世界杯模型(0611铁律) + EV算术逐行复核 + 14场腿全
+  const slipPath = path.join(process.env.FOOTBALL_EXPORT_DIR || "D:\\football-model-exports", `wc-betting-slip-${DATE}.json`);
+  if (!existsSync(slipPath)) rec("s4-slip", "SKIP", "当日无实盘下注单(出单后必须重跑本闸)");
+  else {
+    try {
+      const slip = JSON.parse(readFileSync(slipPath, "utf8"));
+      const errs = [];
+      if (slip.source?.model !== "wc-match-model") errs.push(`决策源=${slip.source?.model}≠wc-match-model(违反0611铁律)`);
+      const badEv = (slip.rows || []).filter((r) => Math.abs(r.ev - (r.modelProb * r.odds - 1)) > 0.005);
+      if (badEv.length) errs.push(`${badEv.length}行EV算术不符`);
+      if (!(slip.rows || []).length) errs.push("下注单0行");
+      const f = slip.fourteen;
+      if (f && !f.error) {
+        if ((f.legs || []).length !== 14) errs.push(`14场腿数=${f.legs?.length}≠14`);
+        const noPred = (f.legs || []).filter((l) => l.error).length;
+        if (noPred > 0) errs.push(`${noPred}腿无世界杯模型预测(已如实标缺,核对是否该有)`);
+      }
+      rec("s4-slip", errs.length ? "FAIL" : "PASS", errs.length ? errs.join("; ") : `下注单${slip.rows.length}注+${(slip.parlays || []).length}串+14场${f && !f.error ? "14腿" : "无"} 源/EV/腿数全核过`);
+    } catch (e) { rec("s4-slip", "FAIL", `下注单解析失败: ${e.message}`); }
+  }
   // worldcup.html ↔ 超算json 数字一致(站点常驻页)
   const wcHtmlPath = path.join(WEB, "worldcup.html");
   const sc2 = existsSync(path.join(WC, "worldcup-supercomputer.json")) ? JSON.parse(readFileSync(path.join(WC, "worldcup-supercomputer.json"), "utf8")) : null;
