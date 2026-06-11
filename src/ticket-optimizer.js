@@ -20,9 +20,12 @@ const EPS = 1e-12;
 const logp = (x) => Math.log(Math.max(x, EPS));
 
 /**
- * @param {Array<{probs:number[], codes:string[]}>} legs 每腿:probs 为该腿各结果概率(无需排序),codes 对应
+ * @param {Array<{probs:number[], codes:string[], minCover?:number}>} legs 每腿:probs 为该腿各结果概率(无需排序),codes 对应;
+ *   minCover 该腿最少覆盖数(默认 1)。护栏约束入口(engine-core-spot-3,2026-06-11):
+ *   isLowSampleWorldCup/isWeakLeague 等"不当胆"腿由调用方传 minCover=2,优化器在约束内做预算分配,
+ *   绝不把护栏腿降回单选——即便约束初始成本已超预算(安全约束优先于预算,成本如实上报)。
  * @param {object} opts
- *   budget   注数上限(默认 100)。覆盖成本=Π 各腿覆盖数,须 ≤ budget。
+ *   budget   注数上限(默认 100)。覆盖成本=Π 各腿覆盖数,须 ≤ budget(minCover 约束本身除外)。
  *   maxCover 单腿最多覆盖数(默认 3=胜平负全覆盖)
  * @returns {{legs:Array, jointHitProb:number, cost:number, baselineHitProb:number, baselineCost:number}}
  */
@@ -38,12 +41,15 @@ export function optimizeTicket(legs, opts = {}) {
     const prefix = []; // coveredProb 覆盖前 k 个结果
     let s = 0;
     for (let k = 0; k < pairs.length; k++) { s += pairs[k].p; prefix.push(s); }
-    return { i, pairs, prefix };
+    // minCover 护栏约束:坏值按 1 解析,上限截到 maxCover 与可覆盖结果数
+    const rawMin = Number(leg?.minCover);
+    const minC = Math.min(Number.isFinite(rawMin) && rawMin > 1 ? Math.floor(rawMin) : 1, maxCover, pairs.length);
+    return { i, pairs, prefix, minC };
   });
 
-  // 初始:全单选(每腿覆盖 1),成本 1
-  const cover = norm.map(() => 1);
-  let cost = 1; // Π count
+  // 初始:每腿覆盖 = 其 minCover 约束(默认 1=全单选)。约束成本可超预算——安全约束优先,成本如实。
+  const cover = norm.map((l) => l.minC);
+  let cost = cover.reduce((m, c) => m * c, 1); // Π count
   const baselineHitProb = norm.reduce((m, l) => m * (l.prefix[0] ?? 0), 1);
 
   // 候选升级:每腿 cover→cover+1,直到 maxCover。贪心按 Δlog(prob)/Δlog(count)。

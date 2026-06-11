@@ -1938,6 +1938,11 @@ export function buildRenxuan9(source) {
     ranked.map(({ prediction }) => ({
       probs: [prediction.probabilities?.home, prediction.probabilities?.draw, prediction.probabilities?.away],
       codes: ["3", "1", "0"],
+      // engine-core-spot-3(2026-06-11):"不当胆"护栏必须贯穿到最优票——此前 optimizeTicket
+      // 纯按预算贪心,把 picks 层已挡胆的世界杯低样本/弱联赛腿标回『胆』,同一 xlsx 两层矛盾。
+      // 护栏腿强制 minCover≥2(只挡胆位仍在票内,绝不弃赛),预算优化在约束内进行。
+      minCover: (isWeakLeague(prediction.fixture?.competition)
+        || isLowSampleWorldCup(prediction.fixture?.competition, fixtureKickoffDate(prediction.fixture))) ? 2 : 1,
     })),
     { budget: ticketBudget }
   );
