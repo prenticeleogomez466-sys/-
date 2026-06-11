@@ -24,6 +24,42 @@ export function findPrematureResults(fixtures, now = Date.now()) {
 }
 
 /**
+ * 第二不变量(2026-06-11 ledger-settlement-2 / store-hygiene-2):
+ * 同一场物理比赛(真实赛日|主队|客队)在跨业务日 store 文件里的全部已结算副本,
+ * 比分必须一致——互相矛盾 ⇒ 至少一份是假赛果/错配(06-10 事故同源残留:
+ * 摩洛哥1-1挪威被四份 4-0 假副本压垮 DC 拟合)。这类坏值因 kickoff 已过,
+ * findPrematureResults 永远抓不到;backfill 跳过已有 result 也不自愈,必须独立检测。
+ *
+ * @param {Array<{storeDate:string, fixture:object}>} entries 全 store 展平的(业务日,场次)对
+ * @returns {Array<{key:string, scores:string[], copies:Array<{storeDate,score,competition,source}>}>}
+ *   比分互斥的冲突组(比分集合 size>1);干净时返回 []。
+ */
+export function findCrossFileResultConflicts(entries) {
+  const groups = new Map();
+  for (const { storeDate, fixture: f } of Array.isArray(entries) ? entries : []) {
+    const home = Number(f?.result?.home);
+    const away = Number(f?.result?.away);
+    if (!Number.isFinite(home) || !Number.isFinite(away)) continue;
+    const matchDay = String(f.kickoff ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0]
+      ?? (String(f.date ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? "");
+    const key = `${matchDay}|${String(f.homeTeam ?? "").trim()}|${String(f.awayTeam ?? "").trim()}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({
+      storeDate: String(storeDate ?? ""),
+      score: `${home}-${away}`,
+      competition: f.competition ?? f.league ?? null,
+      source: f.source ?? null
+    });
+  }
+  const conflicts = [];
+  for (const [key, copies] of groups) {
+    const scores = [...new Set(copies.map((c) => c.score))];
+    if (scores.length > 1) conflicts.push({ key, scores, copies });
+  }
+  return conflicts;
+}
+
+/**
  * 枚举 fixture store 目录下全部"日期文件"(YYYY-MM-DD.json)的日期,升序。
  * 去毒/全量体检的扫描域必须用它,绝不能用"ledger 出现过的日期"——
  * ledger 某日 0 行时该日 store 文件就永远扫不到(T1 漏洞根因:2026-06-06.json
