@@ -39,23 +39,38 @@ async function fetchCity(v) {
 }
 const num = (x) => { const n = Number(x); return Number.isFinite(n) ? Math.round(n * 10) / 10 : null; };
 
+// 0611修:①每城最多3试(连发16城偶发限流,此前每跑必随机掉一城)②失败城保留上次真实预报
+//   (旧档是真数据只是旧,丢掉=场馆温度λ静默回退静态均温;如实标注staleFrom,绝不编造)
+const path = join(dir, "worldcup-weather.json");
+let prev = { byCity: {}, updatedAt: null };
+try { prev = JSON.parse(readFileSync(path, "utf8")); } catch { /* 首跑无旧档 */ }
+
 const byCity = {};
+const staleCities = {};
 let okCities = 0, totalDays = 0;
 for (const v of venues) {
-  const res = await fetchCity(v);
+  let res = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    res = await fetchCity(v).catch((e) => ({ city: v.city, error: e.message }));
+    if (res.days && Object.keys(res.days).length) break;
+    if (attempt < 3) await new Promise((s) => setTimeout(s, 1500 * attempt));
+  }
   if (res.days && Object.keys(res.days).length) {
     byCity[res.city] = res.days;
     okCities++; totalDays += Object.keys(res.days).length;
     const sample = Object.entries(res.days)[0];
     console.log(`${res.city.padEnd(22)} ${Object.keys(res.days).length}天 首日${sample[0]} 高温${sample[1].highTempC}℃${res.indoor ? " [室内恒温]" : ""}`);
+  } else if (prev.byCity?.[v.city]) {
+    byCity[v.city] = prev.byCity[v.city];
+    staleCities[v.city] = prev.updatedAt;
+    console.log(`${v.city.padEnd(22)} ⚠️ 3试均败(${res.error || "无数据"})→保留上次真实预报(${prev.updatedAt})`);
   } else {
-    console.log(`${res.city.padEnd(22)} ⚠️ ${res.error || "无数据"}`);
+    console.log(`${v.city.padEnd(22)} ❌ 3试均败且无旧档(${res.error || "无数据"})——该城预报缺,如实留空`);
   }
   await new Promise((s) => setTimeout(s, 300)); // 轻限速,Open-Meteo 免费
 }
 
-const out = { updatedAt: new Date().toISOString(), forecastDays: 16, byCity };
-const path = join(dir, "worldcup-weather.json");
+const out = { updatedAt: new Date().toISOString(), forecastDays: 16, byCity, ...(Object.keys(staleCities).length ? { staleCities } : {}) };
 writeFileSync(path, JSON.stringify(out, null, 2), "utf8");
-console.log(`\n✅ ${okCities}/16 城市,共 ${totalDays} 天 → ${path}`);
+console.log(`\n✅ 实时${okCities}/16 城市${Object.keys(staleCities).length ? `+保留旧档${Object.keys(staleCities).length}城(${Object.keys(staleCities).join(",")})` : ""},共 ${totalDays} 天 → ${path}`);
 console.log("用途:venueLambdaMultiplier 对预报窗内(~16天)的世界杯场次用真实最高温替换静态气候均温;窗外回退均温。");
