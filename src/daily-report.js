@@ -490,6 +490,11 @@ export function simpleHalfFullCell(prediction) {
     const pe = dist.find((d) => d.halfFull === hp.primary && ftOfHalfFull(d.halfFull) === ft1);
     if (pe) main.push(pe);
     for (const d of dist) { if (ftOfHalfFull(d.halfFull) === ft1 && d.halfFull !== hp.primary && main.length < 2) main.push(d); }
+    // 首选兜底(consistency-engine-4,2026-06-11):primary 不在展示分布且分布无主选向条目时,
+    //   旧逻辑 main=[]、all=[次选向top1] 非空即返回 → wld 锚首选被静默丢弃,半全场格方向≠胜负平
+    //   且无标注。与 simpleScoreCell 的 wldConsistent 兜底对齐:main 为空强制 hp.primary
+    //   (带 primaryProbability)排首再接次选,保证"primary 恒排首/首方向=胜负平主选"不变量。
+    if (!main.length) main.push({ halfFull: hp.primary, probability: hp.primaryProbability });
     const sec = ft2 ? dist.filter((d) => ftOfHalfFull(d.halfFull) === ft2).slice(0, 1) : [];
     const all = [...main, ...sec];
     if (all.length) return all.map(fmt).join(" / ");
@@ -522,8 +527,17 @@ export function simpleWldCell(prediction) {
     const L = { "3": "主胜", "1": "平局", "0": "客胜" };
     const S = { "3": "1", "1": "X", "0": "2" };
     const main = prediction.pick?.code;
-    const ordered = dc.codes.includes(main) ? [main, dc.codes.find((c) => c !== main)] : dc.codes;
-    dcPrefix = `双选${ordered.map((c) => L[c] ?? c).join("/")}(${ordered.map((c) => S[c] ?? "?").join("")}) `;
+    if (dc.codes.includes(main)) {
+      const ordered = [main, dc.codes.find((c) => c !== main)];
+      dcPrefix = `双选${ordered.map((c) => L[c] ?? c).join("/")}(${ordered.map((c) => S[c] ?? "?").join("")}) `;
+    } else {
+      // 双选与主推分裂闸(consistency-engine-3,2026-06-11):computeDoubleChance 按市场隐含舍最低项,
+      //   市场与模型 argmax 分歧时 dc.codes 可恰好排除 pick.code → 旧逻辑照打前缀,输出
+      //   "双选主胜/平局(1X) 主选 客胜"自相矛盾,且前缀方向词污染 dirWld 判向(取最左方向词)。
+      //   修:不打无解释的方向词前缀,显式标注分歧(只用 shortCode 1X/12/X2,不含胜平负方向词,
+      //   保主选段仍为格内第一个方向词);信息不静默吞掉、由用户自判(不替弃赛)。
+      dcPrefix = `⚠️市场双选(${dc.shortCode ?? dc.codes.map((c) => S[c] ?? "?").join("")})与模型主推分歧 `;
+    }
   }
   const p = prediction.probabilities ?? {};
   const arr = [["3", p.home], ["1", p.draw], ["0", p.away]]
