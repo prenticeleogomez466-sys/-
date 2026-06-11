@@ -21,6 +21,7 @@
     "sync:wc-winner": "node scripts/sync-wc-winner-odds.mjs",
     "sync:wc-elo": "node scripts/sync-wc-elo.mjs",
     "ingest:wc-odds": "node scripts/ingest-worldcup-match-odds.mjs",
+    "refresh:wc-odds-espn": "node scripts/refresh-wc-match-odds-espn.mjs",
     "sync:oddsapi-wc": "node scripts/fetch-oddsapi-movement.mjs",
     "china:sources": "node src/china-web-source-runner.js",
     "china:sources:sync": "node src/china-web-source-runner.js --sync-fixtures",

@@ -241,6 +241,8 @@ function Run-MarketRefresh {
   Invoke-Step "china official+500 fallback odds sync" "npm run china:sources -- --date=$Date --no-history" $true
   # The Odds API 世界杯快照:开盘write-once + 每刷攒异动(替代死掉的 odds.500.com/betexplorer/titan007)。
   Invoke-Step "snapshot World Cup odds movement (The Odds API)" "npm run sync:oddsapi-wc" $true
+  # ESPN core odds 续鲜世界杯逐场盘(免配额;The Odds API配额尽时的临场盘替代,防match-odds陈化)。
+  Invoke-Step "refresh WC match odds via ESPN core odds" "npm run refresh:wc-odds-espn" $true
 }
 
 Write-Log "Football automation started: Mode=$Mode Date=$Date AllowMissingOdds=$AllowMissingOdds"
