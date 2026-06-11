@@ -11,11 +11,13 @@ import { listFixtureDates, loadFixtures } from "../src/fixture-store.js";
 import { getExportDir } from "../src/paths.js";
 
 const byLeague = {};
+const datesByLeague = {};
 for (const d of listFixtureDates()) {
   for (const f of loadFixtures(d).fixtures) {
     if (!f.result || !Number.isFinite(f.result.home) || !Number.isFinite(f.result.away)) continue;
     const lg = f.competition || "?";
     (byLeague[lg] ??= []).push([f.result.home, f.result.away]);
+    (datesByLeague[lg] ??= []).push(d);
   }
 }
 
@@ -47,8 +49,24 @@ profiles.__global__ = profileOf(allArr);
 const SEED_PROFILES = {
   "国际赛": { n: 600, avgGoals: 2.48, homeGoalsAvg: 1.495, awayGoalsAvg: 0.985, homeAdvantage: 1.518, drawRate: 0.308, homeWinRate: 0.44, overRate: 0.44, source: "espn-friendly-6yr-seed" },
 };
+// 学习域隔离闸(2026-06-11 finding learning-isolation-1):seed 联赛的六年先验绝不允许被短窗偏样本顶掉。
+// 实锤:store 12 天窗口攒 124 条国际赛(drawRate 0.129/homeAdv 2.314)≥120 阈值即静默顶掉 seed(drawRate 0.308),
+// scenario drawDim(histDraw>=0.30)永不触发、deep-fusion 反向输出"平局率偏低/偏大球"→平局盲区缓解在国际赛反向。
+// 规则:store 拟合要顶掉 seed,须 n>=500 且样本时间跨度 >=365 天;否则保留 seed(附 storeN/storeSpanDays 供审计)。
+const SEED_OVERRIDE_MIN_N = 500;
+const SEED_OVERRIDE_MIN_SPAN_DAYS = 365;
+function spanDaysOf(dates) {
+  const ts = (dates ?? []).map((x) => Date.parse(x)).filter(Number.isFinite);
+  if (ts.length < 2) return 0;
+  return Math.round((Math.max(...ts) - Math.min(...ts)) / 86400000);
+}
 for (const [lg, seed] of Object.entries(SEED_PROFILES)) {
-  if (!profiles[lg]) profiles[lg] = seed; // 仅当 store 自身没拟出该联赛(n<120)才用 seed,store 有真数据优先
+  const storeN = byLeague[lg]?.length ?? 0;
+  const storeSpanDays = spanDaysOf(datesByLeague[lg]);
+  const storeTrustworthy = storeN >= SEED_OVERRIDE_MIN_N && storeSpanDays >= SEED_OVERRIDE_MIN_SPAN_DAYS;
+  if (!storeTrustworthy) {
+    profiles[lg] = { ...seed, storeN, storeSpanDays }; // 六年先验优先;store 有真数据但量/窗不够,只记账不顶掉
+  }
 }
 
 const path = join(getExportDir(), "league-profiles.json");
