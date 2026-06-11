@@ -1657,8 +1657,12 @@ export function buildFourteenPlan(predictions, date = null) {
     ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(stopSaleIso))
     : null;
   const saleStillOpen = !date || !stopSaleDate || stopSaleDate >= date;
+  // 2026-06-11 用户裁决(口径修改):停售日=最后购买日,当天仍可购即可发——
+  // 世界杯 26085 期停售 6/11 22:00、首腿 6/12,matchOnDate 不再对"停售日当天"一票否决。
+  // 收口保守:只放行"推荐日恰为停售日"这一种;停售日不可知(无停售证据)仍走 matchOnDate 闸。
+  const stopSaleDayRelease = Boolean(date && stopSaleDate && stopSaleDate === date);
   const fourteenFull = selected.length === 14;
-  const hasRealFourteen = fourteenFull && matchOnDate && saleStillOpen;
+  const hasRealFourteen = fourteenFull && saleStillOpen && (matchOnDate || stopSaleDayRelease);
   const periodLabel = (selected[0]?.fixture?.notes ?? "").match(/第\d+期/)?.[0] ?? "本期";
   const source = selected.length ? selected : predictions.slice(0, 14);
   const rules = fourteenSelectionRules();
@@ -1808,12 +1812,15 @@ export function buildFourteenPlan(predictions, date = null) {
 
   return {
     available: hasRealFourteen,
+    stopSaleDayRelease,
     note: hasRealFourteen
-      ? undefined
+      ? (stopSaleDayRelease && !matchOnDate
+          ? `${periodLabel}经"停售日=最后购买日"口径放行(2026-06-11 用户裁决):今日 ${date} 为停售日仍可购,腿开赛均在未来。`
+          : undefined)
       : fourteenFull && !saleStillOpen
         ? `14 场胜负彩${periodLabel}已于 ${stopSaleDate} 停售,${date} 不可购买,按规则今日不发 14 场。`
         : fourteenFull && !matchOnDate
-          ? `14 场胜负彩${periodLabel}比赛日不在 ${date}(本期赛在未来),按规则今日不发 14 场。`
+          ? `14 场胜负彩${periodLabel}比赛日不在 ${date}(本期赛在未来${stopSaleDate ? `,停售日 ${stopSaleDate} 当天将按"停售日=最后购买日"口径放行` : ""}),按规则今日不发 14 场。`
           : "今日无 14 场胜负彩(不足 14 场),按硬规则不发 14 场。",
     count: selections.length,
     singleLine: selections.map((item) => item.single).join(" "),

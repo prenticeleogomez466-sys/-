@@ -272,7 +272,7 @@ try {
       const matchOnDate = kos.includes(date);
       fourteenFacts.push(
         ["期次事实", `${periodLabel}·14/14腿已从 store(${fourteenStoreDate})映射到今日模型预测·停售(北京)${stopBj}·腿开赛${kos[0] ?? "?"}~${kos[kos.length - 1] ?? "?"}`],
-        ["闸明细", `恰14腿=✅ ｜ 停售未过(${date})=✅ ｜ matchOnDate(当日有腿开赛)=${matchOnDate ? "✅" : `⛔(所有腿开赛日均晚于业务日${date},闸防"把未来期混进今日单";本期停售${stopBj}=今日实际为最后购买日,如需放行属口径修改须用户裁决,本次按闸如实判定)`}`],
+        ["闸明细", `恰14腿=✅ ｜ 停售未过(${date})=✅ ｜ matchOnDate(当日有腿开赛)=${matchOnDate ? "✅" : (fourteen?.stopSaleDayRelease ? `⛔→✅停售日放行(2026-06-11用户裁决"停售日=最后购买日可发":今日为停售日${stopBj},腿开赛均在未来,买的就是本期)` : `⛔(所有腿开赛日均晚于业务日${date},且今日非停售日;停售日当天将按"停售日=最后购买日"口径放行)`)}`],
         ["胆护栏", "世界杯样本<20一律不当胆(isLowSampleWorldCup,2026-06-10审计rank11):本期14腿全为世界杯场→即便发也0胆只作多选,护栏在buildFourteenPlan内部生效"],
       );
     }
