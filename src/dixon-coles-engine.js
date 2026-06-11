@@ -24,6 +24,7 @@
 import { listFixtureDates, loadFixtures } from "./fixture-store.js";
 import { canonicalTeamName as canonicalTeamNameFromTable } from "./team-aliases.js";
 import { annotateRegressedGoals } from "./shot-based-xg.js";
+import { isSoftCompetition } from "./competition-soft-recalibration.js";
 
 const MAX_GOALS = 8;
 const OUTCOMES = ["home", "draw", "away"];
@@ -54,13 +55,34 @@ export function fitFromFixtureStore(opts = {}) {
   const allDates = listFixtureDates();
   const dates = (beforeDate ? allDates.filter((d) => d < beforeDate) : allDates).slice(0, maxDates);
   const rawMatches = [];
+  // 2026-06-11 ledger-settlement-1/2 根修(对抗证伪确认,世界杯首日方向颠倒事故):
+  //   ①学习域隔离 club-only 落到 DC 拟合层(0610 审计 rank12 裁决的延伸,口径复用
+  //     isSoftCompetition,不造第三套):国际赛/世界杯/友谊行绝不进俱乐部 DC 拟合。
+  //     否则国家队按 1~4 场薄样本被学成垃圾系数(伊拉克 1 场=西班牙级 attack 0.966、
+  //     挪威被假赛果压到 0.351),且 dcResult 非空会在 prediction-engine 短路掉正确的
+  //     国家队 Elo 先验 → 伊拉克 67% 胜挪威还标🟢建议下注。国家队场自动走
+  //     national-Elo / 市场推断 λ(两条都已回测背书),俱乐部路径零改动。
+  //   ②同场跨业务日副本去重:同一场物理比赛(真实赛日|主|客)在 14场公告期/在售期
+  //     的多个业务日文件各留一份已结算副本,旧式全量直灌=同场 2~4 倍计权(06-10 假赛果
+  //     事故里"摩洛哥4-0挪威"×4 份)。dates 为降序(最新业务日在前),首见即留 ⇒
+  //     保留最新副本(后到的 jc500 真值优先于公告页旧值)。
+  const seenMatchKeys = new Set();
+  let dedupedDuplicates = 0;
+  let excludedSoft = 0;
   for (const date of dates) {
     const { fixtures } = loadFixtures(date);
     for (const f of fixtures) {
       if (!f.result || !Number.isFinite(f.result.home) || !Number.isFinite(f.result.away)) continue;
+      if (isSoftCompetition(f.competition ?? f.league)) { excludedSoft++; continue; }
+      const home = canonicalName(f.homeTeam);
+      const away = canonicalName(f.awayTeam);
+      const matchDay = String(f.kickoff ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? f.date;
+      const matchKey = `${matchDay}|${home}|${away}`;
+      if (seenMatchKeys.has(matchKey)) { dedupedDuplicates++; continue; }
+      seenMatchKeys.add(matchKey);
       rawMatches.push({
-        home: canonicalName(f.homeTeam),
-        away: canonicalName(f.awayTeam),
+        home,
+        away,
         homeGoals: f.result.home,
         awayGoals: f.result.away,
         date: f.date,
@@ -79,7 +101,7 @@ export function fitFromFixtureStore(opts = {}) {
   //   直接 usable:false → predictFromFitted 返回 null → 该场无 DC 贡献;若同时无真实赔率,
   //   prediction-engine 标 unpredictable(不推荐)。要么真实强烈,要么不给,绝不凑数。
   if (matches.length < minMatches) {
-    return { usable: false, coldStart: false, reason: `样本不足(${matches.length}/${minMatches}),不兜底凑数`, teams: {}, matches: matches.length, fittedAt: new Date().toISOString() };
+    return { usable: false, coldStart: false, reason: `样本不足(${matches.length}/${minMatches}),不兜底凑数`, teams: {}, matches: matches.length, excludedSoft, dedupedDuplicates, fittedAt: new Date().toISOString() };
   }
   const fitOpts = {
     iterations: opts.iterations ?? 80,
@@ -96,12 +118,16 @@ export function fitFromFixtureStore(opts = {}) {
   if (opts.perLeague === true) {
     const pl = fitPerLeague(matches, fitOpts);
     pl.fittedAt = new Date().toISOString();
+    pl.excludedSoft = excludedSoft;
+    pl.dedupedDuplicates = dedupedDuplicates;
     return pl;
   }
   const fitted = fit(matches, { ...fitOpts, decayHalfLife: fitOpts.decayDays });
   fitted.usable = true;
   fitted.coldStart = false;
   fitted.matches = matches.length;
+  fitted.excludedSoft = excludedSoft;
+  fitted.dedupedDuplicates = dedupedDuplicates;
   fitted.fittedAt = new Date().toISOString();
   return fitted;
 }
