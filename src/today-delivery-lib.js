@@ -186,6 +186,102 @@ export function threeColumnCoherence(rows) {
 }
 
 // ── ④ 数据审计工作表(场×维度矩阵 + 内容审计区) ──
+// ── 四玩法独立真实裁决(2026-06-11 用户裁决,取代"四列同向"显示锁):
+//    胜负平=模型综合;让球=模型vs市场过盘真实裁决(0610口径);比分/半全场=各自500盘口de-vig真实热门(✅市场)主推,
+//    模型方向一致视图退居次行。方向可不同向但每个不同向必须带依据;绝不为"看起来独特"人造分歧——
+//    盘口与胜负平真同向时如实标"同向共振"。内部真钱管线(validatePredictionConsistency 核 wldConsistent)零改动。 ──
+const SCORE_DIR = (score) => { const m = String(score).match(/^(\d+)\s*-\s*(\d+)$/); if (!m) return null; const a = +m[1], b = +m[2]; return a > b ? "3" : a === b ? "1" : "0"; };
+export const DIR_LABEL = { "3": "主胜", "1": "平局", "0": "客胜" };
+const FT_DIR = (hf) => { const ft = String(hf ?? "").split("-")[1]?.trim(); return ft === "主胜" ? "3" : ft === "平局" ? "1" : ft === "客胜" ? "0" : null; };
+
+export function marketScoreView(p) {
+  const sp = p.scorePicks ?? {};
+  const md = Array.isArray(sp.marketDistribution) && sp.marketDistribution.length ? sp.marketDistribution : null;
+  const wld = p.pick?.code != null ? String(p.pick.code) : null;
+  if (!md) return { fromMarket: false, dir: null, sameAsWld: null, cell: null, basis: "比分盘未开售/模板盘弃用→退模型DC矩阵🔶" };
+  const top = md.slice(0, 3);
+  const dir = SCORE_DIR(top[0].score);
+  const sameAsWld = wld != null && dir != null ? dir === wld : null;
+  const fmt = (d) => `${d.score}(${Math.round(d.probability * 100)}%)`;
+  const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500比分盘de-vig` +
+    (sameAsWld === false ? ` ⚠️与胜负平不同向:比分盘真实热门=${DIR_LABEL[dir]}方向(比分玩法按盘口热门下,胜负平玩法按方向下,两问不同)` : sameAsWld ? " ·与胜负平同向共振" : "");
+  return { fromMarket: true, dir, sameAsWld, cell, basis: "500比分盘de-vig真实众数", top };
+}
+
+export function marketHalfFullView(p) {
+  const hp = p.halfFullPicks ?? {};
+  const md = Array.isArray(hp.marketDistribution) && hp.marketDistribution.length ? hp.marketDistribution : null;
+  const wld = p.pick?.code != null ? String(p.pick.code) : null;
+  if (!md) return { fromMarket: false, dir: null, sameAsWld: null, cell: null, basis: "半全场盘未开售/模板盘弃用→退模型半场联合矩阵🔶" };
+  const top = md.slice(0, 3);
+  const dir = FT_DIR(top[0].halfFull);
+  const sameAsWld = wld != null && dir != null ? dir === wld : null;
+  const fmt = (d) => `${d.halfFull}(${Math.round(d.probability * 100)}%)`;
+  const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500半全场盘de-vig` +
+    (sameAsWld === false ? ` ⚠️与胜负平不同向:半全场盘真实热门终场=${DIR_LABEL[dir] ?? "?"}(按盘口热门下,非方向复制)` : sameAsWld ? " ·与胜负平同向共振" : "");
+  return { fromMarket: true, dir, sameAsWld, cell, basis: "500半全场盘de-vig真实众数", top };
+}
+
+// 信号面板:只用本次实抓证据拼装(欧赔初→现、亚盘开→现+水位、竞彩让球盘de-vig、大小球),阵容未出如实标⚠️。
+//   共振/背离判定措辞诚实:欧赔答"谁赢"、亚盘/让球盘答"过不过盘",两问不同向≠矛盾,标"赢球与过盘分离"。
+export function buildSignalPanel({ euroCur, euroIni, asian, hcDist, ouLine, lineupKnown = false }) {
+  const parts = []; const dirs = {};
+  if (euroCur && [euroCur.home, euroCur.draw, euroCur.away].every((x) => Number.isFinite(Number(x)))) {
+    const cur = { "3": Number(euroCur.home), "1": Number(euroCur.draw), "0": Number(euroCur.away) };
+    const fav = Object.entries(cur).sort((a, b) => a[1] - b[1])[0][0];
+    dirs.euro = fav;
+    let move = "";
+    if (euroIni && Number.isFinite(Number(euroIni.home))) {
+      const ini = { "3": Number(euroIni.home), "1": Number(euroIni.draw), "0": Number(euroIni.away) };
+      const d = cur[fav] - ini[fav];
+      move = Math.abs(d) >= 0.01 ? (d < 0 ? `·热门${DIR_LABEL[fav]}水位压入(${ini[fav]}→${cur[fav]},资金进)` : `·热门${DIR_LABEL[fav]}水位走高(${ini[fav]}→${cur[fav]},资金出)`) : "·初现持平";
+    }
+    parts.push(`欧赔:热门=${DIR_LABEL[fav]}${move}`);
+  } else parts.push("欧赔:⚠️未开售");
+  if (asian && asian.line != null) {
+    const lean = Number(asian.homeOdds) < Number(asian.awayOdds) ? "主" : "客";
+    const moved = asian.openLine != null && String(asian.openLine) !== String(asian.line);
+    dirs.asianLean = lean === "主" ? "3" : "0";
+    parts.push(`亚盘:让${asian.line}${moved ? `(开${asian.openLine}→现${asian.line}·盘口异动)` : "(开盘未动)"}·水位偏${lean}(主${asian.homeOdds}/客${asian.awayOdds})`);
+  } else parts.push("亚盘:⚠️未取到");
+  if (hcDist && hcDist.home != null) {
+    const lean = hcDist.home > hcDist.away ? "3" : "0";
+    dirs.hcLean = lean;
+    parts.push(`竞彩让球盘:过盘资金偏${DIR_LABEL[lean] === "主胜" ? "主" : "客"}(主过盘${Math.round(hcDist.home * 100)}%/客过盘${Math.round(hcDist.away * 100)}%)`);
+  } else parts.push("竞彩让球盘:⚠️缺");
+  if (ouLine) parts.push(ouLine);
+  let verdict = "";
+  if (dirs.euro && dirs.hcLean) {
+    if (dirs.euro === dirs.hcLean && (!dirs.asianLean || dirs.asianLean === dirs.euro)) {
+      verdict = `🟣三盘共振${DIR_LABEL[dirs.euro]}(欧赔/亚盘/让球盘同侧)`;
+    } else {
+      // 精确点名分歧腿(不笼统):逐盘列方向,谁背离一眼可见
+      const side = (d) => (d === "3" ? "主" : d === "0" ? "客" : "平");
+      const segs = [`欧赔热门=${side(dirs.euro)}`];
+      if (dirs.asianLean) segs.push(`亚盘水位偏${side(dirs.asianLean)}`);
+      segs.push(`让球盘资金偏${side(dirs.hcLean)}`);
+      verdict = `🟠盘口信号分歧:${segs.join(" / ")}——欧赔答"谁赢"、亚盘/让球盘答"过不过盘",分歧=赢球难赢盘信号,玩法间方向不同有据`;
+    }
+  }
+  parts.push(lineupKnown ? "阵容:✅已出(已按首发重算)" : "阵容:⚠️未公布(开赛前~1h LineupWatch自动按首发重分析推送)");
+  if (verdict) parts.push(verdict);
+  return { text: parts.join(" ‖ "), dirs, verdict };
+}
+
+// 方向矩阵审计:四玩法方向逐场列出;任何与胜负平不同向的格必须带依据(basis),无依据=FAIL(拒交付)。
+export function directionMatrixAudit(entries) {
+  const lines = []; const errors = [];
+  for (const e of entries) {
+    const cells = [];
+    for (const m of e.markets) {
+      cells.push(`${m.name}=${m.dirLabel ?? "—"}${m.sameAsWld === false ? `(不同向·依据:${m.basis || "❌缺依据"})` : ""}`);
+      if (m.sameAsWld === false && !m.basis) errors.push(`${e.match}:${m.name}与胜负平不同向但无依据`);
+    }
+    lines.push(`${e.match}:胜负平=${e.wldLabel ?? "—"} ｜ ${cells.join(" ｜ ")}`);
+  }
+  return { ok: errors.length === 0, lines, errors };
+}
+
 export const AUDIT_DIMENSIONS = ["欧赔", "让球", "比分", "半全场", "大小球", "亚盘DK", "亚盘titan007", "欧赔参考(外盘)", "近5", "H2H", "国际赛画像", "世界杯先验"];
 export function auditCell(tag, value, src, t) {
   return `${tag} ${value}｜源:${src}｜抓取:${t ?? "时间未记录"}`;
@@ -272,7 +368,8 @@ export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事)",
   "🌍世界杯模型·Elo先验三概率(洲际校正)", "🌍世界杯模型·场馆λ乘子", "🏆世界杯模型·出线/夺冠%",
   "让球方向🔶(模型真实裁决·可与胜平负不同向)",
   "竞彩让球(模型过盘vs市场)", "竞彩让球赔率✅", "博彩亚盘✅(DK+titan007双源)",
-  "比分🔶", "比分赔率✅", "半全场🔶", "半全场赔率✅", "大小球✅", "进球分布✅",
+  "信号面板✅(欧赔异动·亚盘水位·让球盘资金·共振/背离·阵容)",
+  "比分(盘口✅真实热门主推+模型🔶次行)", "比分赔率✅", "半全场(盘口✅真实热门主推+模型🔶次行)", "半全场赔率✅", "大小球✅", "进球分布✅",
   "主队近5✅", "客队近5✅", "H2H(本地49k历史库)", "攻防画像", "信心档", "串关安全度", "🔴对抗证伪(三视角·只标注不弃赛)"];
 
 export function buildXlsxSheets({ date, rows, banner, advDataPresent }) {
@@ -282,7 +379,7 @@ export function buildXlsxSheets({ date, rows, banner, advDataPresent }) {
     r.wld, r.euro,
     r.wcElo ?? "—", r.wcLambda ?? "—", r.wcTourney ?? (r.wcLine || "—"),
     r.hv?.text ?? "⚠️让球真实裁决缺",
-    r.hcView, r.hc, r.asian, `${r.score}〔${r.scoreSrc}〕`, r.scoreMkt, `${r.halffull}〔${r.hfSrc}〕`, r.hfMkt, r.ouReal, r.dist,
+    r.hcView, r.hc, r.asian, r.signals ?? "⚠️未拼装", `${r.score}〔${r.scoreSrc}〕`, r.scoreMkt, `${r.halffull}〔${r.hfSrc}〕`, r.hfMkt, r.ouReal, r.dist,
     `${r.homeRec} ${r.homeLast5}`, `${r.awayRec} ${r.awayLast5}`, r.h2h, r.profile, `${r.tier}(${Math.round(r.conf)})`,
     r.parlay?.text ?? "⚠️未评", advCellText(r, advDataPresent)]);
   return [{ name: "竞彩完整", rows: [[`⚡ 神选 · 竞彩完整覆盖 · ${date}`], [banner], XLSX_HEADERS, ...xrows] }];
@@ -309,8 +406,9 @@ export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, 
     (r.hv ? `<div class="drow"><b>让球真实裁决</b>${br(r.hv.text)}</div>` : "") +
     `<div class="drow"><b>让球${esc(r.hcP.line)}</b>模型 ${esc(r.hcP.model)}<br><span class="ind">市场 ${esc(r.hcP.market)}${r.hcP.diverge ? ` <span class="w2">⚠️以市场为准</span>` : ""}</span></div>` +
     `<div class="drow"><b>让球赔率</b>${esc(r.hc)}<br><b>博彩亚盘</b>${esc(r.asian)}</div>` +
-    `<div class="drow"><b>比分</b>${esc(r.score)}<span class="g"> · 赔率 ${esc(r.scoreMkt)}</span></div>` +
-    `<div class="drow"><b>半全场</b>${esc(r.halffull)}<span class="g"> · 赔率 ${esc(r.hfMkt)}</span></div>` +
+    (r.signals ? `<div class="drow"><b>信号面板</b>${br(r.signals)}</div>` : "") +
+    `<div class="drow"><b>比分</b>${br(r.score)}<span class="g"> · 赔率 ${esc(r.scoreMkt)}</span></div>` +
+    `<div class="drow"><b>半全场</b>${br(r.halffull)}<span class="g"> · 赔率 ${esc(r.hfMkt)}</span></div>` +
     `<div class="drow"><b>大小球</b>${esc(r.ouReal)}<span class="g"> · 进球分布 ${esc(r.dist)}</span></div>` +
     `<div class="drow"><b>近5</b>${esc(r.homeRec)} <span class="g">${esc(r.homeLast5)}</span><br><span class="ind">${esc(r.awayRec)} <span class="g">${esc(r.awayLast5)}</span></span></div>` +
     `<div class="drow"><b>H2H</b>${esc(r.h2h)}</div>` +

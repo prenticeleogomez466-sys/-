@@ -18,6 +18,8 @@ import {
   wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
   renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
   auditCell, buildAuditSheet, buildFourteenSheetRows,
+  // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
+  marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
 } from "../src/today-delivery-lib.js";
 import { writeFileSync, copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import { worldCupContextLine } from "../src/worldcup-context.js";
@@ -190,13 +192,35 @@ const rows = games.map((p, i) => {
     hw: p.handicapPick?.handicapWld ?? null, marketDist: hcP.mkDist,
   });
   const adv = advFor(p);
+  // ── 四玩法独立真实裁决(2026-06-11 用户裁决):比分/半全场主推=各自500盘口de-vig真实热门(✅市场,可与胜负平不同向),
+  //    模型方向一致视图退居次行;无盘口场如实退模型🔶。绝不人造分歧:盘口真同向时标"同向共振"。
+  const msv = marketScoreView(p);
+  const mhv = marketHalfFullView(p);
+  const scoreCell = msv.fromMarket
+    ? `${msv.cell}\n模型方向一致🔶: ${simpleScoreCell(p)}`
+    : `${simpleScoreCell(p)}〔🔶模型DC矩阵:${msv.basis}〕`;
+  const hfCell = mhv.fromMarket
+    ? `${mhv.cell}\n模型方向锚🔶: ${simpleHalfFullCell(p)}`
+    : `${simpleHalfFullCell(p)}〔🔶模型半场联合:${mhv.basis}〕`;
+  // 信号面板:欧赔初→现异动 + DK亚盘开→现/水位 + 竞彩让球盘资金 + 共振/背离裁决(全部本次实抓,缺标缺)
+  const t7live = c?.asianHandicap?.titan007?.live ?? null;
+  const panel = buildSignalPanel({
+    euroCur: s.europeanOdds?.current ?? null, euroIni: s.europeanOdds?.initial ?? null,
+    // 亚盘优先 DK(line/openLine 直读);缺则用 titan007 即时盘(水位=homeWater/awayWater,line>0=主让,语义同向可比水)
+    asian: c?.espnOdds?.asian ?? (t7live ? {
+      line: t7live.line, openLine: c?.asianHandicap?.titan007?.init?.line ?? null,
+      homeOdds: t7live.homeWater, awayOdds: t7live.awayWater,
+    } : null),
+    hcDist: hcP.mkDist, ouLine: null, lineupKnown: false,
+  });
   return {
     idx: i + 1, ko: ko(p), comp: compTag(p),
     match: `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
     // 模型方向概率(🔶,由500真盘de-vig+DC推得)
     wld: simpleWldCell(p), handicap: simpleHandicapCell(p), hcView: hcViewStr(p, s), hcP,
-    score: simpleScoreCell(p), halffull: simpleHalfFullCell(p),
-    scoreSrc: scoreMkt ? "✅500真盘" : "🔶DC", hfSrc: hfMkt ? "✅500真盘" : "🔶DC",
+    score: scoreCell, halffull: hfCell,
+    msv, mhv, signals: panel.text, signalDirs: panel.dirs,
+    scoreSrc: msv.fromMarket ? "✅500盘口主推" : "🔶DC", hfSrc: mhv.fromMarket ? "✅500盘口主推" : "🔶DC",
     // 真实赔率(✅500实测 + ESPN/DK与titan007双源亚盘 + 外盘欧赔参考;coverage 缺 → 诚实标缺不编)
     euro: (s.europeanOdds?.current || cov) ? euroStr(s, c) : COV_MISS,
     asian: cov ? (c?.asianHandicap ? renderAsianDualCell(c.asianHandicap) : asianStr(c?.espnOdds)) : COV_MISS,
@@ -302,9 +326,24 @@ const counts = buildOddsFillCounts(rows);
 const degradeNote = buildDegradeNote(counts, !cov);
 const covNote = cov ? "近5场/H2H/攻防=ESPN真实战绩+本地49k历史库H2H" : `近5场/H2H/攻防=⚠️未补全(coverage缺,先跑 fetch-match-coverage)`;
 // ── 2026-06-11 新口径段:三列同向自检(让球列放行真实裁决)+ 不同向场清单 + 串关排序说明 + 14场闸裁决 ──
-const coh = threeColumnCoherence(rows);
 const hvDiverge = rows.filter((r) => r.hv?.sameDir === false);
-const cohNote = `让球新口径(2026-06-11用户裁决):让球方向=模型真实裁决可与胜平负不同向${hvDiverge.length ? `,本次${hvDiverge.length}场不同向已逐场注逻辑(${hvDiverge.map((r) => r.match.split(" vs ")[0]).join("/")})` : ",本次全部同向"};胜负平/比分/半全场三列仍同向(自检${coh.checked}场${coh.ok ? "全过" : `⚠️违例:${coh.violations.join(";")}`}${coh.skipped ? `,${coh.skipped}场未开售跳过` : ""})。`;
+// ── 四玩法方向矩阵审计(2026-06-11 用户裁决,取代"三列同向"硬约束):
+//    每个与胜负平不同向的玩法格必须带依据(来自哪个盘/什么逻辑),无依据=直接 throw 拒交付;
+//    同向≠模板复制——同向场=盘口与方向真实共振,不同向场=盘口真实热门所在,两者都可追溯。 ──
+const dirMatrix = directionMatrixAudit(rows.map((r) => ({
+  match: r.match,
+  wldLabel: (String(r.wld).match(/主胜|平局|客胜/) || ["—"])[0],
+  markets: [
+    { name: "让球", dirLabel: r.hv?.verdict ?? "—", sameAsWld: r.hv?.sameDir, basis: r.hv?.note ?? "模型比分分布真实裁决(0610口径)" },
+    { name: "比分", dirLabel: r.msv?.dir ? DIR_LABEL[r.msv.dir] : "—", sameAsWld: r.msv?.sameAsWld, basis: r.msv?.basis },
+    { name: "半全场", dirLabel: r.mhv?.dir ? DIR_LABEL[r.mhv.dir] : "—", sameAsWld: r.mhv?.sameAsWld, basis: r.mhv?.basis },
+  ],
+})));
+if (!dirMatrix.ok) throw new Error(`方向矩阵审计FAIL(存在不同向但无依据的玩法格,拒绝交付):${dirMatrix.errors.join(" ; ")}`);
+const scoreDiv = rows.filter((r) => r.msv?.sameAsWld === false).length;
+const hfDiv = rows.filter((r) => r.mhv?.sameAsWld === false).length;
+const resonate = rows.filter((r) => r.msv?.sameAsWld === true && r.mhv?.sameAsWld === true && r.hv?.sameDir !== false).length;
+const cohNote = `四玩法独立真实裁决(2026-06-11用户裁决):胜负平=模型综合;让球=模型vs市场过盘裁决(${hvDiverge.length}场与胜负平不同向,逐场注逻辑);比分主推=500比分盘de-vig真实热门(${scoreDiv}场与胜负平不同向);半全场主推=500半全场盘de-vig真实热门(${hfDiv}场不同向);${resonate}场四玩法盘口真实共振同向。方向矩阵逐场审计通过(不同向均带依据,绝无模板复制、绝无人造分歧)。`;
 const parlayCount = { g: rows.filter((r) => r.parlay?.grade === "🟢").length, y: rows.filter((r) => r.parlay?.grade === "🟡").length, b: rows.filter((r) => r.parlay?.grade === "⛔").length };
 const parlayNote = `串关安全度:🟢${parlayCount.g}/🟡${parlayCount.y}/⛔${parlayCount.b}。${PARLAY_ORDER_NOTE}`;
 const fourteenNote = fourteen?.available
@@ -318,7 +357,8 @@ const auditFoot = buildAuditFoot({ rows, advData });
 const advAudited = rows.filter((r) => r.adv).length;
 const dcRows = rows.filter((r) => r.dc);
 const contentAudit = [
-  ["三列同向自检(胜负平/比分/半全场)", coh.ok ? `✅ ${coh.checked}场核验全同向${coh.skipped ? `(另${coh.skipped}场未开售无方向,跳过)` : ""}` : `⚠️违例:${coh.violations.join(" ; ")}`, "让球列按2026-06-11新口径放行真实裁决,不再纳入同向硬约束"],
+  ["四玩法方向矩阵审计(2026-06-11新口径,取代三列同向)", dirMatrix.ok ? `✅ ${rows.length}场逐场过审:比分不同向${scoreDiv}场/半全场不同向${hfDiv}场/让球不同向${hvDiverge.length}场,全部带依据;${resonate}场盘口真实共振同向` : `⛔FAIL:${dirMatrix.errors.join(";")}`, "不同向=该玩法盘口真实热门所在;同向=盘口共振,非模板复制"],
+  ...dirMatrix.lines.map((l) => ["方向矩阵", l]),
   ["让球真实裁决·与胜平负不同向场", hvDiverge.length ? hvDiverge.map((r) => `${r.match}:${r.hv.verdict}(${r.hv.note})`).join(" ║ ") : "无(本次让球裁决全部与胜平负同向)"],
   ["双选触发场(复盘'接住率'口径=任一兑现)", dcRows.length ? dcRows.map((r) => `${r.match} ${r.dc.pick}(${r.dc.shortCode})`).join(" ║ ") : "无"],
   ["证伪标签汇总", `🔴证伪${advKilled.length}场 / 已审计${advAudited}场 / 未审计${rows.length - advAudited}场(未审计≠通过,串关列按"证伪未覆盖"降🟡)`],
@@ -392,8 +432,9 @@ for (const r of rows) {
   console.log(`     竞彩让球🔶: ${r.hcView}`);
   console.log(`     竞彩让球赔率✅: ${r.hc}`);
   console.log(`     博彩亚盘✅: ${String(r.asian).replace(/\n/g, " ")}`);
-  console.log(`  ③ 比分🔶: ${r.score}〔${r.scoreSrc}〕| 赔率✅: ${r.scoreMkt}`);
-  console.log(`     半全场🔶: ${r.halffull}〔${r.hfSrc}〕| 赔率✅: ${r.hfMkt}`);
+  console.log(`     📡 信号面板: ${String(r.signals ?? "⚠️未拼装").replace(/\n/g, " ")}`);
+  console.log(`  ③ 比分〔${r.scoreSrc}〕: ${String(r.score).replace(/\n/g, " ‖ ")} | 赔率✅: ${r.scoreMkt}`);
+  console.log(`     半全场〔${r.hfSrc}〕: ${String(r.halffull).replace(/\n/g, " ‖ ")} | 赔率✅: ${r.hfMkt}`);
   console.log(`     大小球✅: ${r.ouReal} | 进球分布: ${r.dist}`);
   console.log(`  ④ 近5✅: ${r.homeRec} 〔${r.homeLast5}〕 ‖ ${r.awayRec} 〔${r.awayLast5}〕`);
   console.log(`     H2H: ${r.h2h} | 攻防: ${r.profile}`);

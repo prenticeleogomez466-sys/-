@@ -192,6 +192,19 @@ function rec(g5) {
 const dir = "D:/football-model-data/coverage";
 if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 const outPath = join(dir, `${DATE}.json`);
+// 重抓保留富集字段(2026-06-11 踩坑根修:重抓曾把 titan007 亚盘双源 asianHandicap 整批冲掉,亚盘20/24→4/24)——
+// 本脚本不产这些字段,旧文件里有而新抓没有 → 按对阵保留;绝不覆盖本次新抓出的同名字段。
+if (existsSync(outPath)) {
+  try {
+    const prev = JSON.parse(readFileSync(outPath, "utf8"));
+    const prevBy = new Map((prev.matches ?? []).map((m) => [`${m.home?.zh}|${m.away?.zh}`, m]));
+    for (const m of out.matches) {
+      const old = prevBy.get(`${m.home?.zh}|${m.away?.zh}`);
+      if (!old) continue;
+      for (const k of ["asianHandicap", "euroRef"]) if (old[k] != null && m[k] == null) m[k] = old[k];
+    }
+  } catch { /* 旧文件坏=不保留,照常全新写 */ }
+}
 writeFileSync(outPath, JSON.stringify(out, null, 2), "utf8");
 console.error(`\n写入 ${outPath}`);
 // 控制台摘要

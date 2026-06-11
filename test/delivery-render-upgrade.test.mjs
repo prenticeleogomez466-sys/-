@@ -227,12 +227,15 @@ test("buildFourteenSheetRows:闸不过→⛔+依据原话+期次事实,绝不渲
 
 // ── 列头归属(用户裁决①:世界杯模型列与市场锚列并排,归属一眼分清) ──
 test("XLSX_HEADERS:模型归属注明+新列齐全+末列对抗证伪", () => {
-  assert.equal(XLSX_HEADERS.length, 25);
+  // 26列(2026-06-11 四玩法独立裁决升级:亚盘列后+信号面板列;比分/半全场列改"盘口✅真实热门主推+模型🔶次行")
+  assert.equal(XLSX_HEADERS.length, 26);
   assert.match(XLSX_HEADERS[3], /足球大模型/);
   assert.match(XLSX_HEADERS[4], /市场锚/);
   assert.equal(XLSX_HEADERS.filter((h) => h.includes("世界杯模型")).length, 3);
   assert.match(XLSX_HEADERS[8], /真实裁决.*可与胜平负不同向/);
   assert.match(XLSX_HEADERS[11], /DK\+titan007双源/);
-  assert.match(XLSX_HEADERS[23], /串关安全度/);
-  assert.match(XLSX_HEADERS[24], /对抗证伪/);
+  assert.match(XLSX_HEADERS[12], /信号面板/);
+  assert.match(XLSX_HEADERS[13], /盘口✅真实热门主推\+模型🔶/);
+  assert.match(XLSX_HEADERS[24], /串关安全度/);
+  assert.match(XLSX_HEADERS[25], /对抗证伪/);
 });
