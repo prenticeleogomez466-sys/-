@@ -152,6 +152,10 @@ function Run-Daily {
   Invoke-Step "refresh World Cup schedule/match-dates" "npm run sync:wc-schedule" $true
   #   实时夺冠盘(Betfair outright)刷新 team-priors.title_odds → 超算 blend 原生吃最锐市场信号。
   Invoke-Step "refresh World Cup winner outright odds" "npm run sync:wc-winner" $true
+  #   世界杯48队Elo保鲜(fetch-wc-sources-2,2026-06-11):eloratings.net World.tsv 直拉刷新 team-priors.elo。
+  #   开赛后每天有比赛,不刷=先验/超算逐日吃陈旧Elo且无任何告警。脚本自带 48/48 全对上才写盘 + 漂移>80
+  #   哨兵,绝不兜底写坏;只动 elo/elo_date,不碰 squad/赔率/冻结基线。AllowFailure:源挂不阻塞主线。
+  Invoke-Step "refresh World Cup team Elo (eloratings.net)" "npm run sync:wc-elo" $true
   #   逐场临场 1X2(竞彩单场世界杯)→ match-odds.json → 超算单场市场融合(2026-06-07 体检补:此前无写入方、
   #   融合层永远休眠跑纯 Elo)。只写真实欧赔、14场胜负彩无欧赔自动跳过、无则不写(诚实不臆造)。AllowFailure。
   Invoke-Step "ingest World Cup per-match 1X2 odds" "npm run ingest:wc-odds" $true
