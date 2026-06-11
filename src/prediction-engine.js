@@ -1843,6 +1843,10 @@ export function buildFourteenPlan(predictions, date = null) {
       type: codes.length === 1 ? "胆" : codes.length === 2 ? "双选" : "全选",
       competitionType: competitionCategory(prediction.fixture?.competition),
       probabilities: { home: pctOrEmpty(homeProb), draw: pctOrEmpty(drawProb), away: pctOrEmpty(awayProb) },
+      // 原始数值概率(2026-06-11 爆冷情景推演用:展示层据此做全票DP/冷向后果,不再反解百分比文本)
+      rawProbabilities: { home: round(homeProb), draw: round(drawProb), away: round(awayProb) },
+      singleCode,
+      compoundCodes: codes,
       upsetRisk,
       risk: prediction.risk,
       confidence: prediction.confidence,

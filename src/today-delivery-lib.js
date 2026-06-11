@@ -304,10 +304,57 @@ export function buildFourteenSheetRows({ date, fourteen, periodFacts = [] }) {
       ...periodFacts.map((x) => (Array.isArray(x) ? x : [x])),
     ];
   }
-  const header = ["腿", "对阵", "单选", "复选", "类型", "主/平/客%", "爆冷", "信心", "理由"];
+  // ── 爆冷情景推演(2026-06-11 用户:"考虑的内容重新覆盖到表格里"——哪腿会爆/根据什么/爆了什么后果/全票数字)──
+  // 🔶推断:由本表逐腿 rawProbabilities(引擎真实概率)派生,腿间独立假设如实标注;旧产物无 raw 字段则整节如实跳过。
+  const sels = (fourteen.selections ?? []).filter((s) => s.rawProbabilities && Number.isFinite(s.rawProbabilities.home));
+  const CODE_LABEL = { "3": "主胜", "1": "平局", "0": "客胜" };
+  const probOfCode = (s, c) => (c === "3" ? s.rawProbabilities.home : c === "1" ? s.rawProbabilities.draw : s.rawProbabilities.away);
+  for (const s of sels) {
+    const coldCode = s.rawProbabilities.home <= s.rawProbabilities.away ? "3" : "0";
+    s._cold = { code: coldCode, label: CODE_LABEL[coldCode], p: probOfCode(s, coldCode) };
+    s._coldCovered = (s.compoundCodes ?? []).includes(coldCode);
+    s._coldNote = s._coldCovered ? `复选护住(${s.compound})` : `复选未含${s._cold.label}——该腿爆冷整票死`;
+  }
+  const header = ["腿", "对阵", "单选", "复选", "类型", "主/平/客%", "爆冷", "若爆冷后果", "信心", "理由"];
   const legs = (fourteen.selections ?? []).map((s) => [String(s.index), s.match, s.single, s.compound, s.type,
-    `${s.probabilities?.home ?? ""}/${s.probabilities?.draw ?? ""}/${s.probabilities?.away ?? ""}`, s.upsetRisk ?? "", String(s.confidence ?? ""), s.reason ?? ""]);
+    `${s.probabilities?.home ?? ""}/${s.probabilities?.draw ?? ""}/${s.probabilities?.away ?? ""}`,
+    s._cold ? `${s.upsetRisk ?? ""}(冷向${s._cold.label}${Math.round(s._cold.p * 100)}%)` : (s.upsetRisk ?? ""),
+    s._coldNote ?? "—", String(s.confidence ?? ""), s.reason ?? ""]);
   const r9 = fourteen.renxuan9;
+  const scenarioRows = [];
+  if (sels.length >= 2) {
+    const hitDist = (ps) => { let d = [1]; for (const p of ps) { const n = new Array(d.length + 1).fill(0); for (let k = 0; k < d.length; k++) { n[k] += d[k] * (1 - p); n[k + 1] += d[k] * p; } d = n; } return d; };
+    const singlePs = sels.map((s) => probOfCode(s, s.singleCode));
+    const dist = hitDist(singlePs);
+    const nL = sels.length;
+    const expHits = singlePs.reduce((a, b) => a + b, 0);
+    const coverPs = sels.map((s) => Math.min(1, (s.compoundCodes ?? [s.singleCode]).reduce((a, c) => a + probOfCode(s, c), 0)));
+    const comboAll = coverPs.reduce((a, b) => a * b, 1);
+    const tickets = sels.reduce((a, s) => a * Math.max(1, (s.compoundCodes ?? [1]).length), 1);
+    const topUpset = [...sels].sort((a, b) => b._cold.p - a._cold.p).slice(0, 5);
+    const pairs = [];
+    for (let i = 0; i < sels.length; i++) for (let j = i + 1; j < sels.length; j++) pairs.push([sels[i], sels[j], sels[i]._cold.p * sels[j]._cold.p]);
+    pairs.sort((a, b) => b[2] - a[2]);
+    scenarioRows.push(
+      [""],
+      ["💣 爆冷情景推演", "🔶推断:由引擎逐腿真实概率派生(腿间独立假设);冷向=主/客低概方向,平局风险走防平/双选通道"],
+      ["全票·单选", `全中率 ${(dist[nL] * 100).toFixed(3)}% · ≥${nL - 1}中 ${((dist[nL] + (dist[nL - 1] ?? 0)) * 100).toFixed(2)}% · 期望命中 ${expHits.toFixed(2)}/${nL} 腿`],
+      ["全票·按复选买", `全中率 ${(comboAll * 100).toFixed(2)}% · ${tickets}注=${tickets * 2}元(逐腿按本表复选列)`],
+      ...topUpset.map((s) => [`🔥爆冷候选·第${s.index}腿`, `${s.match} | 冷向=${s._cold.label}(${Math.round(s._cold.p * 100)}%) | ${s._coldNote} | 依据:${(s.reason ?? "").split("；").slice(0, 2).join(";")}`]),
+      ...pairs.slice(0, 3).map(([a, b, p]) => ["💥双冷组合", `第${a.index}+${b.index}腿(${a.match} + ${b.match}) 联合概率${(p * 100).toFixed(1)}%`]),
+    );
+    if (r9?.ok && Array.isArray(r9.picks)) {
+      const nineMatches = new Set(r9.picks.map((p) => p.match));
+      const nineRisk = [...sels].sort((a, b) => b._cold.p - a._cold.p).filter((s) => nineMatches.has(s.match)).slice(0, 2);
+      if (nineRisk.length) scenarioRows.push(["⚠️任选9命门腿", nineRisk.map((s) => `第${s.index}腿 ${s.match}(冷向${s._cold.label}${Math.round(s._cold.p * 100)}%,炸一腿任选9即死)`).join(" ║ ")]);
+    }
+    scenarioRows.push(
+      ["胆口径双轨(谁说了算=你)", "本表官方计划:世界杯腿样本<20一律不当胆(保守护栏);实盘下注单Sheet2:按你0611裁决(P≥62%+平<25%+市场同向)给可胆腿参考——两口径并存,以你临场决定为准"],
+      ["分析溯源链", "✅实测(eloratings当日Elo/500五赔种/ESPN·DK·titan007盘口/Open-Meteo天气/ESPN近5) → 🔶世界杯模型(Elo差+洲际校正[OOS+1.08pp]+东道主+海拔→λ泊松矩阵) → 闸门(启动自检+audit:suite16探针+对抗证伪);1X2系统打不过收盘线=诚实边界"],
+    );
+  } else if (fourteen.selections?.length) {
+    scenarioRows.push([""], ["💣 爆冷情景推演", "⚠️本期产物缺逐腿原始概率字段(旧版引擎生成),推演如实跳过——重跑生成即有"]);
+  }
   const tail = [[""],
     ["闸裁决", "✅ 本期可发(恰14腿·比赛日含今日·停售未过)"],
     ...periodFacts.map((x) => (Array.isArray(x) ? x : [x])),
@@ -315,6 +362,7 @@ export function buildFourteenSheetRows({ date, fourteen, periodFacts = [] }) {
     ["复式串", fourteen.compoundLine ?? ""],
     ["胆串(相关性修正)", fourteen.bankerParlay ? `独立估计${fourteen.bankerParlay.independentProbability ?? "—"} / 修正${fourteen.bankerParlay.adjustedProbability ?? "—"}` : "—"],
     ["任选9", r9?.ok ? `9场:${(r9.picks ?? []).map((p) => `${p.match ?? ""}${p.single ?? p.pick ?? ""}`).join(" ")}` : `不出(${r9?.reason ?? "—"})`],
+    ...scenarioRows,
   ];
   return [head, header, ...legs, ...tail];
 }
