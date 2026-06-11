@@ -56,7 +56,7 @@
 - 硬闸:s2-iswc-closure / s2-venue-closure / s2-prior-closure——**直接调用生产函数实测**,不重造解析。
 
 ### S3 数据分析(模型怎么算)
-- 单场(每日竞彩世界杯场):prediction-engine → Elo先验(洲际校正+1.08pp)+DC攻防(club-only学习域隔离)+市场融合(分歧大信市场)→ 平局盲区双选0.70阈值、中信心客胜不当胆。
+- 单场(世界杯场):**🔴0611铁律——世界杯比赛一律走世界杯模型**(national Elo+world-cup-priors+洲际校正+1.08pp),**不准用每日大模型**的俱乐部市场跟随+防平双选兜底(0611当天38场全防平的根因就是喂错模型);每日prediction-engine只管俱乐部场。DC攻防拟合保持club-only学习域隔离,国家队不漏入。
 - 整届(超算):`run-worldcup-supercomputer.mjs --n 20000`,FIFA官方对阵表推进,点球=50/50(学界:点球与强度无关),夺冠盘=比例归一(Shin只在逐场融合)。
 - 硬闸:s3-sc-invariants(夺冠和=1/出线和=32/48队单调链/blend公式逐队复核)、s3-sc-fresh(≤72h)、s3-sc-teams(与先验表一致)、s3-baseline-freeze(**0610赛前基线sha256,重冻=作弊即红**,登记在 scripts/wc-baseline-freeze.json)。
 
