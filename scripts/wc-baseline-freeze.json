@@ -1,0 +1,8 @@
+{
+  "frozenAt": "2026-06-10",
+  "note": "赛前冻结基线sha256登记——audit-wc-pipeline S3 校验,内容被改/被删=闸红(赛前基线绝不可重冻)",
+  "files": {
+    "worldcup-forecast-baseline-2026-06-10.json": "884d82af73f5bfe8135e15413bb28e59b2a77222ee0c794fdd94bf054429d89e",
+    "worldcup-supercomputer-baseline-2026-06-10.json": "328f9f41d8885a6a9e0f4cc9253674f0c75e0bfd5c40eb3c70d672543c3eabfa"
+  }
+}
