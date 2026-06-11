@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+﻿import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   computePerMethodRPS, inverseRpsWeights, softmaxWeights,
@@ -6,7 +6,7 @@ import {
 } from "../src/auto-weight-optimizer.js";
 import { normalizeMatchRow, summarizeMatchEvents } from "../src/statsbomb-loader.js";
 import { computeScorecard } from "../src/model-scorecard-cli.js";
-import { createDeepPipeline } from "../src/integrated-deep-pipeline.js";
+// 2026-06-11 融合大扫除:integrated-deep-pipeline 已删,其测试块移除。
 
 describe("auto-weight-optimizer", () => {
   it("computePerMethodRPS calculates per-method mean RPS", () => {
@@ -35,7 +35,7 @@ describe("auto-weight-optimizer", () => {
   it("softmaxWeights with low T = sharp; high T = uniform", () => {
     const sharp = softmaxWeights({ A: 0.18, B: 0.25 }, { temperature: 0.01 });
     const soft = softmaxWeights({ A: 0.18, B: 0.25 }, { temperature: 1.0 });
-    assert.ok(sharp.A > soft.A);  // 锐化时 A 权重更高
+    assert.ok(sharp.A > soft.A);  // 閿愬寲鏃?A 鏉冮噸鏇撮珮
   });
 
   it("coordinateDescentWeights finds non-trivial weight optimum", () => {
@@ -51,7 +51,7 @@ describe("auto-weight-optimizer", () => {
     };
     const r = coordinateDescentWeights(aligned, { iterations: 20 });
     assert.ok(r);
-    // A 更准 → A 权重应高
+    // A 鏇村噯 鈫?A 鏉冮噸搴旈珮
     assert.ok(r.weights.A > r.weights.B);
   });
 
@@ -125,44 +125,3 @@ describe("model-scorecard-cli", () => {
   });
 });
 
-describe("integrated-deep-pipeline I 档接入", () => {
-  it("accepts multi-source odds and line snapshots", () => {
-    const p = createDeepPipeline({ bankrollSize: 1000 });
-    const fixture = { id: "f1", homeTeam: "A", awayTeam: "B", competition: "EPL" };
-    const snap = { fixtureId: "f1", europeanOdds: { current: { home: 2.0, draw: 3.4, away: 3.8 } } };
-    const result = p.analyze(fixture, snap, {}, {
-      multiSourceOdds: [
-        { source: "pinnacle", odds: { home: 2.0, draw: 3.5, away: 4.0 } },
-        { source: "bet365", odds: { home: 1.95, draw: 3.6, away: 4.2 } }
-      ],
-      oddsSnapshots: [
-        { source: "A", timestamp: "2026-05-29T10:00Z", odds: { home: 2.0, draw: 3.5, away: 4.0 } },
-        { source: "A", timestamp: "2026-05-29T20:00Z", odds: { home: 1.80, draw: 3.6, away: 4.5 } }
-      ]
-    });
-    assert.ok(result.steps.sharpener);
-    assert.equal(result.steps.sharpener.sources, 2);
-    assert.ok(result.steps.lineMovement);
-  });
-
-  it("accepts recent matches for form features", () => {
-    const p = createDeepPipeline({ bankrollSize: 1000 });
-    const fixture = { id: "f1", homeTeam: "A", awayTeam: "B", competition: "EPL" };
-    const snap = { fixtureId: "f1", europeanOdds: { current: { home: 2.0, draw: 3.4, away: 3.8 } } };
-    const recent = [];
-    for (let i = 0; i < 5; i++) {
-      recent.push({
-        opponent: "X", isHome: i % 2 === 0, gf: 2, ga: 1,
-        opponentRating: 1500, xgFor: 1.5, xgAgainst: 1.0,
-        date: `2026-04-${String(i + 1).padStart(2, "0")}`
-      });
-    }
-    const result = p.analyze(fixture, snap, {}, {
-      homeRecentMatches: recent,
-      awayRecentMatches: recent
-    });
-    assert.ok(result.steps.formFeatures);
-    assert.ok(result.steps.formFeatures.home);
-    assert.ok(result.steps.matchupFeatures);
-  });
-});

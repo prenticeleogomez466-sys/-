@@ -16,8 +16,9 @@ const STEPS = [
   ["Elo→Poisson 框架", "run-worldcup-elo-poisson.mjs"],
   ["Elo 校准曲线(400 scale)", "run-worldcup-elo-calibration.mjs"],
   ["小组出线概率 MC", "run-worldcup-group-sim.mjs"],
-  ["夺冠概率 MC(model/market/blend)", "run-worldcup-champion-sim.mjs"],
-  ["多模型融合(Opta+预测市场+本模型)", "run-worldcup-fusion.mjs"],
+  // 2026-06-11 融合裁决:旧 champion-sim/多模型融合链已被官方 bracket 超算(run-worldcup-supercomputer.mjs,
+  //   内置市场混合 0.65市+0.35模)永久取代并删除;夺冠/晋级概率复验直接跑超算(N 可调)。
+  ["夺冠/晋级概率超算(官方bracket+市场混合)", "run-worldcup-supercomputer.mjs --n 4000"],
 ];
 
 console.log("══════ 2026 世界杯验证套件(一键复验,leak-safe)══════\n");

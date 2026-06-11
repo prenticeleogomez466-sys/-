@@ -1,6 +1,15 @@
 # Football AI Copilot
 
-中文足球大模型落地骨架：授权数据源、赔率硬门槛、竞彩/14场推荐、XLSX 日报、微信发信箱和赛后复盘。
+中文足球大模型——**所有足球数据分析的唯一大脑**:授权数据源、赔率硬门槛、竞彩/14场推荐、XLSX 日报、微信发信箱和赛后复盘。
+
+## 唯一大模型架构(2026-06-11 融合裁决)
+
+世界杯模型已全面融合为大模型内部的**世界杯域模块**,不再是并行的第二套模型:
+
+- **路由在引擎里**:`prediction-engine.predictFixture` 检测到 2026 世界杯正赛场(赛事名+赛期窗+48 强 Elo 先验)自动走 `src/wc-match-model.js`(国家队 Elo+洲际校正+东道主+海拔气温→λ),1X2 取模型自主 argmax 单选;市场只作对照/风险旗标。任何入口(每日/竞彩/14 场/server)进来的世界杯场都不可能误入俱乐部市场跟随路径(0611 铁律的结构性保证,守护 `test/wc-engine-route.test.mjs`)。
+- **域隔离**:世界杯路由场旁路俱乐部信号融合层/isotonic 校准/软赛事平局重校准/drawLean 防平;俱乐部场零影响。
+- **整届蒙特卡洛超算**(`run-worldcup-supercomputer.mjs`,官方 bracket+市场混合)与逐场域共享同一套 `world-cup-priors`/`tournament-simulator`。
+- **大扫除**:2026-06-11 永久删除 26 个生产不可达/回测证伪的死模块(conformal/markov/thompson/state-space/temperature 僵尸/ensemble-1x2 等)+ 20 个一次性证伪脚本 + 旧 champion-sim/fusion 重复链,结论存长期记忆与 `scripts/models-registry.mjs`,**勿重建**。
 
 ## 核心命令
 

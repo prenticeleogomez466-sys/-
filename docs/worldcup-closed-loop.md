@@ -2,7 +2,8 @@
 
 > 目标:从数据源读取 → 数据吸收 → 数据分析 → 输出表格 → 复盘回灌,**每个环节有探针硬闸,红灯=拒绝交付**。
 > 日常入口:`npm run audit:suite`(含 probe-wc-pipeline 五层闸+喂毒守护);单独跑:`node scripts/audit-wc-pipeline.mjs`。
-> 与足球大模型的边界:本文件只管世界杯模型(整届蒙特卡洛+世界杯场次的每日竞彩通路),两模型 7/19 后物理拆分。
+> 与足球大模型的边界(2026-06-11 用户最高指令改裁):**足球大模型=唯一大脑,世界杯模型已全面融合为其内部"世界杯域模块"**,不再拆分。
+> 每日引擎 `prediction-engine.predictFixture` 内建世界杯路由:正赛场自动走 `wc-match-model`(守护 `test/wc-engine-route.test.mjs`),任何入口都不可能误入俱乐部市场跟随路径。本文件管的是世界杯域的探针与 SOP。
 
 ## 体系总览(五层闭环)
 
@@ -57,7 +58,7 @@
 - 硬闸:s2-iswc-closure / s2-venue-closure / s2-prior-closure——**直接调用生产函数实测**,不重造解析。
 
 ### S3 数据分析(模型怎么算)
-- 单场(世界杯场):**🔴0611铁律——世界杯比赛一律走世界杯模型**(national Elo+world-cup-priors+洲际校正+1.08pp),**不准用每日大模型**的俱乐部市场跟随+防平双选兜底(0611当天38场全防平的根因就是喂错模型);每日prediction-engine只管俱乐部场。DC攻防拟合保持club-only学习域隔离,国家队不漏入。
+- 单场(世界杯场):**🔴0611铁律——世界杯比赛一律走世界杯模型**(national Elo+world-cup-priors+洲际校正+1.08pp),绝不走俱乐部市场跟随+防平双选兜底(0611当天38场全防平的根因就是喂错模型)。**融合后(2026-06-11晚)铁律由引擎结构保证**:`predictFixture` 检测正赛场自动路由 `wc-match-model`,俱乐部信号层/isotonic校准/软重校准/drawLean 全旁路(provenance=worldcup-match-model,与 wc:predict 逐位一致已实测 24/24)。DC攻防拟合保持club-only学习域隔离,国家队不漏入。
 - 整届(超算):`run-worldcup-supercomputer.mjs --n 20000`,FIFA官方对阵表推进,点球=50/50(学界:点球与强度无关),夺冠盘=比例归一(Shin只在逐场融合)。
 - 硬闸:s3-sc-invariants(夺冠和=1/出线和=32/48队单调链/blend公式逐队复核)、s3-sc-fresh(≤72h)、s3-sc-teams(与先验表一致)、s3-baseline-freeze(**0610赛前基线sha256,重冻=作弊即红**,登记在 scripts/wc-baseline-freeze.json)。
 

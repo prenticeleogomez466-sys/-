@@ -6,7 +6,7 @@
 // ③生产推理链(prediction-engine / signal-weight-tuner)不得出现温度消费点。
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,9 +34,10 @@ describe("temperature 僵尸调度链已摘除(缺陷#19,禁止回接)", () => {
       assert.ok(!/profile\.temperature|weightProfile\.temperature/.test(source), `${file.join("/")} 不得读取 profile.temperature`);
     }
   });
-  it("run-temperature-fit 自身必须带僵尸警告头(防误判在线)", () => {
-    const source = read("scripts", "run-temperature-fit.mjs");
-    assert.match(source, /僵尸警告/);
-    assert.match(source, /绝不.*接回消费点|绝不把 temperature 接回消费点/);
+  it("僵尸尸体已永久火化:temperature-calibration.js / run-temperature-fit.mjs 必须不存在(2026-06-11 融合大扫除)", () => {
+    // 0611 用户最高指令「无效无用的全部删除」:僵尸从"留尸体+警告头"升级为"彻底删除"。
+    // 守护反转:文件若重新出现 = 有人把僵尸接回来了,立刻红。
+    assert.ok(!existsSync(join(rootDir, "scripts", "run-temperature-fit.mjs")), "run-temperature-fit.mjs 已永久删除,不得回加");
+    assert.ok(!existsSync(join(rootDir, "src", "temperature-calibration.js")), "temperature-calibration.js 已永久删除,不得回加");
   });
 });

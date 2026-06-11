@@ -31,6 +31,10 @@ import { recalibrateSoftCompetition, softCompetitionLambdaScale, isSoftCompetiti
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { ensembleHalfFull } from "./ensemble-halffull.js";
 import { scoreConfidenceTier, halfFullConfidenceTier } from "./score-halffull-tier.js";
+// 世界杯域模块(2026-06-11 用户最高指令:足球大模型=唯一大脑,世界杯逐场模型全面融合为引擎内部路由)。
+// 0611 铁律「世界杯比赛必须用世界杯模型」由引擎结构保证:正赛场自动走 wcEngineRoute,绝不走俱乐部市场跟随。
+import { wcEngineRoute, loadWcMatchOddsIndex } from "./wc-match-model.js";
+import { loadNationalResults as loadWcNationalForm } from "./wc-national-form.js";
 
 // 半全场分布:优先多路集成(model_notau 80%+经验 20%,回测 LL 1.9624→1.9488),profile/经验表
 // 不可用则回退裸 halfFullJoint(τ+状态默认)。league 缺则集成用全局经验。
@@ -110,7 +114,13 @@ export function recommendFixtures(date) {
   // 限业务日 + 跨源去重(2026-05-30):兜底/多源抓取会把次日(周日)与重复场次(XML 6001 与 Playwright 周六001 同场)
   // 灌进当日,产生 34 场假象;此处收敛到目标业务日的去重竞彩单 + 原样保留 14 场/其它。
   const scopedFixtures = scopeJingcaiFixtures(fixtureSet.date, fixtureSet.fixtures);
-  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, modelMemory, nationalElo, dixonColesFitted, ratingsBootstrap, fusionContext: buildFusionContext(fixture, history), ...extra });
+  // 世界杯域资源一次性装载(融合 2026-06-11):ESPN 逐场真实赔率索引 + 国家队近5/H2H 缓存。
+  //   缺档=null 优雅降级(wcEngineRoute 内部按缺标注,绝不兜底);非世界杯日零成本。
+  let wcOddsIndex = null;
+  let wcFormCache = null;
+  try { wcOddsIndex = loadWcMatchOddsIndex().idx; } catch { wcOddsIndex = null; }
+  try { wcFormCache = loadWcNationalForm(); } catch { wcFormCache = null; }
+  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, modelMemory, nationalElo, dixonColesFitted, ratingsBootstrap, wcOddsIndex, wcFormCache, fusionContext: buildFusionContext(fixture, history), ...extra });
   let rawPredictions = scopedFixtures.map((fixture, index) => predictOne(fixture, index));
   // 「竞彩要全」铁律(2026-05-31):竞彩缺欧赔被判 data-missing 的场,若同场在 14 场有真实预测 → 借其 wld 重算补全。
   const shengfucaiByKey = new Map(
@@ -465,6 +475,28 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   if (nationalEloUsed && typeof blendResult.blendSource === "string") {
     blendResult.blendSource = blendResult.blendSource.replace(/dixon-coles/g, "national-elo");
   }
+  // ═══ 世界杯正赛路由(2026-06-11 用户最高指令·融合版)═══
+  //   0611 铁律:世界杯比赛必须用世界杯模型(国家队 Elo+洲际校正+东道主+海拔气温→λ),
+  //   1X2 取模型自主 argmax 单选,市场只作对照/风险旗标——绝不市场混合、绝不防平双选兜底。
+  //   此前靠"人工选 wc:predict 脚本"保证口径,6/11 当天 38 场全防平的根因就是喂错模型;
+  //   现在路由长在引擎里,任何入口(每日/竞彩/14场/server)进来的世界杯场自动走世界杯域。
+  let wcRouted = null;
+  if (options.worldCupRouting !== false) {
+    const _eu = snapshot?.europeanOdds?.current ?? null;
+    const _jcOdds = _eu && Number(_eu.home) > 1 && Number(_eu.draw) > 1 && Number(_eu.away) > 1
+      ? { home: Number(_eu.home), draw: Number(_eu.draw), away: Number(_eu.away) }
+      : null;
+    wcRouted = wcEngineRoute(fixture, _jcOdds, { oddsIndex: options.wcOddsIndex ?? null, formCache: options.wcFormCache ?? null });
+    if (wcRouted) {
+      const wcSm = buildDerivedScoreModel(wcRouted.lambdas.home, wcRouted.lambdas.away, { nbSize: wcRouted.lambdas.nbSize });
+      if (wcSm) {
+        wcSm.source = "worldcup-match-model";
+        blendResult = { probabilities: { ...wcRouted.wld.probabilities }, blendSource: "worldcup-match-model", dcWeight: 1, dcResult: wcSm };
+      } else {
+        wcRouted = null; // 矩阵构造失败 → 如实退常规路径(那里有自己的诚实闸门)
+      }
+    }
+  }
   // 借用先验(2026-05-31,「竞彩要全」铁律):竞彩让0档"未开售"→无欧赔、国际队又冷启动 ⇒ 本会 data-missing 被删。
   //   但同一场比赛常在 14 场胜负彩里有真实预测(同队)。recommendFixtures 二次传入该场 14 场的 wld 作先验,
   //   让竞彩跑完整机器(让球/比分/半全场/分档),竞彩明细补全。这是借**模型已对同场做出的真实预测**,非编造。
@@ -502,7 +534,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     };
   }
   const baseProbabilities = blendResult.probabilities;
-  const probabilityAdjustment = adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
+  // 世界杯路由场:概率=WC 模型自主观点,俱乐部域信号层/校准层全部旁路(域隔离,0611 铁律)。
+  const probabilityAdjustment = wcRouted
+    ? { applied: false, probabilities: baseProbabilities, signals: [], wcModelRoute: "worldcup-match-model(俱乐部信号域旁路)" }
+    : adjustProbabilitiesWithAdvancedData(fixture, baseProbabilities, options.advancedData);
   // V 档:贝叶斯信号融合层 —— 把伤停/H2H/赛季阶段/赛事性质等信号以 LR 证据融进概率。
   // 缺数据的信号自动休眠(见 fusion.dormant),冷启动下只有元数据类信号会真 fire。
   // X 档(2026-05-29):把市场开盘→当前的盘口移动接进融合层。europeanOdds.initial=开盘、
@@ -540,7 +575,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     : weightProfile
       ? { signalWeights: weightProfile.signalWeights, disabledSignals: weightProfile.disabledSignals }
       : {});
-  const fusion = fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext, fusionOpts);
+  const fusion = wcRouted
+    ? fuseSignals(probabilityAdjustment.probabilities, fixture, null, {}, { disabledSignals: SIGNAL_NAMES })
+    : fuseSignals(probabilityAdjustment.probabilities, fixture, options.advancedData, fusionContext, fusionOpts);
   probabilityAdjustment.fusionGatedOff = gateFusionOff;
   // 缺陷#6(2026-06-10):权重 profile 缺失时 loadFusionWeightProfile 返回 degraded 兜底
   //   (4 害硬禁、其余权重 1)——这里把降级状态写进产物,展示/审计层据此标注,不静默。
@@ -553,7 +590,10 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   (保留——它是用真实历史学出的纠偏,不是凑数)。不再保留温度创可贴。
   let fusedProbs = fusion.probabilities;
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
-  const calibrated = calibrateProbabilities(fusedProbs, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
+  // 世界杯路由场:俱乐部 isotonic 校准域不适用国家队(学习域隔离 club-only),直通不校准。
+  const calibrated = wcRouted
+    ? { probabilities: fusedProbs, calibration: { applied: false, source: "worldcup-model-bypass" }, priorProb: null, delta: null }
+    : calibrateProbabilities(fusedProbs, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
   let probabilities = calibrated.probabilities;
   probabilityAdjustment.calibration = calibrated.calibration;
   const fixtureAdvancedData = advancedFixtureData(options.advancedData, fixture);
@@ -570,14 +610,18 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   // 软赛事(友谊/国家队/国际赛)平局重校准(2026-05-31):五大联赛 isotonic 校准把强热门压到
   //   ~0.807、平局机械钉 ~13%,但国际赛/友谊赛真实平局率 28-30%。仅命中软赛事时,把平局有界地
   //   朝"赛事性质先验 + 历史同情境平局率"移动(改 wld 锚本身,下游派生一致)。**俱乐部路径零改动**。
-  const softRecal = recalibrateSoftCompetition(probabilities, fixture?.competition, experienceBaseline);
+  // 世界杯路由场:WC 模型概率已是国家队域自主观点,软赛事平局重校准不再二次改写(防平兜底=0611 铁律禁区)。
+  const softRecal = wcRouted
+    ? { applied: false }
+    : recalibrateSoftCompetition(probabilities, fixture?.competition, experienceBaseline);
   if (softRecal.applied) probabilities = softRecal.probabilities;
   probabilityAdjustment.softCompetitionRecal = softRecal.applied ? softRecal.detail : null;
   let ranked = OUTCOMES.map((outcome) => ({ ...outcome, probability: probabilities[outcome.key] })).sort((a, b) => b.probability - a.probability);
   // 平局倾向修正(2026-05-30 用户要求强化):纯 argmax 结构性永不推平(平局概率上限~30%,常低于热门胜率)。
   // 真实足球知识:平局概率高(≥30%)本身只在"低进球+均势"profile 出现(高进球均势场平局概率反而低),
   // 这类"闷平"里平局是价值选择。命中 draw-favorable(平≥30% 且与最高仅差≤5%)时把平提为主推。
-  const drawLean = evaluateDrawLean(ranked);
+  // 世界杯路由场:0611 铁律「单选不防平」——平局提升仅俱乐部/常规域生效。
+  const drawLean = wcRouted ? { applies: false } : evaluateDrawLean(ranked);
   if (drawLean.applies) ranked = drawLean.ranked;
   probabilityAdjustment.drawLean = drawLean.applies ? { margin: drawLean.margin, note: "低进球均势·平局为价值选择" } : null;
   const gap = ranked[0].probability - ranked[1].probability;
@@ -622,7 +666,11 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   const _ma = Number(simulation.lambdas?.away);
   const _dcW = Math.min(1, Math.max(0, Number(blendResult.dcWeight) || 0));
   let scoreModel;
-  if (blendResult.dcResult && Number.isFinite(_mh) && Number.isFinite(_ma)
+  if (wcRouted) {
+    // 世界杯路由场:比分/半全场/让球全部从 WC 模型同一矩阵派生(λ 已含海拔/气温/阶段乘子),
+    //   不向市场 λ 收缩、不二次缩放——与 wc:predict 逐场表同源同口径。
+    scoreModel = blendResult.dcResult;
+  } else if (blendResult.dcResult && Number.isFinite(_mh) && Number.isFinite(_ma)
       && _dcEg && Number.isFinite(_dcEg.home) && Number.isFinite(_dcEg.away)) {
     const lamH = ((1 - _dcW) * _mh + _dcW * _dcEg.home) * _lamScale;
     const lamA = ((1 - _dcW) * _ma + _dcW * _dcEg.away) * _lamScale;
@@ -907,6 +955,18 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   //   概率退回了模型融合概率(行内 oddsProbabilities ?? probabilities)→ 档位非真实市场背书。
   //   不推翻退回设计(保留现存测试),只挂 noMarketOdds 让展示层诚实标注「暂无盘口·据模型概率」。
   if (prediction.selectionTier) prediction.selectionTier.noMarketOdds = !hasRealMarketOdds(prediction);
+  // 世界杯域全景挂载(融合 2026-06-11):决定因素/市场分歧旗标/近5/H2H/比分让球大小球半全场,
+  //   供日报/竞彩表/下注单直接读,与 wc:predict 单独跑完全同源。
+  if (wcRouted) {
+    prediction.wcModel = {
+      stage: wcRouted.stage, elo: wcRouted.elo, confed: wcRouted.confed, coach: wcRouted.coach,
+      venue: wcRouted.venue, lambdaMult: wcRouted.lambdaMult, lambda: wcRouted.lambda,
+      wld: wcRouted.wld, score: wcRouted.score, handicap: wcRouted.handicap,
+      overUnder: wcRouted.overUnder, halfFull: wcRouted.halfFull, market: wcRouted.market,
+      recentForm: wcRouted.recentForm, h2h: wcRouted.h2h,
+      decisiveFactors: wcRouted.decisiveFactors, gaps: wcRouted.gaps
+    };
+  }
   // 市场背离置信门(2026-05-31 接生产)—— 实证(signal-crossval 回测):模型与市场分歧越大、市场赢越多,
   //   逆市场押独门=陷阱。此处把 clv-confidence-gate 接进每场预测,**只附加**背离标签 + 建议降档系数,
   //   遵 [[feedback_confidence_not_autosuppress]]:不改 pick、不覆盖 confidence、不抑制玩法,买不买由用户定。

@@ -56,20 +56,9 @@ const MODELS = [
     verdict: "holdout Brier 0.2491→0.2475(Δ+0.0016)真增益 → 已落 profile 接生产",
     drivesProb: "是(无盘口冷门场用校准 P(over);有盘口优先市场)", autonomy: "全(训练器自裁决+落 profile)",
   },
-  {
-    name: "胜负平 10 路集成", module: "ensemble-1x2", sym: "fuseEnsemble1x2",
-    dataSrc: "10 路 producer(market/DC/BVP/Pi/Massey/Colley/Skellam/经验/联赛先验/Elo)",
-    profile: "ensemble-weights-1x2-profile.json",
-    verdict: "前向逐步:有盘口→market 100%(模型加不了增量);无盘口冷门→DC60%+经验40% RPS-0.0034",
-    drivesProb: "否(profile/loader 就绪,未接引擎:冷门段增益小+引擎热,待接)", autonomy: "全(回测自学权重)",
-  },
-  {
-    name: "比分多路集成", module: "score-ensemble-producers", sym: "__score_ensemble__",
-    dataSrc: "6 路(DC-τ/BVP/Markov/独立泊松/经验频率/市场λ反推)",
-    profile: "ensemble-weights-score-profile.json",
-    verdict: "有盘口→市场λ反推100%(=生产O/U-λ校准已做);无盘口→独立泊松。融合无增益(到顶)",
-    drivesProb: "否(到顶,等价生产已有路径)", autonomy: "全(回测自学权重)",
-  },
+  // 2026-06-11 融合大扫除:ensemble-1x2(10路集成,回测证有盘口时市场100%加不了增量)与
+  //   score-ensemble-producers(比分6路集成,到顶=等价生产已有路径)两个"无增益不接"模块已永久删除,
+  //   不再占登记表。结论留此为证:集成路线已测到顶,别再重建。
   {
     name: "半全场多路集成", module: "ensemble-halffull", sym: "ensembleHalfFull",
     dataSrc: "6 路(halfFullJoint变体×4 + 数据拟合 + 经验HT-FT频率9万+半场)",

@@ -191,6 +191,14 @@ function Run-Recap {
   Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date --no-result-sync"
   #   世界杯赛果复盘校准:开赛后逐场验证赛前预测(出线Brier/夺冠logloss/爆冷);开赛前空态冻结基线。AllowFailure。
   Invoke-Step "World Cup forecast recap calibration" "npm run wc:recap -- --json" $true
+  #   铁律(2026-06-11):世界杯逐场预测只用世界杯模型(wc:predict),复盘基线据此冻结。
+  #   顺序:抓真实盘口快照(refresh+snapshot)→ WC模型逐场预测 → 逐场复盘(冻结赛前预测+对真实赛果结算)。AllowFailure。
+  Invoke-Step "World Cup odds snapshot (line-movement series)" "npm run wc:odds-capture" $true
+  #   国家队近5战/H2H 决定因素语料续鲜(ESPN 跨赛事真实赛果)。AllowFailure。
+  Invoke-Step "World Cup national-team recent form / H2H refresh" "npm run wc:sync-form" $true
+  Invoke-Step "World Cup per-match prediction (WC model, autonomous picks)" "npm run wc:predict" $true
+  #   世界杯【逐场】复盘回测:每日把赛前冻结预测 vs 实际赛果逐场比对、累计胜平负/比分/半全场/让球命中率(累积单表落桌面)。AllowFailure。
+  Invoke-Step "World Cup per-match recap (hit-rate backtest)" "npm run wc:recap-match" $true
   Invoke-Step "run evolution backtest" "npm run backtest:evolution"
   # 神选复盘:把全部历史复盘汇成桌面单一总表(每日命中率+逐场明细),用户每天就看这一张。
   # 放在 recap:daily 之后 → 前一日赛果已回填,桌面表立即刷新到最新。
