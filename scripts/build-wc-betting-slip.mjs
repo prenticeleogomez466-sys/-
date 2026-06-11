@@ -12,6 +12,10 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
+import { preflightOrDie } from "../src/preflight-selfcheck.js";
+
+// 启动自检(2026-06-11 用户裁决:所有生成入口启动必检,红=拒跑;--skip-preflight 仅诊断)
+await preflightOrDie("wc:slip 实盘下注单");
 
 const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.split("=")[1] : d; };
 const DATE = arg("date", new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10));

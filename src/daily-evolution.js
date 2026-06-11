@@ -19,6 +19,11 @@ const offlineDemo = args.includes("--offline-demo");
 const allowMissingOdds = args.includes("--allow-missing-odds") || process.env.ODDS_ALLOW_MISSING === "1";
 const syncArtifacts = !args.includes("--no-sync") && process.env.FOOTBALL_ARTIFACT_SYNC !== "0";
 
+// 启动自检(2026-06-11 用户裁决:生成入口必检,红=拒跑)。每日链自己先抓 fixtures,
+// 故不要求当日文件已在(requireFixtures:false),只查数据源新鲜度/引擎路由活体/冻结基线。
+const { preflightOrDie } = await import("./preflight-selfcheck.js");
+await preflightOrDie("daily 每日生成链", { date, requireFixtures: false });
+
 const result = { date, startedAt: new Date().toISOString(), realtimeCrawler: null, market: null, package: null, recommendation: null, evolutionBacktest: null, wechat: null, sync: null, ok: false, error: null };
 try {
   if (!withWeb && !offlineDemo) {

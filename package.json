@@ -44,6 +44,7 @@
     "train:overunder": "node scripts/train-overunder-calibration.mjs",
     "audit:autonomous": "node scripts/audit-autonomous-models.mjs",
     "audit:suite": "node scripts/audit-suite.mjs",
+    "preflight": "node src/preflight-selfcheck.js",
     "models:registry": "node scripts/models-registry.mjs",
     "backtest:ensemble-halffull": "node scripts/backtest-ensemble-halffull.mjs",
     "showcase:framework": "node scripts/build-framework-showcase.mjs",

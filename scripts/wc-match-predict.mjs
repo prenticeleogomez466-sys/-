@@ -16,6 +16,10 @@ import { getExportDir } from "../src/paths.js";
 import { writeXlsxWorkbook } from "../src/xlsx-writer.js";
 import { predictWcMatch } from "../src/wc-match-model.js";
 import { loadNationalResults } from "../src/wc-national-form.js";
+import { preflightOrDie } from "../src/preflight-selfcheck.js";
+
+// 启动自检(2026-06-11 用户裁决:所有生成入口启动必检,红=拒跑;--skip-preflight 仅诊断)
+await preflightOrDie("wc:predict 世界杯逐场表");
 
 const WC_START = "2026-06-11", WC_END = "2026-07-19";
 const ODDS_PATH = join(getExportDir(), "..", "football-model-data", "world-cup", "2026", "match-odds.json");

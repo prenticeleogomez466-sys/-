@@ -38,6 +38,10 @@ try {
   console.error(`❌ ${e.message}`);
   process.exit(1);
 }
+
+// 启动自检(2026-06-11 用户裁决:所有生成入口启动必检,红=拒跑;--skip-preflight 仅诊断)
+const { preflightOrDie } = await import("../src/preflight-selfcheck.js");
+await preflightOrDie("today-full-coverage 竞彩+14场", { date });
 // dry-run 沙箱(F2 验证用):设 TODAY_FULL_OUT_DIR 时产物全落该目录,不碰桌面/webshare 正式目录。
 const outBase = process.env.TODAY_FULL_OUT_DIR || null;
 const pkg = buildDailyRecommendationPackage(date, { skipRealtimeGate: true });

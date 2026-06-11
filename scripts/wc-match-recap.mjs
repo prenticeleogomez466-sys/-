@@ -20,6 +20,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { preflightOrDie } from "../src/preflight-selfcheck.js";
+
+// 启动自检(复盘口径:不要求当日 fixtures——复盘对象是历史日;冻结基线在位是命门)
+await preflightOrDie("wc:recap-match 逐场复盘", { requireFixtures: false });
 import { pathToFileURL } from "node:url";
 import { listFixtureDates, loadFixtures } from "../src/fixture-store.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
