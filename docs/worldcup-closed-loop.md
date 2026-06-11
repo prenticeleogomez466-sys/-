@@ -48,6 +48,7 @@
 | 真实天气预报 | worldcup-weather.json | `npm run sync:wc-weather` | s1-weather-fresh(≤48h)/cover(未来5天逐场) |
 | 单场赔率续鲜 | match-odds.json | `npm run refresh:wc-odds-espn`(ESPN core免配额) | s1-odds-sane/fresh(≤36h)/cover(未来36h全覆盖) |
 | 夺冠外盘 | The Odds API(8账户key池轮换) | `npm run sync:wc-winner` | 超算note如实标注盘口vintage |
+| 单场大小球真实盘 | match-totals.json(Pinnacle主线+比例devig,72场小组赛) | `node scripts/sync-wc-totals.mjs`(~3配额/次) | s1-totals(采用即保鲜≤48h;Power devig已证伪勿换) |
 | 竞彩五赔种 | 500.com trade静态XML | today-full-coverage.mjs内联 | (足球大模型域)spf/nspf互换防护已内建 |
 
 ### S2 数据吸收(数据怎么进引擎)

@@ -148,6 +148,16 @@ if (ONLY.includes("s1")) {
       rec("s1-odds-cover", missing.length ? "FAIL" : "PASS", missing.length ? `未来36h ${missing.length}场无赔率: ${missing.slice(0, 4).map((m) => `${m.homeTeam}-${m.awayTeam}`).join(";")}` : `未来36h ${next36.length}场赔率全覆盖`);
     } else { rec("s1-odds-fresh", "SKIP", inWindow ? "未来36h无场次" : "非赛会窗口"); rec("s1-odds-cover", "SKIP", "同上"); }
   }
+  // 大小球totals(可选锐盘源:Pinnacle主线+devig)。未采用=SKIP;一旦落档,在窗内就必须保鲜(陈数据比没数据更毒)
+  const totals = quietLoad(path.join(WC, "match-totals.json"));
+  if (!totals) rec("s1-totals", "SKIP", "match-totals.json 未落档(可选源,跑 node scripts/sync-wc-totals.mjs 接入)");
+  else {
+    const ageH = hours(NOW - Date.parse(totals.updatedAt));
+    const bad = (totals.fixtures || []).filter((f) => !(f.over > 1.01 && f.under > 1.01 && f.pOver > 0 && f.pOver < 1));
+    if (bad.length) rec("s1-totals", "FAIL", `${bad.length}场totals坏赔率/坏概率`);
+    else if (inWindow && ageH > 48) rec("s1-totals", "FAIL", `totals已${ageH}h未刷新(采用即保鲜,跑 node scripts/sync-wc-totals.mjs)`);
+    else rec("s1-totals", "PASS", `${totals.count}场大小球真实盘(${ageH}h前,源=${(totals.fixtures?.[0]?.book) || "?"})`);
+  }
 }
 
 // ════ S2 吸收闭合(每日竞彩store行 → 引擎真实链路 worldCupLambdaContext/teamPrior 无断点) ════
