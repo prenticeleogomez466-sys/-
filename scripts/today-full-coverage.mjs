@@ -22,6 +22,9 @@ import {
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
 } from "../src/today-delivery-lib.js";
 import { writeFileSync, copyFileSync, mkdirSync, readFileSync } from "node:fs";
+// 串关推荐(2026-06-12 用户需求:最稳/均衡/高赔/爆冷,五玩法混合过关;表+手机页+英文页三处同源)
+import { buildParlaySheet } from "../src/today-delivery-lib.js";
+import { buildParlayLegs, buildParlayPlan } from "../src/parlay-builder.js";
 import { worldCupContextLine } from "../src/worldcup-context.js";
 import { worldCupMatchPrior } from "../src/world-cup-priors.js";
 import { buildFourteenPlan } from "../src/prediction-engine.js";
@@ -374,6 +377,16 @@ const resonate = rows.filter((r) => r.msv?.sameAsWld === true && r.mhv?.sameAsWl
 const cohNote = `四玩法独立真实裁决(2026-06-11用户裁决):胜负平=模型综合;让球=模型vs市场过盘裁决(${hvDiverge.length}场与胜负平不同向,逐场注逻辑);比分主推=500比分盘de-vig真实热门(${scoreDiv}场与胜负平不同向);半全场主推=500半全场盘de-vig真实热门(${hfDiv}场不同向);${resonate}场四玩法盘口真实共振同向。方向矩阵逐场审计通过(不同向均带依据,绝无模板复制、绝无人造分歧)。`;
 const parlayCount = { g: rows.filter((r) => r.parlay?.grade === "🟢").length, y: rows.filter((r) => r.parlay?.grade === "🟡").length, b: rows.filter((r) => r.parlay?.grade === "⛔").length };
 const parlayNote = `串关安全度:🟢${parlayCount.g}/🟡${parlayCount.y}/⛔${parlayCount.b}。${PARLAY_ORDER_NOTE}`;
+
+// ── 串关推荐(2026-06-12 用户需求):总进球原始赔率须实抓(store 只存 de-vig 概率),缺=总进球不出腿如实标。──
+let jqsRaw = null;
+try { jqsRaw = JSON.parse(readFileSync(`D:/football-model-data/market/jqs-raw-${date}.json`, "utf8")); } catch { jqsRaw = null; }
+if (!jqsRaw) console.log(`⚠️ 总进球原始赔率缺(D:/football-model-data/market/jqs-raw-${date}.json 未抓):串关"总进球"玩法不出腿,先跑实抓再重出可补。`);
+const parlayGames = games.map((p) => buildParlayLegs(p, jqsRaw?.matches?.[String(p.fixture?.sequence ?? "")]?.odds ?? null));
+const parlayPlan = buildParlayPlan(parlayGames);
+const parlayAdvBanner = advKilled.length
+  ? `🔴当日${advKilled.length}/${rows.length}场被三视角对抗证伪(EV负)、串关安全度⛔${parlayCount.b}场:串关=风险叠乘,本表只按要求给搭法标注,不构成下注建议,买不买你定。`
+  : (parlayCount.b ? `⛔串关排除${parlayCount.b}场在列,搭法仅标注参考。` : "");
 const fourteenNote = fourteen?.available
   ? `14场/任选9:本期可发(见"14场·任选9"工作表,世界杯腿一律不当胆)。`
   : `14场/任选9:今日不发——${fourteen?.note ?? (fourteenFacts[0]?.[1] ?? "无本期映射")}(详见"数据审计"表内容审计区)。`;
@@ -399,6 +412,7 @@ const contentAudit = [
 // ── xlsx(25列专业版 + 数据审计 + 14场闸裁决,经 xlsx-writer:深紫FF4A148C表头/banner跨列合并/内容感知行高/冻结筛选) ──
 const sheets = [
   ...buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length) }),
+  buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
   buildAuditSheet({ date, rows, contentAudit }),
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
@@ -415,7 +429,7 @@ writeXlsxWorkbook(xlsxTarget, sheets);
 // 重出旧日期绝不顶掉 —— 改写日期命名副本 足球推荐-<date>.html / football-<date>.html,固定URL保最新。
 const readIfExists = (p) => { try { return readFileSync(p, "utf8"); } catch { return null; } };
 // 头条副标题=逐赔种真计数 + 降级句进头条(2026-06-10 审计确认缺陷:禁硬编码"5赔种全覆盖"假声明,三面同口径)。
-const html = renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, counts, degradeNote });
+const html = renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, counts, degradeNote, parlayPlan });
 let htmlTarget = outBase ? `${outBase}/今日足球推荐.html` : "D:/Temp/webshare_lingdao/今日足球推荐.html";
 if (!outBase) {
   const mob = resolveHtmlWriteTarget({
@@ -428,7 +442,7 @@ if (!outBase) {
 writeFileSync(htmlTarget, html, "utf8");
 
 // ── 英文固定URL页 football.html(缺陷#16:三面同源同日期,不再停在旧日期) ──
-const enHtml = renderEnglishHtml({ date, rows, riskNote, intlN, wcN, banner: BANNER, auditFoot });
+const enHtml = renderEnglishHtml({ date, rows, riskNote, intlN, wcN, banner: BANNER, auditFoot, parlayPlan });
 let enTarget = outBase ? `${outBase}/football.html` : "D:/Temp/webshare_lingdao/football.html";
 if (!outBase) {
   const en = resolveHtmlWriteTarget({
@@ -470,6 +484,20 @@ for (const r of rows) {
   if (r.adv) console.log(`  🔴 对抗证伪: ${r.adv.label}${r.adv.ev != null ? ` EV=${r.adv.ev}` : ""} — ${r.adv.kill}`);
   console.log("");
 }
+// ── 串关推荐(对话口径与 xlsx"串关推荐"表一致) ──
+console.log(`\n## 🔗 串关推荐(混合过关·全2串1)`);
+if (parlayPlan.ok) {
+  for (const t of parlayPlan.tiers) {
+    for (const c of t.combos) {
+      console.log(`${t.tier} ${c.legs.map((l) => `〔${l.match}〕${l.label}(${Math.round(l.probMkt * 100)}%)`).join(" × ")}`);
+      console.log(`   串赔✅${c.odds} · 联合概率🔶${(c.probMkt * 100).toFixed(1)}%${c.probModel != null ? `(模型${(c.probModel * 100).toFixed(1)}%)` : ""} · EV市场口径${c.evMkt} · 2元1注可中${Math.round(c.odds * 2 * 100) / 100}元 · ${c.why}`);
+    }
+  }
+  if (parlayAdvBanner) console.log(`   ${parlayAdvBanner}`);
+} else {
+  console.log(`⚠️ ${parlayPlan.note}(如实不出)`);
+}
+
 // ── 14场/任选9 闸裁决(对话口径与 xlsx"14场·任选9"表一致) ──
 console.log(`\n## 🎯 14场/任选9 闸裁决`);
 if (fourteen?.available) {
