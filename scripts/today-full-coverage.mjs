@@ -26,6 +26,7 @@ import { worldCupContextLine } from "../src/worldcup-context.js";
 import { worldCupMatchPrior } from "../src/world-cup-priors.js";
 import { buildFourteenPlan } from "../src/prediction-engine.js";
 import { loadFixtures } from "../src/fixture-store.js";
+import { jingcaiWeekdayLabel, sequenceWeekdayPrefix } from "../src/jingcai-business-day.js";
 // fetch-gate-500-1 刀③(2026-06-11):✅500欧赔/✅实测标签从快照来源派生,见值即打✅是缺陷
 //   (稳定缓存回填的 06-08 新浪陈旧赔率曾被标"✅500欧赔/✅实测·500竞彩XML(spf)"进真钱交付)。
 import { snapshotEuroProvenance } from "../src/market-data-store.js";
@@ -72,7 +73,27 @@ for (const p of picked) {
   const prev = byMatch.get(key);
   if (!prev || (isJc(p) && !isJc(prev))) byMatch.set(key, p);
 }
-const games = [...byMatch.values()].sort((a, b) => String(a.fixture.kickoff).localeCompare(String(b.fixture.kickoff)));
+let games = [...byMatch.values()].sort((a, b) => String(a.fixture.kickoff).localeCompare(String(b.fixture.kickoff)));
+
+// 当日业务日过滤(2026-06-12 用户裁决:"每次只给我推荐当天的竞彩比赛"——交付只含今日业务日
+//   在售场,不再把后续业务日(周六/周日…)与下期预售腿堆进同一张表;--all-onsale 保留全在售窗口)。
+//   口径权威=竞彩编号周缀(5003 的 5=周五),与 scopeJingcaiFixtures 同源;无编号场无法归业务日,
+//   如实排除并打印(绝不猜)。
+const ALL_ONSALE = process.argv.includes("--all-onsale");
+const WD_DIGIT = { "周一": "1", "周二": "2", "周三": "3", "周四": "4", "周五": "5", "周六": "6", "周日": "7" };
+const todayDigit = WD_DIGIT[jingcaiWeekdayLabel(date)] ?? null;
+if (!ALL_ONSALE && todayDigit) {
+  const before = games.length;
+  const dropped = [];
+  games = games.filter((p) => {
+    const seq = String(p.fixture?.sequence ?? "");
+    const ok = seq.startsWith(todayDigit) || sequenceWeekdayPrefix(seq) === jingcaiWeekdayLabel(date);
+    if (!ok) dropped.push(`${seq || "无编号"} ${p.fixture.homeTeam}vs${p.fixture.awayTeam}`);
+    return ok;
+  });
+  console.log(`当日业务日过滤(${jingcaiWeekdayLabel(date)}=周缀${todayDigit}):${before}场→${games.length}场;排除${dropped.length}场(后续业务日/预售,--all-onsale 可出全量)`);
+  if (!games.length) { console.error(`❌ 今日业务日(${jingcaiWeekdayLabel(date)})无在售竞彩场——不出空表(检查抓取或确为休市日)。`); process.exit(1); }
+}
 
 // coverage 按主队中文名匹配(coverage 缺/未抓到该场 → null,补全列诚实标缺)
 const covFor = (p) => cov?.matches?.find((m) => (p.fixture.homeTeam || "").includes(m.home.zh) && (p.fixture.awayTeam || "").includes(m.away.zh)) ?? null;

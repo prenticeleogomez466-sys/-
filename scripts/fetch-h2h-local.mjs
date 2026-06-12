@@ -70,6 +70,14 @@ const ZH_TO_CSV = {
   '阿尔及利亚': 'Algeria',
   '奥地利': 'Austria',
   '约旦': 'Jordan',
+  // 2026-06-12 补 6/18 批次缺口3队(csv 实测拼写:Panama/Uzbekistan/Colombia 均在库,合计1632行)
+  '巴拿马': 'Panama',
+  '乌兹别克斯坦': 'Uzbekistan',
+  '哥伦比亚': 'Colombia',
+  '加纳': 'Ghana',
+  '克罗地亚': 'Croatia',
+  '刚果(金)': 'DR Congo',
+  '刚果民主共和国': 'DR Congo',
 };
 
 // ---------- 最小引号感知 CSV 解析(city 可能含逗号) ----------
