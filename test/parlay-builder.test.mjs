@@ -73,7 +73,7 @@ test("buildParlayPlan:默认每档最多4注;极限高赔档存在且全部≥40
   for (const c of vol.combos) assert.ok(c.odds >= 40);
 });
 
-test("buildParlaySheet:100元口径列(可中=串赔×100含本金/净赚/期望回收恒<100)+ 腿数动态派生", async () => {
+test("buildParlaySheet:'怎么买'合列(每腿带场+玩法+选项+赔率)+100元口径(可中=串赔×100/期望回收恒<100)+腿数动态", async () => {
   const { buildParlaySheet } = await import("../src/today-delivery-lib.js");
   const a = buildParlayLegs(mkPred(), JQS);
   const b = buildParlayLegs(mkPred({ fixture: { homeTeam: "丙队", awayTeam: "丁队", sequence: "5002" } }), JQS);
@@ -81,15 +81,20 @@ test("buildParlaySheet:100元口径列(可中=串赔×100含本金/净赚/期望
   const sheet = buildParlaySheet({ date: "2026-06-12", plan, jqsFetchedAt: null, advBanner: "" });
   assert.match(sheet.rows[0][0], /全2串1.*100元/);
   const header = sheet.rows.find((r) => r[0] === "档位");
-  assert.ok(header.includes("100元可中(含本金)✅") && header.includes("100元净赚·回报率✅") && header.includes("100元期望回收🔶"));
-  assert.equal(header.filter((h) => /^腿\d/.test(h)).length, 2, "腿列数须=场数动态派生");
-  const iOdds = header.indexOf("串赔率✅"), iWin = header.indexOf("100元可中(含本金)✅"), iExp = header.indexOf("100元期望回收🔶");
+  assert.ok(header.includes("怎么买(一注2腿,全中才中)✅") && header.includes("100元:可中/净赚✅") && header.includes("100元期望回收🔶"));
+  const iBuy = header.indexOf("怎么买(一注2腿,全中才中)✅"), iOdds = header.indexOf("串赔率✅"),
+    iWin = header.indexOf("100元:可中/净赚✅"), iExp = header.indexOf("100元期望回收🔶");
+  let checked = 0;
   for (const r of sheet.rows) {
-    if (r[0] !== "档位" && header.length === r.length && /元$/.test(String(r[iWin] ?? ""))) {
-      assert.equal(parseInt(r[iWin]), Math.round(Number(r[iOdds]) * 100), "可中金额必须=串赔×100");
-      assert.ok(parseInt(r[iExp]) < 100, "期望回收必须<100元(抽水诚实)");
-    }
+    if (r[0] === "档位" || header.length !== r.length) continue;
+    // 怎么买=单列两腿:①【场】玩法→买「选项」@赔率 换行 ②…
+    assert.match(String(r[iBuy]), /①【.+】.+→买「.+」@[\d.]+\n②【.+】.+→买「.+」@[\d.]+/);
+    const win = Number(String(r[iWin]).match(/可中(\d+)元/)?.[1]);
+    assert.equal(win, Math.round(Number(r[iOdds]) * 100), "可中金额必须=串赔×100");
+    assert.ok(parseInt(r[iExp]) < 100, "期望回收必须<100元(抽水诚实)");
+    checked++;
   }
+  assert.ok(checked >= 8, "组合行须实际被校验");
 });
 
 test("buildParlayPlan:仅1场有赔率 → ok:false 如实不出(不硬凑单关)", () => {

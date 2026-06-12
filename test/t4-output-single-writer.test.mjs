@@ -162,16 +162,16 @@ test("三面同源:xlsx标题/手机页/英文页日期一致,双日期互不污
   });
   for (const [i, o] of outputs.entries()) {
     const other = outputs[1 - i].date;
-    // xlsx:标题行 + banner 行都是本日期;26列专业版列数不缩水(2026-06-11 四玩法独立裁决升级:
-    //   +信号面板列,末列仍=🔴对抗证伪)
+    // xlsx:标题行 + banner 行都是本日期;27列专业版列数不缩水(2026-06-12 +💰建议注金列,末列仍=🔴对抗证伪)
     assert.equal(o.sheets[0].rows[0][0], `⚡ 神选 · 竞彩完整覆盖 · ${o.date}`);
     assert.match(o.sheets[0].rows[1][0], new RegExp(o.date));
-    assert.equal(XLSX_HEADERS.length, 26);
-    assert.equal(o.sheets[0].rows[2].length, 26);
-    assert.match(o.sheets[0].rows[2][25], /对抗证伪/);
+    assert.equal(XLSX_HEADERS.length, 27);
+    assert.equal(o.sheets[0].rows[2].length, 27);
+    assert.match(o.sheets[0].rows[2][26], /对抗证伪/);
     assert.match(o.sheets[0].rows[2][5], /世界杯模型/);
     assert.match(o.sheets[0].rows[2][8], /真实裁决/);
-    assert.match(o.sheets[0].rows[2][24], /串关/);
+    assert.match(o.sheets[0].rows[2][24], /建议注金/);
+    assert.match(o.sheets[0].rows[2][25], /串关/);
     // 手机页:标题 + 下载链接 + 落款日期均=本日期
     assert.match(o.mobile, new RegExp(`<title>神选·竞彩·${o.date}</title>`));
     assert.match(o.mobile, new RegExp(`jingcai-${o.date}\\.xlsx`));
