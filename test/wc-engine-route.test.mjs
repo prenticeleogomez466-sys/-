@@ -68,4 +68,17 @@ describe("世界杯引擎路由(0611铁律:世界杯场必用世界杯模型)", 
     assert.equal(wcEngineRoute({ ...WC_FIXTURE, kickoff: "2026-08-01 02:00", date: "2026-08-01" }), null, "7/19 后窗口外不路由");
     assert.equal(wcEngineRoute({ ...WC_FIXTURE, homeTeam: "不存在的队" }), null, "缺 48 强 Elo 先验不路由(标缺不兜底)");
   });
+
+  // 2026-06-12 出表事故守护:下期胜负彩预售腿(比赛在一周后,500 比分盘未开卖)无市场快照时,
+  // 比分诚实回退 worldcup-match-model 真 NB 矩阵——recommendation-audit 白名单必须认它为真实来源,
+  // 否则世界杯预售腿天天被"疑似死表兜底"误拦(78439c6 路由与 0530 白名单的衔接缺口)。
+  it("预售世界杯腿(无比分盘):scorePicks.source=worldcup-match-model 且过来源审计", async () => {
+    const presale = { ...WC_FIXTURE, id: "test-wc-presale-1", kickoff: "2026-06-19", date: "2026-06-12", marketType: "shengfucai" };
+    const p = predictFixture(presale, [], 0, {});
+    assert.equal(p.scorePicks?.source, "worldcup-match-model", "无市场盘的世界杯腿比分来源必须=worldcup-match-model");
+    const { auditRecommendations } = await import("../src/recommendation-audit.js");
+    const report = auditRecommendations({ predictions: [p], fourteen: { count: 0, selections: [] } });
+    const deadTable = (report.checks ?? []).filter((c) => /比分非真实来源/.test(c.message));
+    assert.equal(deadTable.length, 0, `worldcup-match-model 必须在 REAL_SCORE_SOURCES 白名单:${deadTable.map((c) => c.message).join(";")}`);
+  });
 });

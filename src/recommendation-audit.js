@@ -12,7 +12,10 @@ const exportDir = getExportDir();
 // 比分/半全场允许的"真实来源"白名单(2026-05-30):市场赔率 + 真泊松矩阵(训练 DC / λ 派生)。
 // 任何不在白名单的来源(尤其历史死表 scoreForOutcome)都视为未真实跑出 → 自检报错。
 // 2026-06-01:national-elo = 国家队 Elo 差转 λ 建的真泊松-τ 矩阵(俱乐部源无国家队时),真实来源非死表。
-const REAL_SCORE_SOURCES = new Set(["market", "dixon-coles", "dixon-coles:market-derived", "poisson-derived-from-lambda", "poisson-matrix", "dc-matrix", "national-elo"]);
+// 2026-06-12:worldcup-match-model = 统一大脑世界杯路由(78439c6)用 WC λ(national-elo+world-cup-priors
+//   +洲际校正)建的真 NB 矩阵,与 poisson-derived-from-lambda 同性质;预售期(比分盘未开卖)世界杯腿
+//   诚实回退到它,非死表。有 500 比分盘时仍优先 market,不受影响。
+const REAL_SCORE_SOURCES = new Set(["market", "dixon-coles", "dixon-coles:market-derived", "poisson-derived-from-lambda", "poisson-matrix", "dc-matrix", "national-elo", "worldcup-match-model"]);
 const REAL_HALFFULL_SOURCES = new Set(["market", "poisson-half-joint"]);
 // 让球线允许的可追溯来源:竞彩官方(500.com)/ 亚盘 / 无盘口时的诚实默认 0。
 const HANDICAP_LINE_SOURCES = new Set(["500.com-jczq", "asian", "default-0"]);

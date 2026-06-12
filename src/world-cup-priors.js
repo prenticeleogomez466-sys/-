@@ -77,8 +77,10 @@ const WC_TEAM_ALIASES = {
   "ir iran": "iran",
   "congo dr": "dr congo"
 };
-/** 队名归一:小写 + 去音调符(türkiye→turkiye)+ 变体别名,使中文/feed/groups 三方对阵能对上。 */
-function normTeam(name) {
+/** 队名归一:小写 + 去音调符(türkiye→turkiye)+ 变体别名,使中文/feed/groups 三方对阵能对上。
+ *  2026-06-12 导出供 audit-wc-pipeline s1-odds-cover 复用:match-dates 用 USA、ESPN 赔率用
+ *  United States,探针按字面键匹配会把"已捕获的赔率"误报成缺(美巴场首进36h窗口暴露)。 */
+export function normTeam(name) {
   const s = String(name ?? "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return WC_TEAM_ALIASES[s] ?? s;
 }

@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normTeam } from "../src/world-cup-priors.js";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const arg = (k, d) => {
@@ -140,7 +141,9 @@ if (ONLY.includes("s1")) {
     rec("s1-odds-sane", badOdds.length || badOver.length ? "FAIL" : "PASS", badOdds.length || badOver.length ? `坏赔率${badOdds.length}场/overround越界${badOver.length}场` : `${fx.length}场赔率合法(overround∈[0.98,1.35])`);
     const newest = Math.max(...fx.map((f) => Date.parse(f.collectedAt || 0)), 0);
     const next36 = Object.values(matchDates.matchDate).filter((m) => { const t = Date.parse(m.dateUtc); return t > NOW && t < NOW + 36 * 3600e3; });
-    const key = (h, a) => `${h}|${a}`;
+    // 2026-06-12 修误报:match-dates 队名(USA)与 ESPN 赔率队名(United States)是同队不同写法,
+    //   字面键匹配把已捕获赔率误报成缺——复用生产同一套 normTeam 归一(别名表单一权威,不另造表)。
+    const key = (h, a) => `${normTeam(h)}|${normTeam(a)}`;
     const have = new Set(fx.map((f) => key(f.home, f.away)));
     const missing = next36.filter((m) => !have.has(key(m.homeTeam, m.awayTeam)) && !have.has(key(m.awayTeam, m.homeTeam)));
     if (inWindow && next36.length) {
@@ -268,7 +271,30 @@ if (ONLY.includes("s4")) {
         rec("s4-html-garbage", garbage.length ? "FAIL" : "PASS", garbage.length ? `命中: ${garbage.join(" ")}` : "交付html无渲染垃圾");
       }
       const advPath = path.join(DATA, "adversarial", `${DATE}.json`);
-      if (!existsSync(advPath)) rec("s4-adversarial", "FAIL", `对抗审计 ${advPath} 缺失(三视角证伪是固定标准)`);
+      if (!existsSync(advPath)) {
+        // 2026-06-12 对齐 0611 用户裁决(feedback_football_always_workflow):signal-verify workflow
+        // 仅用户明说才跑,默认单线零token。当日未跑≠闸断,但交付必须逐场诚实标"⚠️未跑"且
+        // 绝不出现伪造的证伪背书——诚实标注=SKIP(留痕),发现假背书/无标注=FAIL(防编造审计声明)。
+        const xlsxHonest = (() => {
+          try {
+            const raw = execFileSync("python", ["-c", `
+import openpyxl,json,sys
+sys.stdout.reconfigure(encoding='utf-8')
+wb=openpyxl.load_workbook(r'${path.join(DELIVER, `神选-竞彩推荐-${DATE}.xlsx`)}',read_only=True)
+ws=wb[wb.sheetnames[0]]
+rows=list(ws.iter_rows(values_only=True))
+hdr=[str(c) if c else '' for c in rows[2]]
+ai=[i for i,n in enumerate(hdr) if '证伪' in n][0]
+cells=[str(r[ai] or '') for r in rows[3:] if r and r[2]]
+print(json.dumps({'total':len(cells),'honest':sum(1 for c in cells if '未跑' in c or '未审计' in c),'fake':sum(1 for c in cells if ('通过' in c or '三票' in c) and '未跑' not in c)}))
+`], { encoding: "utf8", timeout: 60000, env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
+            return JSON.parse(raw);
+          } catch { return null; }
+        })();
+        if (!xlsxHonest) rec("s4-adversarial", "FAIL", "对抗审计缺失且无法核验xlsx证伪列诚实标注(检查器断=闸断)");
+        else if (xlsxHonest.fake > 0 || xlsxHonest.honest < xlsxHonest.total) rec("s4-adversarial", "FAIL", `对抗审计未跑但xlsx证伪列有${xlsxHonest.fake}处疑似假背书/${xlsxHonest.total - xlsxHonest.honest}处未诚实标'未跑'——绝不编造审计声明`);
+        else rec("s4-adversarial", "SKIP", `当日未跑signal-verify(0611裁决:用户明说才起workflow);xlsx证伪列${xlsxHonest.total}场全部诚实标'⚠️未跑',串关列已按'证伪未覆盖'降🟡`);
+      }
       else {
         const adv = JSON.parse(readFileSync(advPath, "utf8"));
         const keys = new Set(Object.keys(adv.verdicts || {}));

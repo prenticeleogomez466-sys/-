@@ -112,16 +112,21 @@ def main(path):
             errors.append(f"{row_name} Elo先验列无三向概率也无缺数标注: {elo[:30]}")
 
         # 让球透明度: 双过盘数 + 同/不同向标注(独立裁决但必须透明)
+        # 2026-06-12: 预售腿(下期胜负彩,市场让球赔率未开卖)合法形态="过盘x%(模型)(市场赔率⚠️缺)"
+        #   ——诚实标缺是铁律要求的形态,不算缺透明双数;但缺市场数时绝不许出现伪造的"(市场)"百分数。
         rq = cells.get("让球方向", "")
-        if rq.count("过盘") < 1 or "(模型)" not in rq or "(市场)" not in rq:
+        market_ok = "(市场)" in rq or re.search(r"市场[^〕)]*⚠?️?缺", rq)
+        if rq.count("过盘") < 1 or "(模型)" not in rq or not market_ok:
             errors.append(f"{row_name} 让球列缺'过盘%(模型)vs%(市场)'透明双数: {rq[:30]}")
         if "与胜平负" not in rq:
             errors.append(f"{row_name} 让球列缺与胜平负同/不同向标注")
 
         # 比分: 主推 + ≥3个 比分(p%);只查主推区前3档降序(单元格后段可能附全档列表)
+        # 2026-06-12: 与半全场列同口径——🔶来源标注(如"🔶模型DC矩阵:比分盘未开售→退模型")
+        #   等价于"主推"来源标注;预售腿无市场比分盘时这是诚实合法形态。
         score = cells.get("比分", "")
         sc = [int(x) for x in re.findall(r"\d+-\d+\((\d+)%\)", score)]
-        if "主推" not in score:
+        if "主推" not in score and "🔶" not in score:
             errors.append(f"{row_name} 比分列缺'主推'来源标注")
         if len(sc) < 3:
             errors.append(f"{row_name} 比分主推不足3档: {score[:30]}")
