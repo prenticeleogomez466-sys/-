@@ -13,6 +13,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { preflightOrDie } from "../src/preflight-selfcheck.js";
+import { jingcaiWeekdayLabel, sequenceWeekdayPrefix } from "../src/jingcai-business-day.js";
 
 // 启动自检(2026-06-11 用户裁决:所有生成入口启动必检,红=拒跑;--skip-preflight 仅诊断)
 await preflightOrDie("wc:slip 实盘下注单");
@@ -26,7 +27,24 @@ const EXP = process.env.FOOTBALL_EXPORT_DIR || "D:\\football-model-exports";
 const pred = JSON.parse(readFileSync(path.join(EXP, "worldcup-match-predictions.json"), "utf8"));
 if (pred.date !== DATE) { console.error(`预测JSON日期${pred.date}≠${DATE},先跑 npm run wc:predict`); process.exit(1); }
 const market = JSON.parse(readFileSync(path.join(DATA, "market", `${DATE}.json`), "utf8"));
-const snaps = (market.snapshots || []).filter((s) => s.competition === "世界杯" && s.marketType === "jingcai");
+let snaps = (market.snapshots || []).filter((s) => s.competition === "世界杯" && s.marketType === "jingcai");
+// 当日业务日过滤(2026-06-12 用户裁决:"每次只给我推荐当天的竞彩比赛"——下注单与竞彩表同口径,
+//   口径权威=竞彩编号周缀(5003 的 5=周五),编号取自 fixtures/<date>.json 的 jingcai 单场;
+//   --all-onsale 保留全在售窗口)。无编号可归业务日的场如实排除(绝不猜)。
+const ALL_ONSALE = process.argv.includes("--all-onsale");
+const WD_DIGIT = { "周一": "1", "周二": "2", "周三": "3", "周四": "4", "周五": "5", "周六": "6", "周日": "7" };
+const todayDigit = WD_DIGIT[jingcaiWeekdayLabel(DATE)] ?? null;
+if (!ALL_ONSALE && todayDigit) {
+  const fxAll = JSON.parse(readFileSync(path.join(DATA, "fixtures", `${DATE}.json`), "utf8")).fixtures || [];
+  const todayKeys = new Set(fxAll
+    .filter((f) => f.marketType === "jingcai")
+    .filter((f) => { const seq = String(f.sequence ?? ""); return (seq.length >= 4 && seq.startsWith(todayDigit)) || sequenceWeekdayPrefix(seq) === jingcaiWeekdayLabel(DATE); })
+    .map((f) => `${f.homeTeam}|${f.awayTeam}`));
+  const before = snaps.length;
+  snaps = snaps.filter((s) => todayKeys.has(`${s.homeTeam}|${s.awayTeam}`));
+  console.error(`当日业务日过滤(${jingcaiWeekdayLabel(DATE)}=周缀${todayDigit}):${before}场→${snaps.length}场(--all-onsale 可出全量)`);
+  if (!snaps.length) { console.error(`❌ 今日业务日(${jingcaiWeekdayLabel(DATE)})无在售世界杯竞彩场——不出空单。`); process.exit(1); }
+}
 let adv = {};
 try { adv = JSON.parse(readFileSync(path.join(DATA, "adversarial", `${DATE}.json`), "utf8")).verdicts || {}; } catch { /* 无对抗档如实缺标 */ }
 const groups = JSON.parse(readFileSync(path.join(DATA, "world-cup", "2026", "groups.json"), "utf8"));
@@ -39,9 +57,12 @@ const rows = [], skipped = [];
 // 对抗审计标注来源感知: vintage='当期(wc-match-model)'=对本单决策源的实时三视角证伪;
 // 旧版vintage=对每日模型picks的参考。两者都只标注不筛单(红场保留是用户裁决)。
 const advRef = (h, a) => { const v = adv[`${h}|${a}`]; return v && /🔴|🟠/.test(v.label) ? v : null; };
+// 英文名归一:groups.json("United States") vs match-dates("USA")等源间变体,去音调符+别名表
+const EN_ALIAS = { "united states": "usa", "united states of america": "usa", "south korea": "korea republic", "ivory coast": "cote d'ivoire" };
+const normEn = (s) => { const t = String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim(); return EN_ALIAS[t] ?? t; };
 const kickoffOf = (h, a) => {
-  const eh = enOf[h], ea = enOf[a];
-  const m = Object.values(md).find((x) => (x.homeTeam === eh && x.awayTeam === ea) || (x.homeTeam === ea && x.awayTeam === eh));
+  const eh = normEn(enOf[h]), ea = normEn(enOf[a]);
+  const m = Object.values(md).find((x) => (normEn(x.homeTeam) === eh && normEn(x.awayTeam) === ea) || (normEn(x.homeTeam) === ea && normEn(x.awayTeam) === eh));
   if (!m) return "";
   const t = new Date(Date.parse(m.dateUtc) + 8 * 3600e3);
   return `${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")} ${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
