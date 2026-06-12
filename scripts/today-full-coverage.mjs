@@ -103,7 +103,8 @@ const isWc = isWorldCupGame; // 动态判定(2026-06-10,替代旧 WC_SINGLES 硬
 const compTag = (p) => (isWc(p) ? "世界杯·单场" : (p.fixture.competition || "国际赛"));
 
 // 补全层渲染(全真实,缺标缺)
-const recStr = (side) => side.record5?.n ? `${side.record5.w}胜${side.record5.d}平${side.record5.l}负·进${side.record5.gf}失${side.record5.ga}` : "❌未取到";
+// 2026-06-12 诚实标注:ESPN 实取不足5场时(如美国仅4场)明标"仅N场",不让"近5"表头冒充满额。
+const recStr = (side) => side.record5?.n ? `${side.record5.w}胜${side.record5.d}平${side.record5.l}负·进${side.record5.gf}失${side.record5.ga}${side.record5.n < 5 ? `(⚠️ESPN仅${side.record5.n}场)` : ""}` : "❌未取到";
 // 比分一律本队视角 gf-ga(胜必然 X>Y,避免"主-客"朝向出现"胜1-2"自相矛盾)+ 对手简称
 const last5Str = (side) => side.last5?.length ? side.last5.map((x) => `${x.res}${x.gf}-${x.ga}(${x.homeAway === "home" ? "主" : "客"}${x.oppAbbr})`).join(" ") : "";
 // H2H 从当前主队视角 gf-ga(h2h=主队历史筛对手,gf/ga 即主队)
@@ -221,11 +222,13 @@ const rows = games.map((p, i) => {
   //    模型方向一致视图退居次行;无盘口场如实退模型🔶。绝不人造分歧:盘口真同向时标"同向共振"。
   const msv = marketScoreView(p);
   const mhv = marketHalfFullView(p);
+  // 2026-06-12 标签消歧:次行数值来自同一500盘de-vig、只是按模型方向筛(主选3档+次选1档),
+  //   旧尾标〔✅500盘口主推〕挂在🔶次行末易误读成"次行=盘口主推"。
   const scoreCell = msv.fromMarket
-    ? `${msv.cell}\n模型方向一致🔶: ${simpleScoreCell(p)}`
+    ? `${msv.cell}\n模型方向视图🔶(主选3档+次选1档·数值=同盘de-vig): ${simpleScoreCell(p)}`
     : `${simpleScoreCell(p)}〔🔶模型DC矩阵:${msv.basis}〕`;
   const hfCell = mhv.fromMarket
-    ? `${mhv.cell}\n模型方向锚🔶: ${simpleHalfFullCell(p)}`
+    ? `${mhv.cell}\n模型方向锚🔶(终场=主选/次选方向·数值=同盘de-vig): ${simpleHalfFullCell(p)}`
     : `${simpleHalfFullCell(p)}〔🔶模型半场联合:${mhv.basis}〕`;
   // 信号面板:欧赔初→现异动 + DK亚盘开→现/水位 + 竞彩让球盘资金 + 共振/背离裁决(全部本次实抓,缺标缺)
   const t7live = c?.asianHandicap?.titan007?.live ?? null;
@@ -245,7 +248,7 @@ const rows = games.map((p, i) => {
     wld: simpleWldCell(p), handicap: simpleHandicapCell(p), hcView: hcViewStr(p, s), hcP,
     score: scoreCell, halffull: hfCell,
     msv, mhv, signals: panel.text, signalDirs: panel.dirs,
-    scoreSrc: msv.fromMarket ? "✅500盘口主推" : "🔶DC", hfSrc: mhv.fromMarket ? "✅500盘口主推" : "🔶DC",
+    scoreSrc: msv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC", hfSrc: mhv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC",
     // 真实赔率(✅500实测 + ESPN/DK与titan007双源亚盘 + 外盘欧赔参考;coverage 缺 → 诚实标缺不编)
     euro: (s.europeanOdds?.current || cov) ? euroStr(s, c) : COV_MISS,
     asian: cov ? (c?.asianHandicap ? renderAsianDualCell(c.asianHandicap) : asianStr(c?.espnOdds)) : COV_MISS,
