@@ -63,6 +63,35 @@ test("buildParlayPlan:两场→2串1;每注恰一腿/场(同场单玩法);赔率
   for (const t of plan.tiers) for (const c of t.combos) assert.ok(c.evMkt < 0, "de-vig 概率×赔率必小于1(抽水),EV 不可能为正");
 });
 
+test("buildParlayPlan:默认每档最多4注;极限高赔档存在且全部≥40倍", () => {
+  const a = buildParlayLegs(mkPred(), JQS);
+  const b = buildParlayLegs(mkPred({ fixture: { homeTeam: "丙队", awayTeam: "丁队", sequence: "5002" } }), JQS);
+  const plan = buildParlayPlan([a, b]);
+  for (const t of plan.tiers) assert.ok(t.combos.length <= 4, `${t.tier} 超过4注`);
+  const vol = plan.tiers.find((t) => t.tier === "🌋极限高赔");
+  assert.ok(vol, "比分6×比分6最高132倍,极限高赔档(≥40)必须存在");
+  for (const c of vol.combos) assert.ok(c.odds >= 40);
+});
+
+test("buildParlaySheet:100元口径列(可中=串赔×100含本金/净赚/期望回收恒<100)+ 腿数动态派生", async () => {
+  const { buildParlaySheet } = await import("../src/today-delivery-lib.js");
+  const a = buildParlayLegs(mkPred(), JQS);
+  const b = buildParlayLegs(mkPred({ fixture: { homeTeam: "丙队", awayTeam: "丁队", sequence: "5002" } }), JQS);
+  const plan = buildParlayPlan([a, b]);
+  const sheet = buildParlaySheet({ date: "2026-06-12", plan, jqsFetchedAt: null, advBanner: "" });
+  assert.match(sheet.rows[0][0], /全2串1.*100元/);
+  const header = sheet.rows.find((r) => r[0] === "档位");
+  assert.ok(header.includes("100元可中(含本金)✅") && header.includes("100元净赚·回报率✅") && header.includes("100元期望回收🔶"));
+  assert.equal(header.filter((h) => /^腿\d/.test(h)).length, 2, "腿列数须=场数动态派生");
+  const iOdds = header.indexOf("串赔率✅"), iWin = header.indexOf("100元可中(含本金)✅"), iExp = header.indexOf("100元期望回收🔶");
+  for (const r of sheet.rows) {
+    if (r[0] !== "档位" && header.length === r.length && /元$/.test(String(r[iWin] ?? ""))) {
+      assert.equal(parseInt(r[iWin]), Math.round(Number(r[iOdds]) * 100), "可中金额必须=串赔×100");
+      assert.ok(parseInt(r[iExp]) < 100, "期望回收必须<100元(抽水诚实)");
+    }
+  }
+});
+
 test("buildParlayPlan:仅1场有赔率 → ok:false 如实不出(不硬凑单关)", () => {
   const a = buildParlayLegs(mkPred(), JQS);
   const empty = { match: "x vs y", seq: "5009", legs: [] };

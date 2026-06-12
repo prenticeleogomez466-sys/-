@@ -367,21 +367,25 @@ export function buildFourteenSheetRows({ date, fourteen, periodFacts = [] }) {
 const parlayLegStr = (l) => `${l.match}\n${l.label}(de-vig ${Math.round(l.probMkt * 100)}%${Number.isFinite(l.probModel) ? `·模型${Math.round(l.probModel * 100)}%` : ""})`;
 const parlayPct = (x) => `${(x * 100).toFixed(x >= 0.095 ? 0 : 1)}%`;
 export function buildParlaySheet({ date, plan, jqsFetchedAt, advBanner }) {
-  const head = [`🔗 串关推荐(混合过关·全2串1) · ${date}`];
+  const legsN = plan?.ok ? (plan.tiers[0]?.combos[0]?.legs.length ?? 2) : 2;
+  const head = [`🔗 串关推荐(混合过关·全${legsN}串1·每注100元口径) · ${date}`];
   const rules = [
-    ["规则", "竞彩混合过关:同一场只能选一个玩法的一个选项入同一注;今日在售场为2场→本表全部2串1。"],
-    ["数据", `腿赔率=✅500真盘实测(胜负平/让球/比分/半全场=当日快照;总进球=本次实抓 trade.500.com pl_jqs${jqsFetchedAt ? `,抓取${jqsFetchedAt}` : ""});串赔率=两腿实测赔率乘积。`],
-    ["口径", "联合概率=🔶推断(各玩法全集比例法de-vig × 跨场独立性假设);EV(市场口径)=联合概率×串赔-1,恒为负(两重抽水叠乘)——串关数学期望必然劣于单注,本表只按要求给搭法标注,不构成下注建议。"],
+    ["规则", `竞彩混合过关:同一场只能选一个玩法的一个选项入同一注;今日在售场为${legsN}场→本表全部${legsN}串1。`],
+    ["数据", `腿赔率=✅500真盘实测(胜负平/让球/比分/半全场=当日快照;总进球=本次实抓 trade.500.com pl_jqs${jqsFetchedAt ? `,抓取${jqsFetchedAt}` : ""});串赔率=各腿实测赔率乘积。`],
+    ["口径", "金额列按每注100元假设:可中=串赔×100(含本金);净赚=可中-100,回报率=净赚/100;期望回收🔶=联合概率×可中(恒<100元,两重抽水叠乘)——串关数学期望必然劣于单注,本表只按要求给搭法标注,不构成下注建议。联合概率=🔶推断(各玩法全集比例法de-vig × 跨场独立性假设)。"],
     ...(advBanner ? [["风险", advBanner]] : []),
   ];
   if (!plan?.ok) return { name: "串关推荐", rows: [head, ...rules, [`⚠️ ${plan?.note ?? "串关计划未构建"}(如实不出,不硬凑)`]] };
-  const header = ["档位", "腿1(场·玩法·选项@赔率✅)", "腿2(场·玩法·选项@赔率✅)", "串赔率✅", "市场联合概率🔶", "模型联合概率🔶", "EV市场口径🔶", "2元1注可中", "说明"];
+  const header = ["档位", ...Array.from({ length: legsN }, (_, i) => `腿${i + 1}(场·玩法·选项@赔率✅)`),
+    "串赔率✅", "100元可中(含本金)✅", "100元净赚·回报率✅", "市场联合概率🔶", "模型联合概率🔶", "100元期望回收🔶", "说明"];
   const body = [];
   for (const t of plan.tiers) {
     for (const c of t.combos) {
-      body.push([t.tier, parlayLegStr(c.legs[0]), parlayLegStr(c.legs[1]), `${c.odds}`, parlayPct(c.probMkt),
+      const win = Math.round(c.odds * 100), net = win - 100;
+      body.push([t.tier, ...c.legs.map(parlayLegStr), `${c.odds}`,
+        `${win}元`, `+${net}元(+${net}%)`, parlayPct(c.probMkt),
         c.probModel != null ? parlayPct(c.probModel) : "—(比分/半全场/总进球腿无模型概率,诚实不编)",
-        `${c.evMkt}`, `${Math.round(c.odds * 2 * 100) / 100}元`, c.why]);
+        `${Math.round(c.probMkt * win)}元(亏${100 - Math.round(c.probMkt * win)})`, c.why]);
     }
   }
   const tail = [[""]];
@@ -396,11 +400,12 @@ export function renderParlayHtmlSection(plan, { compact = false } = {}) {
   const esc2 = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   if (!plan) return "";
   if (!plan.ok) return `<div class="note">🔗 串关推荐:⚠️ ${esc2(plan.note ?? "未构建")}(如实不出)</div>`;
+  const legsN = plan.tiers[0]?.combos[0]?.legs.length ?? 2;
   const rows = plan.tiers.flatMap((t) => t.combos.map((c) =>
-    `<tr><td>${esc2(t.tier)}</td><td>${c.legs.map((l) => `${esc2(l.match)}<br><b>${esc2(l.label)}</b><span style="color:#9aa6b4">(${Math.round(l.probMkt * 100)}%)</span>`).join("<hr style='border:none;border-top:1px dashed #ddd;margin:3px 0'>")}</td><td><b>${c.odds}</b></td><td>${esc2(parlayPct(c.probMkt))}${c.probModel != null ? `<br><span style="color:#9aa6b4">模型${esc2(parlayPct(c.probModel))}</span>` : ""}</td></tr>`)).join("");
-  return `<h2 style="font-size:15px;margin:16px 4px 6px;color:#4A148C">🔗 串关推荐(混合过关·全2串1)</h2>
-<div class="note" style="font-size:11.5px">同场只能选一个玩法入串(竞彩规则)。串赔=✅500实测乘积;概率=🔶de-vig×独立假设;串关EV恒负(双重抽水),数学期望劣于单注——只给搭法,买不买你定。${compact ? "" : "完整EV/说明列见 xlsx「串关推荐」表。"}</div>
-<table${compact ? ` class="core" style="font-size:12px"` : ""}><tr><th>档位</th><th>搭法(2串1)</th><th>串赔✅</th><th>联合概率🔶</th></tr>${rows}</table>`;
+    `<tr><td>${esc2(t.tier)}</td><td>${c.legs.map((l) => `${esc2(l.match)}<br><b>${esc2(l.label)}</b><span style="color:#9aa6b4">(${Math.round(l.probMkt * 100)}%)</span>`).join("<hr style='border:none;border-top:1px dashed #ddd;margin:3px 0'>")}</td><td><b>${c.odds}</b></td><td><b>${Math.round(c.odds * 100)}元</b><br><span style="color:#9aa6b4">净+${Math.round(c.odds * 100) - 100}</span></td><td>${esc2(parlayPct(c.probMkt))}${c.probModel != null ? `<br><span style="color:#9aa6b4">模型${esc2(parlayPct(c.probModel))}</span>` : ""}</td></tr>`)).join("");
+  return `<h2 style="font-size:15px;margin:16px 4px 6px;color:#4A148C">🔗 串关推荐(混合过关·全${legsN}串1·每注100元)</h2>
+<div class="note" style="font-size:11.5px">同场只能选一个玩法入串(竞彩规则)。串赔=✅500实测乘积;可中=串赔×100元含本金;概率=🔶de-vig×独立假设;串关EV恒负(双重抽水),数学期望劣于单注——只给搭法,买不买你定。${compact ? "" : "完整期望回收/说明列见 xlsx「串关推荐」表。"}</div>
+<table${compact ? ` class="core" style="font-size:12px"` : ""}><tr><th>档位</th><th>搭法(${legsN}串1)</th><th>串赔✅</th><th>100元可中✅</th><th>联合概率🔶</th></tr>${rows}</table>`;
 }
 
 // ── 手机页头条覆盖副标题(2026-06-10 审计确认缺陷:头条硬编码"5赔种全覆盖"假全覆盖声明,与 xlsx 真计数 banner 口径不一) ──

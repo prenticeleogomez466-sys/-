@@ -73,7 +73,7 @@ export function buildParlayLegs(p, jqsOdds = null) {
 
 // 跨场组合(每场一腿,符合"同场只能一个玩法"规则)。games=buildParlayLegs产物数组。
 // 返回分档组合;每档按市场联合概率降序,跨档去重。
-export function buildParlayPlan(games, { maxPerTier = 2 } = {}) {
+export function buildParlayPlan(games, { maxPerTier = 4 } = {}) {
   const usable = games.filter((g) => g.legs.length);
   if (usable.length < 2) return { ok: false, note: `可串场次不足(需≥2场有真实赔率,实际${usable.length}场)`, tiers: [] };
   // 全交叉(场次小时可行;>3场只取每场概率top8腿防爆炸)
@@ -106,6 +106,7 @@ export function buildParlayPlan(games, { maxPerTier = 2 } = {}) {
     { tier: "🛡️最稳", combos: take(byProb, maxPerTier, "全玩法中市场de-vig联合概率最高的搭法(稳=概率,非保中)") },
     { tier: "⚖️均衡", combos: take(byProb.filter((c) => c.odds >= 4 && c.odds < 9), maxPerTier, "串赔4~9倍区间内联合概率最高") },
     { tier: "🚀高赔", combos: take(byProb.filter((c) => c.odds >= 9 && c.odds < 40), maxPerTier, "串赔9~40倍区间内联合概率最高(比分/半全场天花板低,中率以联合概率为准)") },
+    { tier: "🌋极限高赔", combos: take(byProb.filter((c) => c.odds >= 40), maxPerTier, "串赔≥40倍(多为比分/半全场互串),联合概率1%上下,纯彩票性质") },
     { tier: "💣爆冷", combos: take(byProb.filter((c) => c.legs.every((l) => l.probMkt <= 0.30)), maxPerTier, "每腿均为该玩法冷方向(de-vig≤30%),赔高但联合概率个位数%以下") },
   ].filter((t) => t.combos.length);
   // 模型分歧参考:模型联合概率有值且模型EV>市场EV的最大者(诚实:模型=市场跟随器,常无正EV)
