@@ -142,7 +142,15 @@ const euroStr = (s, c) => {
   if (ref) return `竞彩未开售;${ref}`;
   return "⚠️未开售(竞彩只卖让球)";
 };
-const hcStr = (p, s) => { const line = s.jingcaiHandicap?.line ?? p.handicapPick?.line; const h = s.handicapOdds; if (!h || !h.current) return `让${line}(赔率⚠️缺)`; const cur = trip(h.current), ini = trip(h.initial); return `让${line} ${cur}${ini && ini !== cur ? `(初${ini})` : ""} ✅500让球`; };
+const hcStr = (p, s) => {
+  const h = s.handicapOdds; if (!h || !h.current) return "让球赔率⚠️缺";
+  const cur = trip(h.current), ini = trip(h.initial);
+  // 2026-06-13 铁律:只有竞彩官方让球线(jingcaiHandicap.line)在才标"让X ✅500让球";线未抓到=赔率真但线缺,
+  //   绝不用模型/推断线(p.handicapPick.line 本就无 line 字段=undefined)冒充"让X ✅500"。
+  const realLine = s.jingcaiHandicap?.line;
+  if (realLine == null) return `让球赔率✅500=${cur}${ini && ini !== cur ? `(初${ini})` : ""}·⚠️竞彩官方让球线未抓到(以竞彩App实际线为准)`;
+  return `让${realLine} ${cur}${ini && ini !== cur ? `(初${ini})` : ""} ✅500让球`;
+};
 const ouRealStr = (s) => { const t = s.totalGoalsOdds; if (!t || t.over25 == null) return "⚠️未取到"; return `大2.5球 大${Math.round(t.over25 * 100)}%/小${Math.round(t.under25 * 100)}% ✅500总进球`; };
 const distStr = (s) => { const d = s.totalGoalsOdds?.dist; if (!d) return ""; return Object.entries(d).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([g, pp]) => `${g}球${Math.round(pp * 100)}%`).join(" "); };
 const scoreMktStr = (s) => { const t = s.scoreOdds?.top; return t?.length ? t.slice(0, 5).map((x) => `${x.score}@${x.odds}`).join(" ") + " ✅500比分" : "⚠️未取到"; };
@@ -153,7 +161,15 @@ const asianStr = (eo) => eo?.asian?.line != null
 // 透明让球视图:模型过盘 + 市场de-vig 两套数(带队名),分歧大按铁律标"市场更准·谨慎"。
 // 修2026-06-09:旧 simpleHandicapCell 头条用市场de-vig却配模型"把握"标签,阿根廷出"40%·把握低"与模型67%自相矛盾。
 const hcParts = (p, s) => {
-  const line = s.jingcaiHandicap?.line ?? p.handicapPick?.line;
+  // 2026-06-13 铁律:竞彩官方让球线缺时,模型过盘按推断线(默认0)算不可信→标缺不冒充,且避免 NaN/undefined 垃圾。
+  if (s.jingcaiHandicap?.line == null) {
+    const hc = s.handicapOdds?.current;
+    return { line: "⚠️竞彩官方让球线未抓到", lineNum: null,
+      model: "官方让球线未抓到→模型过盘不出(绝不按推断线冒充)",
+      market: hc ? "让球赔率✅500在·过盘对应竞彩实际线(线未抓到,见赔率列,以App为准)" : "缺",
+      diverge: false, mkDist: null };
+  }
+  const line = s.jingcaiHandicap.line;
   const home = p.fixture.homeTeam, away = p.fixture.awayTeam, absL = Math.abs(line);
   const cb = p.handicapPick?.coverBreakdown || {};
   const hc = s.handicapOdds?.current;
@@ -188,7 +204,11 @@ const auditFor = (p, s, c, prior, wcCtx) => {
   const ec = p.experienceContext;
   return {
     "欧赔": euro,
-    "让球": s.handicapOdds?.current ? auditCell("✅实测", `让${s.jingcaiHandicap?.line ?? p.handicapPick?.line} ${trip(s.handicapOdds.current)}`, "500竞彩XML(nspf)", t500) : MISS("500让球赔率未抓到"),
+    "让球": s.handicapOdds?.current
+      ? (s.jingcaiHandicap?.line != null
+        ? auditCell("✅实测", `让${s.jingcaiHandicap.line} ${trip(s.handicapOdds.current)}`, "500竞彩XML(nspf)", t500)
+        : auditCell("🔶部分", `让球赔率✅${trip(s.handicapOdds.current)}·官方让球线⚠️未抓到(不冒充推断线)`, "500竞彩XML(nspf)·线缺", t500))
+      : MISS("500让球赔率未抓到"),
     "比分": s.scoreOdds?.top?.length ? auditCell("✅实测", `top${s.scoreOdds.top.length}档`, "500竞彩XML(bf)", t500) : MISS("500比分盘未开售/未抓到"),
     "半全场": s.halfFullOdds?.top?.length ? auditCell("✅实测", `top${s.halfFullOdds.top.length}档`, "500竞彩XML(bqc)", t500) : MISS("500半全场未开售/未抓到"),
     "大小球": s.totalGoalsOdds?.over25 != null ? auditCell("✅实测", `大2.5=${Math.round(s.totalGoalsOdds.over25 * 100)}%`, "500竞彩XML(jqs de-vig)", t500) : MISS("500总进球未抓到"),
@@ -225,6 +245,7 @@ const rows = games.map((p, i) => {
     line: s.jingcaiHandicap?.line ?? p.handicapPick?.line,
     wldCode: p.pick?.code, wldLabel: p.pick?.label,
     hw: p.handicapPick?.handicapWld ?? null, marketDist: hcP.mkDist,
+    lineReal: s.jingcaiHandicap?.line != null, // 2026-06-13:仅真竞彩官方线才出过盘分析,线缺=标缺不冒充
   });
   const adv = advFor(p);
   // ── 四玩法独立真实裁决(2026-06-11 用户裁决):比分/半全场主推=各自500盘口de-vig真实热门(✅市场,可与胜负平不同向),

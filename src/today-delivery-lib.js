@@ -87,8 +87,16 @@ export function wcPriorCells({ isWc, prior, lambdaCtx, wcLine }) {
 }
 
 // ── ② 让球方向·模型真实裁决(handicapWld argmax;与胜平负不同向时注逻辑) ──
-export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist }) {
+export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, lineReal = true }) {
   if (!hw?.pickCode) return { text: "⚠️让球真实裁决缺(无让球三态分布)", sameDir: null, note: null, verdict: null, modelPct: null, marketPct: null };
+  // 2026-06-13 铁律(用户三次重申"不许冒充·我要下注"):竞彩官方让球线未抓到时,过盘%只能按推断线算=不可信。
+  //   按 feedback_no_fallback_absolute=标缺不冒充:本场不出让球过盘数字,绝不用推断线盖✅500冒充真实裁决。
+  if (!lineReal) {
+    return {
+      text: "⚠️竞彩官方让球线未抓到→本场不出让球过盘分析(让球赔率✅500在,具体线以竞彩App实际为准;绝不用推断线冒充真实过盘)",
+      sameDir: null, note: "line-missing", verdict: null, modelPct: null, marketPct: null, lineReal: false,
+    };
+  }
   const L = Number(line) || 0;
   const absL = Math.abs(L);
   const lineStr = L > 0 ? `受让+${L}` : L < 0 ? `让${L}` : "平手";
