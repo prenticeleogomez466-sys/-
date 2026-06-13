@@ -76,13 +76,38 @@ export function buildParlayLegs(p, jqsOdds = null) {
 export function buildParlayPlan(games, { maxPerTier = 4 } = {}) {
   const usable = games.filter((g) => g.legs.length);
   if (usable.length < 2) return { ok: false, note: `可串场次不足(需≥2场有真实赔率,实际${usable.length}场)`, tiers: [] };
-  // 全交叉(场次小时可行;>3场只取每场概率top8腿防爆炸)
+  // 2~4 腿串(2026-06-13 修 OOM):旧实现是"每场都串一腿"的全场笛卡尔积(k=N 腿 + 组合数=∏每场腿数),
+  // 场次一多(今天业务日 10 场)即 8^10≈10.7 亿组合爆内存,且语义也错(串成 N 腿而非用户 0612 定的 2-4 腿)。
+  // 改为按腿数 k∈{2,3,4} 枚举【场次组合】(同场只入一腿,守"混合过关同场一玩法"规则);
+  // 场次多时收紧每场候选腿数(>6 场→top5,3<n≤6→top8,≤3→全保留=旧行为),并加硬上限防爆炸。
+  const perGame = usable.length > 6 ? 5 : usable.length > 3 ? 8 : Infinity;
   const lists = usable.map((g) => {
     const sorted = [...g.legs].sort((a, b) => b.probMkt - a.probMkt);
-    return (usable.length > 3 ? sorted.slice(0, 8) : sorted).map((l) => ({ ...l, match: g.match, seq: g.seq }));
+    return sorted.slice(0, perGame).map((l) => ({ ...l, match: g.match, seq: g.seq }));
   });
-  let combos = [[]];
-  for (const list of lists) combos = combos.flatMap((c) => list.map((l) => [...c, l]));
+  const COMBO_CAP = 200000;
+  const combos = [];
+  const maxK = Math.min(4, lists.length);
+  const gameCombos = (k) => {
+    const res = [];
+    const pick = (start, acc) => {
+      if (acc.length === k) { res.push([...acc]); return; }
+      for (let i = start; i < lists.length; i++) { acc.push(i); pick(i + 1, acc); acc.pop(); }
+    };
+    pick(0, []);
+    return res;
+  };
+  outer:
+  for (let k = 2; k <= maxK; k++) {
+    for (const idxs of gameCombos(k)) {
+      let part = [[]];
+      for (const gi of idxs) part = part.flatMap((c) => lists[gi].map((l) => [...c, l]));
+      for (const legs of part) {
+        combos.push(legs);
+        if (combos.length >= COMBO_CAP) break outer;
+      }
+    }
+  }
   const scored = combos.map((legs) => {
     const odds = r2(legs.reduce((t, l) => t * l.odds, 1));
     const probMkt = r3(legs.reduce((t, l) => t * l.probMkt, 1));
