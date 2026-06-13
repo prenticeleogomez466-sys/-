@@ -63,6 +63,7 @@ export function buildDailyRecommendationPackage(date, options = {}) {
     { name: "神选·竞彩", rows: [jingcaiHeaders(), ...jingcai.map(toJingcaiRow)] },
     { name: "神选·多玩法", rows: multiPlayRows(recommendations.predictions) },
     { name: "神选·深度分析", rows: deepAnalysisRows(recommendations.predictions) },
+    { name: "神选·驱动归因", rows: driverAttributionRows(recommendations.predictions) },
     { name: "神选·14场", rows: fourteenRows },
     { name: "神选·任选9", rows: renxuan9Rows(recommendations.fourteen.available === false ? { ok: false, reason: recommendations.fourteen.note ?? "今日无 14 场胜负彩,任选9 不适用。" } : recommendations.fourteen.renxuan9) },
     { name: "赔率变化", rows: [oddsComparisonHeaders(), ...recommendations.predictions.map(toOddsComparisonRow)] },
@@ -75,6 +76,44 @@ export function buildDailyRecommendationPackage(date, options = {}) {
   ]);
   writeXlsxWorkbook(masterPath, [{ name: "复盘总表", rows: [recapHeaders(), ...ledger.map(Object.values)] }]);
   return { date, dailyPath, internalPath, masterPath, recommendations, audit, auditPath, selfCheck, sourceGate, health: { ok: true }, ledgerRows: ledger.length };
+}
+
+// 神选·驱动归因 sheet(2026-06-13):逐注把最终概率拆成可追溯驱动(俱乐部=市场/DC锚→融合→校准
+//   瀑布;WC=决定因素)。纯读 prediction.driverAttribution(predictFixture 已挂的真实值),零编造。
+//   解释层——只回答「为什么这么推」,不改概率/方向。缺归因的场如实留空,不凑数。
+function driverAttributionRows(predictions = []) {
+  const header = ["序", "对阵", "路由", "主推", "概率瀑布(可追溯)", "主因(按影响排序)", "证据标签", "缺口"];
+  const rows = [["⚡ 神选 · 逐注驱动因子归因(为什么这么推 · 只解释不改方向)", "", "", "", "", "", "", ""], header];
+  const pctOf = (probs, key) => (probs && Number.isFinite(probs[key])) ? `${(probs[key] * 100).toFixed(1)}%` : null;
+  for (const p of Array.isArray(predictions) ? predictions : []) {
+    const a = p?.driverAttribution;
+    const vs = `${p?.fixture?.homeTeam ?? "?"} vs ${p?.fixture?.awayTeam ?? "?"}`;
+    if (!a || a.route === "data-missing") {
+      rows.push([p?.fixture?.sequence ?? "—", vs, a?.route ?? "—", "—", "", a?.narrative ?? "数据缺失·未归因", "", ""]);
+      continue;
+    }
+    const pk = a.pick?.key;
+    const waterfall = (a.waterfall ?? []).map((s) => {
+      const v = s.probs ? (pctOf(s.probs, pk) ?? "") : (s.value ?? s.note ?? "");
+      const d = (s.deltaPP != null) ? `(Δ${s.deltaPP > 0 ? "+" : ""}${s.deltaPP}pp)` : "";
+      return `${s.label}:${v}${d}`;
+    }).join("  →  ");
+    const drivers = (a.drivers ?? []).slice(0, 5).map((d) => `${d.factor}${d.detail ? `(${d.detail})` : ""}${d.direction && d.direction !== "锚" ? `·${d.direction}` : ""}`).join("；");
+    const tags = [...new Set((a.drivers ?? []).map((d) => d.tag).filter(Boolean))].join(" ");
+    const gaps = Array.isArray(a.gaps) && a.gaps.length ? a.gaps.join("；") : "";
+    rows.push([
+      p?.fixture?.sequence ?? "—",
+      vs,
+      a.route,
+      a.pick ? `${a.pick.label} ${(a.pick.prob * 100).toFixed(1)}%` : "—",
+      waterfall,
+      drivers || a.narrative,
+      tags,
+      gaps,
+    ]);
+  }
+  if (rows.length === 2) rows.push(["—", "（本期无可归因预测）", "", "", "", "", "", ""]);
+  return rows;
 }
 
 // 2026-05-30 诚实披露:无真实先验被剔除的场(未捕获赔率且不在 DC 训练集),

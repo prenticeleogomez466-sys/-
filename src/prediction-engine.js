@@ -49,6 +49,7 @@ import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
 import { analyzeMatch } from "./match-archetype-analyzer.js";
 import { synthesizeScenario, scenarioNarrative } from "./scenario-synthesizer.js";
+import { buildPickDriverAttribution } from "./pick-driver-attribution.js";
 import { leagueExpertFromFitted } from "./league-expert-mixture.js";
 import { multimodalAnalysis, summarizeMultimodal } from "./multimodal-collab.js";
 import { isScoreTopTemplate, isHalfFullTopTemplate } from "./odds-authenticity.js";
@@ -1003,6 +1004,9 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     const scNarr = scenarioNarrative(prediction.scenario);
     if (scNarr) prediction.rationale = `${prediction.rationale ?? ""}\n${scNarr}`.trim();
   }
+  // 逐注驱动因子归因(2026-06-13):把最终概率诚实拆成可追溯驱动(市场/DC锚→融合→校准;WC=决定因素)。
+  //   解释层——只说明「为什么这么推」,不改概率/方向。纯读 prediction 已挂的真实中间量,零编造。
+  prediction.driverAttribution = buildPickDriverAttribution(prediction);
   const consistencyErrors = validatePredictionConsistency(prediction);
   if (consistencyErrors.length) throw new Error(`推荐派生市场冲突：${fixture.homeTeam} 对 ${fixture.awayTeam}；${consistencyErrors.join("；")}`);
   return prediction;

@@ -269,23 +269,31 @@ function hasCIAndMemory() {
   return { score: (ci ? 2 : 0) + (memory ? 1 : 0), max: 3 };
 }
 
+// 2026-06-13 修陈旧度量:原检测 multi-source-odds-sharpener/line-movement-tracker/
+// explanation-generator/feature-importance/bankroll-risk-management/tilt-detector
+// ——这6个是 0611 铁律永久剔除的证伪僵尸(勿重建),评分卡却仍在找它们 → 决策辅助被错判 1.5/10。
+// 改指真生产件,且沿用本文件"文件在≠在跑"哲学只认 isWired(真接进预测/复盘路径)的能力。
 function hasMarketStructure() {
-  const am = hasFile("asian-handicap-water.js");
-  const ms = hasFile("multi-source-odds-sharpener.js");
-  const lm = hasFile("line-movement-tracker.js");
-  return { score: (am ? 1.5 : 0) + (ms ? 1.5 : 0) + (lm ? 1 : 0), max: 4 };
+  // 市场微结构:亚盘水位 + 去抽水隐含概率 + 收盘线值(CLV)追踪
+  const ah = isWired("asian-handicap-water.js");
+  const dv = isWired("market-devig.js");
+  const clv = isWired("clv-tracker.js");
+  return { score: (ah ? 1.5 : 0) + (dv ? 1.5 : 0) + (clv ? 1 : 0), max: 4 };
 }
 
 function hasExplanationGenerator() {
-  const eg = hasFile("explanation-generator.js");
-  const fi = hasFile("feature-importance.js");
-  return { score: (eg ? 2 : 0) + (fi ? 1 : 0), max: 3 };
+  // 解释性:情景研判(scenario 七维+玩法指引+narrative)已是生产解释主力。
+  // 缺的 1 分=逐注关键驱动因子归因(feature attribution),目前生产确无 → 诚实留缺,标记真空间。
+  const sc = isWired("scenario-synthesizer.js");
+  const attribution = isWired("pick-driver-attribution.js"); // 真空间:尚未建,建成后自动补分
+  return { score: (sc ? 2 : 0) + (attribution ? 1 : 0), max: 3 };
 }
 
 function hasRiskManagement() {
-  const brm = hasFile("bankroll-risk-management.js");
-  const td = hasFile("tilt-detector.js");
-  return { score: (brm ? 2 : 0) + (td ? 1 : 0), max: 3 };
+  // 风险提示:生产凯利/回撤(bankroll-risk.js,≠已删的 bankroll-risk-management.js) + 爆冷陷阱探测
+  const br = isWired("bankroll-risk.js");
+  const ut = isWired("upset-trap-detector.js");
+  return { score: (br ? 2 : 0) + (ut ? 1 : 0), max: 3 };
 }
 
 function hasXlsxOutput() {
