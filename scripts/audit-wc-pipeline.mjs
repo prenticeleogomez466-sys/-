@@ -272,9 +272,10 @@ if (ONLY.includes("s4")) {
       }
       const advPath = path.join(DATA, "adversarial", `${DATE}.json`);
       if (!existsSync(advPath)) {
-        // 2026-06-12 对齐 0611 用户裁决(feedback_football_always_workflow):signal-verify workflow
-        // 仅用户明说才跑,默认单线零token。当日未跑≠闸断,但交付必须逐场诚实标"⚠️未跑"且
-        // 绝不出现伪造的证伪背书——诚实标注=SKIP(留痕),发现假背书/无标注=FAIL(防编造审计声明)。
+        // 2026-06-13 用户裁决(feedback_complete_before_generate):对抗审计=每次出表【必跑】,
+        // 缺 adversarial/<date>.json = FAIL 拒交付(不再 SKIP)。推翻 0611 "仅用户明说才跑";
+        // 用户原话"审计又忘了跑,别让我总是提醒"→闸门强制,我想忘也交付不了。
+        // 仍核 xlsx 证伪列诚实性:发现假背书=FAIL(防编造审计声明)。
         const xlsxHonest = (() => {
           try {
             const raw = execFileSync("python", ["-c", `
@@ -298,7 +299,7 @@ else:
         })();
         if (!xlsxHonest) rec("s4-adversarial", "FAIL", "对抗审计缺失且无法核验xlsx证伪列诚实标注(检查器断=闸断)");
         else if (xlsxHonest.fake > 0 || xlsxHonest.honest < xlsxHonest.total) rec("s4-adversarial", "FAIL", `对抗审计未跑但xlsx证伪列有${xlsxHonest.fake}处疑似假背书/${xlsxHonest.total - xlsxHonest.honest}处未诚实标'未跑'——绝不编造审计声明`);
-        else rec("s4-adversarial", "SKIP", `当日未跑signal-verify(0611裁决:用户明说才起workflow);xlsx证伪列${xlsxHonest.total}场全部诚实标'⚠️未跑',串关列已按'证伪未覆盖'降🟡`);
+        else rec("s4-adversarial", "FAIL", `对抗审计未跑(adversarial/${DATE}.json缺)——0613用户裁决:每次出表必跑 football-signal-verify,缺=拒交付。xlsx证伪列${xlsxHonest.total}场已诚实标⚠️未跑,现去跑 Workflow({name:"football-signal-verify",args:"--date ${DATE}"}) 后重出重审`);
       }
       else {
         const adv = JSON.parse(readFileSync(advPath, "utf8"));
