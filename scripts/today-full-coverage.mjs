@@ -20,8 +20,11 @@ import {
   auditCell, buildAuditSheet, buildFourteenSheetRows,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
+  XLSX_HEADERS,
 } from "../src/today-delivery-lib.js";
-import { writeFileSync, copyFileSync, mkdirSync, readFileSync } from "node:fs";
+// 2026-06-13 交付契约硬闸(根治版式漂移/另起野页):写完产物自检,违约 fail-loud 拒认成功交付
+import { checkContract, CONTRACT_PATH } from "./freeze-delivery-contract.mjs";
+import { writeFileSync, copyFileSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 // 串关推荐(2026-06-12 用户需求:最稳/均衡/高赔/爆冷,五玩法混合过关;表+手机页+英文页三处同源)
 import { buildParlaySheet } from "../src/today-delivery-lib.js";
 import { buildParlayLegs, buildParlayPlan } from "../src/parlay-builder.js";
@@ -528,3 +531,30 @@ console.log(`\n✅ xlsx: ${xlsxTarget}`);
 console.log(`✅ 手机页: ${htmlTarget}`);
 console.log(`✅ 英文页: ${enTarget}`);
 console.log(`\nBANNER: ${BANNER}`);
+
+// ── 交付契约自检(2026-06-13 用户最高指令焊死版式漂移/野页):写完产物即校验,违约 fail-loud ──
+//   列序/列数 != 冻结契约,或交付目录冒出第二个带交付banner的页(0613式另起页) → exit 1,本次交付不算成功。
+//   合法改列/canonical名=显式跑 freeze-delivery-contract.mjs --write 重冻并提交(增减都要过用户)。
+try {
+  let contract = null;
+  try { contract = JSON.parse(readFileSync(CONTRACT_PATH, "utf8")); } catch { /* 缺契约下方报 */ }
+  const scanDir = outBase || "D:/Temp/webshare_lingdao";
+  let bearing = [];
+  if (contract) {
+    const bannerRes = (contract.deliveryBannerPatterns || []).map((p) => new RegExp(p));
+    let files = [];
+    try { files = readdirSync(scanDir).filter((f) => f.endsWith(".html")); } catch { /* 目录读不了跳过野页项 */ }
+    for (const f of files) {
+      try { const t = readFileSync(`${scanDir}/${f}`, "utf8"); if (bannerRes.some((re) => re.test(t))) bearing.push(f); } catch { /* skip */ }
+    }
+  }
+  const v = checkContract(contract, XLSX_HEADERS, bearing);
+  if (v.length) {
+    console.error("\n🔴 交付契约自检不过(本次交付不算成功):\n" + v.map((x) => "  - " + x).join("\n"));
+    console.error("如属合法改动:node scripts/freeze-delivery-contract.mjs --write 重冻并提交后重跑。");
+    process.exit(1);
+  }
+  console.log(`✅ 交付契约自检通过(列序${XLSX_HEADERS.length}逐字 + 交付页唯一,扫${scanDir}带banner ${bearing.length}个均合法)`);
+} catch (e) {
+  console.error(`🔴 交付契约自检异常(拒认成功交付):${e.message}`); process.exit(1);
+}

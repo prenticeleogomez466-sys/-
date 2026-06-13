@@ -9,6 +9,8 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { XLSX_HEADERS } from "../src/today-delivery-lib.js";
+import { checkContract, CONTRACT_PATH } from "./freeze-delivery-contract.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DATA = process.env.FOOTBALL_DATA_DIR || "D:\\football-model-data";
@@ -54,6 +56,26 @@ if (existsSync(WEBDIR)) {
     else record(`html-garbage:${f}`, "PASS", `${Math.round(txt.length / 1024)}KB 干净`);
   }
 } else record("html-garbage", "SKIP", `${WEBDIR} 不存在`);
+
+// ── 2b) 交付契约硬闸(2026-06-13 焊死版式漂移/野页): 列序/列数逐字冻结 + webshare 白名单 ──
+//   根治 0607/0613"每次进化把表格弄乱/另起手机页":出表那刻列变样或冒野页 → 红拒交付。
+//   合法改列/白名单=显式跑 freeze-delivery-contract.mjs --write 重冻并提交(增减都要过用户)。
+{
+  const contract = existsSync(CONTRACT_PATH) ? JSON.parse(readFileSync(CONTRACT_PATH, "utf8")) : null;
+  // webshare 共享目录: 按"交付banner"签名预筛出交付页(只这些受唯一性约束),零误伤彩票/小说/导航页
+  let bearing = [], scanned = 0;
+  if (contract && existsSync(WEBDIR)) {
+    const bannerRes = (contract.deliveryBannerPatterns || []).map((p) => new RegExp(p));
+    for (const f of readdirSync(WEBDIR).filter((x) => x.endsWith(".html"))) {
+      scanned++;
+      try { const t = readFileSync(path.join(WEBDIR, f), "utf8"); if (bannerRes.some((re) => re.test(t))) bearing.push(f); } catch { /* 读不了跳过 */ }
+    }
+  }
+  const v = checkContract(contract, XLSX_HEADERS, bearing);
+  if (!contract) record("delivery-contract", "SKIP", "契约缺失,先跑 freeze-delivery-contract.mjs --write");
+  else if (v.length) record("delivery-contract", "FAIL", v.join(" ‖ "));
+  else record("delivery-contract", "PASS", `列序${contract.xlsxHeaderCount}逐字冻结 + 交付页唯一(扫${scanned}个html,${bearing.length}个带交付banner均在canonical/日期副本)`);
+}
 
 // ── 3) 当日fixtures卫生: 未来场不得带result; kickoff须含HH:mm(48h内场次) ──
 const fxPath = path.join(DATA, "fixtures", `${DATE}.json`);
