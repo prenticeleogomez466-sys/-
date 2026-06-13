@@ -163,6 +163,25 @@ function summarize(rows) {
   };
 }
 
+/** 复盘覆盖自检(对齐 daily-recap.js 口径):全覆盖 / ⏳均有理由 / 0假结算 / 盘口对照覆盖 / 已开赛却未结算告警。 */
+export function wcSelfcheck(rows, predCount, today) {
+  const settled = rows.filter((r) => r.actualStatus === "settled");
+  const pend = rows.filter((r) => r.actualStatus !== "settled");
+  const mkSettled = settled.filter((r) => r.marketImplied != null);
+  // 已开赛日期已过(比赛日 < 今天)却仍 pending = 真窟窿(赛果该到位却没回填),需告警
+  const kickedButPending = pend.filter((r) => r._matchDate && r._matchDate < today);
+  return {
+    全覆盖: rows.length === predCount, 覆盖场次: rows.length, 单总表: true,
+    "⏳均有理由": pend.every((r) => Boolean(r.pendingReason)),
+    待回填: pend.length, 待回填已写理由: pend.filter((r) => r.pendingReason).length,
+    "0假结算": settled.every((r) => Boolean(r.actual)), 可疑假结算: settled.filter((r) => !r.actual).length,
+    盘口对照覆盖: mkSettled.every((r) => Boolean(r._marketWld)),
+    盘口缺隐含场: settled.filter((r) => r.marketImplied == null).length,
+    已开赛却未结算: kickedButPending.length,
+    已开赛却未结算明细: kickedButPending.map((r) => `${r._matchDate} ${r.match}`)
+  };
+}
+
 function summarySheet(date, S, rows) {
   const banner = `⚽ 2026世界杯 · 逐场复盘命中率回测 · 截至 ${date}`;
   const head = ["玩法", "命中/已结算", "累计命中率", "口径说明"];
@@ -217,12 +236,15 @@ function runMain() {
   const rows = buildWcMatchRecap(predByMatch, fixtures);
   const S = summarize(rows);
   const today = new Date().toISOString().slice(0, 10);
+  const selfcheck = wcSelfcheck(rows, predByMatch.size, today);
 
   console.log(`\n=== 2026世界杯逐场复盘(${rows.length}场冻结预测,已结算 ${S.settled},待开赛/回填 ${S.pending})===`);
   console.log(`【模型】主选 ${S.wld.hit}/${S.wld.n}(${pct(S.wld.hit, S.wld.n)}) | 含次选/双选 ${pct(S.wldCover.hit, S.wldCover.n)}`);
   console.log(`【盘口】主推 ${S.marketWld.hit}/${S.marketWld.n}(${pct(S.marketWld.hit, S.marketWld.n)}) | 前二双选 ${pct(S.marketCover.hit, S.marketCover.n)}   ← 与模型分开各算各`);
   console.log(`比分 ${pct(S.score.hit, S.score.n)} | 半全场 ${pct(S.halfFull.hit, S.halfFull.n)} | 让球 ${pct(S.handicap.hit, S.handicap.n)}`);
   if (S.settled === 0) console.log("诚实空态:首战 6/12,暂无已结算场;预测已冻结,赛果到位后逐日自动回测填充。");
+  console.log(`自检: 全覆盖=${selfcheck.全覆盖} | ⏳均有理由=${selfcheck["⏳均有理由"]}(${selfcheck.待回填已写理由}/${selfcheck.待回填}) | 0假结算=${selfcheck["0假结算"]} | 盘口对照覆盖=${selfcheck.盘口对照覆盖} | 已开赛却未结算=${selfcheck.已开赛却未结算}`);
+  if (selfcheck.已开赛却未结算 > 0) console.log(`⚠️ 已开赛却未结算(赛果该到位却没回填):${selfcheck.已开赛却未结算明细.join("; ")}`);
 
   if (!existsSync(DESK_DIR)) mkdirSync(DESK_DIR, { recursive: true });
   const xlsxPath = join(DESK_DIR, "2026世界杯逐场复盘命中率_累计.xlsx");
@@ -232,7 +254,7 @@ function runMain() {
   ]);
   console.log("📊 累计复盘表:", xlsxPath);
 
-  writeFileSync(SNAPSHOT, JSON.stringify({ generatedAt: new Date().toISOString(), date: today, summary: S,
+  writeFileSync(SNAPSHOT, JSON.stringify({ generatedAt: new Date().toISOString(), date: today, summary: S, selfcheck,
     rows: rows.map((r) => ({ matchDate: r._matchDate, stage: r._stage, match: r.match, primary: r.primary,
       actual: r.actual || null, hit: r.hit ?? null,
       marketWld: r._marketWld || null, marketHit: r._marketHit ?? null, marketCoverHit: r._marketCoverHit ?? null,

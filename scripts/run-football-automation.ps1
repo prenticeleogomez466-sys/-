@@ -207,6 +207,10 @@ function Run-Recap {
   #   复盘任务仍报 0x0。现在显式核对桌面表是否今天刷新过;不是就打 ALERT 并计入摘要,不再悄悄漏。
   Verify-DesktopRecap
   Invoke-Step "recap automation health" "npm run recap:health -- --date=$Date"
+  # 复盘覆盖完整性闸(2026-06-13 用户铁律"必须保证每天自动复盘覆盖全面"):合并核验每日+世界杯逐场
+  #   两边 selfcheck + 全部产物今日新鲜度;任何窟窿(产物缺失/陈旧/未全覆盖/pending无理由/假结算/已开赛未结算)
+  #   → 打 ALERT 并计入摘要。AllowFailure=$true:不阻断链路,但红色明确暴露,不再静默留白。
+  Invoke-Step "recap coverage completeness gate" "npm run recap:coverage" $true
 }
 
 function Run-Weekly {
