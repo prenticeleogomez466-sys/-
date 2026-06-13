@@ -283,10 +283,15 @@ sys.stdout.reconfigure(encoding='utf-8')
 wb=openpyxl.load_workbook(r'${path.join(DELIVER, `神选-竞彩推荐-${DATE}.xlsx`)}',read_only=True)
 ws=wb[wb.sheetnames[0]]
 rows=list(ws.iter_rows(values_only=True))
-hdr=[str(c) if c else '' for c in rows[2]]
-ai=[i for i,n in enumerate(hdr) if '证伪' in n][0]
-cells=[str(r[ai] or '') for r in rows[3:] if r and r[2]]
-print(json.dumps({'total':len(cells),'honest':sum(1 for c in cells if '未跑' in c or '未审计' in c),'fake':sum(1 for c in cells if ('通过' in c or '三票' in c) and '未跑' not in c)}))
+hi=next((i for i,r in enumerate(rows) if r and any('对阵' in str(c) for c in r if c)),2)
+hdr=[str(c) if c else '' for c in rows[hi]]
+ais=[i for i,n in enumerate(hdr) if '证伪' in n]
+if not ais:
+    print(json.dumps({'total':0,'honest':0,'fake':0,'nohdr':True}))
+else:
+    ai=ais[0]
+    cells=[str(r[ai] or '') for r in rows[hi+1:] if r and r[2]]
+    print(json.dumps({'total':len(cells),'honest':sum(1 for c in cells if '未跑' in c or '未审计' in c),'fake':sum(1 for c in cells if ('通过' in c or '三票' in c) and '未跑' not in c)}))
 `], { encoding: "utf8", timeout: 60000, env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
             return JSON.parse(raw);
           } catch { return null; }

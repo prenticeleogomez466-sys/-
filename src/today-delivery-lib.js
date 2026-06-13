@@ -65,7 +65,7 @@ export function buildOddsCoverageLine(counts) {
 
 // ── ① 世界杯模型先验透明列组(仅世界杯场;缺哪项标哪项,绝不编) ──
 export function wcPriorCells({ isWc, prior, lambdaCtx, wcLine }) {
-  if (!isWc) return { elo: "—", lambda: "—", tourney: "—" };
+  if (!isWc) return { elo: "⚠️非世界杯场缺(俱乐部联赛无国家队Elo先验,胜负平由每日大模型给)", lambda: "—", tourney: "—" };
   let elo;
   if (prior?.probabilities) {
     const p = prior.probabilities;

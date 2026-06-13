@@ -12,8 +12,11 @@ import {
 } from "../src/today-delivery-lib.js";
 
 // ── ① 世界杯模型先验透明列组 ──
-test("wcPriorCells:非世界杯场三格全'—'(不冒充)", () => {
-  assert.deepEqual(wcPriorCells({ isWc: false, prior: null, lambdaCtx: null, wcLine: "" }), { elo: "—", lambda: "—", tourney: "—" });
+test("wcPriorCells:非世界杯场 Elo先验列须⚠️标缺(透明度闸要求,非裸'—')", () => {
+  const c = wcPriorCells({ isWc: false, prior: null, lambdaCtx: null, wcLine: "" });
+  assert.ok(c.elo.includes("⚠️") && c.elo.includes("非世界杯"), `非WC场Elo先验须含⚠️非世界杯标注,实际: ${c.elo}`);
+  assert.equal(c.lambda, "—");
+  assert.equal(c.tourney, "—");
 });
 
 test("wcPriorCells:WC场=Elo三概率+confedAdj单独注明+场馆λ因子+出线夺冠%", () => {

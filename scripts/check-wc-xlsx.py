@@ -71,7 +71,7 @@ def main(path):
         pair = cells.get("对阵", "")
         # 取首行(第二行起是情景描述);末尾赛事tag形如"(世界杯·单场)"从尾部剥掉,
         # 避免吃掉队名自带括号(如 刚果(金))
-        core = re.sub(r"[\(（][^()（）]*·[^()（）]*[\)）]\s*$", "", pair.splitlines()[0] if pair else "").strip()
+        core = re.sub(r"[\(（][^()（）]*(?:·|联赛|世界杯|单场|杯)[^()（）]*[\)）]\s*$", "", pair.splitlines()[0] if pair else "").strip()
         m = re.match(r"\s*(.+?)\s+vs\s+(.+)$", core)
         if not m:
             errors.append(f"{row_name} 对阵格式异常: {pair[:30]}")
