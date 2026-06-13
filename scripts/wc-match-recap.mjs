@@ -44,6 +44,15 @@ const STAGE_ORDER = ["group", "r32", "r16", "qf", "sf", "final"];
 const pct = (h, n) => (n > 0 ? (h / n * 100).toFixed(1) + "%" : "—");
 const mark = (v) => (v === true ? "✓" : v === false ? "✗" : "—");
 
+/** 盘口隐含概率(home/draw/away)→ 按概率降序的胜平负方向数组,如 ["主胜","平局","客胜"]。缺赔率→[]。 */
+const marketRankWld = (impl) => {
+  if (!impl || impl.home == null || impl.draw == null || impl.away == null) return [];
+  return [["主胜", impl.home], ["平局", impl.draw], ["客胜", impl.away]]
+    .sort((a, b) => b[1] - a[1]).map((x) => x[0]);
+};
+/** 盘口主推(隐含概率最高方向);无赔率→null。 */
+const marketFavWld = (impl) => marketRankWld(impl)[0] || null;
+
 /** 把一条世界杯模型预测(wc-match-model 输出)适配成 updateLedgerRow 可结算的 ledger-row 形状。 */
 export function wcPredToLedgerRow(p, seq) {
   return {
@@ -53,7 +62,8 @@ export function wcPredToLedgerRow(p, seq) {
     halfFullPrimary: p.halfFull?.consistent?.hf, halfFullSecondary: p.halfFull?.mostLikely?.hf,
     handicapLine: p.handicap?.fairLine ?? "", handicapWldCode: "", // 让球按比分+线在 updateLedgerRow 内裁
     confidence: p.wld?.pickProb != null ? Math.round(p.wld.pickProb * 100) : null,
-    modelSource: "wc-match-model", marketAgree: p.market ? p.market.agree : null
+    modelSource: "wc-match-model", marketAgree: p.market ? p.market.agree : null,
+    marketImplied: p.market?.implied || null // 盘口隐含(开球前冻结),供"盘口主推 vs 模型主推"对照
   };
 }
 
@@ -76,7 +86,15 @@ export function freezeWcBaseline(fixtures) {
     frozen[key] = wcPredToLedgerRow(p, ++seq);
     added++;
   }
-  if (added) writeFileSync(FROZEN, JSON.stringify(frozen, null, 1));
+  // 迁移补列:旧冻结行缺 marketImplied 的,从当前预测补齐(开球后盘口已停止刷新→等价开球前快照,诚实)
+  let enriched = 0;
+  for (const p of preds) {
+    const key = `${p.home} 对 ${p.away}`;
+    if (frozen[key] && frozen[key].marketImplied == null && p.market?.implied) {
+      frozen[key].marketImplied = p.market.implied; enriched++;
+    }
+  }
+  if (added || enriched) writeFileSync(FROZEN, JSON.stringify(frozen, null, 1));
   const byMatch = new Map();
   for (const [k, row] of Object.entries(frozen)) byMatch.set(k, row);
   return byMatch;
@@ -107,7 +125,15 @@ export function buildWcMatchRecap(predByMatch, fixtures) {
     const matchDate = String(fx?.kickoff || "").slice(0, 10) || pred.matchDate || "";
     const stage = STAGE(matchDate || WC_START);
     const settled = updateLedgerRow(pred, fixtures);
-    rows.push({ ...settled, _stage: stage, _matchDate: matchDate });
+    // 盘口主推对照(与模型主推分开各算各的,不合并):隐含概率最高=盘口主推,前二=盘口"双选"
+    const rank = marketRankWld(pred.marketImplied);
+    const marketWld = rank[0] || null;
+    const isSettled = settled.actualStatus === "settled";
+    const marketHit = isSettled && marketWld && settled.actual ? marketWld === settled.actual : null;
+    const marketCoverHit = isSettled && rank.length >= 2 && settled.actual
+      ? rank.slice(0, 2).includes(settled.actual) : null;
+    rows.push({ ...settled, _stage: stage, _matchDate: matchDate,
+      _marketWld: marketWld, _marketHit: marketHit, _marketCoverHit: marketCoverHit });
   }
   // 按比赛日 → 阶段排序
   rows.sort((a, b) => (a._matchDate || "").localeCompare(b._matchDate || "") ||
@@ -120,11 +146,16 @@ function summarize(rows) {
   const settled = rows.filter((r) => r.actualStatus === "settled");
   const hfSettled = settled.filter((r) => r.actualHalfFull);
   const hcSettled = settled.filter((r) => r.handicapWldHit !== null && r.handicapWldHit !== undefined);
+  const mkSettled = settled.filter((r) => r._marketWld != null); // 有盘口隐含的已结算场(盘口口径分母独立)
   const r = (sub, pred) => ({ hit: sub.filter(pred).length, n: sub.length });
   return {
     total: rows.length, settled: settled.length, pending: rows.length - settled.length,
+    // —— 模型口径(各档分开算)——
     wld: r(settled, (x) => x.hit === true),
     wldCover: r(settled, (x) => x.hit === true || x.secondaryHit === true || x.doubleChanceHit === true),
+    // —— 盘口口径(与模型分开,各算各的,绝不合并)——
+    marketWld: r(mkSettled, (x) => x._marketHit === true),
+    marketCover: r(mkSettled, (x) => x._marketCoverHit === true),
     score: r(settled, (x) => x.scoreHit === true),
     scoreCover: r(settled, (x) => x.scoreHit === true || x.scoreSecondaryHit === true || x.scoreModeHit === true),
     halfFull: r(hfSettled, (x) => x.halfFullHit === true),
@@ -136,8 +167,10 @@ function summarySheet(date, S, rows) {
   const banner = `⚽ 2026世界杯 · 逐场复盘命中率回测 · 截至 ${date}`;
   const head = ["玩法", "命中/已结算", "累计命中率", "口径说明"];
   const body = [
-    ["胜平负(单选)", `${S.wld.hit}/${S.wld.n}`, pct(S.wld.hit, S.wld.n), "主推方向 = 实际胜平负"],
-    ["胜平负(含次选/双选)", `${S.wldCover.hit}/${S.wldCover.n}`, pct(S.wldCover.hit, S.wldCover.n), "主推或次选或双选覆盖命中"],
+    ["【模型】胜平负(主选)", `${S.wld.hit}/${S.wld.n}`, pct(S.wld.hit, S.wld.n), "世界杯模型主推方向 = 实际胜平负"],
+    ["【模型】胜平负(含次选/双选)", `${S.wldCover.hit}/${S.wldCover.n}`, pct(S.wldCover.hit, S.wldCover.n), "模型主推或次选或双选覆盖命中"],
+    ["【盘口】主推(单选)", `${S.marketWld.hit}/${S.marketWld.n}`, pct(S.marketWld.hit, S.marketWld.n), "盘口隐含概率最高方向 = 实际(与模型分开各算各)"],
+    ["【盘口】前二(双选)", `${S.marketCover.hit}/${S.marketCover.n}`, pct(S.marketCover.hit, S.marketCover.n), "盘口隐含概率前二方向任一 = 实际"],
     ["比分(单选)", `${S.score.hit}/${S.score.n}`, pct(S.score.hit, S.score.n), "首选比分 = 实际比分"],
     ["比分(含备选/众数)", `${S.scoreCover.hit}/${S.scoreCover.n}`, pct(S.scoreCover.hit, S.scoreCover.n), "首选/次选/矩阵众数任一命中"],
     ["半全场", `${S.halfFull.hit}/${S.halfFull.n}`, pct(S.halfFull.hit, S.halfFull.n), "仅半场赛果可得的场计入"],
@@ -158,7 +191,7 @@ function summarySheet(date, S, rows) {
 }
 
 function detailSheet(rows) {
-  const head = ["比赛日", "阶段", "对阵", "预测胜平负", "实际", "✓", "预测比分", "实际比分", "✓",
+  const head = ["比赛日", "阶段", "对阵", "模型主推", "实际", "模型✓", "盘口主推", "盘口✓", "预测比分", "实际比分", "✓",
     "预测半全场", "实际半全场", "✓", "让球线", "让球预测", "让球实际", "✓", "状态/⏳理由"];
   const body = rows.map((r) => {
     const pendDot = r.actualStatus === "settled" ? "已结算" : "⏳ " + (r.pendingReason || "待开赛/待回填");
@@ -166,6 +199,7 @@ function detailSheet(rows) {
       (Array.isArray(r.doubleChanceCodes) && r.doubleChanceCodes.length ? `(双选${r.doubleChanceShort || ""})` : "");
     return [r._matchDate || "—", STAGE_CN[r._stage] || r._stage, r.match,
       wldPred, r.actual || "", mark(r.hit),
+      r._marketWld || "", mark(r._marketHit),
       r.scorePrimary + (r.scoreSecondary ? `/${r.scoreSecondary}` : ""), r.actualScore || "", mark(r.scoreHit || r.scoreSecondaryHit || r.scoreModeHit),
       r.halfFullPrimary || "", r.actualHalfFull || "", mark(r.halfFullHit),
       r.handicapLine ?? "", r.handicapWld || "", r.actualHandicap || "", mark(r.handicapWldHit),
@@ -185,7 +219,9 @@ function runMain() {
   const today = new Date().toISOString().slice(0, 10);
 
   console.log(`\n=== 2026世界杯逐场复盘(${rows.length}场冻结预测,已结算 ${S.settled},待开赛/回填 ${S.pending})===`);
-  console.log(`胜平负单选 ${S.wld.hit}/${S.wld.n}(${pct(S.wld.hit, S.wld.n)}) | 含次选/双选 ${pct(S.wldCover.hit, S.wldCover.n)} | 比分 ${pct(S.score.hit, S.score.n)} | 半全场 ${pct(S.halfFull.hit, S.halfFull.n)} | 让球 ${pct(S.handicap.hit, S.handicap.n)}`);
+  console.log(`【模型】主选 ${S.wld.hit}/${S.wld.n}(${pct(S.wld.hit, S.wld.n)}) | 含次选/双选 ${pct(S.wldCover.hit, S.wldCover.n)}`);
+  console.log(`【盘口】主推 ${S.marketWld.hit}/${S.marketWld.n}(${pct(S.marketWld.hit, S.marketWld.n)}) | 前二双选 ${pct(S.marketCover.hit, S.marketCover.n)}   ← 与模型分开各算各`);
+  console.log(`比分 ${pct(S.score.hit, S.score.n)} | 半全场 ${pct(S.halfFull.hit, S.halfFull.n)} | 让球 ${pct(S.handicap.hit, S.handicap.n)}`);
   if (S.settled === 0) console.log("诚实空态:首战 6/12,暂无已结算场;预测已冻结,赛果到位后逐日自动回测填充。");
 
   if (!existsSync(DESK_DIR)) mkdirSync(DESK_DIR, { recursive: true });
@@ -198,7 +234,9 @@ function runMain() {
 
   writeFileSync(SNAPSHOT, JSON.stringify({ generatedAt: new Date().toISOString(), date: today, summary: S,
     rows: rows.map((r) => ({ matchDate: r._matchDate, stage: r._stage, match: r.match, primary: r.primary,
-      actual: r.actual || null, hit: r.hit ?? null, scorePrimary: r.scorePrimary, actualScore: r.actualScore || null,
+      actual: r.actual || null, hit: r.hit ?? null,
+      marketWld: r._marketWld || null, marketHit: r._marketHit ?? null, marketCoverHit: r._marketCoverHit ?? null,
+      scorePrimary: r.scorePrimary, actualScore: r.actualScore || null,
       scoreHit: r.scoreHit ?? null, halfFullPrimary: r.halfFullPrimary, actualHalfFull: r.actualHalfFull || null,
       halfFullHit: r.halfFullHit ?? null, handicapWld: r.handicapWld, actualHandicap: r.actualHandicap || null,
       handicapWldHit: r.handicapWldHit ?? null, status: r.actualStatus, pendingReason: r.pendingReason || null })) }, null, 1));
