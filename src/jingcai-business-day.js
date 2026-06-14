@@ -25,6 +25,23 @@ export function sequenceWeekdayPrefix(sequence) {
   return m ? m[0] : null;
 }
 
+const WEEKDAY_DIGIT = { "周一": "1", "周二": "2", "周三": "3", "周四": "4", "周五": "5", "周六": "6", "周日": "7" };
+
+// 交付层"今日竞彩"判定(2026-06-14 用户揪出"漏土耳其"):竞彩编号周缀(数字 6008 的"6"/中文"周六")
+//   对应【销售业务日】,但周末批次常卖前一业务日票面、比赛却在次日白天开赛(6008 澳大利亚vs土耳其=
+//   周六批 6 开头、06-14 12:00 开赛)。只按周缀过滤会漏掉今天实际开赛、且售到开赛的跨日场。
+// 规则:① 数字/中文周缀==今日业务日,或 ② kickoff 日期==今日(跨日场,仍在售到开赛)→ 并入今日交付。
+export function isTodayDeliveryFixture(fixture, date) {
+  const label = jingcaiWeekdayLabel(date);
+  if (!label) return true; // 无法判业务日:不擅自丢,交上游
+  const seq = String(fixture?.sequence ?? "");
+  const digit = WEEKDAY_DIGIT[label];
+  if (digit && seq.startsWith(digit)) return true;
+  if (sequenceWeekdayPrefix(seq) === label) return true;
+  if (String(fixture?.kickoff ?? "").slice(0, 10) === date) return true; // 跨日场:今天开赛
+  return false;
+}
+
 // 把一批 fixture 收敛成"目标业务日的去重竞彩单":
 //   1. 限业务日:丢掉竞彩编号 周X 前缀与目标日不符的场次(次日漏入当日);
 //   2. 跨源去重:同一场(canonical 队名相同)只留一条,优先官方 周X 编号 over 数字兜底编号(如 6001),
