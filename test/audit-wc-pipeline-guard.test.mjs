@@ -84,6 +84,16 @@ test("净④: 真实数据 S3 分析层须全绿(防永远红废闸)", { skip: !
 
 // 复发探针(0614根因): SCHED_S_TASK_RUNNING(267009)/READY(267008) 是"任务状态码"非"程序失败码",
 // 撞上 11:10 复盘运行窗时探针曾把"正在运行"误判为失败退出码致 s5-recap-task 假红。豁免集回退即拦。
+// 复发探针(0614根因): s5-result-closure 旧实现只查开赛北京日 store + 字面 zhOf 队名,致跨日场
+//   (竞彩单按销售业务日落 fixtures,5004美国vs巴拉圭 result 在 06-12.json/kickoff 06-13)+ 队名变体
+//   (matchDates "USA" vs team_name_zh "United States")被误报"完赛无赛果"。须查销售业务日窗 + normTeam 归一。
+test("复发探针: s5-result-closure 必须查销售业务日窗(跨日场)+ normTeam 队名归一", () => {
+  const src = readFileSync(PROBE, "utf8");
+  assert.ok(/s5-result-closure/.test(src), "s5-result-closure 探针不存在");
+  assert.match(src, /probeDates|k <= 4|86400e3/, "s5 未扩到销售业务日窗——跨日场赛果会被误报缺失");
+  assert.match(src, /zhByNorm|zhName/, "s5 未用 normTeam 归一队名变体——USA/United States 会误报缺失");
+});
+
 test("复发探针: s5-recap-task 必须豁免 SCHED_S 状态码(267008/267009/267011)不当失败", () => {
   const src = readFileSync(PROBE, "utf8");
   const m = src.match(/SCHED_S_BENIGN\s*=\s*new Set\(\[([^\]]*)\]\)/);

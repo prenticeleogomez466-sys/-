@@ -369,16 +369,27 @@ if (ONLY.includes("s5")) {
     if (!finished.length) rec("s5-result-closure", "SKIP", "尚无完赛超24h的世界杯场(首战后自动生效)");
     else {
       const missing = [];
+      // 队名变体桥(2026-06-14):matchDates 用 "USA"、team_name_zh 键是 "United States"→zhOf["USA"]=undefined
+      //   致已结算场被误报"无赛果"。复用 normTeam(别名表单一权威)把英文变体归一后映中文,不另造表。
+      const zhByNorm = {};
+      for (const [en, zh] of Object.entries(zhOf)) zhByNorm[normTeam(en)] = zh;
+      const zhName = (t) => zhOf[t] ?? zhByNorm[normTeam(t)] ?? t;
       for (const m of finished) {
-        const ld = new Date(Date.parse(m.dateUtc) + 8 * 3600e3).toISOString().slice(0, 10); // 北京日
+        const ld = new Date(Date.parse(m.dateUtc) + 8 * 3600e3).toISOString().slice(0, 10); // 北京日(开赛日)
+        // 跨日场修补(2026-06-14):竞彩单常按【销售业务日】落 fixtures(早开赛 1-4 天),赛果也写在那份
+        //   store(5004 美国vs巴拉圭 result 在 06-12.json、kickoff 06-13)。只查开赛北京日会假报"无赛果"。
+        //   补查开赛日往前 4 天的销售业务日 store(并入 m.localDate),与竞彩预售窗口一致。
+        const probeDates = new Set([ld, m.localDate]);
+        for (let k = 1; k <= 4; k++) probeDates.add(new Date(Date.parse(`${ld}T00:00:00Z`) - k * 86400e3).toISOString().slice(0, 10));
         let found = false;
-        for (const d of [ld, m.localDate]) {
+        for (const d of probeDates) {
+          if (!d) continue;
           const p = path.join(DATA, "fixtures", `${d}.json`);
           if (!existsSync(p)) continue;
           try {
             const fx = JSON.parse(readFileSync(p, "utf8"));
             const list = Array.isArray(fx) ? fx : fx.fixtures || [];
-            const zh = [zhOf[m.homeTeam], zhOf[m.awayTeam]];
+            const zh = [zhName(m.homeTeam), zhName(m.awayTeam)];
             if (list.some((r) => [r.homeTeam, r.awayTeam].filter(Boolean).every((t) => zh.includes(t)) && (r.result || r.finalScore))) { found = true; break; }
           } catch { /* 坏文件由store探针管 */ }
         }

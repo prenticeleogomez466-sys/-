@@ -115,6 +115,7 @@
     "recap:desktop": "node scripts/build-shenxuan-recap-desktop.mjs",
     "recap:health": "node src/recap-automation-health.js",
     "recap:coverage": "node scripts/recap-coverage-audit.mjs",
+    "recap:diagnostic": "node scripts/recap-diagnostic.mjs",
     "backtest:evolution": "node src/evolution-backtest.js",
     "sources:audit": "node src/data-source-registry.js",
     "sources:health-probe": "node scripts/health-probe-all-sources.mjs",

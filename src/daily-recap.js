@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import "./env.js";
-import { getExportDir } from "./paths.js";
+import { getExportDir, getDataDir } from "./paths.js";
 import { loadFixtures } from "./fixture-store.js";
 import { loadMarketSnapshots, findMarketSnapshot } from "./market-data-store.js";
 import { enrichLedgerRow, summarizeLedgerCLV } from "./clv-tracker.js";
@@ -12,6 +12,7 @@ import { writeXlsxWorkbook } from "./xlsx-writer.js";
 import { appendDailyMetrics, recapTrendRows } from "./daily-metrics-trend.js";
 import { attributeRecap, attributionHeadline } from "./recap-attribution.js";
 import { kickoffEpochMs, hasKickedOff } from "./kickoff-time.js";
+import { buildRecapDiagnostic } from "./recap-diagnostic.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const exportDir = getExportDir();
@@ -56,10 +57,15 @@ export async function runDailyRecap(date, options = {}) {
   const pendingRescanReport = { rescanned: pendingRescan.rescanned, settled: pendingRescan.settled, window: pendingRescan.window };
   writeFileSync(summaryPath, `${JSON.stringify({ date: targetDate, generatedAt: new Date().toISOString(), summary, attribution, selfcheck, pendingRescan: pendingRescanReport, rows: targetRows }, null, 2)}\n`, "utf8");
   const dailyMetrics = appendDailyMetrics(targetDate, targetRows);
+  // 诊断型复盘(2026-06-14 用户裁决:复盘核心=进化模型)——并入同一 master(守"一个总表"铁律):
+  //   模型主推 vs 盘口热门头对头胜率 + 命中构成(主/次选) + 未中归因 + 逐场诊断。纯读不改模型。
+  let diag = null;
+  try { diag = buildRecapDiagnostic(nextLedger, { dataDir: getDataDir() }); } catch { diag = null; }
   writeXlsxWorkbook(masterPath, [
     { name: "复盘汇总", rows: [...recapSummaryRows(summary), ...recapTrendRows()] },
     { name: "复盘归因", rows: recapAttributionRows(attribution) },
     { name: "复盘明细", rows: [recapDetailHeaders(), ...detailRows] },
+    ...(diag ? [{ name: "模型vs盘口诊断", rows: diag.summaryRows }, { name: "逐场诊断", rows: diag.detailRows }] : []),
     { name: "历史总表", rows: [recapDetailHeaders(), ...nextLedger.map(toRecapDetailRow)] }
   ]);
   const dDrivePaths = mirrorRecapExports(targetDate, summaryPath, masterPath);
@@ -213,22 +219,46 @@ export function rescanPendingLedgerRows(ledger, targetDate, deps = {}) {
   };
   let rescanned = 0;
   let settled = 0;
+  let pendingFilled = 0;
+  // P1 全窗口 fixture 池(2026-06-14):14场腿/预售场 row.date=销售业务日,比赛常在数日后开赛,
+  //   只在 row.date±1 找 fixture 永远查不到(30条孤儿永久"无状态")。补:本地池无赛果时,全窗口
+  //   按 canonical 队名找"已开赛+带真实赛果"的真实比赛场(seq 跨日无意义,只信队名)结算。
+  let windowPool = null;
+  const getWindowPool = () => {
+    if (!windowPool) {
+      windowPool = [];
+      for (let d = minDate; d <= maxDate; d = addDays(d, 1)) windowPool.push(...cached(fixtureCache, d, loadFixturesFn));
+    }
+    return windowPool;
+  };
   const rows = ledger.map((row) => {
     if (row.date === targetDate) return row; // 主路径当次已处理
     if (row.actualStatus === "settled" || row.actual) return row; // 已结算不重访
     const date = String(row.date ?? "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < minDate || date > maxDate) return row;
     // 同主路径口径:fixture 可能落在业务日或次日(kickoff 跨日)。
-    const pool = [...cached(fixtureCache, date, loadFixturesFn), ...cached(fixtureCache, addDays(date, 1), loadFixturesFn)];
-    const fixture = findFixtureForLedger(row, pool);
-    if (!fixture || !hasKickedOff(fixture)) return row; // 未开赛/无 fixture → 留 pending 不碰
+    let pool = [...cached(fixtureCache, date, loadFixturesFn), ...cached(fixtureCache, addDays(date, 1), loadFixturesFn)];
+    let fixture = findFixtureForLedger(row, pool);
+    // P1 跨日场:本地池无 fixture 或无赛果 → 全窗口按队名找已开赛带赛果的真实比赛场
+    if (!fixture || !fixture.result) {
+      const wide = findResultFixtureByTeams(row, getWindowPool());
+      if (wide) { fixture = wide; pool = getWindowPool(); }
+    }
+    if (!fixture || !fixture.result || !hasKickedOff(fixture)) {
+      // P2 灭"无状态"真空(2026-06-14):未结算行一律带 pendingReason(诚实标因,绝不留三不管)。
+      const anyFx = fixture ?? findFixtureForLedger(row, getWindowPool());
+      const reason = inferPendingReason(row, anyFx);
+      if (row.pendingReason === reason && row.actualStatus === "pending-result") return row;
+      pendingFilled += 1;
+      return { ...row, actualStatus: "pending-result", pendingReason: reason };
+    }
     rescanned += 1;
     const snapshots = [...cached(snapshotCache, date, loadSnapshotsFn), ...cached(snapshotCache, addDays(date, 1), loadSnapshotsFn)];
     const next = updateLedgerRow(row, pool, snapshots);
     if (next.actualStatus === "settled") settled += 1;
     return next;
   });
-  return { rows, rescanned, settled, window: { from: minDate, to: maxDate } };
+  return { rows, rescanned, settled, pendingFilled, window: { from: minDate, to: maxDate } };
 }
 
 // 取某选项(3=主/1=平/0=客)在欧赔里的小数赔率。
@@ -494,6 +524,15 @@ export function findFixtureForLedger(row, fixtures) {
 function splitMatch(match) {
   const parts = String(match ?? "").split(/\s+对\s+|\s+vs\s+|\s+VS\s+/);
   return [parts[0] ?? "", parts[1] ?? ""];
+}
+
+// P1 跨日场结算(2026-06-14):全窗口按 canonical 队名找"已开赛+带真实赛果"的真实比赛场。
+//   仅信队名(不信 sequence——竞彩编号按销售业务日组织、跨日无意义,wide 池里会误配)。
+export function findResultFixtureByTeams(row, fixtures) {
+  const [home, away] = splitMatch(row.match);
+  if (!home || !away) return null;
+  return fixtures.find((fixture) => fixture.result && hasKickedOff(fixture)
+    && sameTeam(fixture.homeTeam, home) && sameTeam(fixture.awayTeam, away)) ?? null;
 }
 
 function outcomeCode(value) {

@@ -189,6 +189,9 @@ function Run-Recap {
   Invoke-Step "backfill half-time scores from API-Football (gap leagues)" "npm run recap:backfill-ht-af -- --date=$Date" $true
   # 用 --no-result-sync:store 已由上面两步填好,recap 只结算不再二次 sync(避免覆盖 ESPN 回填赛果)。
   Invoke-Step "compare predictions with actual results" "npm run recap:daily -- --date=$Date --no-result-sync"
+  # 诊断型复盘(2026-06-14 用户裁决:复盘核心=进化模型):模型主推 vs 盘口热门头对头胜率 + 命中构成
+  #   (主/次选)+ 未中归因 + 逐场诊断。已并入 master,这步另出桌面独立 xlsx 供直观查看。AllowFailure。
+  Invoke-Step "diagnostic recap (model vs market win-rate + miss attribution)" "npm run recap:diagnostic" $true
   #   世界杯赛果复盘校准:开赛后逐场验证赛前预测(出线Brier/夺冠logloss/爆冷);开赛前空态冻结基线。AllowFailure。
   Invoke-Step "World Cup forecast recap calibration" "npm run wc:recap -- --json" $true
   #   铁律(2026-06-11):世界杯逐场预测只用世界杯模型(wc:predict),复盘基线据此冻结。
