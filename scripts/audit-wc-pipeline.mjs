@@ -354,9 +354,13 @@ if (ONLY.includes("s5")) {
       const out = execFileSync("schtasks", ["/query", "/tn", "FootballModel-RecapBacktest", "/fo", "LIST", "/v"], { encoding: "utf8", timeout: 15000 });
       const disabled = /Disabled/i.test(out.split(/\r?\n/).find((l) => /^Status|^状态/.test(l.trim())) || "");
       const lastRes = (out.match(/Last Result:\s*(-?\d+)/i) || [])[1];
+      // Windows SCHED_S_* 是"任务状态码"不是"程序失败码",撞上运行窗会误报失败(0613根因):
+      //   267008(0x41300 READY) / 267009(0x41301 RUNNING) / 267011(0x41303 HAS_NOT_RUN) 均非失败。
+      const SCHED_S_BENIGN = new Set(["0", "267008", "267009", "267011"]);
+      const running = lastRes === "267009";
       if (disabled) rec("s5-recap-task", "FAIL", "RecapBacktest被禁用,复盘闭环断(用户裁决保留的唯一每日任务)");
-      else if (lastRes && lastRes !== "0" && lastRes !== "267011") rec("s5-recap-task", "FAIL", `RecapBacktest上次退出码=${lastRes},查日志`);
-      else rec("s5-recap-task", "PASS", `RecapBacktest在线(上次结果=${lastRes ?? "未知"})`);
+      else if (lastRes && !SCHED_S_BENIGN.has(lastRes)) rec("s5-recap-task", "FAIL", `RecapBacktest上次退出码=${lastRes},查日志`);
+      else rec("s5-recap-task", "PASS", `RecapBacktest在线(${running ? "正在运行中" : `上次结果=${lastRes ?? "未知"}`})`);
     } catch (e) { rec("s5-recap-task", "FAIL", `查任务失败: ${String(e.message).slice(0, 100)}`); }
   }
   // 完赛>24h的世界杯场必须有结果落store(复盘可信的前提)

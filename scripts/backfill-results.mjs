@@ -26,7 +26,7 @@ import { hasKickedOff, fixtureMatchDate } from "../src/kickoff-time.js";
 import { pendingBackfillDates, PENDING_BACKFILL_WINDOW_DAYS, espnPoolDays, poolDayCapDays } from "../src/pending-backfill-dates.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
 import { getExportDir } from "../src/paths.js";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
@@ -209,6 +209,10 @@ console.log(`回填日期(${dates.length}):${dates.join(", ")}${dry ? "  [DRY-RU
 
 let grandMatched = 0, grandPending = 0;
 const stillMissing = [];
+// 赛果回填 provenance(2026-06-14):recap:daily 在自动化里用 --no-result-sync(避免覆盖 ESPN 回填),
+// 自身看不到查过哪些免费源 → selfcheck.穷尽免费源 结构性永远 false(明明上游 backfill 已穷尽 ESPN)。
+// 在此落每日"查了哪些源"审计轨迹,daily-recap 读它诚实填该字段;绝不硬编码 true(那是编造)。
+const reportByDate = {};
 
 for (const date of dates) {
   const store = loadFixtures(date);
@@ -222,7 +226,11 @@ for (const date of dates) {
     console.log(`${date}: 跳过 ${notKickedOff.length} 场未开赛/开赛时刻不可判定的场(绝不回填):`);
     for (const f of notKickedOff) console.log(`    ⏳ ${f.sequence ?? ""} ${f.homeTeam} vs ${f.awayTeam}  kickoff=${JSON.stringify(f.kickoff ?? "")}`);
   }
-  if (!need.length) { console.log(`${date}: 无已开赛且缺 result 的场,跳过`); continue; }
+  if (!need.length) {
+    console.log(`${date}: 无已开赛且缺 result 的场,跳过`);
+    reportByDate[date] = { need: 0, espnQueried: false, poolSize: 0, matched: 0, sources: [], note: "无已开赛且缺result的场(无需查源)" };
+    continue;
+  }
 
   // ESPN 赛果索引(审计③扩窗,2026-06-11):基础窗=业务日±3 天(竞彩业务日常比实际开赛日
   // 早 1-2 天,实测 5-21 预测→5-23 实际)∪ 每个待回填场真实比赛日±1 天——否则 06-07 业务日的
@@ -272,6 +280,8 @@ for (const date of dates) {
   grandPending += need.length - matched;
   const howStr = Object.entries(howCount).filter(([, v]) => v).map(([k, v]) => `${k}:${v}`).join(" ");
   console.log(`${date}: 待回填 ${need.length} → ESPN 命中 ${matched}(${howStr}),仍缺 ${need.length - matched}(池 ${results.length} 场)`);
+  // ESPN 确已被查询(poolDays 全跑过 fetchAllForDay),即便 pool=0 也是"穷尽 ESPN 后该源无该场"。
+  reportByDate[date] = { need: need.length, espnQueried: true, poolSize: results.length, matched, sources: ["ESPN"] };
 
   if (!dry && matched > 0) {
     saveFixtures(date, updated, { source: "espn-backfill", allowEmpty: false });
@@ -283,4 +293,21 @@ if (stillMissing.length) {
   console.log(`\n仍缺(匹配不上 ESPN,留 pending):`);
   for (const s of stillMissing.slice(0, 60)) console.log("  -", s);
   if (stillMissing.length > 60) console.log(`  …还有 ${stillMissing.length - 60} 场`);
+}
+
+// provenance 报告落盘(供 recap:daily --no-result-sync 诚实填 selfcheck.穷尽免费源)。
+// 合并历史日期 + 剪枝超窗(保留 PENDING_BACKFILL_WINDOW_DAYS×2 天),dry-run 不写。
+if (!dry && Object.keys(reportByDate).length) {
+  const reportPath = join(getExportDir(), "recap-backfill-report.json");
+  let prev = {};
+  if (existsSync(reportPath)) { try { prev = JSON.parse(readFileSync(reportPath, "utf8")).dates ?? {}; } catch { prev = {}; } }
+  const merged = { ...prev, ...reportByDate };
+  const cutoffMs = Date.parse(`${todayIso}T00:00:00Z`) - PENDING_BACKFILL_WINDOW_DAYS * 2 * 86400000;
+  const pruned = {};
+  for (const [d, v] of Object.entries(merged)) {
+    const t = Date.parse(`${d}T00:00:00Z`);
+    if (!Number.isFinite(t) || t >= cutoffMs) pruned[d] = v;
+  }
+  writeFileSync(reportPath, `${JSON.stringify({ generatedAt: new Date().toISOString(), dates: pruned }, null, 2)}\n`, "utf8");
+  console.log(`\nprovenance 报告已写:${reportPath}(${Object.keys(pruned).length} 日期)`);
 }

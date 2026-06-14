@@ -81,3 +81,14 @@ test("净④: 真实数据 S3 分析层须全绿(防永远红废闸)", { skip: !
   const r = runProbe(["--only=s3", "--no-task-check"]);
   assert.strictEqual(r.code, 0, "真实数据闸红,要么数据坏了要么闸误伤: " + r.out);
 });
+
+// 复发探针(0614根因): SCHED_S_TASK_RUNNING(267009)/READY(267008) 是"任务状态码"非"程序失败码",
+// 撞上 11:10 复盘运行窗时探针曾把"正在运行"误判为失败退出码致 s5-recap-task 假红。豁免集回退即拦。
+test("复发探针: s5-recap-task 必须豁免 SCHED_S 状态码(267008/267009/267011)不当失败", () => {
+  const src = readFileSync(PROBE, "utf8");
+  const m = src.match(/SCHED_S_BENIGN\s*=\s*new Set\(\[([^\]]*)\]\)/);
+  assert.ok(m, "未找到 SCHED_S_BENIGN 豁免集——探针修复被回退,11:10复盘运行窗会假红");
+  for (const code of ["0", "267008", "267009", "267011"]) {
+    assert.match(m[1], new RegExp(`"${code}"`), `豁免集缺 ${code}(SCHED_S 状态码),运行中任务会被误判失败`);
+  }
+});

@@ -71,6 +71,22 @@ export async function runDailyRecap(date, options = {}) {
   return { ok: true, date: targetDate, summary, attribution, selfcheck, pendingRescan: pendingRescanReport, backupSourceNote, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
 }
 
+// 读 backfill provenance(scripts/backfill-results.mjs 落),诚实推导该业务日穷尽过哪些免费赛果源。
+// 报告须新鲜(generatedAt 在 2 天内,同一自动化周期 backfill→recap)且该日 espnQueried 才背书;
+// 陈旧/缺失/无需查源 → 返回 [](诚实标未穷尽,绝不硬编码 true)。
+export function backfillFreeSources(date, dir = exportDir, now = Date.now()) {
+  try {
+    const reportPath = join(dir, "recap-backfill-report.json");
+    if (!existsSync(reportPath)) return [];
+    const report = JSON.parse(readFileSync(reportPath, "utf8"));
+    const ageMs = now - Date.parse(report.generatedAt ?? "");
+    if (!(ageMs >= 0 && ageMs < 2 * 86400000)) return [];
+    const entry = report.dates?.[date];
+    if (entry?.espnQueried) return entry.sources ?? ["ESPN"];
+    return [];
+  } catch { return []; }
+}
+
 // 结尾【自检】对象:逐项核对 daily-recap-system-prompt 的 5 条 output 要求(诚实返回真值,不强行报✓)。
 function buildSelfcheck(date, rows, syncResults) {
   const pendingRows = rows.filter((row) => !(row.actualStatus === "settled" || row.actual));
@@ -78,7 +94,10 @@ function buildSelfcheck(date, rows, syncResults) {
   // 0 假结算:已结算行必须带 actualScore(来自真抓赛果),无比分却标 settled 即视为可疑假结算。
   const settledRows = rows.filter((row) => row.actualStatus === "settled" || row.actual);
   const suspectFake = settledRows.filter((row) => !row.actualScore).length;
-  const freeSources = (syncResults ?? []).flatMap((item) => item.sources ?? []).filter((s) => s.ok).map((s) => s.name);
+  let freeSources = (syncResults ?? []).flatMap((item) => item.sources ?? []).filter((s) => s.ok).map((s) => s.name);
+  // --no-result-sync 路径(自动化里 store 已由上游 backfill 步骤填好,recap 不二次 sync):
+  //   syncResults 为空 → 读 backfill provenance 报告诚实推导查过哪些免费源,绝不硬编码(no-fabrication)。
+  if (!freeSources.length) freeSources = backfillFreeSources(date);
   return {
     全覆盖: rows.length > 0,
     覆盖场次: rows.length,
