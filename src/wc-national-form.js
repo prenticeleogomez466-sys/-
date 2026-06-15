@@ -4,6 +4,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir } from "./paths.js";
+import { canonicalTeamName } from "./team-aliases.js";
 
 const CACHE = join(getDataSubdir("world-cup"), "2026", "wc-national-results.json");
 
@@ -14,17 +15,26 @@ export function loadNationalResults() {
 
 const RES = (gf, ga) => (gf > ga ? "胜" : gf === ga ? "平" : "负");
 
-/** 某队近 n 场(规范英文名)。返回 null 表示无缓存样本(标缺)。 */
-export function recentForm(cache, teamEn, n = 5) {
-  if (!teamEn || !cache?.matches?.length) return null;
-  const ms = cache.matches.filter((m) => m.homeEn === teamEn || m.awayEn === teamEn)
+// 缓存按【英文名】(homeEn/awayEn)存,而调用方常传规范中文名(canonicalTeamName(德国)="德国")——
+// 直接 === 比对会因中英不一致全 miss(2026-06-14 "情报近期赛全空"根因)。两侧统一过 canonicalTeamName 归一,
+// 中/英任一形式都能匹配;homeEn 为 null 时回退 home 字段。
+const canon = (v) => canonicalTeamName(v ?? "");
+const homeName = (m) => m.homeEn || m.home;
+const awayName = (m) => m.awayEn || m.away;
+const isTeam = (name, team) => name != null && canon(name) === team;
+
+/** 某队近 n 场(队名中/英皆可)。返回 null 表示无缓存样本(标缺)。 */
+export function recentForm(cache, team, n = 5) {
+  const T = canon(team);
+  if (!T || !cache?.matches?.length) return null;
+  const ms = cache.matches.filter((m) => isTeam(homeName(m), T) || isTeam(awayName(m), T))
     .sort((a, b) => b.date.localeCompare(a.date)).slice(0, n);
   if (!ms.length) return null;
   let gf = 0, ga = 0, w = 0, d = 0, l = 0;
   const list = ms.map((m) => {
-    const home = m.homeEn === teamEn;
+    const home = isTeam(homeName(m), T);
     const my = home ? m.homeGoals : m.awayGoals, opp = home ? m.awayGoals : m.homeGoals;
-    const opName = home ? (m.awayEn || m.away) : (m.homeEn || m.home);
+    const opName = home ? awayName(m) : homeName(m);
     const r = RES(my, opp); if (r === "胜") w++; else if (r === "平") d++; else l++;
     gf += my; ga += opp;
     return { date: m.date, vs: opName, ha: home ? "主" : "客", score: `${my}-${opp}`, r };
@@ -32,19 +42,20 @@ export function recentForm(cache, teamEn, n = 5) {
   return { played: ms.length, record: `${w}胜${d}平${l}负`, w, d, l, gf, ga, since: ms[ms.length - 1].date, list };
 }
 
-/** 两队 H2H(从 aEn 视角)。无交手返回 null。 */
-export function headToHead(cache, aEn, bEn, n = 6) {
-  if (!aEn || !bEn || !cache?.matches?.length) return null;
+/** 两队 H2H(从 a 视角,队名中/英皆可)。无交手返回 null。 */
+export function headToHead(cache, a, b, n = 6) {
+  const A = canon(a), B = canon(b);
+  if (!A || !B || !cache?.matches?.length) return null;
   const ms = cache.matches.filter((m) =>
-    (m.homeEn === aEn && m.awayEn === bEn) || (m.homeEn === bEn && m.awayEn === aEn))
-    .sort((a, b) => b.date.localeCompare(a.date)).slice(0, n);
+    (isTeam(homeName(m), A) && isTeam(awayName(m), B)) || (isTeam(homeName(m), B) && isTeam(awayName(m), A)))
+    .sort((a2, b2) => b2.date.localeCompare(a2.date)).slice(0, n);
   if (!ms.length) return null;
   let aw = 0, dr = 0, bw = 0;
   const list = ms.map((m) => {
-    const aHome = m.homeEn === aEn;
+    const aHome = isTeam(homeName(m), A);
     const ag = aHome ? m.homeGoals : m.awayGoals, bg = aHome ? m.awayGoals : m.homeGoals;
     const r = RES(ag, bg); if (r === "胜") aw++; else if (r === "平") dr++; else bw++;
     return { date: m.date, score: `${ag}-${bg}`, aHome, r };
   });
-  return { played: ms.length, aWins: aw, draws: dr, bWins: bw, summary: `${aEn} ${aw}胜${dr}平${bw}负`, list };
+  return { played: ms.length, aWins: aw, draws: dr, bWins: bw, summary: `${A} ${aw}胜${dr}平${bw}负`, list };
 }

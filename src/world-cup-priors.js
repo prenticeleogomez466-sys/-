@@ -208,13 +208,6 @@ export function worldCupPhase(date) {
   return null;
 }
 
-/** 取该队所在小组(英文/中文均可),无则 null。 */
-export function teamGroupOf(team) {
-  if (!team) return null;
-  const { teamGroup } = load();
-  return teamGroup.get(String(team).toLowerCase()) ?? teamGroup.get(String(team)) ?? null;
-}
-
 /** 解析 fixture 的世界杯场地:优先 fixture.venue/city/stadium 字段,匹配 venues 表;无则 null。 */
 export function worldCupVenue(fixture) {
   if (!fixture) return null;
@@ -428,15 +421,3 @@ export function worldCupMatchPrior(homeTeam, awayTeam, opts = {}) {
 }
 
 function round4(x) { return Math.round(x * 10000) / 10000; }
-
-export function worldCupDataLoaded() {
-  const { venuesDoc, groupsDoc, formatDoc } = load();
-  const { teams } = loadTeams();
-  return {
-    venues: venuesDoc?.venues?.length ?? 0,
-    groups: Object.keys(groupsDoc?.groups ?? {}).length,
-    teams: Object.values(groupsDoc?.groups ?? {}).flat().length,
-    phases: formatDoc?.phases?.length ?? 0,
-    teamPriors: Object.keys(teams ?? {}).length
-  };
-}

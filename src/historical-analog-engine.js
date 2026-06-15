@@ -228,4 +228,3 @@ export function analogToLR(analogResult, prior, opts = {}) {
   return lr;
 }
 
-export const __internal = { DEFAULT_WEIGHTS, DEFAULT_OPTS, pickTopConditioned, mapHtFtToHomeFrame };

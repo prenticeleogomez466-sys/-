@@ -249,17 +249,3 @@ function mergeSource(...sources) {
   }
   return parts.join("+");
 }
-
-export function stabilityCacheStats() {
-  const cache = loadStabilityCache();
-  const entries = Object.values(cache.entries);
-  const byMarket = {};
-  for (const entry of entries) {
-    for (const [field, market] of Object.entries(entry.markets ?? {})) {
-      byMarket[field] = byMarket[field] ?? { count: 0, real: 0 };
-      byMarket[field].count += 1;
-      if ((market.quality ?? 0) >= 2) byMarket[field].real += 1;
-    }
-  }
-  return { fixtures: entries.length, updatedAt: cache.updatedAt, byMarket };
-}

@@ -12,7 +12,6 @@
  */
 import { canonicalTeamName } from "./team-aliases.js";
 
-export const UNDERSTAT_LEAGUES = ["EPL", "La_liga", "Bundesliga", "Serie_A", "Ligue_1", "RFPL"];
 
 /**
  * 从 Understat 页面 HTML 提取并解码内嵌变量(`var <name> = JSON.parse('...')`)。

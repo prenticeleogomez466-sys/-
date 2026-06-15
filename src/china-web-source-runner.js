@@ -44,4 +44,3 @@ function todayInShanghai() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-export const runnerPath = fileURLToPath(import.meta.url);

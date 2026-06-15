@@ -67,7 +67,6 @@ export function loadTeamProfiles({ maxDates = 700, beforeDate = null, recentSeas
   _cacheKey = key;
   return _cache;
 }
-export function _resetTeamProfileCache() { _cache = null; _cacheKey = null; }
 
 // 给一场比赛取主客双方画像 + 主客场情景。无=各 null(标缺)。
 export function profileForFixture(fixture, profiles = loadTeamProfiles()) {

@@ -27,7 +27,6 @@ export function loadWorldCupWeather() {
   return _cache;
 }
 
-export function clearWorldCupWeatherCache() { _cache = null; }
 
 /**
  * 查某承办城市某天的真实预报最高温(℃)。无缓存/超出预报窗 → null(调用方回退气候均温)。
@@ -38,11 +37,4 @@ export function realHighTempForCityDate(cityKey, isoDate) {
   const doc = loadWorldCupWeather();
   const day = doc?.byCity?.[cityKey]?.[String(isoDate).slice(0, 10)];
   return day && Number.isFinite(Number(day.highTempC)) ? Number(day.highTempC) : null;
-}
-
-/** 完整天气记录(温/风/雨),供情景层描述。无则 null。 */
-export function weatherForCityDate(cityKey, isoDate) {
-  if (!cityKey || !isoDate) return null;
-  const doc = loadWorldCupWeather();
-  return doc?.byCity?.[cityKey]?.[String(isoDate).slice(0, 10)] ?? null;
 }

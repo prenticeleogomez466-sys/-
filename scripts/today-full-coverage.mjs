@@ -17,7 +17,7 @@ import {
   // 2026-06-11 渲染层升级(用户裁决①②③④):世界杯先验列组/让球真实裁决/串关安全度/数据审计/14场闸裁决
   wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
   renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
-  auditCell, buildAuditSheet, buildFourteenSheetRows,
+  auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
   XLSX_HEADERS,
@@ -39,6 +39,12 @@ import { jingcaiWeekdayLabel, sequenceWeekdayPrefix, isTodayDeliveryFixture } fr
 // fetch-gate-500-1 刀③(2026-06-11):✅500欧赔/✅实测标签从快照来源派生,见值即打✅是缺陷
 //   (稳定缓存回填的 06-08 新浪陈旧赔率曾被标"✅500欧赔/✅实测·500竞彩XML(spf)"进真钱交付)。
 import { snapshotEuroProvenance } from "../src/market-data-store.js";
+// 2026-06-14 情报系统(展示层·不动概率):预测/确认首发+阵型 / 伤停 / 近期热身 / 新闻动机聚合 → 「情报详情」sheet。
+//   复用已采集层(advanced:sync 的 layers.lineups/injuries/news)+ 国家队近赛缓存 + 预测首发缓存;缺即标缺不编。
+import { loadAdvancedData } from "../src/advanced-data-store.js";
+import { loadNationalResults, recentForm } from "../src/wc-national-form.js";
+import { canonicalTeamName } from "../src/team-aliases.js";
+import { buildMatchIntel } from "../src/match-intel.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(缺陷#20:绝不再默认写死历史日期)。
 let date;
@@ -316,6 +322,45 @@ const rows = games.map((p, i) => {
   };
 });
 
+// ── 情报系统装配(2026-06-14 展示层·不动概率):预测/确认首发+阵型 / 伤停 / 近期热身 / 新闻动机 ──
+//   数据全来自已采集层(advanced:sync 的 layers.lineups/injuries/news)+ 国家队近赛缓存 + 预测首发缓存;
+//   任一缺 → 该格如实标⚠️缺(buildMatchIntel 内部逐项标),绝不编造。
+let advLayers = null;
+try { advLayers = loadAdvancedData(date); } catch { advLayers = null; }
+let predictedXi = null;
+try { predictedXi = JSON.parse(readFileSync(`D:/football-model-data/intel/predicted-lineups-${date}.json`, "utf8")); }
+catch { console.log(`⚠️ 预测首发缓存缺(intel/predicted-lineups-${date}.json):预测首发列标⚠️(确认首发/伤停/近赛照出),先跑 node scripts/sync-predicted-lineups.mjs ${date} 可补。`); }
+// 全网赛前情报缓存(伤停/交锋史/小组形势/球队风格·主帅/场地天气/新闻战意,中文+来源URL;展示层不进概率)。
+let webIntel = null;
+try { webIntel = JSON.parse(readFileSync(`D:/football-model-data/intel/web-intel-${date}.json`, "utf8")); }
+catch { console.log(`ℹ️ 全网情报缓存缺(intel/web-intel-${date}.json):伤停/交锋史等扩展情报列标⚠️缺(预测首发/近赛照出)。`); }
+const natCache = loadNationalResults();
+const layerFor = (layer, fxId) => advLayers?.layers?.[layer]?.fixtureData?.[fxId] ?? null;
+// 对话紧凑版首发摘要(详情见 xlsx「情报详情」表;缺标缺不编)
+const intelLineupSummary = (side) => {
+  if (!side || !side.xi?.length) return `${side?.tag ?? "⚠️缺"}${side?.status ?? ""}`;
+  const names = side.xi.slice(0, 5).map((p) => p.name).join("、");
+  return `${side.tag}${side.status}${side.formation ? ` ${side.formation}` : ""}:${names}${side.xi.length > 5 ? `…等${side.xi.length}人` : ""}`;
+};
+const intelByMatch = {};
+for (const p of games) {
+  const key = `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`;
+  const pkey = `${p.fixture.homeTeam}|${p.fixture.awayTeam}`;
+  const pred = predictedXi?.predicted?.[pkey] ?? null;
+  const web = webIntel?.matches?.[pkey] ?? null;
+  intelByMatch[key] = buildMatchIntel({
+    fixture: p.fixture,
+    lineupSide: layerFor("lineups", p.fixture.id),
+    injuriesLayer: layerFor("injuries", p.fixture.id),
+    newsLayer: layerFor("news", p.fixture.id),
+    predictedHome: pred?.home ?? null,
+    predictedAway: pred?.away ?? null,
+    homeForm: recentForm(natCache, canonicalTeamName(p.fixture.homeTeam)),
+    awayForm: recentForm(natCache, canonicalTeamName(p.fixture.awayTeam)),
+    webIntel: web,
+  });
+}
+
 // ── 14场/任选9(2026-06-11 ③):26085 期腿在历日 store 标 shengfucai,当日 store 为竞彩孪生。
 //    从近7天 store 找停售未过的恰14腿期次,映射到今日预测(同对阵同模型),跑 buildFourteenPlan 闸如实裁决;
 //    胆位护栏 isLowSampleWorldCup 在 buildFourteenPlan 内部生效(世界杯样本<20不当胆)。 ──
@@ -451,6 +496,7 @@ const sheets = [
   ...buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length), recordLine: recordLine?.text ?? null, stakeNote: stakeSum.note }),
   buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
   buildAuditSheet({ date, rows, contentAudit }),
+  buildIntelSheet({ date, rows, intelByMatch }),
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
 if (outBase) mkdirSync(outBase, { recursive: true });
@@ -520,6 +566,13 @@ for (const r of rows) {
   console.log(`     大小球✅: ${r.ouReal} | 进球分布: ${r.dist}`);
   console.log(`  ④ 近5✅: ${r.homeRec} 〔${r.homeLast5}〕 ‖ ${r.awayRec} 〔${r.awayLast5}〕`);
   console.log(`     H2H: ${r.h2h} | 攻防: ${r.profile}`);
+  const it = intelByMatch[r.match];
+  if (it) {
+    console.log(`  🕵️ 情报(展示·不动概率·成熟度${it.maturity}/5):`);
+    console.log(`     首发: 主=${String(intelLineupSummary(it.home.lineup)).replace(/\n/g, " ")} ‖ 客=${String(intelLineupSummary(it.away.lineup)).replace(/\n/g, " ")}`);
+    console.log(`     伤停: ${it.injuries.text} | 近期: 主 ${it.home.recentForm.text} ‖ 客 ${it.away.recentForm.text}`);
+    if (it.news?.text) console.log(`     新闻/动机: ${it.news.text}`);
+  }
   if (r.adv) console.log(`  🔴 对抗证伪: ${r.adv.label}${r.adv.ev != null ? ` EV=${r.adv.ev}` : ""} — ${r.adv.kill}`);
   console.log("");
 }

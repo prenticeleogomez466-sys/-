@@ -24,10 +24,3 @@ export function getDataSubdir(name) {
 export function getProfilesDir() {
   return join(getDataDir(), "profiles");
 }
-
-export function ensureFootballGeneratedDirs() {
-  for (const dir of [getDataDir(), getExportDir(), getProfilesDir(), getDataSubdir("fixtures"), getDataSubdir("market"), getDataSubdir("advanced"), getDataSubdir("crawler"), getDataSubdir("logs")]) {
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  }
-  return { dataDir: getDataDir(), exportDir: getExportDir() };
-}

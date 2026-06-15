@@ -14,7 +14,6 @@ function load() {
   CACHE = existsSync(path) ? (JSON.parse(readFileSync(path, "utf8"))?.leagues ?? {}) : {};
   return CACHE;
 }
-export function _resetCache() { CACHE = null; }
 
 // competition 名 → 画像 key 的模糊匹配(中文/英文 label 互通)。
 const ALIASES = [
@@ -54,14 +53,4 @@ export function leagueProfile(competition) {
   }
   const g = leagues.__global__ ?? { avgGoals: 2.7, drawRate: 0.26, homeAdvantage: 1.25, homeWinRate: 0.44, overRate: 0.52, n: 0, source: "fallback" };
   return p ? { ...p, matched: true } : { ...g, matched: false };
-}
-
-/** λ 缩放:本联赛场均进球 / 全局场均,夹在合理区间(德甲>1 放大、日职/意甲<1 收小)。 */
-export function leagueLambdaScale(competition) {
-  const leagues = load();
-  const p = leagueProfile(competition);
-  const g = leagues.__global__;
-  if (!p.matched || !g?.avgGoals) return 1;
-  const scale = p.avgGoals / g.avgGoals;
-  return Math.max(0.8, Math.min(1.2, scale));
 }

@@ -82,6 +82,7 @@
     "sync:injuries": "node scripts/sync-free-injuries.mjs",
     "sync:injuries:sofascore": "node scripts/sync-sofascore-injuries.mjs",
     "sync:lineups": "node scripts/sync-lineups.mjs",
+    "sync:predicted-xi": "node scripts/sync-predicted-lineups.mjs",
     "lineup:watch-gate": "node scripts/lineup-watch-gate.mjs",
     "backfill:formations": "node scripts/backfill-espn-formations.mjs",
     "backtest:lineup": "node scripts/run-lineup-signal-backtest.mjs",

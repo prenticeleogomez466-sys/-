@@ -103,4 +103,3 @@ export function buildFbrefForFixtures(fixtures, teamStatsMap) {
   return { byFixtureId, matched, unmatched: [...unmatched] };
 }
 
-export { norm as normalizeTeamName };

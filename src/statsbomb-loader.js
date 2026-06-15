@@ -31,25 +31,6 @@ const DEFAULT_TTL_DAYS = 90;
  * 加载某场比赛的完整 events(逐脚记录).
  * @param {number|string} matchId
  */
-export async function fetchStatsbombMatchEvents(matchId, opts = {}) {
-  const fetchImpl = opts.fetch ?? globalThis.fetch;
-  const env = opts.env ?? process.env;
-  if (env.STATSBOMB_ENABLED === "0") {
-    return { ok: false, warning: "STATSBOMB_ENABLED=0" };
-  }
-  if (typeof fetchImpl !== "function") {
-    return { ok: false, warning: "fetch 不可用" };
-  }
-  const url = `${BASE_URL}/events/${matchId}.json`;
-  try {
-    const data = await fetchCached(`events-${matchId}`, fetchImpl, url, DEFAULT_TTL_DAYS);
-    if (!Array.isArray(data)) return { ok: false, reason: "not-an-array" };
-    return { ok: true, matchId, events: data, summary: summarizeMatchEvents(data) };
-  } catch (error) {
-    return { ok: false, error: error.message };
-  }
-}
-
 /**
  * 加载某竞赛某赛季的比赛列表.
  * @param {number} competitionId  competition id (如 11 = La Liga)

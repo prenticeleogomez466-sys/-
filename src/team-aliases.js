@@ -475,7 +475,9 @@ const RAW_ALIASES = {
   "colombia": "哥伦比亚", "哥伦比亚": "哥伦比亚",
   "costarica": "哥斯达黎加", "哥斯达黎加": "哥斯达黎加",
   "croatia": "克罗地亚", "克罗地亚": "克罗地亚",
+  "curacao": "库拉索", "库拉索": "库拉索",
   "denmark": "丹麦", "丹麦": "丹麦",
+  "cote d'ivoire": "科特迪瓦", "ivory coast": "科特迪瓦", "科特迪瓦": "科特迪瓦",
   "ecuador": "厄瓜多尔", "厄瓜多尔": "厄瓜多尔",
   "egypt": "埃及", "埃及": "埃及",
   "england": "英格兰", "英格兰": "英格兰",
@@ -554,13 +556,18 @@ const ALIAS_TABLE = Object.fromEntries(
   Object.entries(RAW_ALIASES).map(([raw, canonical]) => [normalizeRaw(raw), normalizeRaw(canonical)])
 );
 
-export function listKnownTeams() {
-  return [...new Set(Object.values(ALIAS_TABLE))].sort();
-}
-
-export function aliasCoverage() {
-  return {
-    rawEntries: Object.keys(ALIAS_TABLE).length,
-    canonicalTeams: listKnownTeams().length,
-  };
+// 中文规范名 → 英文别名(反查)。用于需要英文检索的外部免费源(如 GDELT 新闻):
+// 国家队中文名直接喂英文新闻源=零命中(2026-06-14 新闻列全空根因之一)。取 RAW_ALIASES 里指向
+// 同一 canonical 的【含 ASCII 字母】原始键,偏好更长者(更可能是完整队名);无英文别名→null(标缺)。
+const ENGLISH_BY_CANON = (() => {
+  const m = {};
+  for (const [raw, canonical] of Object.entries(RAW_ALIASES)) {
+    if (!/[a-z]/i.test(raw)) continue;
+    const c = normalizeRaw(canonical);
+    if (!m[c] || raw.length > m[c].length) m[c] = raw;
+  }
+  return m;
+})();
+export function englishTeamName(value) {
+  return ENGLISH_BY_CANON[normalizeRaw(value)] ?? null;
 }

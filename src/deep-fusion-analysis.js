@@ -20,7 +20,6 @@ const pct = (v) => (Number.isFinite(Number(v)) ? `${Math.round(Number(v) * 100)}
 
 // 复盘反馈联动(2026-05-31):读真实结算账本的逐联赛命中记录,接回每场分析。
 let _leagueRecord;
-export function _resetLeagueRecord() { _leagueRecord = undefined; }
 function leagueRecord() {
   if (_leagueRecord !== undefined) return _leagueRecord;
   try {

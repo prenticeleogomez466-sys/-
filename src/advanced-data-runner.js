@@ -12,6 +12,7 @@ import { fetchFplInjuries, injuriesForFixture } from "./free-injury-source.js";
 import { fetchEspnLineupsForFixtures } from "./lineup-source.js";
 import { buildXgLayerFromUnderstat } from "./understat-source.js";
 import { syncDeepContext } from "./deep-context.js";
+import { englishTeamName } from "./team-aliases.js";
 import { existsSync as _existsSync, readFileSync as _readFileSync } from "node:fs";
 import { getDataSubdir } from "./paths.js";
 
@@ -26,12 +27,6 @@ async function getFotmobLayersMemoized(date, fixtures, fetchImpl, env) {
   memoizedFotmobLayers = await syncFotmobAllLayers(date, fixtures, fetchImpl, env);
   memoizedFotmobKey = key;
   return memoizedFotmobLayers;
-}
-
-// 测试 hook:在单测中清除 memoize,确保各测试独立
-export function __resetAdvancedRunnerMemoForTests() {
-  memoizedFotmobLayers = null;
-  memoizedFotmobKey = null;
 }
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -343,13 +338,14 @@ async function syncGdeltNews(date, fixtures, fetchImpl, env) {
     try {
       const payload = await fetchJson(fetchImpl, url);
       const articles = payload.articles ?? [];
-      fixtureData[fixture.id] = { articles };
+      // 无真实新闻命中 → 退一步给【赛事类型派生的战意/动机】(🔶推断),让新闻列不空白(resolveNews 会接住 motivation)。
+      fixtureData[fixture.id] = articles.length ? { articles } : { articles: [], motivation: { summary: motivationHeuristic(fixture) } };
       if (articles.length) count += 1;
     } catch {
-      fixtureData[fixture.id] = { articles: [] };
+      fixtureData[fixture.id] = { articles: [], motivation: { summary: motivationHeuristic(fixture) } };
     }
   }));
-  return { ok: count > 0, source: "GDELT DOC 2.1", count, fixtureData, warning: count ? null : "GDELT 未匹配到新闻" };
+  return { ok: count > 0, source: "GDELT DOC 2.1", count, fixtureData, warning: count ? null : "GDELT 未匹配到新闻(已退回赛事类型派生战意)" };
 }
 
 async function syncOpenMeteoWeather(date, fixtures, fetchImpl, env) {
@@ -543,6 +539,7 @@ function derivedMotivationLayer(fixture) {
 
 function motivationHeuristic(fixture) {
   const competition = String(fixture.competition ?? "");
+  if (/世界杯|world\s?cup/i.test(competition)) return "世界杯小组赛：出线压力+大赛强度,首战定调、末轮易现生死/默契风险,弱队搏命强队或轮换";
   if (/英冠|荷乙|瑞超|芬超|西甲|意甲|德甲/.test(competition)) return "联赛阶段：默认纳入争冠、升级、保级与欧战席位战意风险";
   if (/杯|欧冠|欧罗巴|解放者/.test(competition)) return "杯赛阶段：默认纳入轮换、赛程密度与晋级优先级风险";
   return "常规赛事：战意未获外部源确认，按中性处理";
@@ -924,7 +921,8 @@ function searchName(team) {
     "科林蒂安": "Corinthians",
     "普拉滕斯": "Platense"
   };
-  return aliases[normalizeName(team)] ?? String(team ?? "");
+  // 兜底:本地俱乐部别名未命中 → 用 team-aliases 反查英文名(国家队走这条,GDELT 才有命中);仍无则原样。
+  return aliases[normalizeName(team)] ?? englishTeamName(team) ?? String(team ?? "");
 }
 
 function weatherPlace(team) {

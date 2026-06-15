@@ -14,7 +14,6 @@ export function loadWorldCupSupercomputer() {
   } catch { _cache = null; }
   return _cache;
 }
-export function _resetWorldCupCache() { _cache = undefined; }
 
 /** 仅世界杯决赛圈(世预赛不算)。 */
 export function isWorldCupCompetition(competition) {

@@ -1,8 +1,7 @@
 // 输出层单写者收敛(2026-06-10 缺陷#5#7#8#12#16#17#20):
 //   xlsx(20列专业版)+ 手机页(核心7列点开看全部)+ 英文固定URL页(football.html)
 //   三面渲染的唯一真相源。所有"今日交付"脚本一律经 scripts/today-full-coverage.mjs → 本库,
-//   旁路写者(today-complete-5 / today-mobile-consistent / today-twotable-xlsx / today-full-output /
-//   render-today-mobile / render-recommendation-html / jingcai-daily 桌面copy+openpyxl polish)已改薄壳或摘除。
+//   旧旁路写者(today-*/render-today-mobile 等多套并行生成器)已于 2026-06-15 全部摘除,出表唯一路径=today-full-coverage.mjs。
 // 纯函数,不碰 fs —— 可单测(日期必传/banner真计数/审计背书缺文件不写/双日期三面一致)。
 
 // ── 日期解析:显式参数必须合法,缺参用本机 UTC+8 当日;非法直接 throw(fail-loud,绝不猜) ──
@@ -114,8 +113,15 @@ export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, 
       note = `胜平负主推${wldLabel ?? "—"},让球盘(${lineStr})按比分分布真实裁决=${hw.pick}——让球问"过不过盘"非"谁赢",两问可不同向`;
     }
   }
-  const text = `${hw.pick} 过盘${modelPct}%(模型)${marketPct != null ? ` vs ${marketPct}%(市场)` : "(市场赔率⚠️缺)"}〔${lineStr}〕${sameDir ? "·与胜平负同向" : `\n⚠️与胜平负不同向:${note}`}`;
-  return { text, sameDir, note, verdict: hw.pick, modelPct, marketPct, lineStr };
+  // 模型 vs 市场过盘分歧旗标(2026-06-14 用户审计抓出:同向场也可能模型/市场差很大却不警告)。
+  //   回测铁律「分歧越大市场越准」(见 reference_signal_backtest_findings)→ ≥15pp 强制标"以市场为准·勿当胆",
+  //   不分同向/不同向。典型:科特迪瓦vs厄瓜多尔 让球客胜 模型51% vs 市场16%(35pp)= 模型高估,押冷门。
+  const divergePp = marketPct != null ? Math.abs(modelPct - marketPct) : null;
+  const divergeFlag = (divergePp != null && divergePp >= 15)
+    ? `\n⚠️模型与市场让球分歧${divergePp}pp(模型${modelPct}%/市场${marketPct}%)——「分歧越大市场越准」以市场为准,模型该盘勿当胆`
+    : "";
+  const text = `${hw.pick} 过盘${modelPct}%(模型)${marketPct != null ? ` vs ${marketPct}%(市场)` : "(市场赔率⚠️缺)"}〔${lineStr}〕${sameDir ? "·与胜平负同向" : `\n⚠️与胜平负不同向:${note}`}${divergeFlag}`;
+  return { text, sameDir, note, verdict: hw.pick, modelPct, marketPct, lineStr, divergePp };
 }
 
 // ── ③ 串关安全度(信心档+risk+证伪标签 三级;只标注供搭串参考) ──
@@ -299,6 +305,46 @@ export function buildAuditSheet({ date, rows, contentAudit }) {
   const body = rows.map((r) => [String(r.idx), r.match, ...AUDIT_DIMENSIONS.map((d) => r.audit?.[d] ?? "⚠️缺(该维未登记)")]);
   const tail = [[""], ["—— 内容审计区(2026-06-11 口径) ——"], ...(contentAudit ?? []).map((x) => (Array.isArray(x) ? x : [x]))];
   return { name: "数据审计", rows: [[`🔍 数据审计 · ${date} · ${rows.length}场×${AUDIT_DIMENSIONS.length}维(每格=三标签+值+来源+抓取时间)`], header, ...body, ...tail] };
+}
+
+// ── 情报详情工作表(2026-06-14 情报系统·展示层,不动概率) ──
+// 每场:预测/确认首发XI+阵型 / 关键伤停 / 近期热身赛 / 新闻动机,每格带 ✅实测/🔶推断/⚠️缺 来源标签。
+// intelByMatch[`home|away`] = src/match-intel.buildMatchIntel 产物;缺该场 → 整行如实标缺(不编)。
+function intelLineupCell(side) {
+  if (!side || !side.xi) return "⚠️缺";
+  const names = side.xi.map((p) => p.name).join("、");
+  const form = side.formation ? ` ${side.formation}` : "";
+  const head = `${side.tag} ${side.status}${form}`;
+  if (!names) return `${head}(${side.source ?? "无名单"})`;
+  const prov = side.status === "预测首发" ? `\n〔${side.source}〕` : (side.source ? `\n〔${side.source}〕` : "");
+  return `${head}:${names}${prov}`;
+}
+const intelCell = (v) => (v == null || v === "" ? "⚠️缺" : String(v));
+const intelSourcesCell = (web) => {
+  const s = web?.sources ?? [];
+  return s.length ? s.map((u, i) => `[${i + 1}] ${u}`).join("\n") : "⚠️缺";
+};
+export function buildIntelSheet({ date, rows, intelByMatch }) {
+  const banner = `🕵️ 情报详情 · ${date} · 预测首发+阵型/伤停停赛/近期战绩/交锋史/小组形势/球队风格·关键球员·主帅/场地天气/新闻战意/来源(展示层·不动概率·每格带✅实测/🔶推断/⚠️缺)`;
+  const header = ["#", "对阵", "主队预测/确认首发(阵型)", "客队预测/确认首发(阵型)", "关键伤停/停赛",
+    "主队近期战绩", "客队近期战绩", "交锋史(H2H)", "小组形势/重要性", "球队风格·关键球员·主帅", "场地·天气",
+    "新闻·战意/动机", "情报来源(URL)", "情报成熟度"];
+  const EMPTY = [String, "", "⚠️缺(无情报)", "⚠️缺(无情报)", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "0/5"];
+  const body = rows.map((r) => {
+    const it = intelByMatch?.[r.match] ?? null;
+    if (!it) return [String(r.idx), r.match, ...EMPTY.slice(2)];
+    const w = it.web ?? null;
+    return [String(r.idx), r.match,
+      intelLineupCell(it.home.lineup), intelLineupCell(it.away.lineup),
+      intelCell(it.injuries.text), intelCell(it.home.recentForm.text), intelCell(it.away.recentForm.text),
+      intelCell(w?.h2h), intelCell(w?.group), intelCell(w?.style),
+      intelCell(w?.venue), intelCell(it.news.text), intelSourcesCell(w), `${it.maturity}/5`];
+  });
+  const tail = [[""],
+    ["情报口径", "预测首发=🔶近期真实首发频次聚合(赛前1h官方阵容出即转✅);近期战绩=✅ESPN国际赛真实赛果(含友谊/预选);伤停停赛/交锋史/小组形势/球队风格·主帅/场地天气/新闻战意=全网公开赛前情报(Sports Mole/ESPN/RotoWire/FOX/Goal/Opta/FIFA等),媒体报道·🔶非官方确认,逐条URL见'情报来源'列;🔶为媒体存疑项。免费结构化伤停源对国家队为空墙,故改走全网媒体核录(中文)。"],
+    ["铁律", "情报只作展示与研判,绝不进胜负平/比分概率(有市场赔率时融合情报回测净负,违'打不过市场就别装')。缺即标缺,不用默认/中性值冒充;每条可追溯到来源。"],
+  ];
+  return { name: "情报详情", rows: [[banner], header, ...body, ...tail] };
 }
 
 // ── 14场/任选9 闸裁决工作表(buildFourteenPlan 闸如实判定;不能出写明依据,绝不硬凑) ──

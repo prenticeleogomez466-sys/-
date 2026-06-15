@@ -36,37 +36,6 @@ export function readLocalEnv(path = localEnvPath) {
   return env;
 }
 
-export function writeLocalEnv(updates, options = {}) {
-  const path = options.path ?? localEnvPath;
-  mkdirSync(dirname(path), { recursive: true });
-  const merged = { ...(options.preserve === false ? {} : readLocalEnv(path)) };
-  for (const [key, value] of Object.entries(updates ?? {})) {
-    const normalized = String(value ?? "").trim();
-    if (normalized) merged[key] = normalized;
-  }
-  merged.FREE_ODDS_ONLY = merged.FREE_ODDS_ONLY ?? "1";
-  merged.FREE_MODE_REQUIRE_HANDICAP = merged.FREE_MODE_REQUIRE_HANDICAP ?? "0";
-  merged.ODDS_REQUIRE_COMPLETE = merged.ODDS_REQUIRE_COMPLETE ?? "0";
-  merged.ODDS_REQUIRE_REALTIME = merged.ODDS_REQUIRE_REALTIME ?? "1";
-  merged.ODDS_MAX_AGE_MINUTES = merged.ODDS_MAX_AGE_MINUTES ?? "180";
-  merged.DATA_SOURCE_REQUIRE_FIXTURES = merged.DATA_SOURCE_REQUIRE_FIXTURES ?? "0";
-  const order = [
-    ...SOURCE_CREDENTIALS.map((item) => item.key),
-    "FREE_ODDS_ONLY",
-    "FREE_MODE_REQUIRE_HANDICAP",
-    "ODDS_API_REGIONS",
-    "ODDS_API_SPORTS",
-    "ODDS_REQUIRE_COMPLETE",
-    "ODDS_REQUIRE_REALTIME",
-    "ODDS_MAX_AGE_MINUTES",
-    "DATA_SOURCE_REQUIRE_FIXTURES",
-    "WECHAT_WEBHOOK_URL"
-  ];
-  const keys = [...new Set([...order, ...Object.keys(merged)])].filter((key) => merged[key] !== undefined);
-  writeFileSync(path, `${keys.map((key) => `${key}=${merged[key]}`).join("\n")}\n`, "utf8");
-  return { path, env: merged };
-}
-
 export function validateProductionCredentials(env = process.env) {
   const freeOnly = env.FREE_ODDS_ONLY !== "0";
   const hasFreeOddsSource = Boolean(

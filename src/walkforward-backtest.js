@@ -286,46 +286,6 @@ export function runSignalAblation(opts = {}) {
  * 默认应用 profileOpts(生产 disabledSignals/signalWeights),这样校准的是真实生产模型。
  * @returns {Array<{date, probabilities:{home,draw,away}, actual:"3"|"1"|"0", topProb}>}(按日期升序)
  */
-export function collectFusionSamples(opts = {}) {
-  const maxTestDates = opts.testDates ?? 50;
-  const minTrainMatches = opts.minTrainMatches ?? 200;
-  const maxDates = opts.maxDates ?? 240;
-  const fusionOpts = opts.fusionOpts ?? {};
-
-  const allHistory = loadHistoricalResults();
-  const datesDesc = listFixtureDates();
-  const dated = [];
-  for (const date of datesDesc) {
-    const { fixtures } = loadFixtures(date);
-    const withResult = (fixtures || []).filter(
-      (f) => f.result && Number.isFinite(Number(f.result.home)) && Number.isFinite(Number(f.result.away))
-    );
-    if (withResult.length) dated.push({ date, matches: withResult });
-  }
-
-  const samples = [];
-  let usedDates = 0;
-  for (const { date, matches } of dated) {
-    if (usedDates >= maxTestDates) break;
-    const fit = fitFromFixtureStore({ beforeDate: date, maxDates });
-    if (!fit?.usable || fit.coldStart || (fit.matches ?? 0) < minTrainMatches) continue;
-    usedDates++;
-    const histBefore = allHistory.filter((m) => m.date < date);
-    for (const f of matches) {
-      const pred = predictFromFitted(fit, { homeTeam: f.homeTeam, awayTeam: f.awayTeam });
-      if (!pred?.probabilities) continue;
-      const actual = actualOutcome(f.result);
-      const fixture = { id: f.id, homeTeam: f.homeTeam, awayTeam: f.awayTeam, competition: f.competition, date };
-      const ctx = buildFusionContext(fixture, histBefore);
-      const fused = fuseSignals(pred.probabilities, fixture, {}, ctx, fusionOpts).probabilities;
-      const actualCode = actual === "home" ? "3" : actual === "draw" ? "1" : "0";
-      const topProb = Math.max(fused.home, fused.draw, fused.away);
-      samples.push({ date, probabilities: fused, actual: actualCode, topProb });
-    }
-  }
-  return samples.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-}
-
 export function runWeightSearch(candidates = [], opts = {}) {
   const maxTestDates = opts.testDates ?? 50;
   const minTrainMatches = opts.minTrainMatches ?? 200;
