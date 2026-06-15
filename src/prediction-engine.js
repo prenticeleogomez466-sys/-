@@ -50,6 +50,7 @@ import { optimizeTicket } from "./ticket-optimizer.js";
 import { gate as marketDivergenceGate } from "./clv-confidence-gate.js";
 import { analyzeMatch } from "./match-archetype-analyzer.js";
 import { synthesizeScenario, scenarioNarrative } from "./scenario-synthesizer.js";
+import { buildIntelSnapshot } from "./match-intel.js"; // 复盘临场维快照(展示/复盘用,不进概率)
 import { buildPickDriverAttribution } from "./pick-driver-attribution.js";
 import { leagueExpertFromFitted } from "./league-expert-mixture.js";
 import { multimodalAnalysis, summarizeMultimodal } from "./multimodal-collab.js";
@@ -154,6 +155,8 @@ export function recommendFixtures(date) {
   //   各自给胜平负判断 → 本层做 分流×对比×裁决,挂到每场 prediction.multimodal。
   //   严守硬规则:只读已算好的真实中间量、以 wld 为锚不改方向、分歧只下调信心不弃赛、缺数据 available:false。
   const deepCtxLayer = advancedData?.layers?.deepContext?.fixtureData ?? {};
+  const lineupLayer = advancedData?.layers?.lineups?.fixtureData ?? {};
+  const injuryLayer = advancedData?.layers?.injuries?.fixtureData ?? {};
   // 球队画像层(2026-06-06):全联赛每队攻防/主客场/状态(近~2季 fixture-store),+ 主客场"市场存疑"识别。
   //   情景/避坑展示用,不驱动 wld 概率(回测铁证:画像叠加市场不提命中)。样本不足队=null(标缺)。
   let teamProfiles = null;
@@ -165,6 +168,15 @@ export function recommendFixtures(date) {
     //   无该场数据=null(标缺不兜底),展示层据此标"未取到"。
     p.deepContext = deepCtxLayer[p.fixture?.id] ?? null;
     try { p.teamProfile = teamProfiles ? profileForFixture(p.fixture, teamProfiles) : null; } catch { p.teamProfile = null; }
+    // 复盘临场维快照(2026-06-15):战术姿态/阵容可用度从 lineups+injuries 真实派生,入 ledger 供"阵容/战术→结果"规律挖掘;
+    //   纯展示快照,不进概率(铁律);无该场 lineup→各字段 null(诚实缺)。积分压力暂无feed=null。
+    try {
+      p.intelSnapshot = buildIntelSnapshot({
+        lineups: lineupLayer[p.fixture?.id] ?? null,
+        injuries: injuryLayer[p.fixture?.id] ?? null,
+        homeTeam: p.fixture?.homeTeam, awayTeam: p.fixture?.awayTeam,
+      });
+    } catch { p.intelSnapshot = null; }
   }
   const multimodalSummary = summarizeMultimodal(predictions);
   // 缺陷#6#14(2026-06-10):两份生产 profile 的健康状态随产物输出——缺失=显式降级标注,绝不静默。

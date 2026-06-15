@@ -941,6 +941,15 @@ function toLedgerRow(prediction) {
     handicapOpenTriple: snap?.handicapOdds?.initial ? `${snap.handicapOdds.initial.home}/${snap.handicapOdds.initial.draw}/${snap.handicapOdds.initial.away}` : null,
     handicapCloseTriple: snap?.handicapOdds?.current ? `${snap.handicapOdds.current.home}/${snap.handicapOdds.current.draw}/${snap.handicapOdds.current.away}` : null,
     motivation: prediction.scenario?.motivation?.summary ?? (typeof prediction.scenario?.motivation === "string" ? prediction.scenario.motivation : null),
+    // 临场维快照(2026-06-15:战术姿态/阵容可用度从真实 lineups+injuries 派生,供"阵容/战术→结果"规律挖掘;无数据=null;不进概率)
+    tacticalHome: prediction.intelSnapshot?.tacticalHome ?? null,
+    tacticalAway: prediction.intelSnapshot?.tacticalAway ?? null,
+    tacticalClash: prediction.intelSnapshot?.tacticalClash ?? null,
+    homeKeyMissing: prediction.intelSnapshot?.homeKeyMissing ?? null,
+    awayKeyMissing: prediction.intelSnapshot?.awayKeyMissing ?? null,
+    lineupStabilityHome: prediction.intelSnapshot?.lineupStabilityHome ?? null,
+    lineupStabilityAway: prediction.intelSnapshot?.lineupStabilityAway ?? null,
+    standingsPressure: prediction.intelSnapshot?.standingsPressure ?? null, // ⚠️无积分feed→null(待接源)
     actual: outcomeCodeToChinese(actual),
     actualScore: fixture.result ? `${fixture.result.home}-${fixture.result.away}` : "",
     hit: actual ? actual === prediction.pick.code : null

@@ -30,6 +30,46 @@ import {
 export const INTEL_TAG = { REAL: "✅实测", INFER: "🔶推断", MISS: "⚠️缺" };
 
 /**
+ * 复盘快照(2026-06-15):把【临场情报维】压成可入 ledger 的扁平快照,供日后"阵容/战术/积分→结果"规律挖掘。
+ * 全来自真实采集层(lineups/injuries),无数据→null(诚实缺,不编)。积分压力暂无 feed→null+标注。
+ * @param {{lineups?:object, injuries?:object, predictedHome?:object, predictedAway?:object}} input
+ *        lineups=layers.lineups.fixtureData[id]({home,away});injuries=该场伤停名单;predicted*=aggregatePredictedXI 产物
+ * @returns {object} 扁平快照(字段缺即 null)
+ */
+export function buildIntelSnapshot(input = {}) {
+  const ls = input.lineups ?? null;
+  const homeF = ls?.home?.formation ?? input.predictedHome?.formation ?? null;
+  const awayF = ls?.away?.formation ?? input.predictedAway?.formation ?? null;
+  const pH = homeF ? formationPosture(homeF) : null;
+  const pA = awayF ? formationPosture(awayF) : null;
+  const desc = (p) => (p ? (p.attacking ? "压上" : p.defensive ? "低位防守" : "均衡") : null);
+  // 战术克制标签:双摆防/双压上/攻防对位/单边压
+  let tacticalClash = null;
+  if (pH && pA) {
+    tacticalClash = pH.defensive && pA.defensive ? "双低位(闷战倾向)"
+      : pH.attacking && pA.attacking ? "双压上(对攻倾向)"
+        : (pH.attacking && pA.defensive) ? "主攻客守"
+          : (pH.defensive && pA.attacking) ? "主守客攻" : "均衡对位";
+  }
+  // 阵容可用度(确认/预测XI ∩ 伤停)
+  const injPlayers = input.injuries?.players ?? input.injuries?.injuries ?? (Array.isArray(input.injuries) ? input.injuries : []);
+  const homeXI = ls?.home?.starters ?? input.predictedHome?.xi ?? null;
+  const awayXI = ls?.away?.starters ?? input.predictedAway?.xi ?? null;
+  const homeAvail = homeXI ? lineupAvailability(homeXI, injPlayers.filter((p) => !p.team || p.team === input.homeTeam)) : null;
+  const awayAvail = awayXI ? lineupAvailability(awayXI, injPlayers.filter((p) => !p.team || p.team === input.awayTeam)) : null;
+  return {
+    tacticalHome: pH ? `${pH.raw}·${desc(pH)}` : null,
+    tacticalAway: pA ? `${pA.raw}·${desc(pA)}` : null,
+    tacticalClash,
+    lineupStabilityHome: lineupStability(input.predictedHome)?.stability ?? null,
+    lineupStabilityAway: lineupStability(input.predictedAway)?.stability ?? null,
+    homeKeyMissing: homeAvail?.missingFromXI ?? null,
+    awayKeyMissing: awayAvail?.missingFromXI ?? null,
+    standingsPressure: null, // ⚠️无积分feed(俱乐部);WC组内积分可后续从 national-results 派生,届时填入
+  };
+}
+
+/**
  * 预测首发聚合(真空白模块的核心):用某队**近 N 场真实首发**的频次,推出最可能的首发 11 人 + 阵型。
  * 纯统计、可追溯、不编造:每个入选球员都带 starts/n,整体带 basis(哪几场推出的)。
  *
