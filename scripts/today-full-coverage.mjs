@@ -20,7 +20,7 @@ import {
   auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
-  XLSX_HEADERS,
+  XLSX_HEADERS, h2hToStatsList,
 } from "../src/today-delivery-lib.js";
 // 2026-06-13 交付契约硬闸(根治版式漂移/另起野页):写完产物自检,违约 fail-loud 拒认成功交付
 import { checkContract, CONTRACT_PATH } from "./freeze-delivery-contract.mjs";
@@ -358,6 +358,7 @@ for (const p of games) {
     homeForm: recentForm(natCache, canonicalTeamName(p.fixture.homeTeam)),
     awayForm: recentForm(natCache, canonicalTeamName(p.fixture.awayTeam)),
     webIntel: web,
+    h2hList: h2hToStatsList(covFor(p)?.h2h), // 结构化交锋史(49k库优先/ESPN回退)→ h2hStats 深化统计,填补⚠️空缺
   });
 }
 

@@ -155,6 +155,29 @@ export function renderH2hCell(h2h, homeZh) {
   return `${view}${ms.length > 4 ? ` 等${ms.length}次` : ""} ${h2h.label ?? (h2h.source ? `✅${h2h.source}` : "")}`;
 }
 
+/**
+ * 结构化H2H → intel-stats.h2hStats 可消费的"主队视角{score}"列(2026-06-15:填补"结构化交锋统计"空缺)。
+ * 兼容两形态:①数组(ESPN,{gf,ga}=主队视角直接用) ②{meetings}(本地49k历史库,按 homeEn 定向、客先则flip)。
+ * 全来自真实赛果(✅),无可解析交锋→null(调用方标缺,绝不编)。
+ */
+export function h2hToStatsList(h2h) {
+  if (!h2h) return null;
+  if (Array.isArray(h2h)) {
+    const list = h2h.filter((x) => Number.isFinite(x.gf) && Number.isFinite(x.ga))
+      .map((x) => ({ date: x.date ?? null, score: `${x.gf}-${x.ga}` }));
+    return list.length ? list : null;
+  }
+  const ms = Array.isArray(h2h.meetings) ? h2h.meetings : [];
+  if (!ms.length) return null;
+  const flip = (s) => { const m = String(s).match(/(\d+)-(\d+)/); return m ? `${m[2]}-${m[1]}` : null; };
+  const list = ms.map((m) => {
+    const homeFirst = !h2h.homeEn || m.home === h2h.homeEn;
+    const sc = homeFirst ? String(m.score) : flip(m.score);
+    return sc && /\d+-\d+/.test(sc) ? { date: m.date ?? null, score: sc } : null;
+  }).filter(Boolean);
+  return list.length ? list : null;
+}
+
 // ── 亚盘双源渲染(DK+titan007 并存;口径分歧以 titan007 即时盘为准并注明) ──
 export function renderAsianDualCell(ah) {
   const t7 = ah?.titan007, dk = ah?.dk;
