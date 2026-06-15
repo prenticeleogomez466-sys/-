@@ -39,6 +39,14 @@ const INTL_ZH_EN = {
   "尼日利亚": "Nigeria",
 };
 
+// 中文渲染别名:同一队不同中文写法归一到 groups.json team_name_zh 规范名(纯名称归一,非数据编造)。
+//   竞彩源(500.com)用"刚果(金)",groups.json 官方名是"刚果民主共和国"——同一队(Congo-Kinshasa=DR Congo),
+//   不归一则反查失败致近5/H2H被误标缺(2026-06-16 一条龙踩出)。只收查证过的同义渲染,绝不往里猜。
+const ZH_ALIAS = {
+  "刚果(金)": "刚果民主共和国",
+  "刚果民主共和国": "刚果民主共和国",
+};
+
 const reEscape = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** groups.json team_name_zh 反查:中文 → 英文规范名。文件缺 → 空表(不编)。 */
@@ -59,7 +67,8 @@ export function loadZhToEn() {
 export function buildCoverageTargets(fixtures, zhToEn = {}) {
   const seen = new Map();
   const reOf = (zhName) => {
-    const en = zhToEn[zhName] ?? INTL_ZH_EN[zhName] ?? null;
+    const canonZh = ZH_ALIAS[zhName] ?? zhName; // 中文渲染归一(刚果(金)→刚果民主共和国)再反查
+    const en = zhToEn[canonZh] ?? zhToEn[zhName] ?? INTL_ZH_EN[canonZh] ?? INTL_ZH_EN[zhName] ?? null;
     if (!en) return { zh: zhName, en: null, re: null }; // ⚠️无英文映射 → 抓取层标缺不编
     return { zh: zhName, en, re: EN_VARIANTS[en] ?? reEscape(en) };
   };

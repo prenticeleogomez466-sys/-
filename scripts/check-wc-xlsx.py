@@ -3,7 +3,7 @@
 用法: python scripts/check-wc-xlsx.py <xlsx路径>
 输出: 单行JSON {ok, cols, errors[], warnings[], matches:[{home,away}]} 到 stdout。
 口径(2026-06-10 用户裁决):四玩法独立裁决可不同向,但必须透明——
-让球列必须带 过盘%(模型)vs%(市场)+与胜平负同/不同向标注;比分/半全场必须标主推来源;
+让球列必须带 让/受让后胜平负%(模型)vs%(市场)+与胜平负同/不同向标注;比分/半全场必须标主推来源;
 Elo先验三项和=100;任何单元格不得出现 undefined/NaN/None 渲染垃圾。
 """
 import json
@@ -111,13 +111,14 @@ def main(path):
         elif "缺" not in elo and "⚠️" not in elo:
             errors.append(f"{row_name} Elo先验列无三向概率也无缺数标注: {elo[:30]}")
 
-        # 让球透明度: 双过盘数 + 同/不同向标注(独立裁决但必须透明)
-        # 2026-06-12: 预售腿(下期胜负彩,市场让球赔率未开卖)合法形态="过盘x%(模型)(市场赔率⚠️缺)"
-        #   ——诚实标缺是铁律要求的形态,不算缺透明双数;但缺市场数时绝不许出现伪造的"(市场)"百分数。
+        # 让球透明度: 模型/市场双数 + 同/不同向标注(独立裁决但必须透明)
+        # 2026-06-15 用户裁决:让球文字改"让N球后/受让N球后 胜·平·负"(不用"过盘/走盘"),
+        #   合法形态="让2球后胜 53%(模型) vs 60%(市场)…";预售腿市场缺="…X%(模型)(市场赔率⚠️缺)"。
+        #   诚实标缺是铁律要求的形态,不算缺透明双数;但缺市场数时绝不许出现伪造的"(市场)"百分数。
         rq = cells.get("让球方向", "")
         market_ok = "(市场)" in rq or re.search(r"市场[^〕)]*⚠?️?缺", rq)
-        if rq.count("过盘") < 1 or "(模型)" not in rq or not market_ok:
-            errors.append(f"{row_name} 让球列缺'过盘%(模型)vs%(市场)'透明双数: {rq[:30]}")
+        if "(模型)" not in rq or not market_ok:
+            errors.append(f"{row_name} 让球列缺'让/受让后胜平负%(模型)vs%(市场)'透明双数: {rq[:30]}")
         if "与胜平负" not in rq:
             errors.append(f"{row_name} 让球列缺与胜平负同/不同向标注")
 

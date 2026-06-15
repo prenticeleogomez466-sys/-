@@ -1,6 +1,6 @@
 {
   "_note": "交付契约冻结档。改列序/canonical名/签名是显式动作:改 src/today-delivery-lib.js 或本脚本后,跑 node scripts/freeze-delivery-contract.mjs --write 重冻并提交(增减都要过用户)。audit:suite 的 delivery-contract 探针守它。野页判法=内容签名(只盯带交付banner的页须唯一),不扫整共享目录。",
-  "frozenAt": "2026-06-13",
+  "frozenAt": "2026-06-15",
   "xlsxHeaders": [
     "#",
     "开赛",
@@ -11,7 +11,7 @@
     "🌍世界杯模型·场馆λ乘子",
     "🏆世界杯模型·出线/夺冠%",
     "让球方向🔶(模型真实裁决·可与胜平负不同向)",
-    "竞彩让球(模型过盘vs市场)",
+    "竞彩让球(模型让/受让后胜平负vs市场)",
     "竞彩让球赔率✅",
     "博彩亚盘✅(DK+titan007双源)",
     "信号面板✅(欧赔异动·亚盘水位·让球盘资金·共振/背离·阵容)",

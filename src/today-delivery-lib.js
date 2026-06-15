@@ -4,6 +4,13 @@
 //   旧旁路写者(today-*/render-today-mobile 等多套并行生成器)已于 2026-06-15 全部摘除,出表唯一路径=today-full-coverage.mjs。
 // 纯函数,不碰 fs —— 可单测(日期必传/banner真计数/审计背书缺文件不写/双日期三面一致)。
 
+// 决策辅助层(2026-06-16:把 honest-pass-gate/分歧雷达/组合凯利/精选 4 个原 test-only 模块产品化进交付,消灭僵尸)。
+//   全为纯函数·零 fs·基于真回测实证常量,只标注不替用户弃赛(守 feedback_confidence_not_autosuppress)。
+import { honestPass } from "./honest-pass-gate.js";
+import { rankByDivergence } from "./market-divergence-radar.js";
+import { assessPortfolioRisk } from "./portfolio-kelly.js";
+import { selectHighConfidence } from "./selective-picks.js";
+
 // ── 日期解析:显式参数必须合法,缺参用本机 UTC+8 当日;非法直接 throw(fail-loud,绝不猜) ──
 export function resolveDeliveryDate(arg, now = new Date()) {
   if (arg != null && arg !== "") {
@@ -92,7 +99,7 @@ export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, 
   //   按 feedback_no_fallback_absolute=标缺不冒充:本场不出让球过盘数字,绝不用推断线盖✅500冒充真实裁决。
   if (!lineReal) {
     return {
-      text: "⚠️竞彩官方让球线未抓到→本场不出让球过盘分析(让球赔率✅500在,具体线以竞彩App实际为准;绝不用推断线冒充真实过盘)",
+      text: "⚠️竞彩官方让球线未抓到→本场不出让球(让/受让后胜平负)分析(让球赔率✅500在,具体线以竞彩App实际为准;绝不用推断线冒充真实让球裁决)",
       sameDir: null, note: "line-missing", verdict: null, modelPct: null, marketPct: null, lineReal: false,
     };
   }
@@ -103,14 +110,18 @@ export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, 
   const modelPct = Math.round((hw.probability ?? hw.probabilities?.[mKey] ?? 0) * 100);
   const marketPct = marketDist && Number.isFinite(marketDist[mKey]) ? Math.round(marketDist[mKey] * 100) : null;
   const sameDir = hw.pickCode === String(wldCode);
+  // 让球文字(2026-06-15 用户裁决):不用"过盘/走盘",改主队视角"让N球后/受让N球后 胜·平·负"。
+  //   pickCode 3=主队让(受让)后胜 · 1=让球后平(走盘退款) · 0=主队让(受让)后负(客队赢盘)。
+  const hcSide = L < 0 ? "让" + absL + "球后" : L > 0 ? "受让" + absL + "球后" : "";
+  const pickPhrase = { "3": `${hcSide}胜`, "1": `${hcSide}平`, "0": `${hcSide}负` }[hw.pickCode] ?? hw.pick;
   let note = null;
   if (!sameDir) {
     if (wldCode === "3" && L < 0) {
-      note = hw.pickCode === "1" ? `主胜但最可能恰好只赢${absL}球→走盘` : `主胜但难净胜${absL}球→让球客胜`;
+      note = hw.pickCode === "1" ? `主胜但最可能恰好只赢${absL}球→让球后打平(平)` : `主胜但难净胜${absL}球→让${absL}球后负(客队受让后胜)`;
     } else if (wldCode === "0" && L > 0) {
-      note = hw.pickCode === "1" ? `客胜但最可能恰好只赢${absL}球→走盘` : `客胜但难净胜${absL}球→受让方主队过盘(让球主胜)`;
+      note = hw.pickCode === "1" ? `客胜但最可能恰好只赢${absL}球→受让后打平(平)` : `客胜但难净胜${absL}球→主队受让${absL}球后胜`;
     } else {
-      note = `胜平负主推${wldLabel ?? "—"},让球盘(${lineStr})按比分分布真实裁决=${hw.pick}——让球问"过不过盘"非"谁赢",两问可不同向`;
+      note = `胜平负主推${wldLabel ?? "—"},让球盘(${lineStr})按比分分布真实裁决=${pickPhrase}——让球问"让/受让后的胜平负"非直接"谁赢",两问可不同向`;
     }
   }
   // 模型 vs 市场过盘分歧旗标(2026-06-14 用户审计抓出:同向场也可能模型/市场差很大却不警告)。
@@ -120,8 +131,21 @@ export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, 
   const divergeFlag = (divergePp != null && divergePp >= 15)
     ? `\n⚠️模型与市场让球分歧${divergePp}pp(模型${modelPct}%/市场${marketPct}%)——「分歧越大市场越准」以市场为准,模型该盘勿当胆`
     : "";
-  const text = `${hw.pick} 过盘${modelPct}%(模型)${marketPct != null ? ` vs ${marketPct}%(市场)` : "(市场赔率⚠️缺)"}〔${lineStr}〕${sameDir ? "·与胜平负同向" : `\n⚠️与胜平负不同向:${note}`}${divergeFlag}`;
+  const text = `${pickPhrase} ${modelPct}%(模型)${marketPct != null ? ` vs ${marketPct}%(市场)` : "(市场赔率⚠️缺)"}〔${lineStr}〕${sameDir ? "·与胜平负同向" : `\n⚠️与胜平负不同向:${note}`}${divergeFlag}`;
   return { text, sameDir, note, verdict: hw.pick, modelPct, marketPct, lineStr, divergePp };
+}
+
+// ── 盘口为主(2026-06-15 用户裁决):500竞彩 1X2(europeanOdds)de-vig 真盘口共识 = 主推/信心/注金的主口径,模型只附参考。──
+//   返回真盘口的胜平负 de-vig 分布 + 热门方向/概率/赔率;1X2 未开售(europeanOdds 缺)→ null(调用方退让球档)。
+export function marketWldPrimary(snapshot) {
+  const e = snapshot?.europeanOdds?.current;
+  if (!e || !Number.isFinite(e.home) || !Number.isFinite(e.draw) || !Number.isFinite(e.away)) return null;
+  const ss = 1 / e.home + 1 / e.draw + 1 / e.away;
+  const dist = { home: (1 / e.home) / ss, draw: (1 / e.draw) / ss, away: (1 / e.away) / ss };
+  const entries = [["3", "home", e.home], ["1", "draw", e.draw], ["0", "away", e.away]]
+    .map(([code, key, odds]) => ({ code, key, odds, prob: dist[key] }))
+    .sort((a, b) => b.prob - a.prob);
+  return { ...entries[0], dist, overround: ss };
 }
 
 // ── ③ 串关安全度(信心档+risk+证伪标签 三级;只标注供搭串参考) ──
@@ -284,7 +308,7 @@ export function buildSignalPanel({ euroCur, euroIni, asian, hcDist, ouLine, line
   if (hcDist && hcDist.home != null) {
     const lean = hcDist.home > hcDist.away ? "3" : "0";
     dirs.hcLean = lean;
-    parts.push(`竞彩让球盘:过盘资金偏${DIR_LABEL[lean] === "主胜" ? "主" : "客"}(主过盘${Math.round(hcDist.home * 100)}%/客过盘${Math.round(hcDist.away * 100)}%)`);
+    parts.push(`竞彩让球盘:让球后资金偏${DIR_LABEL[lean] === "主胜" ? "主" : "客"}(主让球后胜${Math.round(hcDist.home * 100)}%/客受让后胜${Math.round(hcDist.away * 100)}%)`);
   } else parts.push("竞彩让球盘:⚠️缺");
   if (ouLine) parts.push(ouLine);
   let verdict = "";
@@ -297,7 +321,7 @@ export function buildSignalPanel({ euroCur, euroIni, asian, hcDist, ouLine, line
       const segs = [`欧赔热门=${side(dirs.euro)}`];
       if (dirs.asianLean) segs.push(`亚盘水位偏${side(dirs.asianLean)}`);
       segs.push(`让球盘资金偏${side(dirs.hcLean)}`);
-      verdict = `🟠盘口信号分歧:${segs.join(" / ")}——欧赔答"谁赢"、亚盘/让球盘答"过不过盘",分歧=赢球难赢盘信号,玩法间方向不同有据`;
+      verdict = `🟠盘口信号分歧:${segs.join(" / ")}——欧赔答"谁赢"、亚盘/让球盘答"让(受让)后的胜平负",分歧=赢球难赢盘信号,玩法间方向不同有据`;
     }
   }
   parts.push(lineupKnown ? "阵容:✅已出(已按首发重算)" : "阵容:⚠️未公布(开赛前~1h LineupWatch自动按首发重分析推送)");
@@ -397,6 +421,79 @@ export function buildIntelSheet({ date, rows, intelByMatch }) {
     ["铁律", "情报只作展示与研判,绝不进胜负平/比分概率(有市场赔率时融合情报回测净负,违'打不过市场就别装')。缺即标缺,不用默认/中性值冒充;每条可追溯到来源。"],
   ];
   return { name: "情报详情", rows: [[banner], header, ...body, ...tail] };
+}
+
+// ── 决策辅助工作表(2026-06-16:4 个原 test-only 模块产品化·全基于真回测实证·只标注不弃赛) ──
+//   A 逐场诚实过关闸(honest-pass-gate:把对抗证伪写成确定性 5 条硬伤,零token每日可判·复盘实证落地)
+//   B 今日精选(selective-picks:高置信桶≥65%·选择性=真edge,附桶级历史命中参考)
+//   C 模型↔市场分歧雷达(market-divergence-radar:Σ|模型−市场|降序,高分歧场置顶供人工复核)
+//   D 组合注金相关性闸(portfolio-kelly:同场跨玩法相关簇+全天总暴露上限,纯保护真钱不抬注)
+// 入参 rows[].decision = today-full-coverage buildDecisionInput 产物(缺=该场不参与,如实标)。
+export function buildDecisionAidsSheet({ date, rows }) {
+  const banner = `🧭 决策辅助 · ${date} · 诚实过关闸/今日精选/分歧雷达/组合注金闸(全基于真回测实证·零token·只标注不替你弃赛·买不买你定)`;
+  const di = rows.map((r) => r.decision).filter(Boolean);
+  if (!di.length) {
+    return { name: "决策辅助", rows: [[banner], ["⚠️ 当日无可归一的盘口推荐行(1X2/让球盘口均未开售或缺),决策辅助本次不出(如实不编)。"]] };
+  }
+  const out = [[banner]];
+
+  // ── A 逐场诚实过关闸 ──
+  out.push([]);
+  out.push([`【A】逐场诚实过关闸(honest-pass-gate·5条硬伤任一不过=观望;判据=walk-forward校准档/风险档命中/EV/逆市/soft-league先验)`]);
+  out.push(["对阵", "推荐方向", "模型概率", "本地EV", "风险", "诚实裁决", "硬伤明细(过则空)"]);
+  let passN = 0;
+  for (const d of di) {
+    const hp = honestPass({ prob: d.prob, ev: d.ev, risk: d.risk, competition: d.competition, divergencePp: d.divergencePp, aligned: d.aligned });
+    if (hp.pass) passN++;
+    out.push([
+      d.match, d.dir,
+      d.modelProb != null ? `${Math.round(d.modelProb * 100)}%` : (d.marketProb != null ? `盘口${Math.round(d.marketProb * 100)}%(1X2未开售)` : "⚠️缺"),
+      d.ev != null ? d.ev.toFixed(4) : "⚠️缺(无赔率无法验证价值)",
+      d.risk ?? "⚠️缺",
+      hp.verdict,
+      hp.failReasons.length ? hp.failReasons.join(" ｜ ") : "—",
+    ]);
+  }
+  out.push([`小结`, `诚实过关 ${passN}/${di.length} 注进推荐池,其余转观望(只标注·守 feedback_confidence_not_autosuppress 不替你弃赛)`]);
+
+  // ── B 今日精选 ──
+  out.push([]);
+  out.push([`【B】今日精选(selective-picks·模型favorite概率≥65%强热门桶;选择性=真edge的产品化,低于门槛≠弃赛=不进精选)`]);
+  const sel = selectHighConfidence(di.map((d) => ({ match: d.match, favoriteProb: d.modelProb ?? d.marketProb, pick: d.dir, competition: d.competition })), { minConfidence: 0.65 });
+  if (sel.selected.length) {
+    out.push(["对阵", "推荐方向", "概率", "桶", "桶级历史命中参考"]);
+    for (const s of sel.selected) out.push([s.match, s.pick, `${Math.round(s.favoriteProb * 100)}%`, s.bucket, s.refHit]);
+    out.push([`覆盖`, `精选 ${sel.coverage.selected}/${sel.coverage.total} 场(覆盖率${sel.coverage.rate != null ? Math.round(sel.coverage.rate * 100) + "%" : "—"})·只推高桶,代价是覆盖↓`]);
+  } else {
+    out.push(["—", "今日无模型概率≥65%的精选场(全覆盖天花板~55%,无强热门桶=如实不硬凑精选)"]);
+  }
+
+  // ── C 模型↔市场分歧雷达 ──
+  out.push([]);
+  out.push([`【C】模型↔市场分歧雷达(market-divergence-radar·Σ|模型−市场|降序;实证"分歧越大市场越对"→默认作风险旗标,不反向下注)`]);
+  out.push(["对阵", "Σ分歧度", "模型主推", "市场主推", "同向?", "旗标"]);
+  const radar = rankByDivergence(di.map((d) => ({ match: d.match, competition: d.competition, modelProbs: d.modelProbs, marketProbs: d.marketProbs })), { threshold: 0.25 });
+  const pk = { home: "主胜", draw: "平局", away: "客胜" };
+  for (const x of radar) {
+    out.push([
+      x.match,
+      x.hasMarket ? x.divergence.toFixed(3) : "⚠️无市场分布",
+      pk[x.modelPick] ?? "—", x.hasMarket ? (pk[x.marketPick] ?? "—") : "—",
+      x.agree == null ? "—" : (x.agree ? "同向" : "⚠️背离"),
+      x.flagged ? "🟠高分歧·优先人工复核" : (x.hasMarket ? "正常" : "—"),
+    ]);
+  }
+
+  // ── D 组合注金相关性闸 ──
+  out.push([]);
+  out.push([`【D】组合注金相关性闸(portfolio-kelly·同场跨玩法=同一赛果驱动的相关簇,逐注下注=同风险重复放大;纯降额保护真钱不抬注)`]);
+  const port = assessPortfolioRisk(di.filter((d) => d.stakeUnits != null).map((d) => ({ id: d.match, match: d.match, market: "胜负平/让球主推", stakeUnits: d.stakeUnits })), { perMatchCap: 2.0, totalCap: 10.0 });
+  out.push(["全天建议总注(单位)", `${port.totalBefore}U`, "相关性闸调整后", `${port.totalAfter}U`, "基础注", `${100}元/单位档系数`]);
+  if (port.warnings.length) for (const w of port.warnings) out.push(["⚠️闸触发", w]);
+  else out.push(["闸状态", "未触发(全天总暴露在 10U 内·单场无多玩法相关簇超限);逐注注金见主表💰列"]);
+  out.push(["铁律", "只降额不抬注·缩放后仍>0由你定·这是组合风险提示非弃赛(守 feedback_confidence_not_autosuppress)"]);
+
+  return { name: "决策辅助", rows: out };
 }
 
 // ── 14场/任选9 闸裁决工作表(buildFourteenPlan 闸如实判定;不能出写明依据,绝不硬凑) ──
@@ -571,7 +668,7 @@ export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事)",
   "胜负平🔶(足球大模型)", "胜平负赔率✅(市场锚)",
   "🌍世界杯模型·Elo先验三概率(洲际校正)", "🌍世界杯模型·场馆λ乘子", "🏆世界杯模型·出线/夺冠%",
   "让球方向🔶(模型真实裁决·可与胜平负不同向)",
-  "竞彩让球(模型过盘vs市场)", "竞彩让球赔率✅", "博彩亚盘✅(DK+titan007双源)",
+  "竞彩让球(模型让/受让后胜平负vs市场)", "竞彩让球赔率✅", "博彩亚盘✅(DK+titan007双源)",
   "信号面板✅(欧赔异动·亚盘水位·让球盘资金·共振/背离·阵容)",
   "比分(盘口✅真实热门主推+模型🔶次行)", "比分赔率✅", "半全场(盘口✅真实热门主推+模型🔶次行)", "半全场赔率✅", "大小球✅", "进球分布✅",
   "主队近5✅", "客队近5✅", "H2H(本地49k历史库)", "攻防画像", "信心档", "💰建议注金🔶(基础100元分层)", "串关安全度", "🔴对抗证伪(三视角·只标注不弃赛)"];
@@ -607,10 +704,11 @@ export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, 
   // 降级句(buildDegradeNote 产物)进手机页头条 risk 块——与 xlsx banner 同口径,头条不再只有平局/硬币档提示。
   const riskBody = [degradeNote, riskNote || "模型只给信心+风险参考,买不买你定。"].filter(Boolean).map((s) => esc(s)).join("<br>");
   const br = (s) => esc(s).replace(/\n/g, "<br>");
-  const detail = (r) => (r.wcLine ? `<div class="drow"><b>🏆赛会</b>${esc(r.wcLine)}</div>` : "") +
+  const detail = (r) => (r.primary ? `<div class="drow"><b>🎯盘口主推</b>${esc(r.primary.text)}<br><span class="g">${esc(r.primary.ref)}</span></div>` : "") +
+    (r.wcLine ? `<div class="drow"><b>🏆赛会</b>${esc(r.wcLine)}</div>` : "") +
     (r.wcElo && r.wcElo !== "—" ? `<div class="drow"><b>🌍世界杯模型</b>Elo先验 ${esc(r.wcElo)}<br><span class="ind">场馆λ ${esc(r.wcLambda ?? "—")}</span></div>` : "") +
     (r.scen ? `<div class="drow"><b>情景</b>${esc(r.scen)}</div>` : "") +
-    `<div class="drow"><b>胜负平</b>${esc(r.wld)}<span class="g"> · 欧赔 ${esc(r.euro)}</span></div>` +
+    `<div class="drow"><b>胜负平(模型🔶参考)</b>${esc(r.wld)}<span class="g"> · 欧赔 ${esc(r.euro)}</span></div>` +
     (r.hv ? `<div class="drow"><b>让球真实裁决</b>${br(r.hv.text)}</div>` : "") +
     `<div class="drow"><b>让球${esc(r.hcP.line)}</b>模型 ${esc(r.hcP.model)}<br><span class="ind">市场 ${esc(r.hcP.market)}${r.hcP.diverge ? ` <span class="w2">⚠️以市场为准</span>` : ""}</span></div>` +
     `<div class="drow"><b>让球赔率</b>${esc(r.hc)}<br><b>博彩亚盘</b>${esc(r.asian)}</div>` +
@@ -650,7 +748,7 @@ ${stakeSum ? `<div class="rec" style="border-left-color:#7b1fa2">${esc(stakeSum)
 <table class="core"><thead><tr><th>对阵 ▾</th><th>信心/注金</th><th>胜负平</th><th>让球</th><th>比分</th><th>半全</th><th>大小</th></tr></thead><tbody>${trs}</tbody></table>
 ${renderParlayHtmlSection(parlayPlan, { compact: true })}
 <a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(20列全字段·含对抗证伪)</a>
-<div class="foot">真实端到端(${date})。5赔种=500竞彩XML(欧赔/让球/比分/半全场/总进球de-vig),亚盘+未开售场欧赔=ESPN/DraftKings,近5/H2H=ESPN。让球过盘=模型与市场两套数·分歧大以市场为准。缺口(国家队真xG/老H2H)诚实标。${esc(auditFoot)}</div>
+<div class="foot">真实端到端(${date})。5赔种=500竞彩XML(欧赔/让球/比分/半全场/总进球de-vig),亚盘+未开售场欧赔=ESPN/DraftKings,近5/H2H=ESPN。让球(让/受让后胜平负)=模型与市场两套数·分歧大以市场为准。缺口(国家队真xG/老H2H)诚实标。${esc(auditFoot)}</div>
 <script>function tg(r){r.nextElementSibling.classList.toggle('open');var a=r.querySelector('.ar');if(a)a.textContent=r.nextElementSibling.classList.contains('open')?'▴':'▾';}</script>
 </div></body></html>`;
 }

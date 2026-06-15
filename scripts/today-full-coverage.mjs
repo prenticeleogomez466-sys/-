@@ -17,11 +17,14 @@ import {
   // 2026-06-11 渲染层升级(用户裁决①②③④):世界杯先验列组/让球真实裁决/串关安全度/数据审计/14场闸裁决
   wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
   renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
-  auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet,
+  auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet, buildDecisionAidsSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
-  XLSX_HEADERS, h2hToStatsList,
+  XLSX_HEADERS, h2hToStatsList, marketWldPrimary,
 } from "../src/today-delivery-lib.js";
+// 2026-06-15 用户裁决:盘口推荐为主、模型只当参考 → 信心/注金按真盘口热门概率定档(selectionTier 本就吃市场隐含)
+import { selectionTier } from "../src/selection-tier.js";
+import { stakeMultiplier, STAKE_BASE } from "../src/stake-plan.js";
 // 2026-06-13 交付契约硬闸(根治版式漂移/另起野页):写完产物自检,违约 fail-loud 拒认成功交付
 import { checkContract, CONTRACT_PATH } from "./freeze-delivery-contract.mjs";
 import { writeFileSync, copyFileSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
@@ -157,7 +160,21 @@ const hcStr = (p, s) => {
   if (realLine == null) return `让球赔率✅500=${cur}${ini && ini !== cur ? `(初${ini})` : ""}·⚠️竞彩官方让球线未抓到(以竞彩App实际线为准)`;
   return `让${realLine} ${cur}${ini && ini !== cur ? `(初${ini})` : ""} ✅500让球`;
 };
-const ouRealStr = (s) => { const t = s.totalGoalsOdds; if (!t || t.over25 == null) return "⚠️未取到"; return `大2.5球 大${Math.round(t.over25 * 100)}%/小${Math.round(t.under25 * 100)}% ✅500总进球`; };
+// 大小球(2026-06-15 用户裁决:与比分/半全场一致,盘口主推 + 模型方向双行)。
+//   盘口主推=500总进球盘 de-vig(✅市场);模型方向=DC λ矩阵 P(大2.5)(🔶,盘口为主仅参考);同向/分歧如实标。
+const ouRealStr = (s, p) => {
+  const t = s.totalGoalsOdds;
+  const em = p?.extendedMarkets?.overUnder?.["2.5"];
+  const mOver = em && Number.isFinite(em.over) ? Math.round(em.over * 100) : null;
+  const modelLine = mOver != null ? `\n模型方向🔶(DC矩阵·盘口为主仅参考): 大${mOver}%/小${100 - mOver}%` : "";
+  if (!t || t.over25 == null) {
+    return mOver != null ? `⚠️500总进球盘未取到 ‖ 模型方向🔶 大${mOver}%/小${100 - mOver}%(DC矩阵·无盘口仅参考)` : "⚠️未取到";
+  }
+  const mkOver = Math.round(t.over25 * 100);
+  const sameDir = mOver != null ? ((mkOver >= 50) === (mOver >= 50)) : null;
+  const note = mOver == null ? "" : (sameDir ? " ·与盘口同向" : " ⚠️与盘口分歧(以盘口为准)");
+  return `盘口主推 大2.5 大${mkOver}%/小${Math.round(t.under25 * 100)}% ✅500总进球${modelLine}${note}`;
+};
 const distStr = (s) => { const d = s.totalGoalsOdds?.dist; if (!d) return ""; return Object.entries(d).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([g, pp]) => `${g}球${Math.round(pp * 100)}%`).join(" "); };
 const scoreMktStr = (s) => { const t = s.scoreOdds?.top; return t?.length ? t.slice(0, 5).map((x) => `${x.score}@${x.odds}`).join(" ") + " ✅500比分" : "⚠️未取到"; };
 const hfMktStr = (s) => { const t = s.halfFullOdds?.top; return t?.length ? t.slice(0, 4).map((x) => `${x.halfFull}@${x.odds}`).join(" ") + " ✅500半全场" : "⚠️未取到"; };
@@ -179,20 +196,90 @@ const hcParts = (p, s) => {
   const home = p.fixture.homeTeam, away = p.fixture.awayTeam, absL = Math.abs(line);
   const cb = p.handicapPick?.coverBreakdown || {};
   const hc = s.handicapOdds?.current;
-  const model = cb.home != null
-    ? `${home}${line}过盘${Math.round(cb.home * 100)}% · 走盘${Math.round(cb.push * 100)}% · ${away}+${absL}过盘${Math.round(cb.away * 100)}%`
-    : "缺";
+  // 让球文字(2026-06-15 用户裁决):不用"过盘/走盘",改主队视角"让N球后/受让N球后 胜·平·负"。
+  //   胜=主队让(受让)后赢盘(cb.home) · 平=让球后打平退款(cb.push) · 负=主队让(受让)后输盘(cb.away,即客队赢盘)。
+  const hcPrefix = line < 0 ? `${home}让${absL}球后` : line > 0 ? `${home}受让${absL}球后` : `${home}平手`;
+  const swl = (d) => `${hcPrefix} 胜${Math.round(d.home * 100)}% · 平${Math.round(d.push * 100)}% · 负${Math.round(d.away * 100)}%`;
+  const model = cb.home != null ? swl(cb) : "缺";
   let market = "缺", mkHome = null, mkDist = null;
   if (hc) {
     const ss = 1 / hc.home + 1 / hc.draw + 1 / hc.away;
     mkHome = (1 / hc.home) / ss;
     mkDist = { home: (1 / hc.home) / ss, push: (1 / hc.draw) / ss, away: (1 / hc.away) / ss };
-    market = `${home}过盘${Math.round(mkDist.home * 100)}% · 走盘${Math.round(mkDist.push * 100)}% · ${away}+${absL}过盘${Math.round(mkDist.away * 100)}%`;
+    market = swl(mkDist);
   }
   const diverge = (cb.home != null && mkHome != null && Math.abs(cb.home - mkHome) > 0.15);
   return { line: `让${line}`, lineNum: line, model, market, diverge, mkDist };
 };
 const hcViewStr = (p, s) => { const h = hcParts(p, s); return `${h.line} ‖ 模型:${h.model} ‖ 市场de-vig:${h.market}${h.diverge ? " ⚠️模型与市场分歧大(市场更准·谨慎)" : ""}`; };
+
+// ── 盘口为主决策(2026-06-15 用户裁决:盘口推荐为主,模型只当参考)──
+//   主推方向/信心档/注金 = 500竞彩 1X2 真盘口 de-vig 热门定;1X2未开售(悬殊盘只卖让球)→ 退让球档 de-vig 热门;
+//   模型方向/概率只作"参考",并标与盘口同向/分歧(分歧时铁律"以盘口为准")。两套数都给,买不买你定。
+function buildMarketPrimary(p, s, hcP) {
+  const home = p.fixture.homeTeam, away = p.fixture.awayTeam;
+  const named = (code) => code === "3" ? `${home}主胜` : code === "0" ? `${away}客胜` : "平局";
+  const pr = p.probabilities ?? {};
+  const mEntries = [["3", pr.home], ["1", pr.draw], ["0", pr.away]].filter(([, v]) => Number.isFinite(v)).sort((a, b) => b[1] - a[1]);
+  const modelCode = p.pick?.code ?? mEntries[0]?.[0] ?? null;
+  const modelPct = mEntries.length ? Math.round((mEntries.find(([c]) => c === modelCode)?.[1] ?? mEntries[0][1]) * 100) : null;
+  const mkStake = (prob) => { const tier = selectionTier(prob); const mult = stakeMultiplier(tier.label); return { tier: tier.label, mult, stake: mult != null ? Math.round(STAKE_BASE * mult) : null }; };
+  const mp = marketWldPrimary(s);
+  if (mp) {
+    const { tier, mult, stake } = mkStake(mp.prob);
+    const agree = modelCode === mp.code;
+    const pct = Math.round(mp.prob * 100);
+    return {
+      basis: "1X2盘口", code: mp.code, dir: named(mp.code), pct, odds: mp.odds, tier, mult, stakeAmount: stake, modelCode, modelPct, agree,
+      stakeMarket: "胜负平",
+      text: `盘口主推:${named(mp.code)} [盘口${pct}%·赔${mp.odds}] ${tier}${stake != null ? `/${stake}元` : ""}`,
+      ref: modelPct != null ? `模型参考${modelPct}%·${agree ? "与盘口同向" : "⚠️与盘口分歧(铁律以盘口为准)"}` : "模型参考缺",
+    };
+  }
+  const mk = hcP?.mkDist, line = s?.jingcaiHandicap?.line;
+  if (mk && Number.isFinite(mk.home) && line != null) {
+    const absL = Math.abs(line);
+    const prefix = line < 0 ? `${home}让${absL}球后` : line > 0 ? `${home}受让${absL}球后` : `${home}`;
+    const [res, prob] = [["胜", mk.home], ["平", mk.push], ["负", mk.away]].sort((a, b) => b[1] - a[1])[0];
+    const { tier, mult, stake } = mkStake(prob);
+    const pct = Math.round(prob * 100);
+    return {
+      basis: "让球盘口(1X2未开售)", code: null, dir: `${prefix}${res}`, pct, odds: null, tier, mult, stakeAmount: stake, modelCode, modelPct, agree: null,
+      stakeMarket: `让球(${line > 0 ? `+${line}` : line})`,
+      text: `盘口主推(1X2未开售·只让球档):${prefix}${res} [盘口${pct}%] ${tier}${stake != null ? `/${stake}元` : ""}`,
+      ref: modelPct != null ? `模型参考直胜${modelPct}%(悬殊盘1X2未开售,仅参考赢球方向、勿当让球胆)` : "模型参考缺",
+    };
+  }
+  return null;
+}
+
+// ── 决策辅助输入(2026-06-16):把每场推荐归一成 honest-pass-gate/分歧雷达/组合凯利/精选 的喂入行。
+//    本地自洽:EV=模型对"被推方向"概率×市场赔率−1(独立于 LLM 对抗证伪 workflow,零token每日可算);
+//    缺赔率/缺模型概率 → 对应字段 null,下游闸如实判"无法验证"不兜底(守 feedback_no_fallback_absolute)。 ──
+const CODE2KEY = { "3": "home", "1": "draw", "0": "away" };
+function buildDecisionInput(p, s, mkPrimary, adv) {
+  if (!mkPrimary) return null;
+  const pr = p.probabilities ?? {};
+  const pickKey = mkPrimary.code != null ? CODE2KEY[mkPrimary.code] : null;
+  const modelProb = pickKey && Number.isFinite(pr[pickKey]) ? pr[pickKey] : null;
+  const marketProb = mkPrimary.pct != null ? mkPrimary.pct / 100 : null;
+  const odds = mkPrimary.odds ?? null;
+  const ev = (odds != null && modelProb != null) ? +(modelProb * odds - 1).toFixed(4)
+    : (adv && Number.isFinite(adv.ev) ? adv.ev : null);
+  const divergencePp = (modelProb != null && marketProb != null) ? Math.round(Math.abs(modelProb - marketProb) * 100) : null;
+  const aligned = mkPrimary.code != null && mkPrimary.modelCode != null ? (mkPrimary.code === mkPrimary.modelCode) : null;
+  const mp = marketWldPrimary(s);
+  return {
+    match: `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
+    competition: p.fixture.competition ?? "",
+    dir: mkPrimary.dir, tier: mkPrimary.tier ?? null,
+    prob: modelProb != null ? modelProb : marketProb, // honest-pass-gate 校准档优先看模型概率;1X2未开售退市场概率
+    modelProb, marketProb, odds, ev, risk: p.risk ?? null, divergencePp, aligned,
+    modelProbs: { home: pr.home ?? null, draw: pr.draw ?? null, away: pr.away ?? null },
+    marketProbs: mp?.dist ?? null,
+    stakeUnits: mkPrimary.mult ?? null, stakeAmount: mkPrimary.stakeAmount ?? null,
+  };
+}
 
 // ── 数据审计矩阵(2026-06-11 ④):每格=三标签+值+来源+抓取时间,缺标缺不兜底 ──
 const tCov = cov?.generatedAt ?? null;
@@ -241,6 +328,8 @@ const rows = games.map((p, i) => {
   const s = p.marketSnapshot || {};
   const scoreMkt = !!(s.scoreOdds?.top?.length), hfMkt = !!(s.halfFullOdds?.top?.length);
   const hcP = hcParts(p, s);
+  // 🔑 盘口为主决策(2026-06-15):真盘口 de-vig 定主推/信心/注金,模型只附参考
+  const mkPrimary = buildMarketPrimary(p, s, hcP);
   // ① 世界杯模型先验透明列组(Elo先验=worldCupMatchPrior 实时算;λ=prediction 已算好的 worldCup 上下文,不重算)
   const wcCtx = p.probabilityAdjustment?.worldCup ?? null;
   const prior = isWc(p) ? worldCupMatchPrior(p.fixture.homeTeam, p.fixture.awayTeam, { hostHome: true }) : null;
@@ -289,7 +378,7 @@ const rows = games.map((p, i) => {
     euro: (s.europeanOdds?.current || cov) ? euroStr(s, c) : COV_MISS,
     asian: cov ? (c?.asianHandicap ? renderAsianDualCell(c.asianHandicap) : asianStr(c?.espnOdds)) : COV_MISS,
     hc: hcStr(p, s),
-    ouReal: ouRealStr(s), dist: distStr(s),
+    ouReal: ouRealStr(s, p), dist: distStr(s),
     scoreMkt: scoreMktStr(s), hfMkt: hfMktStr(s),
     // ESPN 补全(coverage 文件缺 → ⚠️未补全;文件在但该场没抓到 → ❌未取到)
     homeRec: c ? `${c.home.zh} ${recStr(c.home)}` : (cov ? "❌未取到" : COV_MISS),
@@ -298,15 +387,21 @@ const rows = games.map((p, i) => {
     // H2H:新版=本地49k历史库(零交锋⚠️如实标);旧 coverage 数组形状兼容
     h2h: c ? renderH2hCell(c.h2h, c.home.zh) : (cov ? "❌未取到" : COV_MISS),
     profile: c ? profileStr(c) : (cov ? "❌未取到" : COV_MISS),
-    conf: p.confidence, tier: p.selectionTier?.label ?? "",
-    // 💰信心档注金分层(2026-06-12 裁决):每场只挂最可信玩法;档位缺=null 不给金额
-    stake: buildStakeSuggestion(p),
+    // 🔑 盘口为主(2026-06-15 用户裁决):信心档/注金/主推方向 = 真盘口 de-vig 热门定,模型只附参考
+    primary: mkPrimary,
+    conf: mkPrimary ? mkPrimary.pct : p.confidence,
+    tier: mkPrimary ? mkPrimary.tier : (p.selectionTier?.label ?? ""),
+    // 💰信心档注金分层(盘口口径):盘口热门概率定档×基础100元;1X2未开售退让球档;档位缺=null 不给金额
+    stake: mkPrimary && mkPrimary.stakeAmount != null
+      ? { market: mkPrimary.stakeMarket, sel: mkPrimary.dir, prob: mkPrimary.pct, tier: mkPrimary.tier, mult: mkPrimary.mult, stake: mkPrimary.stakeAmount,
+          text: `${mkPrimary.stakeAmount}元→盘口${mkPrimary.dir}(盘口${mkPrimary.pct}%·${mkPrimary.tier})` }
+      : buildStakeSuggestion(p),
     // 🏆赛会(出线/夺冠%)= 世界杯模型超算产物;另入专属列 wcTourney
     wcLine,
     wcElo: wcCells.elo, wcLambda: wcCells.lambda, wcTourney: wcCells.tourney,
     hv,
     // ③ 串关安全度(信心档+risk+证伪标签;只标注不替弃赛)
-    parlay: parlaySafety({ tier: p.selectionTier?.label ?? "", risk: p.risk, advLabel: adv?.label ?? "" }),
+    parlay: parlaySafety({ tier: mkPrimary?.tier ?? p.selectionTier?.label ?? "", risk: p.risk, advLabel: adv?.label ?? "" }),
     // 双选触发(复盘"接住率"口径的赛前依据)
     dc: p.doubleChance?.recommended ? { pick: p.doubleChance.pick, shortCode: p.doubleChance.shortCode } : null,
     // 情景研判一行(自检⑥:scenario-synthesizer 现成 headline,逐场不同,不重算不编造)
@@ -317,6 +412,8 @@ const rows = games.map((p, i) => {
     drawAlert: p.experienceContext?.drawAlert
       ?? ((Number(p.scenario?.dims?.draw?.prob) >= 0.28 && p.pick?.code !== "1") ? (p.scenario.dims.draw.note ?? "平局风险偏高") : null),
     adv,
+    // 决策辅助喂入(2026-06-16:接入 honest-pass-gate/分歧雷达/组合凯利/精选,4个原 test-only 模块产品化)
+    decision: buildDecisionInput(p, s, mkPrimary, adv),
     // ④ 数据审计矩阵行
     audit: auditFor(p, s, c, prior, wcCtx),
   };
@@ -465,7 +562,7 @@ const parlayAdvBanner = advKilled.length
 const fourteenNote = fourteen?.available
   ? `14场/任选9:本期可发(见"14场·任选9"工作表,世界杯腿一律不当胆)。`
   : `14场/任选9:今日不发——${fourteen?.note ?? (fourteenFacts[0]?.[1] ?? "无本期映射")}(详见"数据审计"表内容审计区)。`;
-const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、零交锋场H2H(49k历史库已查证为缺),已⚠️标不编。${cohNote}${parlayNote}${fourteenNote}${riskNote}模型概率由真盘de-vig派生,1X2系统打不过收盘线、本质市场跟随器,买不买你定。`;
+const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。🎯口径(2026-06-15用户裁决):盘口推荐为主、模型只当参考——每场主推方向/信心档/注金均由500竞彩真盘口de-vig热门定(1X2未开售的悬殊盘退让球档),模型概率仅附"参考X%·与盘口同向/分歧",分歧时铁律以盘口为准。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、零交锋场H2H(49k历史库已查证为缺),已⚠️标不编。${cohNote}${parlayNote}${fourteenNote}${riskNote}盘口=市场有效共识(1X2打不过收盘线),模型本质市场跟随器无独立edge、只作对照,买不买你定。`;
 // 审计背书(缺陷#17修):全部从本次 rows + adversarial/<date>.json 动态生成;无当日审计文件 → 不写"已审计"背书句。
 const auditFoot = buildAuditFoot({ rows, advData });
 
@@ -498,6 +595,7 @@ const sheets = [
   buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
   buildAuditSheet({ date, rows, contentAudit }),
   buildIntelSheet({ date, rows, intelByMatch }),
+  buildDecisionAidsSheet({ date, rows }),
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
 if (outBase) mkdirSync(outBase, { recursive: true });
@@ -551,11 +649,17 @@ console.log(`\n## ⚡ 今日竞彩完整覆盖交付 · ${date} · ${rows.length
 if (recordLine) console.log(recordLine.text);
 console.log(stakeSum.note);
 for (const r of rows) {
-  console.log(`### ${r.idx}. ${r.match}(${r.comp})· ${r.ko} · ${r.tier}${Math.round(r.conf)} · ${r.stake ? `💰${r.stake.text}` : "💰—"} · ${r.parlay?.text ?? ""}`);
+  console.log(`### ${r.idx}. ${r.match}(${r.comp})· ${r.ko} · ${r.tier}${Math.round(r.conf)} · ${r.parlay?.text ?? ""}`);
+  if (r.primary) {
+    console.log(`  🎯 ${r.primary.text}${r.stake ? ` 💰${r.stake.text}` : ""}`);
+    console.log(`     (${r.primary.ref})`);
+  } else {
+    console.log(`  🎯 盘口主推:⚠️本场无可用真盘口(1X2与让球档均缺)→ 仅模型参考,勿当盘口背书`);
+  }
   if (r.wcLine) console.log(`  🏆 赛会: ${r.wcLine}`);
   if (r.wcElo && r.wcElo !== "—") console.log(`  🌍 世界杯模型: Elo先验 ${r.wcElo} | 场馆λ ${r.wcLambda}`);
   if (r.scen) console.log(`  🎬 情景: ${r.scen}`);
-  console.log(`  ① 胜负平🔶: ${r.wld}`);
+  console.log(`  ① 胜负平(盘口为主·模型🔶参考): ${r.wld}`);
   console.log(`     胜平负赔率✅: ${r.euro}`);
   console.log(`  ② 让球真实裁决🔶: ${String(r.hv?.text ?? "⚠️缺").replace(/\n/g, " ")}`);
   console.log(`     竞彩让球🔶: ${r.hcView}`);
