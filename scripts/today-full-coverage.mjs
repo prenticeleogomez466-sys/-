@@ -278,6 +278,9 @@ function buildDecisionInput(p, s, mkPrimary, adv) {
     modelProbs: { home: pr.home ?? null, draw: pr.draw ?? null, away: pr.away ?? null },
     marketProbs: mp?.dist ?? null,
     stakeUnits: mkPrimary.mult ?? null, stakeAmount: mkPrimary.stakeAmount ?? null,
+    // 爆冷风险档(读 prediction-engine 已算的 analyzeUpsetTrap 产物·经验基线锚·零重算):
+    //   势均60%/微热门52%/中等热门42%/强热门30%/超级大热18% 基线 upset(reference_data_change_5yr_empirics)。
+    upset: p.upsetTrap ? { tier: p.upsetTrap.tier, risk: p.upsetTrap.upsetRisk, level: p.upsetTrap.upsetLevel, favLabel: p.upsetTrap.favoriteLabel, reason: p.upsetTrap.reason } : null,
   };
 }
 

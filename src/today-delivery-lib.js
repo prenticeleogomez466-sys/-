@@ -493,6 +493,26 @@ export function buildDecisionAidsSheet({ date, rows }) {
   else out.push(["闸状态", "未触发(全天总暴露在 10U 内·单场无多玩法相关簇超限);逐注注金见主表💰列"]);
   out.push(["铁律", "只降额不抬注·缩放后仍>0由你定·这是组合风险提示非弃赛(守 feedback_confidence_not_autosuppress)"]);
 
+  // ── E 爆冷风险档(upset-trap-detector·经验基线锚:势均60%/微热门52%/中等热门42%/强热门30%/超级大热18%) ──
+  //   实证(reference_data_change_5yr_empirics 33278场+复盘):爆冷不可预测、只可分档管理。中等热门以下=高爆冷区,
+  //   单押命中骤降→建议双选/观望(复盘"双选救回8场"即此机理);不反向押冷(逆市命中仅22.7%)。
+  const ups = di.filter((d) => d.upset).map((d) => d.upset ? { ...d.upset, match: d.match, dir: d.dir } : null).filter(Boolean);
+  if (ups.length) {
+    out.push([]);
+    out.push([`【E】爆冷风险档(upset-trap·favorite越弱爆冷基线越高;中等热门以下=高爆冷区·建议双选/观望不单押;不反向押冷)`]);
+    out.push(["对阵", "盘口主推", "热门档", "爆冷风险", "档位", "玩法建议"]);
+    const advice = (lvl, tier) => {
+      const hot = /超级大热|强热门/.test(tier || "");
+      if (hot && (lvl === "低" || lvl === "标准")) return "可单押(强热门·爆冷基线低)";
+      if (lvl === "高" || /势均|微热门/.test(tier || "")) return "🟠高爆冷区·建议双选(1X/X2)或观望·勿单押";
+      return "🟡中爆冷·偏向双选护一手";
+    };
+    for (const u of ups.sort((a, b) => (b.risk ?? 0) - (a.risk ?? 0))) {
+      out.push([u.match, u.dir, u.tier ?? "—", u.risk != null ? `${Math.round(u.risk * 100)}%` : "—", u.level ?? "—", advice(u.level, u.tier)]);
+    }
+    out.push(["机理", "爆冷不可预测只可分档:复盘实证中等热门以下高发(昨日多场均势/中等热门场打平或被翻)·市场也测不准(逆市无edge)→管理风险而非预测冷门"]);
+  }
+
   return { name: "决策辅助", rows: out };
 }
 
