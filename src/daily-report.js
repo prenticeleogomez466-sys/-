@@ -934,6 +934,13 @@ function toLedgerRow(prediction) {
     primaryOdds: pickDecimalOdds(euBet, prediction.pick.code),
     primaryOpeningOdds: pickDecimalOdds(euOpen, prediction.pick.code),
     betCapturedAt: snap?.collectedAt ?? null,
+    // 深度复盘快照(2026-06-15:供"盘口/让球/赔率变化→大概率什么结果"规律挖掘;全✅真实快照,缺则null不编)。
+    // 让球水位 初盘→收盘(三向);全1X2 初盘→收盘;战意=scenario派生(无则null,临场维持续补)。
+    euOpenTriple: euOpen ? `${euOpen.home}/${euOpen.draw}/${euOpen.away}` : null,
+    euCloseTriple: euBet ? `${euBet.home}/${euBet.draw}/${euBet.away}` : null,
+    handicapOpenTriple: snap?.handicapOdds?.initial ? `${snap.handicapOdds.initial.home}/${snap.handicapOdds.initial.draw}/${snap.handicapOdds.initial.away}` : null,
+    handicapCloseTriple: snap?.handicapOdds?.current ? `${snap.handicapOdds.current.home}/${snap.handicapOdds.current.draw}/${snap.handicapOdds.current.away}` : null,
+    motivation: prediction.scenario?.motivation?.summary ?? (typeof prediction.scenario?.motivation === "string" ? prediction.scenario.motivation : null),
     actual: outcomeCodeToChinese(actual),
     actualScore: fixture.result ? `${fixture.result.home}-${fixture.result.away}` : "",
     hit: actual ? actual === prediction.pick.code : null

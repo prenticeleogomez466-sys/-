@@ -1,7 +1,7 @@
 // 深度归因复盘守护(2026-06-15):逐场拆维度+因果;跨场规律带样本n;临场情报维标缺不编;诚实不当edge。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { oddsDrift, decomposeMatch, minePatterns } from "../src/recap-decomposition.js";
+import { oddsDrift, decomposeMatch, minePatterns, mineConditionalOutcomes } from "../src/recap-decomposition.js";
 
 const row = (o = {}) => ({
   date: "2026-06-14", match: "A vs B", competition: "世界杯", primary: "主胜", actual: "主胜",
@@ -62,4 +62,21 @@ test("minePatterns: 跨场规律带样本n;小样本不强行归纳;平局占比
 test("minePatterns: 样本不足→空规律不编", () => {
   const p = minePatterns([row(), row({ match: "C vs D" })], { minN: 8 });
   assert.equal(p.patterns.length, 0); // 各桶 < 8
+});
+
+test("mineConditionalOutcomes: 条件→实际结果分布(主/平/客%+大球+过盘);待积累维诚实列出", () => {
+  const rows = [];
+  // 10 场平手盘:6主3平1客 → 平手盘桶大概率主胜60%
+  const outs = ["主胜", "主胜", "主胜", "主胜", "主胜", "主胜", "平局", "平局", "平局", "客胜"];
+  outs.forEach((o, i) => rows.push(row({ match: `P${i}`, handicapLine: 0, actual: o, actualScore: o === "主胜" ? "2-1" : o === "平局" ? "1-1" : "0-1" })));
+  const c = mineConditionalOutcomes(rows, { minN: 8 });
+  const flat = c.buckets.find((b) => b.condition.includes("平手盘"));
+  assert.ok(flat && flat.n === 10);
+  assert.equal(flat.homePct, 60);
+  assert.equal(flat.drawPct, 30);
+  assert.ok(flat.likely.startsWith("主胜"));
+  assert.ok(flat.bttsPct != null && flat.over25Pct != null);
+  // 待积累维(临场情报)诚实列出,不编
+  assert.ok(c.pendingDims.some((d) => d.includes("阵容")) && c.pendingDims.some((d) => d.includes("战意")) && c.pendingDims.some((d) => d.includes("积分")));
+  assert.ok(c.note.includes("打不过收盘线"));
 });

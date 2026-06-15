@@ -181,3 +181,63 @@ export function minePatterns(rows, opts = {}) {
     note: `🔶规律=观测性统计(样本n标注),非预测edge:小样本/未经leak-safe回测不得据此改下注;模型1X2本质市场跟随、打不过收盘线(回测铁证)。实际平局占比${drawRate}% vs 模型主推平局${modelDrawPick}%(平局盲区实证)。`,
   };
 }
+
+const parseGoals = (s) => { const m = String(s ?? "").match(/(\d+)-(\d+)/); return m ? { h: +m[1], a: +m[2] } : null; };
+
+/** 一组场的【实际结果分布】(主/平/客% + 大2.5球% + BTTS% + 主队过盘%);n=0→空。 */
+function outcomeDist(arr) {
+  const n = arr.length;
+  if (!n) return { n: 0 };
+  const c = (f) => arr.filter(f).length;
+  const homePct = pctOf(c((x) => x.r.actual === "主胜"), n);
+  const drawPct = pctOf(c((x) => x.r.actual === "平局"), n);
+  const awayPct = pctOf(c((x) => x.r.actual === "客胜"), n);
+  const over25Pct = pctOf(c((x) => x.total >= 3), n);
+  const bttsPct = pctOf(c((x) => x.sc.h > 0 && x.sc.a > 0), n);
+  const hcRows = arr.filter((x) => x.r.actualHandicapCode != null);
+  const homeCoverPct = hcRows.length ? pctOf(hcRows.filter((x) => String(x.r.actualHandicapCode) === "3").length, hcRows.length) : null;
+  const modal = [["主胜", homePct], ["平局", drawPct], ["客胜", awayPct]].sort((a, b) => b[1] - a[1])[0];
+  return { n, homePct, drawPct, awayPct, over25Pct, bttsPct, homeCoverPct, likely: `${modal[0]}${modal[1]}%`, avgGoals: r2(arr.reduce((t, x) => t + x.total, 0) / n) };
+}
+
+/**
+ * 条件→大概率结果(🔶观测性):什么样的盘口/让球/赔率变化 → 实际结果分布(主/平/客% + 大球% + BTTS% + 过盘%)。
+ * 直接回答用户"什么变化造成大概率什么结果"。临场维(阵容/战意/积分/战术/亚盘水位)历史ledger未持久化→列入"待积累"不挖。
+ * @param {Array} rows 已结算 ledger 行;@param {{minN?:number}} [opts]
+ */
+export function mineConditionalOutcomes(rows, opts = {}) {
+  const minN = opts.minN ?? 8;
+  const settled = rows.filter((r) => (r.actualStatus === "settled" || r.actual) && r.actual && r.actualScore);
+  const enrich = settled.map((r) => { const sc = parseGoals(r.actualScore); return sc ? { r, sc, total: sc.h + sc.a, drift: oddsDrift(r) } : null; }).filter(Boolean);
+  const base = outcomeDist(enrich);
+  const buckets = [];
+  const add = (dim, label, subset) => { if (subset.length >= minN) buckets.push({ dim, condition: label, ...outcomeDist(subset) }); };
+  const hcLine = (x) => Number(x.r.handicapLine);
+
+  // 让球线变化 → 结果分布
+  add("让球线", "深盘·主让≥1.5", enrich.filter((x) => hcLine(x) <= -1.5));
+  add("让球线", "主让1球(-1)", enrich.filter((x) => hcLine(x) === -1));
+  add("让球线", "主小让(-1<line<0)", enrich.filter((x) => hcLine(x) > -1 && hcLine(x) < 0));
+  add("让球线", "平手盘(0)", enrich.filter((x) => hcLine(x) === 0));
+  add("让球线", "客受让(line>0)", enrich.filter((x) => hcLine(x) > 0));
+  // 赔率漂移(主推方向初盘→收盘)→ 结果分布
+  add("赔率漂移", "主推被加注(收缩≤-3%)", enrich.filter((x) => x.drift && x.drift.pct <= -3));
+  add("赔率漂移", "主推退烧(走高≥+3%)", enrich.filter((x) => x.drift && x.drift.pct >= 3));
+  add("赔率漂移", "赔率稳定(±3%内)", enrich.filter((x) => x.drift && Math.abs(x.drift.pct) < 3));
+  // 赛事类型 → 结果分布(国家队平局率高 vs 联赛)
+  const isIntl = (r) => /世界杯|国际|友谊|预选|国家|洲/.test(r.competition || "");
+  add("赛事类型", "国家队/国际赛", enrich.filter((x) => isIntl(x.r)));
+  add("赛事类型", "俱乐部联赛", enrich.filter((x) => !isIntl(x.r)));
+  // 模型信心档 → 结果分布
+  const conf = (x) => Math.max(x.r.probabilityHome || 0, x.r.probabilityDraw || 0, x.r.probabilityAway || 0);
+  add("模型信心", "强信心(≥65%)", enrich.filter((x) => conf(x) >= 0.65));
+  add("模型信心", "硬币档(50~55%)", enrich.filter((x) => conf(x) >= 0.5 && conf(x) < 0.55));
+
+  // 临场维(历史 ledger 未持久化)→ 诚实列"待积累",绝不编(快照机制上线后从该日起累积)
+  const pending = ["阵容(预测/确认首发·缺阵)", "战意/动机(赛事重要性·已出线轮换)", "积分/排名压力(保级/争冠/出线形势)", "战术克制(阵型姿态对位)", "亚盘水位变化(初盘→临场水位)"];
+
+  return {
+    n: enrich.length, minN, base, buckets, pendingDims: pending,
+    note: `🔶条件→结果=观测性分布(带样本n),非预测edge:模型1X2打不过收盘线、逆市场分歧是陷阱(回测铁证),规律仅供研判、未经leak-safe回测不得据此逆市下注。阵容/战意/积分/战术/亚盘水位=临场维,历史从未入ledger→已列"待积累",需快照入库后累积≥${minN}场方可挖,现标缺不编。`,
+  };
+}
