@@ -21,7 +21,7 @@
  * 便于回归测试钉死(防"情报被悄悄编造")。I/O 在 scripts/sync-predicted-lineups.mjs 与交付编排器里做。
  */
 
-import { parseFormation } from "./lineup-source.js";
+import { parseFormation, formationPosture } from "./lineup-source.js";
 
 export const INTEL_TAG = { REAL: "✅实测", INFER: "🔶推断", MISS: "⚠️缺" };
 
@@ -202,6 +202,68 @@ export function resolveWebInjuries(items, sources) {
   return { tag: INTEL_TAG.REAL, count: items.length, players: items, text: text + note, source: "全网赛前媒体(非官方)" };
 }
 
+/** "X胜Y平Z负" → 积分/场均分(纯展示派生,无则 null,不编造)。 */
+function parseRecordPoints(record) {
+  const m = String(record ?? "").match(/(\d+)\D+(\d+)\D+(\d+)/);
+  if (!m) return null;
+  const w = Number(m[1]), d = Number(m[2]), l = Number(m[3]);
+  const games = w + d + l;
+  if (!games) return null;
+  return { w, d, l, games, ppg: Math.round(((w * 3 + d) / games) * 100) / 100 };
+}
+
+/**
+ * 主客情报对位研判(2026-06-15 情报增强):把已组装的逐维情报压成一句"谁信息更全/状态更好/阵型怎么碰",
+ * 严守铁律——纯展示层,只对位已有情报,**绝不进任何概率**,缺的维度标⚠️缺不编。
+ * 维度: ①首发情报确定度(✅已确认>🔶预测>⚠️缺) ②近期状态场均分(双方真赛果ppg) ③阵型对位(姿态) ④伤停分边。
+ * @param {object} intel buildMatchIntel 组装中的对象(home/away/injuries 已就位)
+ */
+export function buildIntelComparison(intel) {
+  const H = intel.home, A = intel.away;
+  const rank = (t) => (t === INTEL_TAG.REAL ? 2 : t === INTEL_TAG.INFER ? 1 : 0);
+  const lh = H.lineup, la = A.lineup;
+  const dh = rank(lh.tag), da = rank(la.tag);
+  const lineupEdge = (dh === 0 && da === 0)
+    ? { tag: INTEL_TAG.MISS, text: "双方首发均未取到(标缺)" }
+    : { tag: (dh === 2 && da === 2) ? INTEL_TAG.REAL : INTEL_TAG.INFER,
+        text: `首发 主${lh.status}/客${la.status}${dh !== da ? `(${dh > da ? "主" : "客"}方信息更确定)` : ""}` };
+
+  const ph = parseRecordPoints(H.recentForm.record), pa = parseRecordPoints(A.recentForm.record);
+  const formEdge = (ph && pa)
+    ? (() => { const diff = Math.round((ph.ppg - pa.ppg) * 100) / 100;
+        return { tag: INTEL_TAG.REAL, homePpg: ph.ppg, awayPpg: pa.ppg, diff,
+          text: `近期场均分 主${ph.ppg} vs 客${pa.ppg}${Math.abs(diff) >= 0.5 ? `(${diff > 0 ? "主" : "客"}状态更佳·差${Math.abs(diff)})` : "(状态接近)"}` }; })()
+    : { tag: INTEL_TAG.MISS, text: "近期状态对比不全(一方或双方近赛缺)" };
+
+  let tacticalNote = null;
+  if (lh.formation && la.formation) {
+    const pH = formationPosture(lh.formation), pA = formationPosture(la.formation);
+    if (pH && pA) {
+      const desc = (p) => (p.attacking ? "压上(真三前锋)" : p.defensive ? "低位防守(5后卫)" : "均衡");
+      tacticalNote = { tag: (lh.tag === INTEL_TAG.REAL && la.tag === INTEL_TAG.REAL) ? INTEL_TAG.REAL : INTEL_TAG.INFER,
+        text: `阵型对位 主${pH.raw}·${desc(pH)} vs 客${pA.raw}·${desc(pA)}` };
+    }
+  }
+
+  let injuryNote = null;
+  const inj = intel.injuries;
+  if (inj?.players?.length && inj.players[0]?.team) {
+    const cnt = {};
+    for (const p of inj.players) if (p.team) cnt[p.team] = (cnt[p.team] ?? 0) + 1;
+    injuryNote = { tag: INTEL_TAG.REAL, text: `伤停分边:${Object.entries(cnt).map(([t, c]) => `${t}${c}人`).join("、")}` };
+  } else if (inj?.tag === INTEL_TAG.REAL && inj.count) {
+    injuryNote = { tag: INTEL_TAG.REAL, text: `伤停共${inj.count}条(源未分边)` };
+  }
+
+  const dims = [lineupEdge, formEdge, tacticalNote, injuryNote].filter((x) => x && x.tag !== INTEL_TAG.MISS);
+  return {
+    tag: dims.length ? ((lineupEdge.tag === INTEL_TAG.REAL && formEdge.tag === INTEL_TAG.REAL) ? INTEL_TAG.REAL : INTEL_TAG.INFER) : INTEL_TAG.MISS,
+    lineupEdge, formEdge, tacticalNote, injuryNote,
+    text: dims.length ? dims.map((x) => `${x.tag}${x.text}`).join(" ║ ") : "⚠️缺(暂无可对位的情报维度)",
+    note: "🔶情报维度对位研判,展示层不进任何概率(铁律:打不过市场不融合);缺维标缺不编",
+  };
+}
+
 export function buildMatchIntel(input) {
   const fx = input.fixture ?? {};
   const ls = input.lineupSide ?? null;
@@ -234,5 +296,6 @@ export function buildMatchIntel(input) {
     intel.injuries.tag === INTEL_TAG.REAL,
   ].filter(Boolean).length;
   intel.maturity = realBits; // 0..5
+  intel.comparison = buildIntelComparison(intel); // 主客情报对位研判(2026-06-15,纯展示不进概率)
   return intel;
 }

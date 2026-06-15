@@ -6,6 +6,8 @@
 //   · 竞彩混合过关规则:同一场只能选一个玩法的一个选项入同一注串。
 // 纯函数,不读盘不抓网;jqs 原始赔率由调用方传入(store 只存 de-vig 概率,原始赔率须实抓)。
 
+import { adjustParlayForCorrelation } from "./parlay-correlation-adjuster.js";
+
 const r3 = (x) => Math.round(x * 1000) / 1000;
 const r2 = (x) => Math.round(x * 100) / 100;
 
@@ -22,11 +24,18 @@ function devig(entries) {
 export function buildParlayLegs(p, jqsOdds = null) {
   const s = p.marketSnapshot ?? {};
   const home = p.fixture?.homeTeam ?? "主队", away = p.fixture?.awayTeam ?? "客队";
+  // 腿对位元数据(供跨场相关性修正用;league/kickoff 真值,缺则 null 不编)
+  const meta = {
+    league: p.fixture?.competition ?? p.fixture?.league ?? null,
+    kdate: p.fixture?.matchDateTime ?? p.fixture?.kickoff ?? p.fixture?.date ?? null,
+    home, away,
+  };
   const legs = [];
+  // 每腿带 mktOverround=该玩法真盘抽水(Σ(1/o)>1 的溢出);串关价值=∏(1/overround),抽水越小价值越高(精确,非编造)。
   const push = (market, sels) => {
     const dv = devig(sels);
     if (!dv) return;
-    sels.forEach((e, i) => legs.push({ market, sel: e.sel, odds: e.odds, probMkt: r3(dv.probs[i]), probModel: e.probModel ?? null, label: `${market}:${e.sel}@${e.odds}` }));
+    sels.forEach((e, i) => legs.push({ market, sel: e.sel, odds: e.odds, probMkt: r3(dv.probs[i]), probMktRaw: dv.probs[i], probModel: e.probModel ?? null, mktOverround: r3(dv.overround), label: `${market}:${e.sel}@${e.odds}`, ...meta }));
   };
   // 胜负平(spf):赔率快照 current;模型概率=prediction.probabilities
   const eu = s.europeanOdds?.current;
@@ -54,7 +63,7 @@ export function buildParlayLegs(p, jqsOdds = null) {
   if (Array.isArray(sc) && sc.length >= 6) {
     const dv = devig(sc.map((x) => ({ odds: x.odds })));
     if (dv && dv.overround > 1) {
-      sc.slice(0, 6).forEach((x, i) => legs.push({ market: "比分", sel: x.score, odds: x.odds, probMkt: r3(dv.probs[i]), probModel: null, label: `比分:${x.score}@${x.odds}` }));
+      sc.slice(0, 6).forEach((x, i) => legs.push({ market: "比分", sel: x.score, odds: x.odds, probMkt: r3(dv.probs[i]), probMktRaw: dv.probs[i], probModel: null, mktOverround: r3(dv.overround), label: `比分:${x.score}@${x.odds}`, ...meta }));
     }
   }
   // 半全场(bqc):9 类全集
@@ -109,13 +118,34 @@ export function buildParlayPlan(games, { maxPerTier = 4 } = {}) {
     }
   }
   const scored = combos.map((legs) => {
-    const odds = r2(legs.reduce((t, l) => t * l.odds, 1));
+    const rawOdds = legs.reduce((t, l) => t * l.odds, 1);
+    const odds = r2(rawOdds);
     const probMkt = r3(legs.reduce((t, l) => t * l.probMkt, 1));
     const hasModel = legs.every((l) => Number.isFinite(l.probModel));
     const probModel = hasModel ? r3(legs.reduce((t, l) => t * l.probModel, 1)) : null;
-    return { legs, odds, probMkt, probModel, evMkt: r3(probMkt * odds - 1), evModel: probModel != null ? r3(probModel * odds - 1) : null };
+    // 抽水透明化(精确,非编造):combo overround=∏各玩法真盘抽水;价值效率 valueScore=∏(概率×赔率)=1/∏overround,
+    // 越接近1抽水越小=结构最优。EV/价值从【未取整】devig概率算(probMkt/odds各自取整的乘积会虚增到≥1=伪正EV);
+    // 数学保证 ∏overround>1 ⇒ valueScore<1 ⇒ EV 恒负。
+    const overround = legs.every((l) => Number.isFinite(l.mktOverround))
+      ? r3(legs.reduce((t, l) => t * l.mktOverround, 1)) : null;
+    const valueScoreRaw = legs.reduce((t, l) => t * (l.probMktRaw ?? l.probMkt) * l.odds, 1);
+    const valueScore = r3(valueScoreRaw);
+    // 跨场相关性修正(🔶启发ρ,与14场胆串同源同口径,展示层不参与选档/不影响下注):
+    const corr = adjustParlayForCorrelation(legs.map((l) => ({
+      fixtureId: l.seq, league: l.league, kickoffDate: l.kdate, outcome: l.market,
+      probability: l.probMkt, homeTeam: l.home, awayTeam: l.away,
+    })));
+    return {
+      legs, odds, probMkt, probModel, overround, valueScore,
+      probMktCorr: corr.ok ? corr.jointProbabilityCorrelated : null,
+      corrAdjPct: corr.ok ? corr.adjustmentPct : null,
+      evMkt: r3(valueScoreRaw - 1), evModel: probModel != null ? r3(probModel * odds - 1) : null,
+    };
   });
   const byProb = [...scored].sort((a, b) => b.probMkt - a.probMkt);
+  // 价值最优:抽水最小(valueScore 最高)的真串(odds≥3,排除两热门凑数的伪串);这是"混合串关最优化"的核心答案。
+  const byValue = [...scored].filter((c) => c.odds >= 3 && c.valueScore != null)
+    .sort((a, b) => b.valueScore - a.valueScore || b.probMkt - a.probMkt);
   const seen = new Set();
   const key = (c) => c.legs.map((l) => `${l.seq}|${l.market}|${l.sel}`).join("&");
   const take = (arr, n, why) => {
@@ -129,6 +159,7 @@ export function buildParlayPlan(games, { maxPerTier = 4 } = {}) {
   };
   const tiers = [
     { tier: "🛡️最稳", combos: take(byProb, maxPerTier, "全玩法中市场de-vig联合概率最高的搭法(稳=概率,非保中)") },
+    { tier: "💎最优value", combos: take(byValue, maxPerTier, "抽水最小=结构最优(价值效率valueScore=概率×串赔=1/∏各玩法抽水,越接近1越不亏;EV恒负,此档=同类里最不亏的搭法,多为低抽水的胜负平/让球)") },
     { tier: "⚖️均衡", combos: take(byProb.filter((c) => c.odds >= 4 && c.odds < 9), maxPerTier, "串赔4~9倍区间内联合概率最高") },
     { tier: "🚀高赔", combos: take(byProb.filter((c) => c.odds >= 9 && c.odds < 40), maxPerTier, "串赔9~40倍区间内联合概率最高(比分/半全场天花板低,中率以联合概率为准)") },
     { tier: "🌋极限高赔", combos: take(byProb.filter((c) => c.odds >= 40), maxPerTier, "串赔≥40倍(多为比分/半全场互串),联合概率1%上下,纯彩票性质") },
@@ -136,5 +167,10 @@ export function buildParlayPlan(games, { maxPerTier = 4 } = {}) {
   ].filter((t) => t.combos.length);
   // 模型分歧参考:模型联合概率有值且模型EV>市场EV的最大者(诚实:模型=市场跟随器,常无正EV)
   const mdl = scored.filter((c) => c.evModel != null).sort((a, b) => b.evModel - a.evModel)[0] ?? null;
-  return { ok: true, tiers, modelBest: mdl, note: null };
+  // 相关性汇总(🔶):取最稳头注的修正幅度作代表(同源14场胆串口径;展示层,不参与选档)
+  const repr = tiers[0]?.combos?.[0] ?? null;
+  const correlationNote = (repr && repr.corrAdjPct != null && Math.abs(repr.corrAdjPct) >= 0.005)
+    ? `🔶跨场相关性修正(同源14场胆串ρ):头注独立联合概率${(repr.probMkt * 100).toFixed(1)}%→相关性修正${(repr.probMktCorr * 100).toFixed(1)}%(${repr.corrAdjPct > 0 ? "同联赛/同日正相关→实际略高" : "反向腿负相关→实际略低"});仅展示,EV/选档仍按独立口径`
+    : "🔶腿间相关性弱(±0.5%内,跨场基本独立),联合概率按独立口径";
+  return { ok: true, tiers, modelBest: mdl, correlationNote, note: null };
 }

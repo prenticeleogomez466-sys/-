@@ -328,8 +328,8 @@ export function buildIntelSheet({ date, rows, intelByMatch }) {
   const banner = `🕵️ 情报详情 · ${date} · 预测首发+阵型/伤停停赛/近期战绩/交锋史/小组形势/球队风格·关键球员·主帅/场地天气/新闻战意/来源(展示层·不动概率·每格带✅实测/🔶推断/⚠️缺)`;
   const header = ["#", "对阵", "主队预测/确认首发(阵型)", "客队预测/确认首发(阵型)", "关键伤停/停赛",
     "主队近期战绩", "客队近期战绩", "交锋史(H2H)", "小组形势/重要性", "球队风格·关键球员·主帅", "场地·天气",
-    "新闻·战意/动机", "情报来源(URL)", "情报成熟度"];
-  const EMPTY = [String, "", "⚠️缺(无情报)", "⚠️缺(无情报)", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "0/5"];
+    "新闻·战意/动机", "情报来源(URL)", "情报成熟度", "情报对位研判(🔶不进概率)"];
+  const EMPTY = [String, "", "⚠️缺(无情报)", "⚠️缺(无情报)", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "0/5", "⚠️缺"];
   const body = rows.map((r) => {
     const it = intelByMatch?.[r.match] ?? null;
     if (!it) return [String(r.idx), r.match, ...EMPTY.slice(2)];
@@ -338,7 +338,8 @@ export function buildIntelSheet({ date, rows, intelByMatch }) {
       intelLineupCell(it.home.lineup), intelLineupCell(it.away.lineup),
       intelCell(it.injuries.text), intelCell(it.home.recentForm.text), intelCell(it.away.recentForm.text),
       intelCell(w?.h2h), intelCell(w?.group), intelCell(w?.style),
-      intelCell(w?.venue), intelCell(it.news.text), intelSourcesCell(w), `${it.maturity}/5`];
+      intelCell(w?.venue), intelCell(it.news.text), intelSourcesCell(w), `${it.maturity}/5`,
+      intelCell(it.comparison?.text)];
   });
   const tail = [[""],
     ["情报口径", "预测首发=🔶近期真实首发频次聚合(赛前1h官方阵容出即转✅);近期战绩=✅ESPN国际赛真实赛果(含友谊/预选);伤停停赛/交锋史/小组形势/球队风格·主帅/场地天气/新闻战意=全网公开赛前情报(Sports Mole/ESPN/RotoWire/FOX/Goal/Opta/FIFA等),媒体报道·🔶非官方确认,逐条URL见'情报来源'列;🔶为媒体存疑项。免费结构化伤停源对国家队为空墙,故改走全网媒体核录(中文)。"],
@@ -436,14 +437,19 @@ export function buildParlaySheet({ date, plan, jqsFetchedAt, advBanner }) {
   const body = [];
   for (const t of plan.tiers) {
     for (const c of t.combos) {
-      const win = Math.round(c.odds * 100), net = win - 100, exp = Math.round(c.probMkt * win);
+      // exp 用 floor:期望回收数学上恒<100(∏(1/抽水)<1),四舍五入会把0.998×100=99.8顶成100假装不亏→违诚实铁律;floor把损失向上取整=保守。
+      const win = Math.round(c.odds * 100), net = win - 100, exp = Math.floor(c.probMkt * win);
+      const valueCell = c.valueScore != null ? `·价值${c.valueScore}` : "";
+      const corrCell = c.probMktCorr != null && Math.abs(c.corrAdjPct ?? 0) >= 0.005 ? `·相关修正${parlayPct(c.probMktCorr)}` : "";
       body.push([t.tier, howToBuy(c), `${c.odds}`,
         `可中${win}元(净赚+${net}元·回报率+${net}%)`,
-        `${parlayPct(c.probMkt)}${c.probModel != null ? `(模型${parlayPct(c.probModel)})` : ""}`,
+        `${parlayPct(c.probMkt)}${c.probModel != null ? `(模型${parlayPct(c.probModel)})` : ""}${valueCell}${corrCell}`,
         `${exp}元(亏${100 - exp})`, c.why]);
     }
   }
   const tail = [[""]];
+  tail.push(["价值口径(🔶)", "价值=概率×串赔=1/∏各玩法抽水(越接近1越不亏);💎最优value档=全空间抽水最小的真串(多为低抽水胜负平/让球),是混合串关结构最优解。比分/半全场抽水大→同赔率下价值更低,高赔档慎追。"]);
+  if (plan.correlationNote) tail.push(["相关性(🔶)", plan.correlationNote]);
   if (plan.modelBest) {
     tail.push(["模型分歧参考(🔶)", `模型口径EV最高搭法:${plan.modelBest.legs.map((l) => `${l.match} ${l.label}`).join(" × ")} 串赔${plan.modelBest.odds}·模型联合概率${parlayPct(plan.modelBest.probModel)}·模型EV=${plan.modelBest.evModel}${plan.modelBest.evModel < 0 ? "(仍为负:模型本质市场跟随器,无独立edge,与当日对抗证伪结论一致)" : "(⚠️正EV仅为模型自评,当日三视角证伪未背书,勿当真edge)"}`]);
   }

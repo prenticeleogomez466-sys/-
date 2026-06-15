@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   aggregatePredictedXI, resolveLineupSide, resolveInjuries,
-  resolveRecentForm, resolveNews, buildMatchIntel, INTEL_TAG,
+  resolveRecentForm, resolveNews, buildMatchIntel, buildIntelComparison, INTEL_TAG,
 } from "../src/match-intel.js";
 
 function lineupMatch(date, opponent, formation, names) {
@@ -107,4 +107,33 @@ test("buildMatchIntel: 组装完整对象 + maturity 计真实可追溯项", () 
   assert.equal(intel.injuries.tag, INTEL_TAG.REAL);
   // 真实项:主首发✅ + 主近赛✅ + 伤停✅ = 3
   assert.equal(intel.maturity, 3);
+});
+
+test("buildIntelComparison: 主客对位研判(首发确定度+近期场均分+阵型对位+伤停分边)·纯展示不进概率", () => {
+  const confH = { starterCount: 11, confirmed: true, formation: "4-3-3", starters: XI_A.map((n) => ({ name: n })) };
+  const confA = { starterCount: 11, confirmed: true, formation: "5-4-1", starters: XI_A.map((n) => ({ name: n })) };
+  const intel = buildMatchIntel({
+    fixture: { homeTeam: "巴西", awayTeam: "塞尔维亚" },
+    lineupSide: { home: confH, away: confA },
+    homeForm: { played: 3, record: "3胜0平0负", list: [{ date: "2026-06-10", ha: "主", vs: "X", r: "胜", score: "2-0" }] },
+    awayForm: { played: 3, record: "0胜1平2负", list: [{ date: "2026-06-10", ha: "客", vs: "Y", r: "负", score: "0-1" }] },
+    // webIntel 带分边伤停
+    webIntel: { injuries: [{ team: "巴西", name: "A", status: "伤" }, { team: "塞尔维亚", name: "B" }, { team: "塞尔维亚", name: "C" }], sources: ["x"] },
+  });
+  const cmp = intel.comparison;
+  assert.ok(cmp, "comparison 必须挂上");
+  assert.equal(cmp.formEdge.tag, INTEL_TAG.REAL);
+  assert.equal(cmp.formEdge.homePpg, 3);          // 3胜=场均3分
+  assert.equal(cmp.formEdge.awayPpg, Math.round((1 / 3) * 100) / 100); // 1平=场均0.33
+  assert.ok(cmp.text.includes("场均分") && cmp.text.includes("主状态更佳"));
+  assert.ok(cmp.tacticalNote && cmp.tacticalNote.text.includes("压上") && cmp.tacticalNote.text.includes("低位防守"));
+  assert.ok(cmp.injuryNote.text.includes("塞尔维亚2人"), "伤停按队分边");
+  assert.ok(cmp.note.includes("不进任何概率"), "诚实铁律:展示层不进概率");
+});
+
+test("buildIntelComparison: 数据全缺=⚠️缺不编造", () => {
+  const intel = buildMatchIntel({ fixture: { homeTeam: "A", awayTeam: "B" }, lineupSide: null, homeForm: null, awayForm: null });
+  const cmp = intel.comparison;
+  assert.equal(cmp.tag, INTEL_TAG.MISS);
+  assert.ok(cmp.text.includes("⚠️缺"));
 });
