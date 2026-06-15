@@ -167,6 +167,9 @@ export function updateLedgerRow(row, fixtures, snapshots = []) {
   const actualHandicap = handicapResultCode(fixture.result, row.handicapLine);
   const settled = {
     ...row,
+    // 结算成功:清除残留的 pending 诊断字段,否则 {...row} 会把上一次未开赛时写的
+    //   pendingReason 带进 settled 行 → "已结算却显示未开赛"的自相矛盾残留(字段卫生)。
+    pendingReason: undefined,
     actual: outcomeCodeToChinese(actualCode),
     actualCode,
     actualScore,

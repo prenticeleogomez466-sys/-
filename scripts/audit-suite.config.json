@@ -10,5 +10,12 @@
   { "id": "probe-league-profile-seed", "cmd": "node --test test/league-profile-seed-guard.test.mjs", "expect": "exit0", "desc": "国际赛画像ESPN六年seed先验不被短窗偏样本顶掉(learning-isolation-1, commit 36ea3f0)", "timeoutMs": 120000 },
   { "id": "probe-renxuan9-mincover", "cmd": "node --test test/renxuan9-optimized-ticket-mincover.test.mjs", "expect": "exit0", "desc": "任选9最优票不绕过不当胆护栏(engine-core-spot-3, commit e5c9afb)", "timeoutMs": 120000 },
   { "id": "probe-wc-pipeline", "cmd": "node scripts/audit-wc-pipeline.mjs", "expect": "exit0", "desc": "世界杯全链路五层硬闸: S1源完整(Elo/天气/赔率新鲜+合法)→S2吸收闭合(引擎venue/先验实测)→S3分析不变量(夺冠和/出线和/单调链/冻结基线sha256)→S4输出三处一致(xlsx结构透明度/html/对抗证伪)→S5复盘闭环(赛果回收/逐场复盘)", "timeoutMs": 240000 },
-  { "id": "probe-wc-pipeline-guard", "cmd": "node --test test/audit-wc-pipeline-guard.test.mjs", "expect": "exit0", "desc": "喂毒守护: 单调破/基线篡改/坏赔率必拦+真实数据须能过(防废闸)", "timeoutMs": 240000 }
+  { "id": "probe-wc-pipeline-guard", "cmd": "node --test test/audit-wc-pipeline-guard.test.mjs", "expect": "exit0", "desc": "喂毒守护: 单调破/基线篡改/坏赔率必拦+真实数据须能过(防废闸)", "timeoutMs": 240000 },
+  { "id": "probe-ledger-settled-coherent", "cmd": "node scripts/audit-ledger-settled-coherent.mjs", "expect": "exit0", "desc": "ledger已结算行不得残留pendingReason(settled↔未开赛自相矛盾, 2026-06-15根因: settled对象{...row}带入旧pendingReason+从不重访)", "timeoutMs": 60000 },
+  { "id": "probe-ledger-coherent-guard", "cmd": "node --test test/ledger-settled-coherent.test.mjs", "expect": "exit0", "desc": "喂毒守护: settled↔pendingReason矛盾行必被抓+干净放行(2026-06-15)", "timeoutMs": 60000 },
+  { "id": "probe-health-monitor", "cmd": "node scripts/audit-health-monitor.mjs", "expect": "exit0", "desc": "数据新鲜度+校准reliability监控(展示型;样本足够桶系统性失准提示;--strict仅当天数据缺失才拦, 2026-06-15新功能)", "timeoutMs": 60000 },
+  { "id": "probe-health-metrics-guard", "cmd": "node --test test/health-metrics.test.mjs", "expect": "exit0", "desc": "守护: 新鲜度阈值/reliability分桶/防薄样本误报(2026-06-15)", "timeoutMs": 60000 },
+  { "id": "probe-wc-calibration-guard", "cmd": "node --test test/wc-calibration-feedback.test.mjs", "expect": "exit0", "desc": "守护: WC校准反哺去重/gate/漂移闸/应用一致(2026-06-15)", "timeoutMs": 60000 },
+  { "id": "probe-wc-match-model-guard", "cmd": "node --test test/wc-match-model.test.mjs", "expect": "exit0", "desc": "守护: WC模型Elo→λ/argmax锚/洲际校正/λ物理范围正向覆盖(2026-06-15)", "timeoutMs": 60000 },
+  { "id": "probe-decision-aids-guard", "cmd": "node --test test/decision-aids.test.mjs", "expect": "exit0", "desc": "守护: 组合凯利相关性闸/分歧雷达/选择性精选(2026-06-15新功能)", "timeoutMs": 60000 }
 ]

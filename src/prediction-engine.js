@@ -11,6 +11,7 @@ import { analyzeUpsetTrap } from "./upset-trap-detector.js";
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
+import { applyWcCalibration } from "./wc-calibration-feedback.js";
 import { loadModelMemory, recallSegmentPerformance } from "./model-memory.js";
 import { loadNationalElo, nationalEloFor, eloToLambdas } from "./national-elo-source.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
@@ -592,8 +593,16 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
   let fusedProbs = fusion.probabilities;
   // hasMarketPrior:prior 已含市场赔率时(已被市场校准),跳过 cold-start favorite 收缩,避免过度收缩。
   // 世界杯路由场:俱乐部 isotonic 校准域不适用国家队(学习域隔离 club-only),直通不校准。
+  // 世界杯路由场:不走俱乐部 isotonic(学习域 club-only),改走 WC 专属校准反哺(2026-06-15)。
+  //   wcCalibrationProfile 缺失或 gate 未过(WC 唯一已结算 < minSamples)时 applyWcCalibration
+  //   返回 applied:false → 完全 bypass = 旧行为(worldcup-model-bypass);零行为变化,样本够自动激活。
   const calibrated = wcRouted
-    ? { probabilities: fusedProbs, calibration: { applied: false, source: "worldcup-model-bypass" }, priorProb: null, delta: null }
+    ? (() => {
+        const wc = applyWcCalibration(fusedProbs, options.wcCalibrationProfile);
+        return wc.applied
+          ? { probabilities: wc.probabilities, calibration: { applied: true, source: "wc-recap-isotonic", drift: wc.drift, warn: wc.warn }, priorProb: null, delta: wc.drift }
+          : { probabilities: fusedProbs, calibration: { applied: false, source: "worldcup-model-bypass", reason: wc.reason }, priorProb: null, delta: null };
+      })()
     : calibrateProbabilities(fusedProbs, options.calibrationProfile, { fixture, snapshot, hasMarketPrior: Boolean(oddsProbabilities) });
   let probabilities = calibrated.probabilities;
   probabilityAdjustment.calibration = calibrated.calibration;

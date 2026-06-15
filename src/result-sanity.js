@@ -60,6 +60,23 @@ export function findCrossFileResultConflicts(entries) {
 }
 
 /**
+ * 第三不变量(2026-06-15):recommendation-ledger 里"已结算行"(actualStatus==="settled"
+ * 或 row.actual 非空)绝不应残留 pendingReason 字段。
+ * 根因:daily-recap.js 结算成功时 settled={...row} 会把上一次未开赛时写的 pendingReason
+ *   原样带进 settled 行 → "已结算却显示未开赛"的自相矛盾残留(误导,虽不影响 settled 统计
+ *   口径,但污染人读/复盘可信度)。源头已修(settled 显式置 pendingReason:undefined)+ 历史
+ *   订正(fix-settled-pendingreason-residue.mjs);本探针守复发。
+ * @param {Array<object>} rows ledger 行
+ * @returns {Array<object>} 矛盾行子集(原引用)
+ */
+export function findSettledWithPendingResidue(rows) {
+  const isSettled = (r) => r?.actualStatus === "settled" || Boolean(r?.actual);
+  return (Array.isArray(rows) ? rows : []).filter(
+    (r) => isSettled(r) && typeof r.pendingReason === "string" && r.pendingReason.trim()
+  );
+}
+
+/**
  * 枚举 fixture store 目录下全部"日期文件"(YYYY-MM-DD.json)的日期,升序。
  * 去毒/全量体检的扫描域必须用它,绝不能用"ledger 出现过的日期"——
  * ledger 某日 0 行时该日 store 文件就永远扫不到(T1 漏洞根因:2026-06-06.json
