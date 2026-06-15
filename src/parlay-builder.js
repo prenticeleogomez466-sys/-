@@ -135,17 +135,28 @@ export function buildParlayPlan(games, { maxPerTier = 4 } = {}) {
       fixtureId: l.seq, league: l.league, kickoffDate: l.kdate, outcome: l.market,
       probability: l.probMkt, homeTeam: l.home, awayTeam: l.away,
     })));
+    // 每注质量研判(纯展示,零编造):最弱腿(联合概率短板)、抽水最大腿、模型认同腿数(model≥市场=模型也看好该向)。
+    const weakest = legs.reduce((m, l) => (l.probMkt < m.probMkt ? l : m), legs[0]);
+    const maxVig = legs.reduce((m, l) => ((l.mktOverround ?? 0) > (m.mktOverround ?? 0) ? l : m), legs[0]);
+    const modelLegs = legs.filter((l) => Number.isFinite(l.probModel));
+    const modelAgree = modelLegs.filter((l) => l.probModel >= l.probMkt).length;
+    const quality = {
+      weakest: `${weakest.match}「${weakest.sel}」${(weakest.probMkt * 100).toFixed(0)}%`,
+      maxVig: `${maxVig.market}(抽水${maxVig.mktOverround ?? "?"})`,
+      modelAgree: modelLegs.length ? `${modelAgree}/${modelLegs.length}腿` : null,
+    };
     return {
-      legs, odds, probMkt, probModel, overround, valueScore,
+      legs, odds, probMkt, probModel, overround, valueScore, quality,
       probMktCorr: corr.ok ? corr.jointProbabilityCorrelated : null,
       corrAdjPct: corr.ok ? corr.adjustmentPct : null,
       evMkt: r3(valueScoreRaw - 1), evModel: probModel != null ? r3(probModel * odds - 1) : null,
     };
   });
   const byProb = [...scored].sort((a, b) => b.probMkt - a.probMkt);
-  // 价值最优:抽水最小(valueScore 最高)的真串(odds≥3,排除两热门凑数的伪串);这是"混合串关最优化"的核心答案。
-  const byValue = [...scored].filter((c) => c.odds >= 3 && c.valueScore != null)
-    .sort((a, b) => b.valueScore - a.valueScore || b.probMkt - a.probMkt);
+  // 全空间按价值效率降序(抽水最小优先);各风险档"该层最优解"=本档赔率区间内价值效率最高的搭法(非单纯联合概率)。
+  const byValueAll = [...scored].sort((a, b) => b.valueScore - a.valueScore || b.probMkt - a.probMkt);
+  // 价值最优:抽水最小的真串(odds≥3,排除两热门凑数的伪串);这是"混合串关最优化"的核心答案。
+  const byValue = byValueAll.filter((c) => c.odds >= 3 && c.valueScore != null);
   const seen = new Set();
   const key = (c) => c.legs.map((l) => `${l.seq}|${l.market}|${l.sel}`).join("&");
   const take = (arr, n, why) => {
@@ -157,13 +168,14 @@ export function buildParlayPlan(games, { maxPerTier = 4 } = {}) {
     }
     return out;
   };
+  // 完整阶梯【从最稳到高配】:每档=该风险层我能给的最优解。最稳按联合概率(保中率优先);其余各档按价值效率(同赔率区间内抽水最小=最不亏)。
   const tiers = [
-    { tier: "🛡️最稳", combos: take(byProb, maxPerTier, "全玩法中市场de-vig联合概率最高的搭法(稳=概率,非保中)") },
-    { tier: "💎最优value", combos: take(byValue, maxPerTier, "抽水最小=结构最优(价值效率valueScore=概率×串赔=1/∏各玩法抽水,越接近1越不亏;EV恒负,此档=同类里最不亏的搭法,多为低抽水的胜负平/让球)") },
-    { tier: "⚖️均衡", combos: take(byProb.filter((c) => c.odds >= 4 && c.odds < 9), maxPerTier, "串赔4~9倍区间内联合概率最高") },
-    { tier: "🚀高赔", combos: take(byProb.filter((c) => c.odds >= 9 && c.odds < 40), maxPerTier, "串赔9~40倍区间内联合概率最高(比分/半全场天花板低,中率以联合概率为准)") },
-    { tier: "🌋极限高赔", combos: take(byProb.filter((c) => c.odds >= 40), maxPerTier, "串赔≥40倍(多为比分/半全场互串),联合概率1%上下,纯彩票性质") },
-    { tier: "💣爆冷", combos: take(byProb.filter((c) => c.legs.every((l) => l.probMkt <= 0.30)), maxPerTier, "每腿均为该玩法冷方向(de-vig≤30%),赔高但联合概率个位数%以下") },
+    { tier: "🛡️最稳", combos: take(byProb, maxPerTier, "阶梯①最稳:全玩法中市场de-vig联合概率最高(稳=概率最大,非保中);多为低赔大热搭法") },
+    { tier: "💎性价比", combos: take(byValue, maxPerTier, "阶梯②性价比:全空间价值效率最高(valueScore=概率×串赔=1/∏各玩法抽水,越接近1越不亏);EV恒负,此=结构最优解,多为低抽水胜负平/让球") },
+    { tier: "⚖️均衡", combos: take(byValueAll.filter((c) => c.odds >= 4 && c.odds < 9), maxPerTier, "阶梯③均衡:串赔4~9倍区间内价值效率最高(兼顾赔率与抽水的该层最优)") },
+    { tier: "🚀进取", combos: take(byValueAll.filter((c) => c.odds >= 9 && c.odds < 40), maxPerTier, "阶梯④进取:串赔9~40倍区间内价值效率最高(博赔但选抽水最小的搭法)") },
+    { tier: "🏆高配", combos: take(byValueAll.filter((c) => c.odds >= 40), maxPerTier, "阶梯⑤高配:串赔≥40倍(多为比分/半全场互串),区间内价值效率最高=高赔里相对最不亏;联合概率1%上下,博大彩性质") },
+    { tier: "💣爆冷", combos: take(byValueAll.filter((c) => c.legs.every((l) => l.probMkt <= 0.30)), maxPerTier, "阶梯⑥爆冷:每腿均为该玩法冷方向(de-vig≤30%),区间内价值效率最高;赔高但联合概率个位数%以下,纯搏冷") },
   ].filter((t) => t.combos.length);
   // 模型分歧参考:模型联合概率有值且模型EV>市场EV的最大者(诚实:模型=市场跟随器,常无正EV)
   const mdl = scored.filter((c) => c.evModel != null).sort((a, b) => b.evModel - a.evModel)[0] ?? null;

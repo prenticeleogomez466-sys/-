@@ -22,6 +22,10 @@
  */
 
 import { parseFormation, formationPosture } from "./lineup-source.js";
+import {
+  formStats, homeAwaySplit, formMomentum, scheduleCongestion,
+  attackDefenseProfile, h2hStats, lineupStability, lineupAvailability,
+} from "./intel-stats.js";
 
 export const INTEL_TAG = { REAL: "✅实测", INFER: "🔶推断", MISS: "⚠️缺" };
 
@@ -255,10 +259,21 @@ export function buildIntelComparison(intel) {
     injuryNote = { tag: INTEL_TAG.REAL, text: `伤停共${inj.count}条(源未分边)` };
   }
 
-  const dims = [lineupEdge, formEdge, tacticalNote, injuryNote].filter((x) => x && x.tag !== INTEL_TAG.MISS);
+  // 攻防对比(✅,依据统计层场均进失)+ 状态动量对比(🔶)
+  let statEdge = null;
+  const hs = intel.home?.stats?.stats, as = intel.away?.stats?.stats;
+  if (hs && as) {
+    const atkDiff = Math.round((hs.gfPer - as.gfPer) * 100) / 100;
+    statEdge = { tag: INTEL_TAG.REAL, atkDiff, text: `攻防 主进${hs.gfPer}失${hs.gaPer} vs 客进${as.gfPer}失${as.gaPer}${Math.abs(atkDiff) >= 0.5 ? `(${atkDiff > 0 ? "主" : "客"}火力更强)` : ""}` };
+  }
+  let momentumEdge = null;
+  const hm = intel.home?.stats?.momentum, am = intel.away?.stats?.momentum;
+  if (hm && am) momentumEdge = { tag: INTEL_TAG.INFER, text: `状态 主${hm.streak}·${hm.trend} vs 客${am.streak}·${am.trend}` };
+
+  const dims = [lineupEdge, formEdge, statEdge, momentumEdge, tacticalNote, injuryNote].filter((x) => x && x.tag !== INTEL_TAG.MISS);
   return {
     tag: dims.length ? ((lineupEdge.tag === INTEL_TAG.REAL && formEdge.tag === INTEL_TAG.REAL) ? INTEL_TAG.REAL : INTEL_TAG.INFER) : INTEL_TAG.MISS,
-    lineupEdge, formEdge, tacticalNote, injuryNote,
+    lineupEdge, formEdge, statEdge, momentumEdge, tacticalNote, injuryNote,
     text: dims.length ? dims.map((x) => `${x.tag}${x.text}`).join(" ║ ") : "⚠️缺(暂无可对位的情报维度)",
     note: "🔶情报维度对位研判,展示层不进任何概率(铁律:打不过市场不融合);缺维标缺不编",
   };
@@ -289,6 +304,27 @@ export function buildMatchIntel(input) {
       venue: web.venue ?? null, odds: web.odds ?? null, sources: web.sources ?? [],
     } : null,
   };
+  // ── 情报统计层(2026-06-15 最大范围增强):从已采真实数据派生多维统计,纯展示不进概率 ──
+  const kdate = fx.matchDateTime ?? fx.date ?? fx.kickoff ?? null;
+  const injPlayers = intel.injuries?.players ?? [];
+  const injOf = (teamName) => injPlayers.filter((p) => !p.team || p.team === teamName); // 有 team 字段按队分,无则全给(保守)
+  const sideStats = (formObj, predicted, teamName) => {
+    const stats = formStats(formObj);
+    return {
+      stats,                                              // ✅近期进失/胜率/BTTS/大球/零封
+      split: homeAwaySplit(formObj),                      // ✅主客场拆分
+      momentum: formMomentum(formObj),                    // 🔶状态动量/连续态
+      profile: attackDefenseProfile(stats),              // 🔶攻防画像
+      congestion: scheduleCongestion(formObj, kdate),    // 🔶赛程密度/疲劳
+      stability: lineupStability(predicted),             // 🔶预测XI稳定度/轮换风险
+      availability: lineupAvailability(predicted?.xi, injOf(teamName)), // 🔶关键缺阵
+    };
+  };
+  intel.home.stats = sideStats(input.homeForm ?? null, input.predictedHome ?? null, fx.homeTeam);
+  intel.away.stats = sideStats(input.awayForm ?? null, input.predictedAway ?? null, fx.awayTeam);
+  // 交锋史深化:仅在结构化 h2h 列存在时统计;只有文本→标缺(绝不从文本编造数字)
+  intel.h2hStats = h2hStats(input.h2hList ?? null);
+
   // 整场情报成熟度:几项真实可追溯(用于 banner 统计 / 排序,不做下注建议)
   const realBits = [
     intel.home.lineup.tag === INTEL_TAG.REAL, intel.away.lineup.tag === INTEL_TAG.REAL,

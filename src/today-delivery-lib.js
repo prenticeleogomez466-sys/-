@@ -326,18 +326,46 @@ const intelSourcesCell = (web) => {
 };
 export function buildIntelSheet({ date, rows, intelByMatch }) {
   const banner = `🕵️ 情报详情 · ${date} · 预测首发+阵型/伤停停赛/近期战绩/交锋史/小组形势/球队风格·关键球员·主帅/场地天气/新闻战意/来源(展示层·不动概率·每格带✅实测/🔶推断/⚠️缺)`;
-  const header = ["#", "对阵", "主队预测/确认首发(阵型)", "客队预测/确认首发(阵型)", "关键伤停/停赛",
-    "主队近期战绩", "客队近期战绩", "交锋史(H2H)", "小组形势/重要性", "球队风格·关键球员·主帅", "场地·天气",
+  const header = ["#", "对阵", "主队预测/确认首发(阵型·稳定度·缺阵)", "客队预测/确认首发(阵型·稳定度·缺阵)", "关键伤停/停赛",
+    "主队近期战绩·统计(进失/胜率/BTTS/大球/主客/动量/攻防/赛程)", "客队近期战绩·统计(进失/胜率/BTTS/大球/主客/动量/攻防/赛程)", "交锋史(H2H深化)", "小组形势/重要性", "球队风格·关键球员·主帅", "场地·天气",
     "新闻·战意/动机", "情报来源(URL)", "情报成熟度", "情报对位研判(🔶不进概率)"];
   const EMPTY = [String, "", "⚠️缺(无情报)", "⚠️缺(无情报)", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "0/5", "⚠️缺"];
+  // 近期战绩单元格=原始赛果 + 统计层(📊场均进失/胜率/BTTS/大球 🏠主客拆分 📈动量 ⚔️攻防 🗓️赛程),全✅/🔶可追溯
+  const formCell = (side) => {
+    const parts = [];
+    if (side?.recentForm?.text) parts.push(side.recentForm.text);
+    const st = side?.stats ?? {};
+    if (st.stats?.text) parts.push("📊" + st.stats.text);
+    if (st.split?.text) parts.push("🏠" + st.split.text);
+    if (st.momentum?.text) parts.push("📈" + st.momentum.text);
+    if (st.profile?.text) parts.push("⚔️" + st.profile.text);
+    if (st.congestion?.text) parts.push("🗓️" + st.congestion.text);
+    return parts.length ? parts.join("\n") : "⚠️缺";
+  };
+  // 首发单元格=确认/预测XI + 🔄稳定度/轮换风险 + 🚑预测首发疑伤停(名字匹配)
+  const lineupPlus = (lineupSide, sideStats) => {
+    const base = intelLineupCell(lineupSide);
+    const extra = [];
+    if (sideStats?.stability?.text) extra.push("🔄" + sideStats.stability.text);
+    if (sideStats?.availability?.missingFromXI > 0) extra.push("🚑" + sideStats.availability.text);
+    return extra.length ? base + "\n" + extra.join("\n") : base;
+  };
+  // 交锋史=📊结构化深化统计(有则✅) + 媒体文本;结构化数据缺则标缺不编
+  const h2hCell = (it2, w2) => {
+    const parts = [];
+    if (it2.h2hStats?.text) parts.push("📊" + it2.h2hStats.text);
+    if (w2?.h2h) parts.push(w2.h2h);
+    if (!it2.h2hStats && w2?.h2h) parts.push("⚠️结构化交锋数据未采集,上为媒体文本");
+    return parts.length ? parts.join("\n") : "⚠️缺";
+  };
   const body = rows.map((r) => {
     const it = intelByMatch?.[r.match] ?? null;
     if (!it) return [String(r.idx), r.match, ...EMPTY.slice(2)];
     const w = it.web ?? null;
     return [String(r.idx), r.match,
-      intelLineupCell(it.home.lineup), intelLineupCell(it.away.lineup),
-      intelCell(it.injuries.text), intelCell(it.home.recentForm.text), intelCell(it.away.recentForm.text),
-      intelCell(w?.h2h), intelCell(w?.group), intelCell(w?.style),
+      lineupPlus(it.home.lineup, it.home.stats), lineupPlus(it.away.lineup, it.away.stats),
+      intelCell(it.injuries.text), formCell(it.home), formCell(it.away),
+      h2hCell(it, w), intelCell(w?.group), intelCell(w?.style),
       intelCell(w?.venue), intelCell(it.news.text), intelSourcesCell(w), `${it.maturity}/5`,
       intelCell(it.comparison?.text)];
   });
@@ -426,6 +454,7 @@ export function buildParlaySheet({ date, plan, jqsFetchedAt, advBanner }) {
   const rules = [
     ["规则", `竞彩混合过关:同一场只能选一个玩法的一个选项入同一注;今日在售场为${legsN}场→本表全部${legsN}串1。`],
     ["数据", `腿赔率=✅500真盘实测(胜负平/让球/比分/半全场=当日快照;总进球=本次实抓 trade.500.com pl_jqs${jqsFetchedAt ? `,抓取${jqsFetchedAt}` : ""});串赔率=各腿实测赔率乘积。`],
+    ["阶梯", "从最稳到高配完整阶梯,每档=该风险层的最优解:①🛡️最稳=联合概率最高(保中率优先)→②💎性价比=价值效率最高(抽水最小=结构最优)→③⚖️均衡(4~9倍)→④🚀进取(9~40倍)→⑤🏆高配(≥40倍博大彩)→⑥💣爆冷(全冷腿)。②~⑥按价值效率(=1/∏抽水)选注=同区间内最不亏。每注末附🔬研判(最弱腿/抽水最大腿/模型认同腿数)。"],
     ["口径", "金额列按每注100元假设:可中=串赔×100(含本金);净赚=可中-100,回报率=净赚/100;期望回收🔶=联合概率×可中(恒<100元,两重抽水叠乘)——串关数学期望必然劣于单注,本表只按要求给搭法标注,不构成下注建议。联合概率=🔶推断(各玩法全集比例法de-vig × 跨场独立性假设)。"],
     ...(advBanner ? [["风险", advBanner]] : []),
   ];
@@ -441,14 +470,15 @@ export function buildParlaySheet({ date, plan, jqsFetchedAt, advBanner }) {
       const win = Math.round(c.odds * 100), net = win - 100, exp = Math.floor(c.probMkt * win);
       const valueCell = c.valueScore != null ? `·价值${c.valueScore}` : "";
       const corrCell = c.probMktCorr != null && Math.abs(c.corrAdjPct ?? 0) >= 0.005 ? `·相关修正${parlayPct(c.probMktCorr)}` : "";
+      const research = c.quality ? `\n🔬研判:最弱腿${c.quality.weakest}·${c.quality.maxVig}${c.quality.modelAgree ? `·模型认同${c.quality.modelAgree}` : "·无模型腿"}` : "";
       body.push([t.tier, howToBuy(c), `${c.odds}`,
         `可中${win}元(净赚+${net}元·回报率+${net}%)`,
         `${parlayPct(c.probMkt)}${c.probModel != null ? `(模型${parlayPct(c.probModel)})` : ""}${valueCell}${corrCell}`,
-        `${exp}元(亏${100 - exp})`, c.why]);
+        `${exp}元(亏${100 - exp})`, c.why + research]);
     }
   }
   const tail = [[""]];
-  tail.push(["价值口径(🔶)", "价值=概率×串赔=1/∏各玩法抽水(越接近1越不亏);💎最优value档=全空间抽水最小的真串(多为低抽水胜负平/让球),是混合串关结构最优解。比分/半全场抽水大→同赔率下价值更低,高赔档慎追。"]);
+  tail.push(["价值口径(🔶)", "价值=概率×串赔=1/∏各玩法抽水(越接近1越不亏);💎性价比档=全空间抽水最小的真串(多为低抽水胜负平/让球),是混合串关结构最优解。比分/半全场抽水大→同赔率下价值更低,高赔档慎追。"]);
   if (plan.correlationNote) tail.push(["相关性(🔶)", plan.correlationNote]);
   if (plan.modelBest) {
     tail.push(["模型分歧参考(🔶)", `模型口径EV最高搭法:${plan.modelBest.legs.map((l) => `${l.match} ${l.label}`).join(" × ")} 串赔${plan.modelBest.odds}·模型联合概率${parlayPct(plan.modelBest.probModel)}·模型EV=${plan.modelBest.evModel}${plan.modelBest.evModel < 0 ? "(仍为负:模型本质市场跟随器,无独立edge,与当日对抗证伪结论一致)" : "(⚠️正EV仅为模型自评,当日三视角证伪未背书,勿当真edge)"}`]);
