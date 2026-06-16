@@ -638,6 +638,10 @@ const sheets = [
   buildDecisionAidsSheet({ date, rows }),
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
+// 硬闸(2026-06-16 用户:两sheet接进一条龙自动出·做实):盘口合理性/爆冷研判必在,缺=fail-loud拒认交付
+const REQUIRED_SHEETS = ["盘口合理性", "爆冷研判"];
+const missingSheets = REQUIRED_SHEETS.filter((n) => !sheets.some((s) => s.name === n));
+if (missingSheets.length) { console.error(`🔴 必含工作表缺失(拒认成功交付):${missingSheets.join("、")}——盘口合理性/爆冷研判须每天自动出。`); process.exit(1); }
 if (outBase) mkdirSync(outBase, { recursive: true });
 // 权威产物=桌面稳定子文件夹(2026-06-11 EBUSY 根修:用户常开着桌面根 xlsx 在看,WPS/Excel 文件锁
 //   不该让整条交付链第一步就崩死)。先写子文件夹权威份,桌面根/手机站副本降级 best-effort。
