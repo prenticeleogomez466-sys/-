@@ -10,6 +10,7 @@ import { honestPass } from "./honest-pass-gate.js";
 import { rankByDivergence } from "./market-divergence-radar.js";
 import { assessPortfolioRisk } from "./portfolio-kelly.js";
 import { selectHighConfidence } from "./selective-picks.js";
+import { handicapReferenceRows, ouReferenceRows } from "./handicap-sanity.js";
 
 // ── 日期解析:显式参数必须合法,缺参用本机 UTC+8 当日;非法直接 throw(fail-loud,绝不猜) ──
 export function resolveDeliveryDate(arg, now = new Date()) {
@@ -540,8 +541,12 @@ export function buildHandicapSanitySheet({ date, rows }) {
       : s.verdict === "合理" ? "盘口与历史同线常态一致" : s.verdict === "过深" ? "让球比同强度该有的深→受让方/爆冷有值" : "让球比该有的浅→热门实际更强·受让方过盘易";
     return [r.match, s.line, probCell, range, verdict, gap, read];
   });
-  const tail = [[""], ["参考·其它让球线正常热门胜率区间(P5–P95)", "让0.5=46–52% · 让1=58–65% · 让1.5=69–75% · 让2=77–82%(详见「盘口标准区间」xlsx)"]];
-  return { name: "盘口合理性", rows: [[banner], header, ...body, ...tail] };
+  // 全量历史标准区间参照(用户:全写出来·什么区间合理)——每条让球线 胜率+胜/平/客赔 + 大小球区间。
+  const refHead = [[""], ["━━ 历史标准区间总表(12458场7季·所有让球线·本场赔率落区外=过深/过浅)━━"]];
+  const ref = handicapReferenceRows();
+  const ouHead = [[""], ["━━ 大小球(总进球2.5)标准区间 ━━"]];
+  const ou = ouReferenceRows();
+  return { name: "盘口合理性", rows: [[banner], header, ...body, ...refHead, ...ref, ...ouHead, ...ou] };
 }
 
 // ── 爆冷研判工作表(2026-06-16 用户:单独·据数据排序哪场最可能爆冷+若爆冷的比分半全场+怎么防)──

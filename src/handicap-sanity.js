@@ -25,6 +25,48 @@ const LINE_FAV_BANDS = {
   2.25: { p5: 0.802, p25: 0.815, p50: 0.826, p75: 0.836, p95: 0.852, n: 125 },
   2.5:  { p5: 0.832, p25: 0.844, p50: 0.854, p75: 0.861, p95: 0.879, n: 88 },
 };
+// 让球线 → 欧赔 胜/平/客 十进制赔率正常区间 [P5,中位,P95](12458场7季实测·收盘)。
+//   配 LINE_FAV_BANDS(热门胜率隐含)给完整"什么区间合理"参照。本场赔率落区外=过深/过浅。
+const LINE_DECIMAL_BANDS = {
+  0:    { win: [2.45, 2.59, 2.77], draw: [2.88, 3.25, 3.68], dog: [2.64, 2.83, 3.05], n: 1407 },
+  0.25: { win: [2.09, 2.27, 2.49], draw: [2.96, 3.33, 3.73], dog: [2.89, 3.26, 3.78], n: 3380 },
+  0.5:  { win: [1.82, 1.95, 2.07], draw: [3.17, 3.54, 3.95], dog: [3.48, 3.99, 4.74], n: 2250 },
+  0.75: { win: [1.63, 1.72, 1.81], draw: [3.48, 3.85, 4.27], dog: [4.18, 4.88, 5.84], n: 1721 },
+  1:    { win: [1.48, 1.56, 1.64], draw: [3.87, 4.26, 4.65], dog: [4.94, 5.91, 7.36], n: 1259 },
+  1.25: { win: [1.37, 1.43, 1.50], draw: [4.42, 4.78, 5.16], dog: [5.93, 7.21, 9.21], n: 881 },
+  1.5:  { win: [1.28, 1.34, 1.39], draw: [5.03, 5.46, 5.97], dog: [7.11, 8.90, 11.21], n: 673 },
+  1.75: { win: [1.21, 1.26, 1.30], draw: [5.82, 6.25, 6.82], dog: [8.84, 10.76, 14.39], n: 363 },
+  2:    { win: [1.17, 1.21, 1.24], draw: [6.61, 7.17, 7.96], dog: [10.41, 13.0, 17.06], n: 246 },
+  2.25: { win: [1.13, 1.16, 1.19], draw: [7.62, 8.36, 9.38], dog: [12.8, 16.09, 21.8], n: 125 },
+  2.5:  { win: [1.09, 1.12, 1.15], draw: [8.85, 9.72, 11.32], dog: [15.71, 20.12, 26.43], n: 88 },
+};
+// 大小球:收盘大球隐含分档 → over/under 十进制 [P5,中,P95] / under中位(12458场实测)。
+const OU_DECIMAL_BANDS = [
+  { lo: 0.35, hi: 0.45, over: [2.13, 2.28, 2.64], underMid: 1.63, n: 2521 },
+  { lo: 0.45, hi: 0.55, over: [1.75, 1.91, 2.09], underMid: 1.91, n: 4665 },
+  { lo: 0.55, hi: 0.65, over: [1.48, 1.61, 1.72], underMid: 2.32, n: 3600 },
+  { lo: 0.65, hi: 0.78, over: [1.25, 1.38, 1.45], underMid: 3.03, n: 1292 },
+];
+
+/** 完整"什么区间合理"参照表行(供盘口合理性 sheet 全量列出)。每条让球线:热门胜率区间+胜/平/客赔区间。 */
+export function handicapReferenceRows() {
+  const pct = (x) => `${(x * 100).toFixed(0)}%`;
+  const rg = (a) => `${a[0]}–${a[2]}(中${a[1]})`;
+  const rows = [["让球线", "热门胜率正常区间(P5–P95)", "热门胜赔", "平赔", "客(冷)赔", "样本N"]];
+  for (const k of Object.keys(LINE_DECIMAL_BANDS).map(Number).sort((a, b) => a - b)) {
+    const d = LINE_DECIMAL_BANDS[k], f = LINE_FAV_BANDS[k];
+    rows.push([k === 0 ? "平手" : "让" + k, f ? `${pct(f.p5)}–${pct(f.p95)}(中${pct(f.p50)})` : "—", rg(d.win), rg(d.draw), rg(d.dog), d.n]);
+  }
+  return rows;
+}
+/** 大小球正常区间参照行。 */
+export function ouReferenceRows() {
+  const rg = (a) => `${a[0]}–${a[2]}(中${a[1]})`;
+  const rows = [["收盘大球隐含档", "over赔正常区间", "under赔中位", "样本N"]];
+  for (const b of OU_DECIMAL_BANDS) rows.push([`${(b.lo * 100) | 0}–${(b.hi * 100) | 0}%`, rg(b.over), b.underMid, b.n]);
+  return rows;
+}
+
 const KEYS = Object.keys(LINE_FAV_BANDS).map(Number).sort((a, b) => a - b);
 function nearestLineKey(depth) {
   let best = KEYS[0], bd = Infinity;
