@@ -85,7 +85,7 @@ function upsetDim(prediction) {
       band: dg.band,
       risk: Number.isFinite(dg.baseUpsetProb) ? round3(dg.baseUpsetProb) : null,
       tier: dg.marginExpect ?? null,
-      verdict: dg.grindDivergence ? "盘口背离·隐藏闷局风险" : null,
+      verdict: dg.grindDivergence ? "平局隐含≥30%·防平(样本外校准31.5%)" : null,
       note: dg.reason ?? null,
       signals: Array.isArray(dg.signals) ? dg.signals : null,
       caveat: dg.caveat ?? null,
