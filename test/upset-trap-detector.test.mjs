@@ -76,11 +76,11 @@ describe("爆冷风险 + 诱盘识别(upset-trap-detector)", () => {
       assert.equal(r.band, "低");
       assert.equal(r.grindDivergence, false);
     });
-    it("★西班牙vs佛得角:真区分点=大小球线低(3.5),非线深浅→深热门闷局→中", () => {
+    it("★西班牙型(深热+大小球线低):回测审计证'易爆冷平'OOS翻车(五大联赛78%窄胜)→诚实归低风险+WC尾部caveat", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.88, ahLine: -2.5, totalsLine: 3.5, pOver25: 0.74 });
-      assert.equal(r.grindDivergence, true, "深热门+大小球线低=闷局风险");
-      assert.equal(r.band, "中", "靠大小球线低升档到中");
-      assert.match(r.reason, /闷局|大小球线低|逼平/);
+      assert.equal(r.band, "低", "OOS证强热低球多为窄胜·不夸大爆冷");
+      assert.match(r.upsetType, /低风险/);
+      assert.match(r.reason, /窄胜|尾部|不可靠预判/, "须含诚实WC尾部caveat");
     });
     it("深浅以同1X2实力档中位线为基准:86%热门基准2.5,开-2.5=同类正常(纠正旧绝对阈)", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.86, ahLine: -2.5, totalsLine: 4.0 });
@@ -103,15 +103,15 @@ describe("爆冷风险 + 诱盘识别(upset-trap-detector)", () => {
       assert.equal(r.band, "中");
       assert.match(r.reason, /平局隐含/);
     });
-    it("分型 upsetType:超大热(≥78%)+高球(≥56%)→🟢无风险可胆", () => {
+    it("分型 upsetType:强热(≥72%)→🟢低风险(OOS胜~78%)", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.82, ahLine: -2.5, totalsLine: 4, pOver25: 0.62 });
-      assert.match(r.upsetType, /无风险/);
+      assert.match(r.upsetType, /低风险/);
     });
-    it("分型 upsetType:强热(66~82%)+低球(<48%)→🟡易爆冷平", () => {
-      const r = diagnoseUpsetRisk({ p1x2Fav: 0.70, ahLine: -1.5, totalsLine: 2.5, pOver25: 0.44 });
-      assert.match(r.upsetType, /易爆冷平/);
+    it("分型 upsetType:平局隐含≥30%→🟡防平(OOS校准31.5%·唯一成立的平局触发)", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.55, ahLine: -0.5, totalsLine: 2.5, pOver25: 0.44, drawImplied: 0.31 });
+      assert.match(r.upsetType, /防平|双向爆冷/); // 势均同时满足双向,二者皆为正确高风险标注
     });
-    it("分型 upsetType:势均(不胜≥42%)→🔴双向爆冷", () => {
+    it("分型 upsetType:势均(不胜≥42%)→🔴双向爆冷(OOS胜47/平28/负25)", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.55, ahLine: -0.5, totalsLine: 2.5, pOver25: 0.5 });
       assert.match(r.upsetType, /双向爆冷/);
     });
