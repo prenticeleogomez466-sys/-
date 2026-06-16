@@ -53,13 +53,17 @@ function goalsDim(prediction) {
   const over = Number(ou?.overCalibrated ?? ou?.over);
   const eg = prediction?.dixonColes?.expectedGoals ?? prediction?.simulation?.lambdas;
   const lamSum = eg && Number.isFinite(eg.home) && Number.isFinite(eg.away) ? Number(eg.home) + Number(eg.away) : null;
+  // 大小球走势触发(2026-06-16 实证 z>4 真 edge):盘口初→收移动方向对实际大小球有真实预测力。
+  const tm = prediction?.totalsMovementSignal;
+  const moveNote = (tm && /🟢/.test(tm.band ?? "") && tm.empiricalOverRate != null) ? ` · 🟢走势:${tm.note}` : "";
+  const moveLean = (tm && /🟢/.test(tm.band ?? "")) ? tm.lean : null;
   if (Number.isFinite(over)) {
     const source = ou?.calibration?.hasMarketLine ? "盘口" : "校准模型";
     let lean, note;
     if (over >= 0.56) { lean = "大球"; note = `大于2.5球 ${PCT(over)}(${source}):比分往 2-1/2-2/3-1 偏`; }
     else if (over <= 0.44) { lean = "小球"; note = `大于2.5球 ${PCT(over)}(${source}):低比分(1-0/1-1/0-0)为主`; }
     else { lean = "均衡"; note = `大小球接近五五(over ${PCT(over)},${source}),不偏押`; }
-    return { lean, prob: round3(over), source, note };
+    return { lean, prob: round3(over), source, note: note + moveNote, movementLean: moveLean };
   }
   if (Number.isFinite(lamSum)) {
     let lean, note;
@@ -71,9 +75,23 @@ function goalsDim(prediction) {
   return null;
 }
 
-/* ── 爆冷倾向(爆冷探测器 → 实力差回退)── */
+/* ── 爆冷倾向(多信号诊断 → 爆冷探测器 → 实力差回退)── */
 function upsetDim(prediction) {
-  const t = prediction?.handicapPick?.upsetTrap;
+  // 优先:多信号爆冷诊断(2026-06-16)——1X2热门不胜 + 亚盘线深度 + 大小球线背离。
+  //   解决"超级大热 1X2 看着稳(西班牙88%)但盘口背离=隐藏闷局风险"被旧'实力悬殊→爆冷低'拍平的问题。
+  const dg = prediction?.upsetDiagnosis;
+  if (dg && dg.band) {
+    return {
+      band: dg.band,
+      risk: Number.isFinite(dg.baseUpsetProb) ? round3(dg.baseUpsetProb) : null,
+      tier: dg.marginExpect ?? null,
+      verdict: dg.grindDivergence ? "盘口背离·隐藏闷局风险" : null,
+      note: dg.reason ?? null,
+      signals: Array.isArray(dg.signals) ? dg.signals : null,
+      caveat: dg.caveat ?? null,
+    };
+  }
+  const t = prediction?.handicapPick?.upsetTrap ?? prediction?.upsetTrap;
   if (t && (t.upsetLevel || t.upsetRisk != null)) {
     return {
       band: t.upsetLevel ?? null,

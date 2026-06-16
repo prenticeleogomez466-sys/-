@@ -142,6 +142,108 @@ function buildReason({ tier, favLabel, favImplied, moveTag, upsetRisk, upsetLeve
   return parts.join(" · ");
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// 多信号爆冷风险诊断(2026-06-16,用户最终目的:"为什么德国不冷、西班牙冷——盘口水位/
+//   赔率/球队特点上有没有体现")。
+//
+// 实证锚(德国vs库拉索 7-1·没冷  vs  西班牙vs佛得角 0-0·爆冷,真实存盘赔率):
+//   · 1X2 都笃定(德1.03/97% vs 西1.06/94%)→ 光看 1X2 分不出谁会冷;
+//   · 但 亚盘让球线深度 + 大小球总进球线 把两场清楚分开:
+//       德国 亚盘-3.5 / 大小球4.5(深线+高球=市场预期血洗)→ 真打出 7-1;
+//       西班牙 亚盘-2.5 / 大小球3.5(线浅+球低=市场预期"赢球但低净胜分闷局")→ 被铁桶逼平 0-0。
+//   · 机制 = 背离:1X2 极笃定(≥80%)但 让球线浅 + 大小球线低 ⇒ 市场在"赢球确定性"与
+//     "赢多少/进多少"之间自相背离 = 隐藏的"啃硬骨头"风险 = 平局/爆冷温床。
+//   · 球队特点(佛得角防守强/摆大巴)免费抓不到(FBref Cloudflare 墙),但市场已把它消化进
+//     "大小球只敢挂3.5、让球只敢-2.5"里 —— 读懂这两条线 ≈ 间接读到球队特点。
+//
+// 诚实边界(瑞典vs突尼斯反例:亚盘-0.5/大小球2.5 线浅球低却 5-1):盘口信号只能**上调风险**、
+//   提示"别当胆/别打深让球",绝不保证必爆,也不自动弃赛(遵 feedback-confidence-not-autosuppress)。
+//   概率以"热门1X2不胜"市场共识为诚实锚,背离信号只作风险升档与原因披露,不编造精确加成数字。
+//
+// @param {Object} a
+//   p1x2Fav    {number}  热门 1X2 隐含胜率(de-vig,必填;0~1)
+//   ahLine     {number}  亚盘让球线(热门视角:主热取负、客热取正绝对值;|line| 越大=市场预期净胜越大)
+//   totalsLine {number}  大小球总进球线(如 2.5/3.5/4.5)
+//   favDrift   {number}  (可选)热门赔率移动:>0 加注 / <0 退烧
+//   pOver25    {number}  (可选)2.5 线大球 de-vig 概率,辅助佐证进球量
+// @returns {null | {
+//   favWinProb, baseUpsetProb, marginExpect, goalsExpect, grindDivergence,
+//   band, signals:[], reason, caveat
+// }}
+export function diagnoseUpsetRisk(a = {}) {
+  const p = Number(a.p1x2Fav);
+  if (!Number.isFinite(p) || p <= 0 || p >= 1) return null; // 无 1X2 隐含=不诊断,不编造
+  const ahAbs = Number.isFinite(Number(a.ahLine)) ? Math.abs(Number(a.ahLine)) : null;
+  const totals = Number.isFinite(Number(a.totalsLine)) ? Number(a.totalsLine) : null;
+  const drift = Number.isFinite(Number(a.favDrift)) ? Number(a.favDrift) : null;
+  const pOver = Number.isFinite(Number(a.pOver25)) ? Number(a.pOver25) : null;
+
+  const baseUpsetProb = round(1 - p, 3);            // ✅市场锚:热门不胜的共识概率
+  const heavyFav = p >= 0.80;                        // 超级大热(1X2 极笃定)
+  const signals = [];
+  signals.push(`1X2热门不胜${pct(baseUpsetProb)}(市场共识)`);
+
+  // 让球线深度 → 净胜分预期。阈值由实证定档(德-3.5血洗 / 西-2.5啃硬骨头 / 比-0.5势均)。
+  let marginExpect = "未知";
+  if (ahAbs != null) {
+    marginExpect = ahAbs >= 3 ? "血洗预期(净胜≥3)" : ahAbs >= 1.75 ? "明显优势" : ahAbs >= 0.75 ? "小胜预期" : "势均/半球内";
+    signals.push(`亚盘${a.ahLine}(${marginExpect})`);
+  }
+  // 大小球线 → 进球量预期。低线=闷战(净胜薄+平局多)。
+  let goalsExpect = "未知";
+  if (totals != null) {
+    goalsExpect = totals >= 4 ? "高球(goalfest)" : totals >= 3.25 ? "中高" : totals >= 2.75 ? "中" : "低球闷战";
+    signals.push(`大小球${totals}(${goalsExpect})${pOver != null ? `·大球${pct(pOver)}` : ""}`);
+  }
+
+  // ── 核心:背离检测 —— 1X2 极笃定 但 让球线浅 / 大小球线低 = 隐藏闷局风险 ──
+  const shallowLine = ahAbs != null && ahAbs < 3;   // 对超级大热而言,<3 即"啃硬骨头"
+  const lowGoals = totals != null && totals <= 3.5;
+  const grindDivergence = heavyFav && (shallowLine || lowGoals);
+  if (grindDivergence) {
+    signals.push("⚠背离:1X2笃定但市场不敢给深让球/高球线→预期低净胜分闷局,防被逼平");
+  }
+
+  // ── 赔率移动(退烧=危险,复用 5 年实证方向)──
+  if (drift != null) {
+    if (drift < -0.02) signals.push("热门退烧(收盘走冷)→风险上调");
+    else if (drift > 0.02) signals.push("热门被加注(收盘更热)→风险略降");
+  }
+
+  // ── 分档(概率锚 + 背离/移动升降档;诚实不编精确加成)──
+  let band;
+  if (baseUpsetProb >= 0.35) band = "高";                        // 1X2 本身就不稳(如比利时36%)
+  else if (baseUpsetProb >= 0.25) band = "中";                   // 中等热门(如乌拉圭28%)
+  else if (grindDivergence) band = "中";                         // ★关键:1X2看着稳但盘口背离→升档(西班牙)
+  else band = "低";                                             // 深线+高球的真血洗(德国)
+  if (drift != null && drift < -0.05 && band === "低") band = "中"; // 大幅退烧把"低"提到"中"
+
+  const reason = buildUpsetReason({ band, baseUpsetProb, marginExpect, goalsExpect, grindDivergence, signals });
+  return {
+    favWinProb: round(p, 3),
+    baseUpsetProb,
+    marginExpect, goalsExpect,
+    grindDivergence,
+    band,
+    signals,
+    reason,
+    caveat: "盘口信号只上调风险、非必爆(瑞典5-1反例);仅提示别当胆/别打深让球,不自动弃赛",
+  };
+}
+
+function pct(x) { return `${Math.round((Number(x) || 0) * 100)}%`; }
+
+function buildUpsetReason({ band, baseUpsetProb, marginExpect, goalsExpect, grindDivergence }) {
+  const head = `爆冷风险${band}(热门不胜≈${pct(baseUpsetProb)})`;
+  if (grindDivergence) {
+    return `${head} · 关键:1X2笃定但市场给的让球线浅(${marginExpect})+大小球线低(${goalsExpect})=预期低净胜分闷局,平局/被逼平风险高于1X2表象,勿当胆勿打深让球`;
+  }
+  if (band === "低") {
+    return `${head} · 深让球线(${marginExpect})+高大小球线(${goalsExpect})与1X2笃定一致=市场预期真血洗,无隐藏闷局信号`;
+  }
+  return `${head} · 1X2本身即非稳胆,${marginExpect}/${goalsExpect},按市场共识控注`;
+}
+
 // 供回测/汇总:把一场标成是否"爆冷已发生"(热门未胜)。
 export function favoriteUpset(closingImplied, result) {
   if (!closingImplied || !result) return null;

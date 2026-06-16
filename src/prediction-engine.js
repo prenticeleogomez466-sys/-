@@ -7,7 +7,8 @@ import { buildMonteCarloSimulation, lambdaTotalFromMarket } from "./monte-carlo-
 import { worldCupLambdaContext, worldCupMatchPrior, teamPrior, confederationEloAdjustment } from "./world-cup-priors.js";
 import { getExperienceBaseline } from "./experience-library-store.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapCoverFromMatrix, scoreProbFromMatrix, topScoresWithProb, bestDistinctFirstHalfHalfFull, topHalfFull, handicapLadder, totalGoalsBands, halfFullDepth } from "./derived-score-model.js";
-import { analyzeUpsetTrap } from "./upset-trap-detector.js";
+import { analyzeUpsetTrap, diagnoseUpsetRisk } from "./upset-trap-detector.js";
+import { analyzeTotalsMovement, overImpliedProb } from "./totals-movement-signal.js";
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
@@ -925,6 +926,35 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       closing: oddsProbabilities ?? null,
       model: probabilities ?? null,
     }),
+    // 多信号爆冷诊断(2026-06-16 用户最终目的:"德国为什么不冷、西班牙为什么冷,盘口/赔率上有没有体现"):
+    //   融合 1X2热门不胜概率 + 亚盘让球线深度 + 大小球线 → 背离检测(1X2笃定但线浅/球低=隐藏闷局风险)。
+    //   实证:德国 -3.5/4.5=低、西班牙 -2.5/3.5=中(1X2看着88%笃定却被背离信号升档,正是1X2漏掉的)。
+    //   只上调风险/提示别当胆,不改 wld 锚、不自动弃赛(瑞典5-1反例已写进 caveat)。
+    upsetDiagnosis: (() => {
+      const cl = oddsProbabilities ?? probabilities ?? null;
+      if (!cl || !Number.isFinite(cl.home) || !Number.isFinite(cl.away)) return null;
+      const fside = cl.home >= cl.away ? "home" : "away";
+      const ahLine = Number(snapshot?.asianHandicap?.current?.line ?? snapshot?.asianHandicap?.initial?.line ?? snapshot?.asianHandicap?.final?.line);
+      const totalsLine = Number(snapshot?.totals?.current?.line ?? snapshot?.totals?.initial?.line ?? snapshot?.totals?.line);
+      const op = fusionContext.openingOdds;
+      const favDrift = op && Number.isFinite(op[fside]) ? cl[fside] - op[fside] : null;
+      return diagnoseUpsetRisk({
+        p1x2Fav: cl[fside],
+        ahLine: Number.isFinite(ahLine) ? ahLine : undefined,
+        totalsLine: Number.isFinite(totalsLine) ? totalsLine : undefined,
+        favDrift: favDrift ?? undefined,
+      });
+    })(),
+    // 大小球走势触发(2026-06-16 盘口共性挖掘:8906场实证的唯一 z>4 真实 edge):
+    //   大小球盘口初→收移动方向对实际大小球有真实预测力(加注→大球63%/退烧→小球)。
+    //   欧赔/亚盘走势=噪声不做;此为大小球玩法的有据倾向提示,不自动下注。无初/收双盘=null。
+    totalsMovementSignal: (() => {
+      const openProb = overImpliedProb(tg?.initial?.over ?? tg?.opening?.over, tg?.initial?.under ?? tg?.opening?.under);
+      if (openProb == null || ouOverProb == null) return null;
+      const ahDepth = Number.isFinite(Number(snapshot?.asianHandicap?.current?.line ?? snapshot?.asianHandicap?.initial?.line))
+        ? Math.abs(Number(snapshot?.asianHandicap?.current?.line ?? snapshot?.asianHandicap?.initial?.line)) : null;
+      return analyzeTotalsMovement({ openOverProb: openProb, closeOverProb: ouOverProb, ahDepth });
+    })(),
     // 永久记忆召回(2026-06-01):本场所属联赛/热门档的模型历史真实命中率(诚实自知,样本不足标 insufficient)。
     //   只读附注,不改 wld/概率;盘上无记忆则 null。
     memoryRecall: options.modelMemory
@@ -1462,7 +1492,7 @@ function buildHalfFullPicks(code, secondaryCode, snapshot = null, probabilities 
 }
 
 // 深度强化:给比分/半全场附概率 + 分布 + 主方向内"不同首半场"反超备选(真实矩阵派生,可追溯)。
-function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCode, league = null) {
+function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCode, league = null, secondaryCode = null) {
   const matrix = scoreModel?.matrix ?? null;
   scorePicks.primaryProbability = scoreProbFromMatrix(matrix, scorePicks.primary);
   scorePicks.secondaryProbability = scoreProbFromMatrix(matrix, scorePicks.secondary);
@@ -1487,6 +1517,13 @@ function enrichScoreAndHalfFull(scorePicks, halfFullPicks, scoreModel, primaryCo
     const finalCh = { "3": "主胜", "1": "平局", "0": "客胜" }[primaryCode];
     const onDir = Object.entries(hfDist).filter(([k]) => String(k).split("-")[1]?.trim() === finalCh).sort((a, b) => b[1] - a[1]);
     if (onDir.length) halfFullPicks.primary = onDir[0][0];
+    // 半全场情景化次选(共享 hedgeHalfFull,与 wc-match-model 同一决策函数):对冲领先被扳平/被逆转,
+    //   或悬殊场慢热反超;恒≠首选(消灭"次选=首选"重复)。次方向缺则退回任意非首选最高概率走势。
+    if (matrix && secondaryCode != null) {
+      const scen = classifyScoreScenario(matrix, primaryCode, { expectedGoals: eg });
+      const hh = hedgeHalfFull(hfDist, primaryCode, secondaryCode, halfFullPicks.primary, scen);
+      if (hh?.halfFull) halfFullPicks.secondary = hh.halfFull;
+    }
   }
   halfFullPicks.primaryProbability = hfDist?.[halfFullPicks.primary] != null ? round(hfDist[halfFullPicks.primary]) : null;
   halfFullPicks.secondaryProbability = hfDist?.[halfFullPicks.secondary] != null ? round(hfDist[halfFullPicks.secondary]) : null;
