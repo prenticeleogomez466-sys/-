@@ -114,18 +114,8 @@ if (!ALL_ONSALE && todayDigit) {
     return ok;
   });
   console.log(`当日业务日过滤(${jingcaiWeekdayLabel(date)}=周缀${todayDigit}):${before}场→${games.length}场;排除${dropped.length}场(后续业务日/预售,--all-onsale 可出全量)`);
-  // 次日白天场归明日(2026-06-16 用户裁决:"奥地利6/17中午=明天的比赛,不考虑在今天里"):
-  //   竞彩业务日含跨夜场(次日凌晨03~09时仍算今日,如法国/伊拉克/阿根廷=今晚),但开赛落在次日**白天(≥10:00)**
-  //   的场,用户按"开赛日"视为明天 → 剔出今日推荐(奥地利6/17 12:00)。无精确时刻不剔(不猜)。--all-onsale 不过滤。
-  const beforeNd = games.length;
-  const ndDaytime = [];
-  games = games.filter((p) => {
-    const m = String(p.fixture?.kickoff ?? "").match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}):/);
-    if (!m) return true;
-    if (m[1] > date && Number(m[2]) >= 10) { ndDaytime.push(`${p.fixture.homeTeam}vs${p.fixture.awayTeam}(${m[1]} ${m[2]}:00)`); return false; }
-    return true;
-  });
-  if (ndDaytime.length) console.log(`次日白天场归明日(开赛次日≥10:00·用户裁决):${beforeNd}→${games.length}场,剔除 ${ndDaytime.join("、")}`);
+  // 2026-06-16(傍晚)用户推翻早先"次日白天场归明日"裁决:奥地利vs约旦(6/17 12:00)虽次日白天开赛,但属今日业务日在售竞彩场,
+  //   用户明确"少了一场奥地利的比赛"→ 凡当日业务日在售的竞彩场一律纳入今日交付,不再按开赛落次日白天剔除。原 ndDaytime 过滤块已移除。
   if (!games.length) { console.error(`❌ 今日业务日(${jingcaiWeekdayLabel(date)})无在售竞彩场——不出空表(检查抓取或确为休市日)。`); process.exit(1); }
 }
 
