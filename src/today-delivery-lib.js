@@ -520,6 +520,56 @@ export function buildDecisionAidsSheet({ date, rows }) {
   return { name: "决策辅助", rows: out };
 }
 
+// ── 盘口合理性工作表(2026-06-16 用户:给直观历史区间·自己判超临界多少=深/浅)──
+//   标准=12458场五大联赛(7季)亚盘线↔1X2热门隐含历史分位;本场落 P5..P95 内=合理,<P5过深·>P95过浅。
+export function buildHandicapSanitySheet({ date, rows }) {
+  const banner = `📐 盘口合理性 · ${date} · 标准=12458场五大联赛(7季)历史区间;本场热门隐含落 P5–P95=合理,低于P5=过深(让太多/热门被高估),高于P95=过浅(让太少/热门更强)。✅历史频次,供你自行判断,非下注edge。`;
+  const header = ["对阵", "亚盘线", "本场热门胜率", "该线历史正常区间(P5–P95·中位)", "落点判定", "超临界多少", "解读"];
+  const body = rows.map((r) => {
+    const s = r.sanity;
+    if (!s) return [r.match, r.ahLineEspn ?? "—", "—", "—", "⚠️无亚盘线或1X2隐含", "—", "缺数据不判(不编)"];
+    const pc = (x) => x == null ? "—" : (x * 100).toFixed(1) + "%";
+    if (!s.band) return [r.match, s.line, pc(s.favProb), "无该线≥30样本", s.verdict, "—", "该让球线历史样本不足,不硬套"];
+    const range = `${pc(s.band.p5)}–${pc(s.band.p95)}(中${pc(s.band.p50)})·N=${s.band.n}`;
+    const verdict = s.verdict === "合理" ? "🟢合理(区间内)" : s.verdict === "过深" ? "🔴过深(低于P5)" : "🔴过浅(高于P95)";
+    const gap = s.exceeded ? `${s.verdict === "过深" ? "低于下限" : "高于上限"} ${s.gapPp}pp` : "区间内·0";
+    const read = s.verdict === "合理" ? "盘口与历史同线常态一致" : s.verdict === "过深" ? "让球比同强度该有的深→受让方/爆冷有值" : "让球比该有的浅→热门实际更强·受让方过盘易";
+    return [r.match, s.line, pc(s.favProb), range, verdict, gap, read];
+  });
+  const tail = [[""], ["参考·其它让球线正常热门胜率区间(P5–P95)", "让0.5=46–52% · 让1=58–65% · 让1.5=69–75% · 让2=77–82%(详见「盘口标准区间」xlsx)"]];
+  return { name: "盘口合理性", rows: [[banner], header, ...body, ...tail] };
+}
+
+// ── 爆冷研判工作表(2026-06-16 用户:单独·据数据排序哪场最可能爆冷+若爆冷的比分半全场+怎么防)──
+export function buildUpsetAnalysisSheet({ date, rows }) {
+  const banner = `🎲 爆冷研判 · ${date} · 据真实盘口+历史区间排序:哪场最可能爆冷(不胜%越高越易冷)+盘口深浅+若爆冷最可能结果(🔶模型矩阵派生·非500真盘·具体比分=不可约方差仅供参考)+怎么防。证伪只标注,买不买你定。`;
+  const header = ["排名", "对阵", "热门不胜%(盘口)", "盘口深浅(超临界)", "若爆冷最可能(🔶模型派生)", "怎么防"];
+  const ranked = rows
+    .map((r) => ({ r, nw: Number.isFinite(r.notWinPct) ? r.notWinPct : -1 }))
+    .sort((a, b) => b.nw - a.nw);
+  const body = ranked.map(({ r, nw }, i) => {
+    const s = r.sanity;
+    const depth = !s || !s.band ? "—" : s.verdict === "合理" ? "🟢合理" : `🔴${s.verdict} ${s.gapPp}pp`;
+    const us = r.upsetData;
+    let shape = "—";
+    if (us) {
+      const pc = (x) => x == null ? "" : Math.round(x * 100) + "%";
+      const parts = [];
+      if (us.drawScore && us.drawScoreProb != null) parts.push(`被逼平 ${us.drawScore}(${pc(us.drawScoreProb)})`);
+      if (us.drawHalfFull != null) parts.push(`半全场平-平 ${pc(us.drawHalfFull)}`);
+      if (us.reverseScore && us.reverseScoreProb != null) parts.push(`或被翻盘 ${us.reverseScore}(${pc(us.reverseScoreProb)})`);
+      if (us.goalsLean) parts.push(`大小球倾向${us.goalsLean}`);
+      shape = parts.join(" · ") || "—";
+    }
+    const guard = nw >= 25
+      ? "别当胆·胜负平双选含平" + (us?.drawScore ? `·比分加平局格${us.drawScore}` : "") + "·半全场加平-平·深让球减注·串关排除"
+      : (s?.verdict === "过浅" ? "1X2难爆冷但盘口过浅→受让方过盘易·别买热门深让当胆" : "相对稳·按盘口控注");
+    const rankTag = i === 0 ? "1·最可能" : i === ranked.length - 1 ? `${i + 1}·最稳` : String(i + 1);
+    return [rankTag, r.match, nw >= 0 ? nw + "%" : "—", depth, shape, guard];
+  });
+  return { name: "爆冷研判", rows: [[banner], header, ...body] };
+}
+
 // ── 14场/任选9 闸裁决工作表(buildFourteenPlan 闸如实判定;不能出写明依据,绝不硬凑) ──
 export function buildFourteenSheetRows({ date, fourteen, periodFacts = [] }) {
   const head = [`🎯 14场/任选9 · ${date} · 闸裁决`];
@@ -699,7 +749,7 @@ export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事)",
 
 export function buildXlsxSheets({ date, rows, banner, advDataPresent, recordLine = null, stakeNote = null }) {
   // 对阵列附加行:每场情景研判(🏆赛会 出线/夺冠% 已移到专属"世界杯模型"列,不再塞对阵格)
-  const matchCell = (r) => `${r.match}(${r.comp})${r.scen ? `\n情景:${r.scen}` : ""}${r.upsetScen ? `\n⚠️${r.upsetScen}` : ""}`;
+  const matchCell = (r) => `${r.match}(${r.comp})${r.scen ? `\n情景:${r.scen}` : ""}`; // 爆冷研判移出→独立sheet(主表干净)
   const xrows = rows.map((r) => [String(r.idx), r.ko, matchCell(r),
     r.wld, r.euro,
     r.wcElo ?? "—", r.wcLambda ?? "—", r.wcTourney ?? (r.wcLine || "—"),
@@ -792,7 +842,7 @@ export function resolveHtmlWriteTarget({ existingHtml, date, canonicalPath, date
 // ── 英文固定URL页 football.html(手机收藏夹固定地址;缺陷#16:跟随当日,与 xlsx/手机页同源同日期) ──
 export function renderEnglishHtml({ date, rows, riskNote, intlN, wcN, banner, auditFoot, parlayPlan = null, recordLine = null, stakeSum = null }) {
   const br = (s) => esc(s).replace(/\n/g, "<br>");
-  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}${r.upsetScen ? `<br><span style="color:#c62828;font-size:11px">⚠️${esc(r.upsetScen)}</span>` : ""}</td><td>${esc(r.wld)}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(r.hcView)}</td><td>${esc(r.score)}〔${esc(r.scoreSrc)}〕</td><td>${esc(r.halffull)}〔${esc(r.hfSrc)}〕</td><td>${esc(r.ouReal)}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
+  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}</td><td>${esc(r.wld)}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(r.hcView)}</td><td>${esc(r.score)}〔${esc(r.scoreSrc)}〕</td><td>${esc(r.halffull)}〔${esc(r.hfSrc)}〕</td><td>${esc(r.ouReal)}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>⚡神选·足球·${date}</title>

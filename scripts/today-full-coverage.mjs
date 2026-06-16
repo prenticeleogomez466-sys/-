@@ -18,6 +18,7 @@ import {
   wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
   renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
   auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet, buildDecisionAidsSheet,
+  buildHandicapSanitySheet, buildUpsetAnalysisSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
   XLSX_HEADERS, h2hToStatsList, marketWldPrimary,
@@ -48,6 +49,7 @@ import { loadAdvancedData } from "../src/advanced-data-store.js";
 import { loadNationalResults, recentForm } from "../src/wc-national-form.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
 import { buildMatchIntel } from "../src/match-intel.js";
+import { handicapSanity } from "../src/handicap-sanity.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(缺陷#20:绝不再默认写死历史日期)。
 let date;
@@ -424,8 +426,13 @@ const rows = games.map((p, i) => {
     dc: p.doubleChance?.recommended ? { pick: p.doubleChance.pick, shortCode: p.doubleChance.shortCode } : null,
     // 情景研判一行(自检⑥:scenario-synthesizer 现成 headline,逐场不同,不重算不编造)
     scen: p.scenario?.headline ?? "",
-    // 爆冷场景(2026-06-16 用户:检到爆冷必给"若爆冷→比分/半全场/大小球"·真盘派生·只爆冷风险中/高出)
+    // 爆冷场景(2026-06-16:从对阵格移出→独立「爆冷研判」sheet;主表保持干净·用户要求)
     upsetScen: p.scenario?.upsetScenario ?? null,
+    // 盘口合理性(独立「盘口合理性」sheet):亚盘线 vs 同实力档历史区间(12458场)→ 深浅+超临界多少
+    sanity: handicapSanity({ ahLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line, p1x2Fav: p.upsetDiagnosis?.favWinProb }),
+    ahLineEspn: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null,
+    notWinPct: p.upsetDiagnosis?.baseUpsetProb != null ? Math.round(p.upsetDiagnosis.baseUpsetProb * 100) : null,
+    upsetData: p.upsetScenario ?? null,
     // 平局画像(2026-06-10 审计rank13:读现成 scenario.dims.draw / experienceContext 字段,不重算;
     //   世界杯场 experienceContext 落全局经验26%不报警,scenario 情景层才有本场平局维度)
     drawRate: p.scenario?.dims?.draw?.prob ?? p.experienceContext?.historicalDrawRate ?? null,
@@ -615,6 +622,8 @@ const sheets = [
   buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
   buildAuditSheet({ date, rows, contentAudit }),
   buildIntelSheet({ date, rows, intelByMatch }),
+  buildHandicapSanitySheet({ date, rows }),
+  buildUpsetAnalysisSheet({ date, rows }),
   buildDecisionAidsSheet({ date, rows }),
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];

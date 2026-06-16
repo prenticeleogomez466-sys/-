@@ -100,6 +100,13 @@ async function loadOne(league, season, fetchImpl) {
       impliedProbs(num(cells, idx("B365CH")), num(cells, idx("B365CD")), num(cells, idx("B365CA")));
     const oddsPinnacle = impliedProbs(num(cells, idx("PSH")), num(cells, idx("PSD")), num(cells, idx("PSA")));
     const oddsPinnacleClose = impliedProbs(num(cells, idx("PSCH")), num(cells, idx("PSCD")), num(cells, idx("PSCA")));
+    // 原始十进制赔率(2026-06-16 用户:要真实赔率区间判深浅,非只de-vig概率)。Avg→B365回退;additive,不动上面概率字段。
+    const trip = (h, d, a) => (h > 1 && d > 1 && a > 1) ? { home: h, draw: d, away: a } : null;
+    const oddsDecimal = trip(num(cells, idx("AvgH")), num(cells, idx("AvgD")), num(cells, idx("AvgA"))) ?? trip(num(cells, idx("B365H")), num(cells, idx("B365D")), num(cells, idx("B365A")));
+    const oddsDecimalClose = trip(num(cells, idx("AvgCH")), num(cells, idx("AvgCD")), num(cells, idx("AvgCA"))) ?? trip(num(cells, idx("B365CH")), num(cells, idx("B365CD")), num(cells, idx("B365CA")));
+    const pairOU = (o, u) => (o > 1 && u > 1) ? { over: o, under: u } : null;
+    const ouDecimal = pairOU(num(cells, idx("Avg>2.5")), num(cells, idx("Avg<2.5"))) ?? pairOU(num(cells, idx("B365>2.5")), num(cells, idx("B365<2.5")));
+    const ouDecimalClose = pairOU(num(cells, idx("AvgC>2.5")), num(cells, idx("AvgC<2.5"))) ?? pairOU(num(cells, idx("B365C>2.5")), num(cells, idx("B365C<2.5")));
     // 亚盘(经验库需要):AHh=开盘让球线(主队视角,负=主让),AvgAHH/AvgAHA=开盘均值水位;
     //   AHCh/AvgCAHH/AvgCAHA=收盘线+水位。线 open→close 移动 = 真实盘口异动信号。缺列为 null。
     const ahLine = num(cells, idx("AHh"));
@@ -161,6 +168,8 @@ async function loadOne(league, season, fetchImpl) {
       corners, // {home,away} 角球数,或 null
       cards, // {homeYellow,awayYellow,homeRed,awayRed,homeFouls,awayFouls},或 null
       odds, // {home,draw,away} 去 vig 后的隐含概率,或 null(开盘均赔)
+      oddsDecimal, oddsDecimalClose, // {home,draw,away} 原始十进制赔率(含水)初/收,或 null
+      ouDecimal, ouDecimalClose, // {over,under} 大小球2.5原始十进制初/收,或 null
       oddsClose, // 收盘均赔隐含,或 null
       oddsPinnacle, // Pinnacle 开盘隐含,或 null
       oddsPinnacleClose, // Pinnacle 收盘隐含,或 null
