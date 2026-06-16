@@ -551,8 +551,8 @@ export function buildHandicapSanitySheet({ date, rows }) {
 
 // ── 爆冷研判工作表(2026-06-16 用户:单独·据数据排序哪场最可能爆冷+若爆冷的比分半全场+怎么防)──
 export function buildUpsetAnalysisSheet({ date, rows }) {
-  const banner = `🎲 爆冷研判 · ${date} · 据真实盘口+历史区间排序:哪场最可能爆冷(不胜%越高越易冷)+盘口深浅+若爆冷最可能结果(🔶模型矩阵派生·非500真盘·具体比分=不可约方差仅供参考)+怎么防。证伪只标注,买不买你定。`;
-  const header = ["排名", "对阵", "热门不胜%(盘口)", "盘口深浅(超临界)", "若爆冷最可能(🔶模型派生)", "怎么防"];
+  const banner = `🎲 爆冷研判 · ${date} · 据真实盘口+历史区间排序:哪场最可能爆冷(不胜%越高越易冷)+实力差Elo+平局隐含+历史同档爆冷率(12458场真赛果)+盘口深浅+若爆冷最可能结果(🔶模型矩阵派生·非500真盘·具体比分=不可约方差仅供参考)+怎么防。证伪只标注,买不买你定。`;
+  const header = ["排名", "对阵", "热门不胜%(盘口)", "实力差Elo", "平局隐含(盘口)", "历史同档爆冷率", "盘口深浅(超临界)", "若爆冷最可能(🔶模型派生)", "怎么防"];
   const ranked = rows
     .map((r) => ({ r, nw: Number.isFinite(r.notWinPct) ? r.notWinPct : -1 }))
     .sort((a, b) => b.nw - a.nw);
@@ -580,7 +580,15 @@ export function buildUpsetAnalysisSheet({ date, rows }) {
     const rankTag = i === 0 ? "1·最可能" : i === ranked.length - 1 ? `${i + 1}·最稳` : String(i + 1);
     const isModel = /模型/.test(String(r.favProbSource ?? ""));
     const nwCell = nw >= 0 ? `${nw}%${isModel ? "·🔶模型(1X2未开售)" : "·✅盘口"}` : "—";
-    return [rankTag, r.match, nwCell, depth, shape, guard];
+    // 实力差Elo:正=主队强(世界杯模型 national-elo 真先验);非WC/缺=—
+    const eloCell = Number.isFinite(r.eloDiff) ? `${r.eloDiff > 0 ? "+" : ""}${r.eloDiff}${r.eloDiff > 0 ? "(主强)" : r.eloDiff < 0 ? "(客强)" : "(均势)"}` : "—";
+    // 平局隐含:500欧赔de-vig真盘口(✅);≥30%标红=爆冷头号路径(被逼平)历史高发档
+    const di = r.drawImpliedPct;
+    const drawCell = di != null ? `${Math.round(di * 100)}%${di >= 0.30 ? "·🔴防平" : ""}` : "—";
+    // 历史同档爆冷率:该让球线12458场真实赛果"热门不胜"频次(跨场可比爆冷基线)
+    const hu = r.histLineUpset;
+    const huCell = hu != null ? `${Math.round(hu * 100)}%${hu >= 0.45 ? "·🟠高基线" : ""}` : "—";
+    return [rankTag, r.match, nwCell, eloCell, drawCell, huCell, depth, shape, guard];
   });
   return { name: "爆冷研判", rows: [[banner], header, ...body] };
 }

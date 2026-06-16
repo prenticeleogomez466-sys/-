@@ -87,6 +87,13 @@ export function normTeam(name) {
   const s = String(name ?? "").toLowerCase().trim().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return WC_TEAM_ALIASES[s] ?? s;
 }
+
+/** 队名 → 所在小组字母(A..L);未收录(淘汰赛占位/非48强)→null,不编造。2026-06-16 情报网:小组形势展示。 */
+export function teamGroupOf(name) {
+  const { teamGroup } = load();
+  if (!teamGroup || name == null) return null;
+  return teamGroup.get(String(name)) ?? teamGroup.get(normTeam(name)) ?? teamGroup.get(String(name).toLowerCase()) ?? null;
+}
 // 500/feed 中文变体 → groups.json 中文规范名(2026-06-10 体检:刚果(金) 致葡萄牙场赔率融合失败)。
 const ZH_TEAM_ALIASES = { "刚果(金)": "刚果民主共和国", "刚果金": "刚果民主共和国" };
 /** 队名(中/英皆可)→ 英文规范名,用于对上真实赛程的英文对阵。 */

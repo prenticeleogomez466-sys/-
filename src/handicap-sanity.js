@@ -40,6 +40,13 @@ const LINE_DECIMAL_BANDS = {
   2.25: { win: [1.13, 1.16, 1.19], draw: [7.62, 8.36, 9.38], dog: [12.8, 16.09, 21.8], n: 125 },
   2.5:  { win: [1.09, 1.12, 1.15], draw: [8.85, 9.72, 11.32], dog: [15.71, 20.12, 26.43], n: 88 },
 };
+// 让球线 |line| → 历史"热门(让球方)不胜率"(被逼平或被翻盘的真实频次;12458场7季真实赛果实测)。
+//   = 历史同档爆冷率:过去在该让球线上,给球热门最终没赢的比例。越高=该档历史越易冷(让得越少越易冷)。
+//   ✅真实赛果频次(scripts/build-odds-reference-bands 同源,favorite=给球方,line=0用收盘概率定向)。
+const LINE_UPSET_RATE = {
+  0: 0.608, 0.25: 0.568, 0.5: 0.514, 0.75: 0.425, 1: 0.360,
+  1.25: 0.301, 1.5: 0.251, 1.75: 0.242, 2: 0.203, 2.25: 0.200, 2.5: 0.114,
+};
 // 大小球:收盘大球隐含分档 → over/under 十进制 [P5,中,P95] / under中位(12458场实测)。
 const OU_DECIMAL_BANDS = [
   { lo: 0.35, hi: 0.45, over: [2.13, 2.28, 2.64], underMid: 1.63, n: 2521 },
@@ -52,10 +59,11 @@ const OU_DECIMAL_BANDS = [
 export function handicapReferenceRows() {
   const pct = (x) => `${(x * 100).toFixed(0)}%`;
   const rg = (a) => `${a[0]}–${a[2]}(中${a[1]})`;
-  const rows = [["让球线", "热门胜率正常区间(P5–P95)", "热门胜赔", "平赔", "客(冷)赔", "样本N"]];
+  const rows = [["让球线", "热门胜率正常区间(P5–P95)", "热门胜赔", "平赔", "客(冷)赔", "历史不胜率(爆冷)", "样本N"]];
   for (const k of Object.keys(LINE_DECIMAL_BANDS).map(Number).sort((a, b) => a - b)) {
     const d = LINE_DECIMAL_BANDS[k], f = LINE_FAV_BANDS[k];
-    rows.push([k === 0 ? "平手" : "让" + k, f ? `${pct(f.p5)}–${pct(f.p95)}(中${pct(f.p50)})` : "—", rg(d.win), rg(d.draw), rg(d.dog), d.n]);
+    const ur = LINE_UPSET_RATE[k];
+    rows.push([k === 0 ? "平手" : "让" + k, f ? `${pct(f.p5)}–${pct(f.p95)}(中${pct(f.p50)})` : "—", rg(d.win), rg(d.draw), rg(d.dog), ur != null ? pct(ur) : "—", d.n]);
   }
   return rows;
 }
@@ -92,6 +100,14 @@ export function handicapSanity({ ahLine, p1x2Fav } = {}) {
   if (p < band.p5) { verdict = "过深"; gapPp = round1((band.p5 - p) * 100); exceeded = true; }
   else if (p > band.p95) { verdict = "过浅"; gapPp = round1((p - band.p95) * 100); exceeded = true; }
   return { line, favProb: round(p), depth, refLine: key, band, verdict, gapPp, exceeded };
+}
+
+/** 历史同档爆冷率:给球热门在该让球线上的真实"不胜"频次(12458场实测)。无该档样本→null,不编。 */
+export function histUpsetRate(ahLine) {
+  const line = Number(ahLine);
+  if (!Number.isFinite(line)) return null;
+  const key = nearestLineKey(Math.abs(line));
+  return key == null ? null : (LINE_UPSET_RATE[key] ?? null);
 }
 
 /** 人读一行:本场值 vs 区间 + 超临界多少。 */

@@ -49,7 +49,9 @@ import { loadAdvancedData } from "../src/advanced-data-store.js";
 import { loadNationalResults, recentForm } from "../src/wc-national-form.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
 import { buildMatchIntel } from "../src/match-intel.js";
-import { handicapSanity } from "../src/handicap-sanity.js";
+import { handicapSanity, histUpsetRate } from "../src/handicap-sanity.js";
+import { formationPosture } from "../src/lineup-source.js";
+import { teamGroupOf } from "../src/world-cup-priors.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(缺陷#20:绝不再默认写死历史日期)。
 let date;
@@ -434,6 +436,17 @@ const rows = games.map((p, i) => {
     // 热门胜率来源:有1X2盘口=盘口de-vig(真盘口合理性);1X2未开售(悬殊盘只卖让球)=模型prob,标🔶仅参考不冒充盘口
     favProbSource: s.europeanOdds?.current ? "盘口" : "模型(1X2未开售)",
     notWinPct: p.upsetDiagnosis?.baseUpsetProb != null ? Math.round(p.upsetDiagnosis.baseUpsetProb * 100) : null,
+    // 实力差Elo(✅世界杯模型 national-elo;非WC无):正=主强。worldCupMatchPrior 真实先验,缺则wcModel。
+    eloDiff: prior?.eloDiff ?? p.wcModel?.elo?.diff ?? null,
+    // 平局隐含%(✅500欧赔de-vig真盘口;1X2未开售→null不编):爆冷头号路径=被逼平,平局隐含越高越要防平。
+    drawImpliedPct: (() => {
+      const eo = s.europeanOdds?.current; if (!eo) return null;
+      const h = Number(eo.home), d = Number(eo.draw), a = Number(eo.away);
+      if (!(h > 1 && d > 1 && a > 1)) return null;
+      const inv = 1 / h + 1 / d + 1 / a; return Math.round((1 / d) / inv * 1000) / 1000;
+    })(),
+    // 历史同档爆冷率(✅12458场五大联赛真实赛果:该让球线上给球热门"不胜"频次):跨场可比的爆冷基线锚。
+    histLineUpset: histUpsetRate(s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line),
     upsetData: p.upsetScenario ?? null,
     // 若爆冷比分优先用500真盘平局格(✅·非模型0-0),无500盘才退模型矩阵(用户裁决:拿真盘说话)
     upsetMarketDraw: (() => {
@@ -477,12 +490,48 @@ const intelLineupSummary = (side) => {
   const names = side.xi.slice(0, 5).map((p) => p.name).join("、");
   return `${side.tag}${side.status}${side.formation ? ` ${side.formation}` : ""}:${names}${side.xi.length > 5 ? `…等${side.xi.length}人` : ""}`;
 };
+// ── 世界杯真实情报派生(2026-06-16 情报网增强):媒体缓存缺时,用世界杯模型已采集的真实数据补
+//    「场地·天气」(p.wcModel.venue=赛历场馆+Open-Meteo真实预报)、「球队风格·关键球员·主帅」
+//    (coach=真实主帅 + pred=近期真实首发频次聚合的阵型/常用主力)、「小组形势」(groups.json 真实分组+阶段)。
+//    媒体缓存(✅)若有则优先,派生(🔶)只补空缺;缺即标缺不编(守 feedback_no_fabrication)。 ──
+const deriveWcWeb = (p, pred) => {
+  const wm = p.wcModel; if (!wm) return null;
+  const v = wm.venue;
+  const venue = v ? [v.city, v.stadium, v.altitude_m ? `海拔${v.altitude_m}m` : null, v.temp != null ? `均温${v.temp}℃` : null, v.indoor ? "室内控温" : "露天"].filter(Boolean).join("·") + " 🔶WC赛历场馆+Open-Meteo真实预报" : null;
+  const ch = wm.coach;
+  const coachPart = (ch && (ch.home || ch.away)) ? `主帅 ${p.fixture.homeTeam}:${ch.home ?? "⚠️缺"} / ${p.fixture.awayTeam}:${ch.away ?? "⚠️缺"}` : null;
+  const styleSide = (predSide) => {
+    if (!predSide) return null;
+    const f = predSide.formation; const post = f ? formationPosture(f) : null;
+    const desc = post ? (post.attacking ? "压上" : post.defensive ? "低位防守" : "均衡") : null;
+    const keys = (predSide.xi ?? []).slice(0, 4).map((x) => x.name).filter(Boolean).join("、");
+    const parts = [];
+    if (f) parts.push(`${f}${desc ? "·" + desc : ""}`);
+    if (keys) parts.push(`常用主力 ${keys}`);
+    return parts.length ? parts.join(" ") : null;
+  };
+  const sh = styleSide(pred?.home), sa = styleSide(pred?.away);
+  const stylePart = (sh || sa) ? `阵型/球队风格(🔶近期真实首发聚合) 主:${sh ?? "⚠️缺"} ║ 客:${sa ?? "⚠️缺"}` : null;
+  const style = [coachPart, stylePart].filter(Boolean).join("\n") || null;
+  const gh = teamGroupOf(p.fixture.homeTeam), ga = teamGroupOf(p.fixture.awayTeam);
+  const stage = wm.stage ?? null;
+  const groupBody = (gh && gh === ga) ? `同${gh}组` : (gh || ga) ? `${p.fixture.homeTeam}${gh ?? "?"}组/${p.fixture.awayTeam}${ga ?? "?"}组` : null;
+  const group = (gh || ga || stage) ? [stage ? `阶段:${stage}` : null, groupBody].filter(Boolean).join(" · ") + " 🔶groups.json真实分组" : null;
+  return { venue, style, group };
+};
 const intelByMatch = {};
 for (const p of games) {
   const key = `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`;
   const pkey = `${p.fixture.homeTeam}|${p.fixture.awayTeam}`;
   const pred = predictedXi?.predicted?.[pkey] ?? null;
-  const web = webIntel?.matches?.[pkey] ?? null;
+  const web0 = webIntel?.matches?.[pkey] ?? null;
+  const wcWeb = deriveWcWeb(p, pred);
+  // 媒体缓存(✅)优先,WC派生(🔶)只补 venue/style/group 空缺;其余字段(h2h/odds/injuries/sources)保持媒体源
+  const web = (web0 || wcWeb) ? (() => {
+    const base = { ...(web0 || {}) };
+    if (wcWeb) { if (base.venue == null) base.venue = wcWeb.venue; if (base.style == null) base.style = wcWeb.style; if (base.group == null) base.group = wcWeb.group; }
+    return base;
+  })() : null;
   intelByMatch[key] = buildMatchIntel({
     fixture: p.fixture,
     lineupSide: layerFor("lineups", p.fixture.id),
