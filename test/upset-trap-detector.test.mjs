@@ -76,21 +76,46 @@ describe("爆冷风险 + 诱盘识别(upset-trap-detector)", () => {
       assert.equal(r.band, "低");
       assert.equal(r.grindDivergence, false);
     });
-    it("★西班牙vs佛得角:1X2笃定(88%本应判低)但浅让球(-2.5)+低大小球(3.5)→背离升档到中", () => {
+    it("★西班牙vs佛得角:真区分点=大小球线低(3.5),非线深浅→深热门闷局→中", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.88, ahLine: -2.5, totalsLine: 3.5, pOver25: 0.74 });
-      assert.equal(r.grindDivergence, true, "必须检出盘口背离");
-      assert.equal(r.band, "中", "背离把1X2表象的低风险升到中");
-      assert.match(r.reason, /闷局|背离|逼平/);
+      assert.equal(r.grindDivergence, true, "深热门+大小球线低=闷局风险");
+      assert.equal(r.band, "中", "靠大小球线低升档到中");
+      assert.match(r.reason, /闷局|大小球线低|逼平/);
+    });
+    it("深浅以同1X2实力档中位线为基准:86%热门基准2.5,开-2.5=同类正常(纠正旧绝对阈)", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.86, ahLine: -2.5, totalsLine: 4.0 });
+      assert.equal(r.lineDepth, "同类正常");
+    });
+    it("94%热门基准2.75,开-2.5=踩'浅于同类'临界(残差-0.25,西班牙原型)", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.94, ahLine: -2.5, totalsLine: 4.0 });
+      assert.equal(r.lineDepth, "浅于同类");
+    });
+    it("德国-3.5对91%热门=深于同类(基准2.75),市场敢加码", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.91, ahLine: -3.5, totalsLine: 4.5 });
+      assert.equal(r.lineDepth, "深于同类(市场敢加码)");
     });
     it("比利时vs埃及:1X2本身只60%→不胜40%→高", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.60, ahLine: -0.5, totalsLine: 2.5 });
       assert.equal(r.band, "高");
     });
-    it("热门大幅退烧把'低'提到'中'", () => {
-      const r = diagnoseUpsetRisk({ p1x2Fav: 0.90, ahLine: -3.5, totalsLine: 4.5, favDrift: -0.08 });
+    it("平局隐含≥30%=最干净平局信号→升档到中(校准31.5%)", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.72, ahLine: -1.5, totalsLine: 2.5, drawImplied: 0.31 });
       assert.equal(r.band, "中");
+      assert.match(r.reason, /平局隐含/);
     });
-    it("恒带诚实 caveat(只上调风险·非必爆·不自动弃赛)", () => {
+    it("分型 upsetType:超大热(≥78%)+高球(≥56%)→🟢无风险可胆", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.82, ahLine: -2.5, totalsLine: 4, pOver25: 0.62 });
+      assert.match(r.upsetType, /无风险/);
+    });
+    it("分型 upsetType:强热(66~82%)+低球(<48%)→🟡易爆冷平", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.70, ahLine: -1.5, totalsLine: 2.5, pOver25: 0.44 });
+      assert.match(r.upsetType, /易爆冷平/);
+    });
+    it("分型 upsetType:势均(不胜≥42%)→🔴双向爆冷", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.55, ahLine: -0.5, totalsLine: 2.5, pOver25: 0.5 });
+      assert.match(r.upsetType, /双向爆冷/);
+    });
+    it("恒带诚实 caveat(非必爆·不自动弃赛)", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.88, ahLine: -2.5, totalsLine: 3.5 });
       assert.ok(r.caveat && /非必爆|不自动弃赛/.test(r.caveat));
     });

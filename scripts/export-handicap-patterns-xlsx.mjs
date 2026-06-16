@@ -19,9 +19,11 @@ function feat(m) {
   const lineC = Number(m.asian.lineClose ?? m.asian.line);
   const ovO = m.overProb, ovC = m.overProbClose;
   return {
-    league: m.league, result, favSide, ahDepthC: Math.abs(lineC),
+    league: m.league, result, favSide, pFav: oc[favSide], ahDepthC: Math.abs(lineC),
     ovC, overMove: (Number.isFinite(ovC) && Number.isFinite(ovO)) ? ovC - ovO : null,
-    favUpset: result !== favSide, favDrew: result === "draw", over25: (hg + ag) > 2.5,
+    favUpset: result !== favSide, favDrew: result === "draw",
+    favWin: result === favSide, favLost: result !== favSide && result !== "draw",
+    over25: (hg + ag) > 2.5,
   };
 }
 const F = matches.map(feat).filter(Boolean);
@@ -80,9 +82,32 @@ const s5 = [["触发条件(读盘口即可判)", "历史命中", "玩法指引",
 ["意甲/西甲场", "平局26-27%·大球仅47-49%", "偏小球/防平", "联赛风格代理球队特点"],
 ["德甲/英超场", "大球57-61%", "偏大球", "同上"]];
 
+// Sheet6 爆冷出平vs出负(大小球分水岭 + 强度决定平负)
+const s6 = [["维度", "分档", "样本N", "热门胜", "平", "热门负", "解读"]];
+for (const [lab, lo, hi, tag] of [["大小球", 0, 0.40, "铁闷→出平"], ["大小球", 0.40, 0.48, "低球→出平"], ["大小球", 0.48, 0.56, "中"], ["大小球", 0.56, 0.64, "偏稳"], ["大小球", 0.64, 1.01, "对攻→热门最稳"]]) {
+  const g = F.filter(x => x.ovC != null && x.ovC >= lo && x.ovC < hi); if (g.length < 30) continue;
+  s6.push([lab, `${(lo * 100).toFixed(0)}~${(hi * 100).toFixed(0)}%`, g.length, PC(rate(g, x => x.favWin).p), PC(rate(g, x => x.favDrew).p), PC(rate(g, x => x.favLost).p), tag]);
+}
+for (const [lab, lo, hi] of [["1X2势均", 0.50, 0.58], ["1X2中热", 0.58, 0.66], ["1X2强热", 0.66, 0.74], ["1X2大热", 0.74, 0.82], ["1X2超大热", 0.82, 1.01]]) {
+  const g = F.filter(x => x.pFav >= lo && x.pFav < hi); if (g.length < 30) continue;
+  const ups = g.filter(x => !x.favWin); const ds = ups.length ? rate(ups, x => x.favDrew).p : 0;
+  s6.push([lab, `${(lo * 100).toFixed(0)}~${(hi * 100).toFixed(0)}%`, g.length, PC(rate(g, x => x.favWin).p), PC(rate(g, x => x.favDrew).p), PC(rate(g, x => x.favLost).p), `爆冷里平占比${PC(ds)}`]);
+}
+
+// Sheet7 分型临界值标准(可触发)
+const s7 = [["分型", "临界条件(读盘口即可判)", "实证命中", "玩法指引"],
+["🟢无风险(可胆)", "1X2≥78% + 大小球线≥4(真高球) + 让球线≥同类中位", "热门胜≈85%(德国7-1型)", "可当胆·可打深让球"],
+["🟢可胆(次)", "强热66~78% × 大小球中高(≥48%)", "热门胜72~78%", "可主推·谨慎当胆"],
+["🟡易爆冷平", "强/大热66~82% + 大小球线≤3.5(闷局·西班牙0-0型)", "平30%+·强队啃不开铁桶", "防平·勿当胆·勿打深让球·考虑双选含平"],
+["🟡易爆冷平", "平局隐含≥30%", "实际平局31.5%(最干净信号)", "同上"],
+["🔴双向爆冷", "1X2势均50~58%(荷兰/瑞典型)", "爆冷54%·负占45%", "平负都可能·绝不当胆"],
+["——深浅标准——", "本场亚盘线 vs 同1X2实力档中位线:残差≤-0.25=浅·≥+0.25=深", "基准表见①", "浅≠绝对值小,是比同类浅"],
+["——诱盘——", "公众加注热门+锐盘不跟", "实证无edge:加注热门照样55%胜≈基线", "❌别靠'识诱盘'反买(市场高效)"]];
+
 const sheets = [
   { name: "①亚盘线基线", rows: s1 }, { name: "②走势=噪声(诚实排除)", rows: s2 },
   { name: "③大小球走势(真edge)", rows: s3 }, { name: "④联赛风格", rows: s4 }, { name: "⑤可执行触发条件", rows: s5 },
+  { name: "⑥爆冷出平vs出负", rows: s6 }, { name: "⑦分型临界值标准", rows: s7 },
 ];
 const date = new Date().toISOString().slice(0, 10);
 const dir = join(process.env.USERPROFILE || "C:/Users/Administrator", "Desktop", "足球推荐", date);
@@ -97,7 +122,14 @@ const baselines = {
   ahLineBaseline: s1.slice(1).map(r => ({ line: r[0], n: r[1], upset: r[2], draw: r[3], over: r[4] })),
   totalsMovementTrigger: { steamOverRate: 0.63, drainOverRate: 0.44, baseOver: Number(baseOver.toFixed(3)), threshold: 0.04, z: 4.4 },
   leagueStyle: s4.slice(1).map(r => ({ league: r[0], draw: r[2], over: r[3], style: r[5] })),
-  ruledOutAsNoise: ["欧赔热门加注/退烧→爆冷", "亚盘线加深/退浅→爆冷", "Pinnacle背离(样本不足)"],
+  upsetTypology: {
+    深浅标准: "本场亚盘线 vs 同1X2实力档中位线;残差≤-0.25=浅·≥+0.25=深",
+    易爆冷平: "大小球线≤3.5(或大球概率<48%) + 1X2强热66~82%",
+    双向爆冷: "1X2势均50~58%(爆冷54%·负占45%)",
+    无风险可胆: "1X2≥78% + 大小球线≥4 + 让球线≥同类中位(胜≈85%)",
+    诱盘: "公众加注+锐盘不跟——实证无edge(加注热门照样55%胜≈基线),不作反买依据",
+  },
+  ruledOutAsNoise: ["欧赔热门加注/退烧→爆冷", "亚盘线加深/退浅→爆冷", "受让方水位移动→爆冷", "诱盘(公众加注锐盘不跟)→underperform", "Pinnacle背离(样本不足)"],
   freeDataGaps: ["阵容(历史批量)", "战意/排名情境(历史批量)", "球员特点", "国家队xG(FBref Cloudflare墙)"],
 };
 const jpath = join("D:/football-model-data", "handicap-pattern-baselines.json");
