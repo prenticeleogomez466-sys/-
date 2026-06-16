@@ -5,7 +5,7 @@
 // 缺即标缺:ESPN 不覆盖/无足够历史首发样本的队 → 该队 predicted=null,展示层标 ⚠️(不硬凑)。
 //
 // 用法:node scripts/sync-predicted-lineups.mjs [YYYY-MM-DD]  (缺省=本机 UTC+8 当日业务日)
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import "../src/env.js";
 import { getDataSubdir } from "../src/paths.js";
@@ -116,8 +116,10 @@ async function main() {
       events = sb?.events || [];
       sbCache.set(sck, events);
     }
+    const mkey = `${fx.homeTeam}|${fx.awayTeam}`;
     const m = matchFixtureToEvent(fx, events);
-    if (!m) continue;
+    // ESPN 未匹配到该场(冷门队/赛程缺)→ 仍登记键(null侧),供下方媒体 override 兜底填,不直接丢场。
+    if (!m) { if (!out[mkey]) out[mkey] = { home: null, away: null }; continue; }
     resolved += 1;
     const homeId = m.swapped ? m.awayId : m.homeId;
     const awayId = m.swapped ? m.homeId : m.awayId;
@@ -131,24 +133,49 @@ async function main() {
     ]);
     if (ph) teamsWith += 1;
     if (pa) teamsWith += 1;
-    out[`${fx.homeTeam}|${fx.awayTeam}`] = { home: ph, away: pa };
+    out[mkey] = { home: ph, away: pa };
   }
 
   const dir = getDataSubdir("intel");
   mkdirSync(dir, { recursive: true });
+
+  // ── 媒体源 fallback 自动合并(2026-06-16 用户:ESPN首发样本不足≠真墙,穷尽媒体源)──
+  //   ESPN 历史首发<2场的队 → 用 intel/predicted-xi-override.json(媒体核录·Sports Mole/Goal/FotMob,
+  //   逐条带 source·🔶非官方·赛前1h官方阵容出即转✅)自动填,每次 sync 自动合并、不破坏 ESPN 主源。
+  //   ⚠诚实:实测 Sports Mole 可抓但 XI 解析脆、FotMob API 被墙——cron 内硬 scrape 会吐垃圾(违不编造),
+  //   故 robust 路径=override 文件(只放媒体核实过的干净11人·绝不半截/猜),sync 自动合并=可靠自动化。
+  let mediaFilled = 0;
+  const ovPath = join(dir, "predicted-xi-override.json");
+  if (existsSync(ovPath)) {
+    try {
+      const ov = JSON.parse(readFileSync(ovPath, "utf8"));
+      const teams = ov.teams || {};
+      const norm = (s) => String(s ?? "").trim();
+      const toSide = (entry) => {
+        if (!entry || !Array.isArray(entry.xi) || entry.xi.length < 7) return null; // <7 人=半截,不收(不编造)
+        return { xi: entry.xi.map((p) => (typeof p === "string" ? { name: p, starts: null, position: "?" } : { name: p.name, starts: null, position: p.position ?? "?" })), formation: entry.formation ?? null, source: entry.source ?? "媒体核录(🔶非官方)", status: "预测首发", mediaProjected: true };
+      };
+      for (const [key, val] of Object.entries(out)) {
+        const [h, a] = key.split("|");
+        if (!val.home && teams[norm(h)]) { const s = toSide(teams[norm(h)]); if (s) { val.home = s; mediaFilled++; } }
+        if (!val.away && teams[norm(a)]) { const s = toSide(teams[norm(a)]); if (s) { val.away = s; mediaFilled++; } }
+      }
+    } catch (e) { console.warn("⚠ override 合并跳过(文件坏):", e.message); }
+  }
   const path = join(dir, `predicted-lineups-${date}.json`);
   const payload = {
     date,
     generatedAt: new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "short" }).format(new Date()),
-    source: "ESPN summary rosters(近期真实首发频次聚合,🔶预测·非官方)",
+    source: "ESPN summary rosters(近期真实首发频次聚合,🔶预测·非官方)+ 媒体override fallback(Sports Mole/Goal/FotMob核录·🔶非官方)",
     recentMatches: RECENT,
     fixturesResolved: resolved,
-    teamsWithPrediction: teamsWith,
+    teamsWithPrediction: teamsWith + mediaFilled,
+    mediaFallbackFilled: mediaFilled,
     predicted: out,
   };
   writeFileSync(path, JSON.stringify(payload, null, 1), "utf8");
   console.log(`✅ 预测首发缓存:${path}`);
-  console.log(`   ESPN解析场次=${resolved} · 出预测首发的队=${teamsWith}(覆盖有限属正常:ESPN不收的联赛/历史首发<2场的队标缺)`);
+  console.log(`   ESPN解析场次=${resolved} · ESPN出预测队=${teamsWith} · 媒体override补=${mediaFilled}(穷尽媒体源·标🔶来源);仍缺=真墙(标⚠️不编)`);
 }
 
 // 仅在直接运行时执行采集;被 import(如守护测试)时不触发,避免误打 ESPN/覆盖缓存。

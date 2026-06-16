@@ -211,18 +211,34 @@ export function synthesizeScenario(prediction) {
   return { headline, dims, marketGuidance: buildMarketGuidance(dims), upsetScenario: buildUpsetScenarioNote(prediction, dims.upset) };
 }
 
-/** 爆冷场景(2026-06-16 用户:检到爆冷必给"若爆冷→具体比分/半全场/大小球"·拿真盘说话)。
- *  只在爆冷风险中/高时渲染;全读 prediction.upsetScenario(wc-match-model 从真矩阵/真半全场分布派生),零编造。 */
+/** 爆冷研判+防法(2026-06-16 用户:不是假设爆冷,是据现有数据情报推演"有没有可能爆冷·多大",
+ *  并给"一旦爆冷怎么防")。只在爆冷风险中/高时渲染;数字全读 prediction.upsetScenario(wc-match-model
+ *  从真矩阵/真半全场分布派生·🔶模型非500真盘) + upsetDim(盘口不胜概率),零编造。 */
 function buildUpsetScenarioNote(prediction, upsetDimVal) {
   const us = prediction?.upsetScenario;
-  if (!us) return null;
-  if (!/高|中/.test(String(upsetDimVal?.band ?? ""))) return null; // 低风险不渲染(避噪声)
-  const bits = [];
-  if (us.drawScore && us.drawScoreProb != null) bits.push(`被逼平最可能 ${us.drawScore}(${Math.round(us.drawScoreProb * 100)}%)`);
-  if (us.drawHalfFull != null) bits.push(`半全场平局-平局 ${Math.round(us.drawHalfFull * 100)}%`);
-  if (us.reverseScore && us.reverseScoreProb != null) bits.push(`被翻盘最可能 ${us.reverseScore}(${Math.round(us.reverseScoreProb * 100)}%)`);
-  if (us.goalsLean) bits.push(`大小球倾向${us.goalsLean}`);
-  return bits.length ? `若爆冷(热门不胜·🔶模型矩阵派生·非500真盘):${bits.join(" · ")}——防平为主,勿单押热门当胆` : null;
+  const band = String(upsetDimVal?.band ?? "");
+  if (!us || !/高|中/.test(band)) return null; // 低风险不渲染(避噪声)
+  const notWin = Number.isFinite(upsetDimVal?.risk) ? Math.round(upsetDimVal.risk * 100) : null;
+  // ① 推演:可能性 + 依据(据真实数据/情报,不是假设)
+  const why = [];
+  if (Number(us.drawProb) >= 0.22) why.push(`平局概率${Math.round(us.drawProb * 100)}%`);
+  if (us.goalsLean && /小球/.test(us.goalsLean)) why.push("市场预期低进球闷局(强队易啃不开)");
+  if (prediction?.upsetDiagnosis?.lineDepth === "浅于同类") why.push("让球线比同实力档浅(市场不敢深让)");
+  const elevated = String(prediction?.upsetDiagnosis?.upsetType ?? "");
+  if (/双向/.test(elevated)) why.push("势均(可平可负·双向风险)");
+  const judge = `爆冷可能性${band.replace(/[⚠\s]/g, "")}${notWin != null ? `·热门不胜≈${notWin}%` : ""}${why.length ? `(依据:${why.join("、")})` : ""}`;
+  // ② 一旦爆冷最可能的样子(真派生)
+  const shape = [];
+  if (us.drawScore && us.drawScoreProb != null) shape.push(`被逼平→${us.drawScore}(${Math.round(us.drawScoreProb * 100)}%)`);
+  if (us.drawHalfFull != null) shape.push(`半全场平-平${Math.round(us.drawHalfFull * 100)}%`);
+  if (us.reverseScore && us.reverseScoreProb != null) shape.push(`或被翻盘→${us.reverseScore}(${Math.round(us.reverseScoreProb * 100)}%)`);
+  // ③ 怎么防(可操作对冲)
+  const guard = ["胜负平改双选含平", "勿单押热门当胆"];
+  if (us.drawScore) guard.push(`比分多选加平局格 ${us.drawScore}`);
+  if (us.drawHalfFull != null) guard.push("半全场加 平-平");
+  if (us.goalsLean && /小球/.test(us.goalsLean)) guard.push("总进球别追大(闷平偏小)");
+  guard.push("深让球(让-2/更深)减注或不打", "串关排除本场");
+  return `${judge}｜若爆冷最可能(🔶模型派生):${shape.join("·")}｜防法:${guard.join("·")}`;
 }
 
 /** 把情景研判拼成一段挂进 narrative 的文本(供 xlsx 选择理由列展示)。 */
