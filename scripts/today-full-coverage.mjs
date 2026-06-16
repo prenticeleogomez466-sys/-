@@ -431,8 +431,19 @@ const rows = games.map((p, i) => {
     // 盘口合理性(独立「盘口合理性」sheet):亚盘线 vs 同实力档历史区间(12458场)→ 深浅+超临界多少
     sanity: handicapSanity({ ahLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line, p1x2Fav: p.upsetDiagnosis?.favWinProb }),
     ahLineEspn: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null,
+    // 热门胜率来源:有1X2盘口=盘口de-vig(真盘口合理性);1X2未开售(悬殊盘只卖让球)=模型prob,标🔶仅参考不冒充盘口
+    favProbSource: s.europeanOdds?.current ? "盘口" : "模型(1X2未开售)",
     notWinPct: p.upsetDiagnosis?.baseUpsetProb != null ? Math.round(p.upsetDiagnosis.baseUpsetProb * 100) : null,
     upsetData: p.upsetScenario ?? null,
+    // 若爆冷比分优先用500真盘平局格(✅·非模型0-0),无500盘才退模型矩阵(用户裁决:拿真盘说话)
+    upsetMarketDraw: (() => {
+      const so = s.scoreOdds?.top; if (!Array.isArray(so) || !so.length) return null;
+      const dv = so.map((x) => ({ sc: x.score ?? x.label, od: Number(x.odds) })).filter((x) => x.sc && x.od > 1);
+      if (!dv.length) return null;
+      const sum = dv.reduce((a, b) => a + 1 / b.od, 0);
+      const draws = dv.map((x) => ({ sc: x.sc, p: (1 / x.od) / sum })).filter((x) => { const m = String(x.sc).match(/^(\d+)-(\d+)$/); return m && m[1] === m[2]; }).sort((a, b) => b.p - a.p);
+      return draws[0] ? { score: draws[0].sc, prob: draws[0].p } : null;
+    })(),
     // 平局画像(2026-06-10 审计rank13:读现成 scenario.dims.draw / experienceContext 字段,不重算;
     //   世界杯场 experienceContext 落全局经验26%不报警,scenario 情景层才有本场平局维度)
     drawRate: p.scenario?.dims?.draw?.prob ?? p.experienceContext?.historicalDrawRate ?? null,

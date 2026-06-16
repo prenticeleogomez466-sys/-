@@ -524,17 +524,21 @@ export function buildDecisionAidsSheet({ date, rows }) {
 //   标准=12458场五大联赛(7季)亚盘线↔1X2热门隐含历史分位;本场落 P5..P95 内=合理,<P5过深·>P95过浅。
 export function buildHandicapSanitySheet({ date, rows }) {
   const banner = `📐 盘口合理性 · ${date} · 标准=12458场五大联赛(7季)历史区间;本场热门隐含落 P5–P95=合理,低于P5=过深(让太多/热门被高估),高于P95=过浅(让太少/热门更强)。✅历史频次,供你自行判断,非下注edge。`;
-  const header = ["对阵", "亚盘线", "本场热门胜率", "该线历史正常区间(P5–P95·中位)", "落点判定", "超临界多少", "解读"];
+  const header = ["对阵", "亚盘线", "本场热门胜率(来源)", "该线历史正常区间(P5–P95·中位)", "落点判定", "超临界多少", "解读"];
   const body = rows.map((r) => {
     const s = r.sanity;
+    const isModel = /模型/.test(String(r.favProbSource ?? ""));
     if (!s) return [r.match, r.ahLineEspn ?? "—", "—", "—", "⚠️无亚盘线或1X2隐含", "—", "缺数据不判(不编)"];
     const pc = (x) => x == null ? "—" : (x * 100).toFixed(1) + "%";
-    if (!s.band) return [r.match, s.line, pc(s.favProb), "无该线≥30样本", s.verdict, "—", "该让球线历史样本不足,不硬套"];
+    const probCell = `${pc(s.favProb)}${isModel ? "·🔶模型(1X2未开售)" : "·✅盘口"}`;
+    if (!s.band) return [r.match, s.line, probCell, "无该线≥30样本", s.verdict, "—", "该让球线历史样本不足,不硬套"];
     const range = `${pc(s.band.p5)}–${pc(s.band.p95)}(中${pc(s.band.p50)})·N=${s.band.n}`;
-    const verdict = s.verdict === "合理" ? "🟢合理(区间内)" : s.verdict === "过深" ? "🔴过深(低于P5)" : "🔴过浅(高于P95)";
+    const verdict = (isModel ? "🔶仅参考·" : "") + (s.verdict === "合理" ? "🟢合理(区间内)" : s.verdict === "过深" ? "🔴过深(低于P5)" : "🔴过浅(高于P95)");
     const gap = s.exceeded ? `${s.verdict === "过深" ? "低于下限" : "高于上限"} ${s.gapPp}pp` : "区间内·0";
-    const read = s.verdict === "合理" ? "盘口与历史同线常态一致" : s.verdict === "过深" ? "让球比同强度该有的深→受让方/爆冷有值" : "让球比该有的浅→热门实际更强·受让方过盘易";
-    return [r.match, s.line, pc(s.favProb), range, verdict, gap, read];
+    const read = isModel
+      ? "⚠️1X2未开售→用模型估非盘口,盘口合理性不适用(只卖让球盘),仅参考"
+      : s.verdict === "合理" ? "盘口与历史同线常态一致" : s.verdict === "过深" ? "让球比同强度该有的深→受让方/爆冷有值" : "让球比该有的浅→热门实际更强·受让方过盘易";
+    return [r.match, s.line, probCell, range, verdict, gap, read];
   });
   const tail = [[""], ["参考·其它让球线正常热门胜率区间(P5–P95)", "让0.5=46–52% · 让1=58–65% · 让1.5=69–75% · 让2=77–82%(详见「盘口标准区间」xlsx)"]];
   return { name: "盘口合理性", rows: [[banner], header, ...body, ...tail] };
@@ -555,17 +559,23 @@ export function buildUpsetAnalysisSheet({ date, rows }) {
     if (us) {
       const pc = (x) => x == null ? "" : Math.round(x * 100) + "%";
       const parts = [];
-      if (us.drawScore && us.drawScoreProb != null) parts.push(`被逼平 ${us.drawScore}(${pc(us.drawScoreProb)})`);
+      // 被逼平比分:优先500真盘平局格(✅),无则模型矩阵(🔶)——用户:拿真盘说话
+      const md = r.upsetMarketDraw;
+      if (md?.score) parts.push(`被逼平 ${md.score}(${pc(md.prob)}·✅500真盘)`);
+      else if (us.drawScore && us.drawScoreProb != null) parts.push(`被逼平 ${us.drawScore}(${pc(us.drawScoreProb)}·🔶模型)`);
       if (us.drawHalfFull != null) parts.push(`半全场平-平 ${pc(us.drawHalfFull)}`);
-      if (us.reverseScore && us.reverseScoreProb != null) parts.push(`或被翻盘 ${us.reverseScore}(${pc(us.reverseScoreProb)})`);
+      if (us.reverseScore && us.reverseScoreProb != null) parts.push(`或被翻盘 ${us.reverseScore}(${pc(us.reverseScoreProb)}·🔶模型)`);
       if (us.goalsLean) parts.push(`大小球倾向${us.goalsLean}`);
       shape = parts.join(" · ") || "—";
     }
+    const drawGrid = r.upsetMarketDraw?.score ?? us?.drawScore;
     const guard = nw >= 25
-      ? "别当胆·胜负平双选含平" + (us?.drawScore ? `·比分加平局格${us.drawScore}` : "") + "·半全场加平-平·深让球减注·串关排除"
+      ? "别当胆·胜负平双选含平" + (drawGrid ? `·比分加平局格${drawGrid}` : "") + "·半全场加平-平·深让球减注·串关排除"
       : (s?.verdict === "过浅" ? "1X2难爆冷但盘口过浅→受让方过盘易·别买热门深让当胆" : "相对稳·按盘口控注");
     const rankTag = i === 0 ? "1·最可能" : i === ranked.length - 1 ? `${i + 1}·最稳` : String(i + 1);
-    return [rankTag, r.match, nw >= 0 ? nw + "%" : "—", depth, shape, guard];
+    const isModel = /模型/.test(String(r.favProbSource ?? ""));
+    const nwCell = nw >= 0 ? `${nw}%${isModel ? "·🔶模型(1X2未开售)" : "·✅盘口"}` : "—";
+    return [rankTag, r.match, nwCell, depth, shape, guard];
   });
   return { name: "爆冷研判", rows: [[banner], header, ...body] };
 }
