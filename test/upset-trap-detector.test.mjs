@@ -86,11 +86,11 @@ describe("爆冷风险 + 诱盘识别(upset-trap-detector)", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.86, ahLine: -2.5, totalsLine: 4.0 });
       assert.equal(r.lineDepth, "同类正常");
     });
-    it("94%热门基准2.75,开-2.5=踩'浅于同类'临界(残差-0.25,西班牙原型)", () => {
+    it("≥90%档不外推:基准用最后可靠档2.5(90%+仅N=3,对抗审计抓出原2.75是编造已删)→94%开-2.5=同类正常", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.94, ahLine: -2.5, totalsLine: 4.0 });
-      assert.equal(r.lineDepth, "浅于同类");
+      assert.equal(r.lineDepth, "同类正常");
     });
-    it("德国-3.5对91%热门=深于同类(基准2.75),市场敢加码", () => {
+    it("德国-3.5对91%热门=深于同类(基准2.5),市场敢加码", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.91, ahLine: -3.5, totalsLine: 4.5 });
       assert.equal(r.lineDepth, "深于同类(市场敢加码)");
     });
@@ -98,21 +98,17 @@ describe("爆冷风险 + 诱盘识别(upset-trap-detector)", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.60, ahLine: -0.5, totalsLine: 2.5 });
       assert.equal(r.band, "高");
     });
-    it("平局隐含≥30%=最干净平局信号→升档到中(校准31.5%)", () => {
-      const r = diagnoseUpsetRisk({ p1x2Fav: 0.72, ahLine: -1.5, totalsLine: 2.5, drawImplied: 0.31 });
-      assert.equal(r.band, "中");
-      assert.match(r.reason, /平局隐含/);
+    it("平局隐含≥30%作信号/原因补充(势均场,band由概率锚定高;非独立升档分支=对抗审计证死代码已删)", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.55, ahLine: -0.5, totalsLine: 2.5, drawImplied: 0.31 });
+      assert.equal(r.band, "高");           // 由 baseUpset 0.45 锚定,非 draw 分支
+      assert.match(r.reason, /平局隐含/);     // 仍作原因补充
     });
     it("分型 upsetType:强热(≥72%)→🟢低风险(OOS胜~78%)", () => {
       const r = diagnoseUpsetRisk({ p1x2Fav: 0.82, ahLine: -2.5, totalsLine: 4, pOver25: 0.62 });
       assert.match(r.upsetType, /低风险/);
     });
-    it("分型 upsetType:平局隐含≥30%→🟡防平(OOS校准31.5%·唯一成立的平局触发)", () => {
-      const r = diagnoseUpsetRisk({ p1x2Fav: 0.55, ahLine: -0.5, totalsLine: 2.5, pOver25: 0.44, drawImplied: 0.31 });
-      assert.match(r.upsetType, /防平|双向爆冷/); // 势均同时满足双向,二者皆为正确高风险标注
-    });
-    it("分型 upsetType:势均(不胜≥42%)→🔴双向爆冷(OOS胜47/平28/负25)", () => {
-      const r = diagnoseUpsetRisk({ p1x2Fav: 0.55, ahLine: -0.5, totalsLine: 2.5, pOver25: 0.5 });
+    it("分型 upsetType:势均(不胜≥42%·含高平局场)→🔴双向爆冷(OOS胜47/平28/负25;防平死代码已删·并入此)", () => {
+      const r = diagnoseUpsetRisk({ p1x2Fav: 0.55, ahLine: -0.5, totalsLine: 2.5, pOver25: 0.5, drawImplied: 0.31 });
       assert.match(r.upsetType, /双向爆冷/);
     });
     it("恒带诚实 caveat(非必爆·不自动弃赛)", () => {

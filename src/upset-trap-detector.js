@@ -162,8 +162,10 @@ function buildReason({ tier, favLabel, favImplied, moveTag, upsetRisk, upsetLeve
 //
 // ── 深浅基准(2026-06-16 细挖 mine-upset-drivers.mjs,8906场五大联赛)──
 //   同 1X2 热门强度档的"典型亚盘线中位",作为判"线深/浅"的客观标准(浅≠绝对值小,而是比同类浅)。
+// 各档样本充足(N≥77)实测中位;≥85% 用 2.5(最后可靠档)——90%+ 仅 N=3 不足以定独立基准,
+// 不外推(2026-06-16 对抗审计抓出原 [0.90,2.75] 是编造,已删)。
 const LINE_BENCHMARK = [
-  [0.50, 0.5], [0.55, 0.75], [0.60, 1.0], [0.65, 1.25], [0.70, 1.5], [0.75, 1.75], [0.80, 2.25], [0.85, 2.5], [0.90, 2.75],
+  [0.50, 0.5], [0.55, 0.75], [0.60, 1.0], [0.65, 1.25], [0.70, 1.5], [0.75, 1.75], [0.80, 2.25], [0.85, 2.5],
 ];
 function benchmarkLine(p) {
   let med = null;
@@ -237,19 +239,19 @@ export function diagnoseUpsetRisk(a = {}) {
     else if (drift > 0.02) signals.push("热门被加注(更热)·注:1X2走势=噪声");
   }
 
-  // ── 分档(只用OOS验证过的:概率锚 + 平局隐含)──
+  // ── 分档(只用OOS验证过的:概率锚)──
+  //   注:平局隐含≥30%(drawSignalHigh)与"势均"几乎等价(平局高必伴fav≤~58%),已被概率锚覆盖,
+  //   不另设升档分支(对抗审计证该分支不可达=死代码,已删);drawSignalHigh 仅作信号/原因补充。
   let band;
   if (baseUpsetProb >= 0.35) band = "高";                        // 1X2 本身就不稳(如比利时36%)
   else if (baseUpsetProb >= 0.25) band = "中";                   // 中等热门(如乌拉圭28%)
-  else if (drawSignalHigh) band = "中";                          // 平局隐含≥30%(唯一OOS成立的低概率升档)
   else band = "低";                                             // 强热(西班牙型也归此:OOS证不可靠预判)
 
-  // ── 爆冷分型(回测审计后:砍掉伪"易爆冷平",只留OOS成立的)──
-  //   🔴双向爆冷=势均(OOS胜47/平28/负25);🟡防平=平局隐含≥30%(OOS校准31.5%);
+  // ── 爆冷分型(回测审计后:砍掉伪"易爆冷平"+死代码"防平",只留OOS成立的)──
+  //   🔴双向爆冷=势均(OOS胜47/平28/负25,平局高的场都在此·防平已被它覆盖);
   //   🟢低风险=强热≥72%(OOS胜~78%,低球也是窄胜);WC对铁桶弱旅留尾部定性提示。
   let upsetType = "中性";
   if (baseUpsetProb >= 0.42) upsetType = "🔴双向爆冷(势均·平/负各半·勿当胆)";
-  else if (drawSignalHigh) upsetType = "🟡防平(平局隐含≥30%·校准31.5%)";
   else if (p >= 0.72) upsetType = lowGoalsHeavy ? "🟢低风险(强热窄胜·WC对弱旅留尾部)" : "🟢低风险(强热可胆)";
   signals.push(`分型:${upsetType}`);
 
