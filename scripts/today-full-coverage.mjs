@@ -302,7 +302,9 @@ const auditFor = (p, s, c, prior, wcCtx) => {
     "欧赔": euro,
     "让球": s.handicapOdds?.current
       ? (s.jingcaiHandicap?.line != null
-        ? auditCell("✅实测", `让${s.jingcaiHandicap.line} ${trip(s.handicapOdds.current)}`, "500竞彩XML(nspf)", t500)
+        ? (s.jingcaiHandicap?.stale
+          ? auditCell("🔶上次捕获(可能过时)", `让${s.jingcaiHandicap.line} ${trip(s.handicapOdds.current)}·本次500未刷出官方线,沿用上次真线`, `500竞彩XML(nspf)·线=上次捕获${s.jingcaiHandicap.staleSince ? `(${String(s.jingcaiHandicap.staleSince).slice(5, 16)})` : ""}`, t500)
+          : auditCell("✅实测", `让${s.jingcaiHandicap.line} ${trip(s.handicapOdds.current)}`, "500竞彩XML(nspf)", t500))
         : auditCell("🔶部分", `让球赔率✅${trip(s.handicapOdds.current)}·官方让球线⚠️未抓到(不冒充推断线)`, "500竞彩XML(nspf)·线缺", t500))
       : MISS("500让球赔率未抓到"),
     "比分": s.scoreOdds?.top?.length ? auditCell("✅实测", `top${s.scoreOdds.top.length}档`, "500竞彩XML(bf)", t500) : MISS("500比分盘未开售/未抓到"),
@@ -317,7 +319,7 @@ const auditFor = (p, s, c, prior, wcCtx) => {
       ? auditCell("✅实测", `${c.h2h.length}次(近赛季)`, "ESPN", tCov)
       : (c.h2h.meetings?.length
         ? auditCell("✅实测", `${c.h2h.meetings.length}次交锋`, c.h2h.source ?? "本地49k历史库", cov?.h2hLocalUpdatedAt ?? tCov)
-        : auditCell("⚠️零交锋(已查证为缺,非未查)", "0次", c.h2h.source ?? "本地49k历史库", cov?.h2hLocalUpdatedAt ?? tCov)))
+        : auditCell("⚠️库无交锋记录(未独立核实:真零交锋或库未收)", "0次", c.h2h.source ?? "本地49k历史库", cov?.h2hLocalUpdatedAt ?? tCov)))
       : MISS(cov ? "该场无H2H记录" : "coverage缺"),
     "国际赛画像": ec ? auditCell("✅实测", `同情境n=${ec.n ?? "?"}·平局率${Number.isFinite(ec.historicalDrawRate) ? Math.round(ec.historicalDrawRate * 100) + "%" : "?"}`, ec.source ?? "经验库", "经验库预构建") : MISS("无同情境经验样本"),
     "世界杯先验": isWc(p)
@@ -344,6 +346,7 @@ const rows = games.map((p, i) => {
     wldCode: p.pick?.code, wldLabel: p.pick?.label,
     hw: p.handicapPick?.handicapWld ?? null, marketDist: hcP.mkDist,
     lineReal: s.jingcaiHandicap?.line != null, // 2026-06-13:仅真竞彩官方线才出过盘分析,线缺=标缺不冒充
+    stale: s.jingcaiHandicap?.stale === true, // 2026-06-16 裁决A:保留的上次真线,标"可能过时"
   });
   const adv = advFor(p);
   // ── 四玩法独立真实裁决(2026-06-11 用户裁决):比分/半全场主推=各自500盘口de-vig真实热门(✅市场,可与胜负平不同向),
@@ -565,7 +568,7 @@ const parlayAdvBanner = advKilled.length
 const fourteenNote = fourteen?.available
   ? `14场/任选9:本期可发(见"14场·任选9"工作表,世界杯腿一律不当胆)。`
   : `14场/任选9:今日不发——${fourteen?.note ?? (fourteenFacts[0]?.[1] ?? "无本期映射")}(详见"数据审计"表内容审计区)。`;
-const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。🎯口径(2026-06-15用户裁决):盘口推荐为主、模型只当参考——每场主推方向/信心档/注金均由500竞彩真盘口de-vig热门定(1X2未开售的悬殊盘退让球档),模型概率仅附"参考X%·与盘口同向/分歧",分歧时铁律以盘口为准。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、零交锋场H2H(49k历史库已查证为缺),已⚠️标不编。${cohNote}${parlayNote}${fourteenNote}${riskNote}盘口=市场有效共识(1X2打不过收盘线),模型本质市场跟随器无独立edge、只作对照,买不买你定。`;
+const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。🎯口径(2026-06-15用户裁决):盘口推荐为主、模型只当参考——每场主推方向/信心档/注金均由500竞彩真盘口de-vig热门定(1X2未开售的悬殊盘退让球档),模型概率仅附"参考X%·与盘口同向/分歧",分歧时铁律以盘口为准。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、H2H(49k历史库无记录·未逐场独立核实是否真零交锋·库覆盖有限如法/塞2002交手过未收),已⚠️标不编。${cohNote}${parlayNote}${fourteenNote}${riskNote}盘口=市场有效共识(1X2打不过收盘线),模型本质市场跟随器无独立edge、只作对照,买不买你定。`;
 // 审计背书(缺陷#17修):全部从本次 rows + adversarial/<date>.json 动态生成;无当日审计文件 → 不写"已审计"背书句。
 const auditFoot = buildAuditFoot({ rows, advData });
 

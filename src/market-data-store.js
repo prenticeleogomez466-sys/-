@@ -17,10 +17,46 @@ export function loadMarketSnapshots(date) {
   return { date: payload.date ?? date, source: payload.source ?? "market-json", snapshots: snapshots.map((snapshot, index) => normalizeMarketSnapshot(snapshot, date, index)) };
 }
 
+// 防 cron 重抓抹真线(2026-06-16 用户裁决A:"保留上次真线+标可能过时")。
+//   背景:03:30 MarketRefresh 等任务重存快照时,500 让球 feed 瞬时为空 → 官方让球线被写成 null,
+//   而每场只留1条快照(无历史可供 findMarketSnapshot 回填)→ 整表 6 场"让球线未抓到"降级。
+//   规则:本次某场缺真线、但磁盘上次该场有真线且原始捕获 ≤48h → 保留上次真线并标 stale(显示"⚠️上次捕获·可能过时"),
+//        不让瞬时空抓把表降级;>48h 或本来就无 → 诚实留缺不冒充(守 feedback_no_fallback_absolute:保留=真实捕获过的线·非编造)。
+const STALE_LINE_MAX_MS = 48 * 3600e3;
+function preservePriorHandicapLines(normalized, path, now) {
+  if (!existsSync(path)) return;
+  let priorSnaps;
+  try {
+    const prior = JSON.parse(readFileSync(path, "utf8"));
+    priorSnaps = Array.isArray(prior) ? prior : prior.snapshots ?? [];
+  } catch { return; }
+  const keyOf = (s) => `${normalizeName(s.homeTeam)}-${normalizeName(s.awayTeam)}`;
+  const best = new Map(); // 队名键 → 上次真线(stale 线按原始捕获时间计龄,防"假新鲜"永不过期)
+  for (const s of priorSnaps) {
+    const jh = s.jingcaiHandicap;
+    if (!jh || !Number.isFinite(Number(jh.line))) continue;
+    const capturedAt = jh.stale ? jh.staleSince : s.collectedAt;
+    const t = String(capturedAt ?? "");
+    const k = keyOf(s);
+    const cur = best.get(k);
+    if (!cur || t > cur.t) best.set(k, { line: Number(jh.line), source: jh.source, t, capturedAt });
+  }
+  for (const s of normalized) {
+    if (s.jingcaiHandicap && Number.isFinite(Number(s.jingcaiHandicap.line))) continue; // 本次有真线→不动
+    const b = best.get(keyOf(s));
+    if (!b || !b.capturedAt) continue;
+    const age = now - Date.parse(b.capturedAt);
+    if (!(age >= 0 && age <= STALE_LINE_MAX_MS)) continue; // 超48h窗/无时间→诚实留缺
+    s.jingcaiHandicap = { line: b.line, source: b.source ?? "500.com-jczq", stale: true, staleSince: b.capturedAt };
+  }
+}
+
 export function saveMarketSnapshots(date, snapshots, metadata = {}) {
   mkdirSync(marketDir, { recursive: true });
-  const payload = { date, source: metadata.source ?? "manual", importedAt: new Date().toISOString(), snapshots: snapshots.map((snapshot, index) => normalizeMarketSnapshot(snapshot, date, index)) };
   const path = join(marketDir, `${date}.json`);
+  const normalized = snapshots.map((snapshot, index) => normalizeMarketSnapshot(snapshot, date, index));
+  preservePriorHandicapLines(normalized, path, Date.now());
+  const payload = { date, source: metadata.source ?? "manual", importedAt: new Date().toISOString(), snapshots: normalized };
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
   return { ...payload, path };
 }
@@ -197,7 +233,10 @@ export function assessSnapshotFreshness(snapshot) {
 export function normalizeJingcaiHandicap(value) {
   const line = Number(value?.line);
   if (!Number.isFinite(line)) return null;
-  return { line, source: value?.source ?? "500.com-jczq" };
+  const out = { line, source: value?.source ?? "500.com-jczq" };
+  // stale:上次真线被保留(防 cron 空抓抹线,2026-06-16 裁决A)——透传供显示层标"可能过时"。
+  if (value?.stale === true) { out.stale = true; if (value.staleSince) out.staleSince = value.staleSince; }
+  return out;
 }
 
 function normalizeOutcomeSet(value = {}) {

@@ -123,10 +123,11 @@ test("renderH2hCell:本地49k库对象→朝向主队比分+赛会+标签;零交
   assert.match(cell, /2010-06-11 墨西哥1-1/, "客场作赛比分须翻转为主队视角");
   assert.match(cell, /2000-06-07 墨西哥4-2\(胜·USA Cup·中立\)/);
   assert.match(cell, /✅实测\(本地历史库\)/);
-  // 零交锋:⚠️明示"已查证为缺",不冒充没查
+  // 库无记录:⚠️诚实标"未独立核实"(2026-06-16修正:库无记录≠已查证真零交锋,如法/塞2002交手过未收),不冒充已核实
   const zero = renderH2hCell({ source: "martj42-intl-results-local", meetings: [] }, "加拿大");
-  assert.match(zero, /⚠️零交锋/);
-  assert.match(zero, /49k国际赛历史库/);
+  assert.match(zero, /⚠️/);
+  assert.match(zero, /无交锋记录|未独立核实/);
+  assert.doesNotMatch(zero, /已查证为缺/, "不得冒充已查证");
   // 旧 ESPN 数组形状兼容
   assert.match(renderH2hCell([{ date: "2025-10-10", gf: 2, ga: 1, res: "胜" }], "主队"), /主队2-1\(胜\)/);
   assert.equal(renderH2hCell(null, "x"), "⚠️未取到");

@@ -93,7 +93,7 @@ export function wcPriorCells({ isWc, prior, lambdaCtx, wcLine }) {
 }
 
 // ── ② 让球方向·模型真实裁决(handicapWld argmax;与胜平负不同向时注逻辑) ──
-export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, lineReal = true }) {
+export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, lineReal = true, stale = false }) {
   if (!hw?.pickCode) return { text: "⚠️让球真实裁决缺(无让球三态分布)", sameDir: null, note: null, verdict: null, modelPct: null, marketPct: null };
   // 2026-06-13 铁律(用户三次重申"不许冒充·我要下注"):竞彩官方让球线未抓到时,过盘%只能按推断线算=不可信。
   //   按 feedback_no_fallback_absolute=标缺不冒充:本场不出让球过盘数字,绝不用推断线盖✅500冒充真实裁决。
@@ -131,8 +131,10 @@ export function handicapVerdictParts({ line, wldCode, wldLabel, hw, marketDist, 
   const divergeFlag = (divergePp != null && divergePp >= 15)
     ? `\n⚠️模型与市场让球分歧${divergePp}pp(模型${modelPct}%/市场${marketPct}%)——「分歧越大市场越准」以市场为准,模型该盘勿当胆`
     : "";
-  const text = `${pickPhrase} ${modelPct}%(模型)${marketPct != null ? ` vs ${marketPct}%(市场)` : "(市场赔率⚠️缺)"}〔${lineStr}〕${sameDir ? "·与胜平负同向" : `\n⚠️与胜平负不同向:${note}`}${divergeFlag}`;
-  return { text, sameDir, note, verdict: hw.pick, modelPct, marketPct, lineStr, divergePp };
+  // stale:官方线本次空抓、保留的上次真线(2026-06-16 裁决A)——明确标"可能过时",诚实不冒充实时。
+  const staleTag = stale ? `\n⚠️上次捕获(可能过时):本次500未刷出官方让球线,沿用上次真线〔${lineStr}〕,以竞彩App实际为准` : "";
+  const text = `${pickPhrase} ${modelPct}%(模型)${marketPct != null ? ` vs ${marketPct}%(市场)` : "(市场赔率⚠️缺)"}〔${lineStr}〕${sameDir ? "·与胜平负同向" : `\n⚠️与胜平负不同向:${note}`}${divergeFlag}${staleTag}`;
+  return { text, sameDir, note, verdict: hw.pick, modelPct, marketPct, lineStr, divergePp, stale: !!stale };
 }
 
 // ── 盘口为主(2026-06-15 用户裁决):500竞彩 1X2(europeanOdds)de-vig 真盘口共识 = 主推/信心/注金的主口径,模型只附参考。──
@@ -162,14 +164,16 @@ export function parlaySafety({ tier, risk, advLabel }) {
 }
 export const PARLAY_ORDER_NOTE = "串关安全度三级:🟢串关候选=一/二档+非高风险+证伪未杀;🟡谨慎=档位/风险/审计覆盖任一不足;⛔串关排除=硬币场或三视角证伪场。只标注供搭串参考,买不买你定。";
 
-// ── H2H 渲染:新版本地49k历史库对象({source,label,meetings})+ 旧版 ESPN 数组兼容;零交锋如实标⚠️ ──
+// ── H2H 渲染:新版本地49k历史库对象({source,label,meetings})+ 旧版 ESPN 数组兼容;库无记录如实标⚠️ ──
+//   2026-06-16 诚实修正:库无记录 ≠ "已查证真零交锋"。49k库覆盖有限(如法国-塞内加尔2002世界杯交手过却未收),
+//   故措辞改为"库无记录·未独立核实",不冒充"已查证"(守 feedback_no_fabrication_live_only)。
 export function renderH2hCell(h2h, homeZh) {
   if (!h2h) return "⚠️未取到";
   if (Array.isArray(h2h)) {
     return h2h.length ? h2h.map((x) => `${x.date} ${homeZh}${x.gf}-${x.ga}(${x.res})`).join(" / ") : "近赛季窗口无交锋(ESPN免费源限近赛季)";
   }
   const ms = Array.isArray(h2h.meetings) ? h2h.meetings : [];
-  if (!ms.length) return `⚠️零交锋:本地49k国际赛历史库(1872-2026)未见两队交手〔${h2h.source ?? "源缺"}〕`;
+  if (!ms.length) return `⚠️本地49k历史库无交锋记录·未独立核实(真零交锋 或 库未收,如法/塞2002交手过未收)〔${h2h.source ?? "源缺"}〕`;
   const flip = (score) => { const m = String(score).match(/(\d+)-(\d+)/); return m ? `${m[2]}-${m[1]}` : score; };
   const view = ms.slice(0, 4).map((m) => {
     const homeFirst = !h2h.homeEn || m.home === h2h.homeEn;
