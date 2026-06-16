@@ -229,6 +229,45 @@ test("buildFourteenSheetRows:闸不过→⛔+依据原话+期次事实,绝不渲
   assert.match(okFlat, /不出\(测试不出\)/);
 });
 
+// ── 14场与任选9 各自分别推荐 胆/双选/全包(2026-06-16 用户裁决)──
+test("buildFourteenSheetRows:14场与任选9各自给出 胆/双选/全包 分组 + 任选9逐腿表", () => {
+  const sels = [
+    { index: 1, match: "A 对 B", single: "主胜", compound: "主胜", type: "胆", compoundCodes: ["3"], probabilities: { home: "72%", draw: "18%", away: "10%" }, confidence: 78, reason: "胆" },
+    { index: 2, match: "C 对 D", single: "主胜", compound: "主胜/平局", type: "双选", compoundCodes: ["3", "1"], probabilities: { home: "50%", draw: "30%", away: "20%" }, confidence: 64, reason: "双" },
+    { index: 3, match: "E 对 F", single: "平局", compound: "主胜/平局/客胜", type: "全选", compoundCodes: ["3", "1", "0"], probabilities: { home: "34%", draw: "33%", away: "33%" }, confidence: 50, reason: "全" },
+  ];
+  const picks = [
+    { rank: 1, match: "A 对 B", pick: "主胜", compound: "主胜", type: "胆", probabilities: { home: "72%", draw: "18%", away: "10%" }, confidence: 78 },
+    { rank: 2, match: "C 对 D", pick: "主胜", compound: "主胜/平局", type: "双选", probabilities: { home: "50%", draw: "30%", away: "20%" }, confidence: 64 },
+  ];
+  const sheet = buildFourteenSheetRows({
+    date: "2026-06-16",
+    fourteen: {
+      available: true, singleLine: "3 3 1", compoundLine: "3 31 310",
+      selections: sels,
+      bankerParlay: { jointProbabilityIndependent: 0.21, jointProbabilityCorrelated: 0.18 },
+      renxuan9: { ok: true, singleLine: "3 3", parlay: { jointProbabilityIndependent: 0.4, jointProbabilityCorrelated: 0.36 }, picks },
+    },
+    periodFacts: [],
+  });
+  const flat = JSON.stringify(sheet);
+  // 两个区块都要有 胆/双选/全包 分组标题
+  assert.match(flat, /14场 · 胆\/双选\/全包 分别推荐/);
+  assert.match(flat, /任选9 · 胆\/双选\/全包 分别推荐/);
+  // 14场分组计数正确(1胆/1双选/1全包)
+  assert.match(flat, /【胆·单选锁定】1腿/);
+  assert.match(flat, /【双选·防一手】1腿/);
+  assert.match(flat, /【全包·三选全】1腿/);
+  // 推荐混合票注数=1×2×3=6 注
+  assert.match(flat, /共 6 注/);
+  // 任选9逐腿表 + 联合命中(用正确字段渲染,非"—")
+  assert.match(flat, /任选9 · 严选9场/);
+  assert.match(flat, /任选9·9串联合命中/);
+  // 胆串相关性修正用正确字段(非旧 independentProbability→"—")
+  assert.match(flat, /胆串\(相关性修正\)/);
+  assert.doesNotMatch(flat, /独立估计— \/ 修正—/);
+});
+
 // ── 列头归属(用户裁决①:世界杯模型列与市场锚列并排,归属一眼分清) ──
 test("XLSX_HEADERS:模型归属注明+新列齐全+末列对抗证伪", () => {
   // 27列(2026-06-12 注金裁决:信心档后+💰建议注金列;2026-06-11 四玩法独立裁决:信号面板列等)

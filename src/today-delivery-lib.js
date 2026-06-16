@@ -630,6 +630,50 @@ export function buildFourteenSheetRows({ date, fourteen, periodFacts = [] }) {
     s._cold ? s._cold.text : (s.upsetRisk ?? ""),
     s._guard ?? "—", String(s.confidence ?? ""), s.reason ?? ""]);
   const r9 = fourteen.renxuan9;
+
+  // ── 胆/双选/全包 分组推荐(2026-06-16 用户裁决:14场与任选9 各自分别给出 胆/双选/全包 三类推荐)──
+  //    纯展示分组:选腿与每腿覆盖一律取自引擎逐腿真实裁决(selection.type / renxuan9.pick.type),不重算、不兜底。
+  const fourteenItems = (fourteen.selections ?? []).map((s) => ({
+    leg: s.index, match: s.match, single: s.single, compound: s.compound, type: s.type,
+    cover: Array.isArray(s.compoundCodes) ? s.compoundCodes.length : String(s.compound ?? "").split("/").length,
+  }));
+  const r9Items = (r9?.ok ? (r9.picks ?? []) : []).map((p) => ({
+    leg: p.rank, match: p.match, single: p.pick ?? p.single, compound: p.compound ?? p.pick ?? p.single, type: p.type,
+    cover: String(p.compound ?? p.pick ?? p.single ?? "").split("/").length,
+  }));
+  const ticketGroupRows = (title, items) => {
+    if (!items.length) return [];
+    const dan = items.filter((it) => it.type === "胆");
+    const dbl = items.filter((it) => it.type === "双选");
+    const full = items.filter((it) => it.type !== "胆" && it.type !== "双选"); // 全选/全包(三选全)
+    const fmt = (arr, useCompound) => arr.length
+      ? arr.map((it) => `第${it.leg}腿 ${it.match}(${useCompound ? it.compound : it.single})`).join(" ║ ")
+      : "无";
+    const notes = items.reduce((n, it) => n * Math.max(1, it.cover || 1), 1);
+    const fnum = (x) => x.toLocaleString("en-US");
+    return [
+      [""],
+      [`🎟 ${title} · 胆/双选/全包 分别推荐`, "🔶选腿与覆盖均由引擎逐腿真实概率裁决,纯展示分组,不重算不兜底"],
+      [`【胆·单选锁定】${dan.length}腿`, fmt(dan, false)],
+      [`【双选·防一手】${dbl.length}腿`, fmt(dbl, true)],
+      [`【全包·三选全】${full.length}腿`, fmt(full, true)],
+      ["推荐混合票(胆×双选×全包)", `胆${dan.length}+双选${dbl.length}+全包${full.length} → 共 ${fnum(notes)} 注(×2元=${fnum(notes * 2)}元),全腿命中即中`],
+    ];
+  };
+
+  // 任选9 严选腿表(此前仅一行串关字符串,补齐逐腿明细+分组,口径同14场)
+  const r9TableRows = r9Items.length ? (() => {
+    const r9Header = ["任选9腿", "对阵", "单选", "复选", "类型", "主/平/客%", "信心"];
+    const body = (r9.picks ?? []).map((p) => [String(p.rank), p.match, p.pick ?? p.single ?? "",
+      p.compound ?? p.pick ?? "", p.type ?? "",
+      `${p.probabilities?.home ?? ""}/${p.probabilities?.draw ?? ""}/${p.probabilities?.away ?? ""}`,
+      String(p.confidence ?? "")]);
+    return [[""], ["🎯 任选9 · 严选9场(从14腿挑市场最有把握的9场,9场全对即中)"], r9Header, ...body];
+  })() : [];
+  const r9ParlayRow = r9?.ok && r9.parlay
+    ? [["任选9·9串联合命中", `独立估计${parlayPct(r9.parlay.jointProbabilityIndependent ?? 0)} / 相关性修正${parlayPct(r9.parlay.jointProbabilityCorrelated ?? 0)}`]]
+    : [];
+
   const scenarioRows = [];
   if (sels.length >= 2) {
     const ranked = [...sels].sort((a, b) => b._cold.p - a._cold.p);
@@ -653,10 +697,14 @@ export function buildFourteenSheetRows({ date, fourteen, periodFacts = [] }) {
   const tail = [[""],
     ["闸裁决", "✅ 本期可发(恰14腿·比赛日含今日·停售未过)"],
     ...periodFacts.map((x) => (Array.isArray(x) ? x : [x])),
-    ["单式串", fourteen.singleLine ?? ""],
-    ["复式串", fourteen.compoundLine ?? ""],
-    ["胆串(相关性修正)", fourteen.bankerParlay ? `独立估计${fourteen.bankerParlay.independentProbability ?? "—"} / 修正${fourteen.bankerParlay.adjustedProbability ?? "—"}` : "—"],
-    ["任选9", r9?.ok ? `9场:${(r9.picks ?? []).map((p) => `${p.match ?? ""}${p.single ?? p.pick ?? ""}`).join(" ")}` : `不出(${r9?.reason ?? "—"})`],
+    ["单式串(14场)", fourteen.singleLine ?? ""],
+    ["复式串(14场)", fourteen.compoundLine ?? ""],
+    ["胆串(相关性修正)", fourteen.bankerParlay ? `独立估计${parlayPct(fourteen.bankerParlay.jointProbabilityIndependent ?? 0)} / 修正${parlayPct(fourteen.bankerParlay.jointProbabilityCorrelated ?? 0)}` : "—"],
+    ...ticketGroupRows("14场", fourteenItems),
+    ...r9TableRows,
+    ...ticketGroupRows("任选9", r9Items),
+    ...r9ParlayRow,
+    ["任选9", r9?.ok ? `单式串:${r9.singleLine ?? (r9.picks ?? []).map((p) => p.pick ?? p.single ?? "").join(" ")}` : `不出(${r9?.reason ?? "—"})`],
     ...scenarioRows,
   ];
   return [head, header, ...legs, ...tail];
