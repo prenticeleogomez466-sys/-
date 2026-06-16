@@ -699,7 +699,7 @@ export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事)",
 
 export function buildXlsxSheets({ date, rows, banner, advDataPresent, recordLine = null, stakeNote = null }) {
   // 对阵列附加行:每场情景研判(🏆赛会 出线/夺冠% 已移到专属"世界杯模型"列,不再塞对阵格)
-  const matchCell = (r) => `${r.match}(${r.comp})${r.scen ? `\n情景:${r.scen}` : ""}`;
+  const matchCell = (r) => `${r.match}(${r.comp})${r.scen ? `\n情景:${r.scen}` : ""}${r.upsetScen ? `\n⚠️${r.upsetScen}` : ""}`;
   const xrows = rows.map((r) => [String(r.idx), r.ko, matchCell(r),
     r.wld, r.euro,
     r.wcElo ?? "—", r.wcLambda ?? "—", r.wcTourney ?? (r.wcLine || "—"),
@@ -792,7 +792,7 @@ export function resolveHtmlWriteTarget({ existingHtml, date, canonicalPath, date
 // ── 英文固定URL页 football.html(手机收藏夹固定地址;缺陷#16:跟随当日,与 xlsx/手机页同源同日期) ──
 export function renderEnglishHtml({ date, rows, riskNote, intlN, wcN, banner, auditFoot, parlayPlan = null, recordLine = null, stakeSum = null }) {
   const br = (s) => esc(s).replace(/\n/g, "<br>");
-  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}</td><td>${esc(r.wld)}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(r.hcView)}</td><td>${esc(r.score)}〔${esc(r.scoreSrc)}〕</td><td>${esc(r.halffull)}〔${esc(r.hfSrc)}〕</td><td>${esc(r.ouReal)}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
+  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}${r.upsetScen ? `<br><span style="color:#c62828;font-size:11px">⚠️${esc(r.upsetScen)}</span>` : ""}</td><td>${esc(r.wld)}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(r.hcView)}</td><td>${esc(r.score)}〔${esc(r.scoreSrc)}〕</td><td>${esc(r.halffull)}〔${esc(r.hfSrc)}〕</td><td>${esc(r.ouReal)}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>⚡神选·足球·${date}</title>

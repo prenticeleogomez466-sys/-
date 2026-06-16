@@ -75,7 +75,10 @@ const WC_TEAM_ALIASES = {
   "cote d'ivoire": "ivory coast",
   "cabo verde": "cape verde",
   "ir iran": "iran",
-  "congo dr": "dr congo"
+  "congo dr": "dr congo",
+  // 中文变体也归一到同 canonical(2026-06-16:抓的盘口队名="刚果(金)"、match-dates="Congo DR",
+  //   normTeam 不归一致 s1-odds-cover 误报"Portugal-Congo DR 无赔率"拒交付。同佛得角修法)。
+  "刚果(金)": "dr congo", "刚果金": "dr congo", "刚果民主共和国": "dr congo"
 };
 /** 队名归一:小写 + 去音调符(türkiye→turkiye)+ 变体别名,使中文/feed/groups 三方对阵能对上。
  *  2026-06-12 导出供 audit-wc-pipeline s1-odds-cover 复用:match-dates 用 USA、ESPN 赔率用

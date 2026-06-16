@@ -1015,9 +1015,12 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       venue: wcRouted.venue, lambdaMult: wcRouted.lambdaMult, lambda: wcRouted.lambda,
       wld: wcRouted.wld, score: wcRouted.score, handicap: wcRouted.handicap,
       overUnder: wcRouted.overUnder, halfFull: wcRouted.halfFull, market: wcRouted.market,
+      upsetScenario: wcRouted.upsetScenario,
       recentForm: wcRouted.recentForm, h2h: wcRouted.h2h,
       decisiveFactors: wcRouted.decisiveFactors, gaps: wcRouted.gaps
     };
+    // 爆冷场景挂顶层供情景层渲染(2026-06-16 用户:检到爆冷必给若爆冷的具体比分/半全场/大小球)。
+    prediction.upsetScenario = wcRouted.upsetScenario ?? null;
   }
   // 市场背离置信门(2026-05-31 接生产)—— 实证(signal-crossval 回测):模型与市场分歧越大、市场赢越多,
   //   逆市场押独门=陷阱。此处把 clv-confidence-gate 接进每场预测,**只附加**背离标签 + 建议降档系数,

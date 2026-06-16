@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { worldCupMatchPrior, teamPrior, confederationOf, worldCupLambdaContext } from "./world-cup-priors.js";
 import { eloToLambdas } from "./national-elo-source.js";
-import { buildDerivedScoreModel, bestScoreFromMatrix, handicapLadder, totalGoalsBands } from "./derived-score-model.js";
+import { buildDerivedScoreModel, bestScoreFromMatrix, handicapLadder, totalGoalsBands, scoreProbFromMatrix } from "./derived-score-model.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { devig } from "./market-devig.js";
 import { recentForm, headToHead } from "./wc-national-form.js";
@@ -120,6 +120,25 @@ export function predictWcMatch(homeZh, awayZh, fixture = {}, marketOdds = null, 
   if (h2h) factors.push({ key: "H2H", detail: `近${h2h.played}次交手 ${h2h.summary}`, weight: 25, tag: "✅实测(只作观察)" });
   factors.sort((a, b) => b.weight - a.weight);
 
+  // ── 爆冷场景(2026-06-16 用户:检到爆冷必给"若爆冷会出什么"的具体比分/半全场/大小球·拿真盘说话)──
+  //   热门不胜的两条路=①被逼平(头号·见复盘平局盲区)②被翻盘。全从真矩阵/真半全场联合分布派生,零编造。
+  const upsetScenario = (() => {
+    const revCode = pick.code === "3" ? "0" : pick.code === "0" ? "3" : null; // 反向(热门被翻盘)
+    const drawScore = bestScoreFromMatrix(sm.matrix, "1");                    // 最可能平局比分(1-1/0-0)
+    const revScore = revCode ? bestScoreFromMatrix(sm.matrix, revCode) : null;
+    const over = r4((ou?.bands?.["3"] ?? 0) + (ou?.bands?.["4+"] ?? 0));      // 大于2.5
+    const drawP = prior.probabilities.draw;
+    const revP = revCode === "3" ? prior.probabilities.home : revCode === "0" ? prior.probabilities.away : null;
+    return {
+      drawProb: r4(drawP),
+      drawScore, drawScoreProb: drawScore ? r4(scoreProbFromMatrix(sm.matrix, drawScore)) : null,
+      drawHalfFull: hfDist?.["平局-平局"] != null ? r4(hfDist["平局-平局"]) : null,
+      reverseProb: revP != null ? r4(revP) : null,
+      reverseScore: revScore, reverseScoreProb: revScore ? r4(scoreProbFromMatrix(sm.matrix, revScore)) : null,
+      overProb: over, goalsLean: over < 0.46 ? "小球(闷平低分)" : over > 0.56 ? "大球(对攻)" : "中性",
+    };
+  })();
+
   const gaps = [];
   if (!formHome || !formAway) gaps.push("部分队近2年国际赛样本缺(归一不到/未参赛)");
   if (!h2h) gaps.push("近2年内无交手记录(H2H 标缺)");
@@ -144,6 +163,7 @@ export function predictWcMatch(homeZh, awayZh, fixture = {}, marketOdds = null, 
     handicap: { fairLine: fair?.line ?? null, cover: fair ? { home: r4(fair.home), push: r4(fair.push), away: r4(fair.away) } : null, ladder: ladder.filter((x) => Number.isInteger(x.line)) },
     overUnder: ou,
     halfFull: hf,
+    upsetScenario,
     market,
     recentForm: { home: formHome, away: formAway },
     h2h,

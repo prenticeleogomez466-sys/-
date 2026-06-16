@@ -424,6 +424,8 @@ const rows = games.map((p, i) => {
     dc: p.doubleChance?.recommended ? { pick: p.doubleChance.pick, shortCode: p.doubleChance.shortCode } : null,
     // 情景研判一行(自检⑥:scenario-synthesizer 现成 headline,逐场不同,不重算不编造)
     scen: p.scenario?.headline ?? "",
+    // 爆冷场景(2026-06-16 用户:检到爆冷必给"若爆冷→比分/半全场/大小球"·真盘派生·只爆冷风险中/高出)
+    upsetScen: p.scenario?.upsetScenario ?? null,
     // 平局画像(2026-06-10 审计rank13:读现成 scenario.dims.draw / experienceContext 字段,不重算;
     //   世界杯场 experienceContext 落全局经验26%不报警,scenario 情景层才有本场平局维度)
     drawRate: p.scenario?.dims?.draw?.prob ?? p.experienceContext?.historicalDrawRate ?? null,

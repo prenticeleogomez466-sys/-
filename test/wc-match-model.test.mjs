@@ -11,6 +11,16 @@ test("Elo→λ:高 Elo 队 λ 更高(supremacy 方向正确)", () => {
   assert.ok(r.lambda.home > r.lambda.away, `强队 λ 应更高: ${r.lambda.home} vs ${r.lambda.away}`);
 });
 
+test("爆冷场景 upsetScenario:真矩阵派生平局比分+大小球lean(2026-06-16)", () => {
+  const r = predictWcMatch("西班牙", "南非", {});
+  assert.ok(r.upsetScenario, "WC模型必带 upsetScenario(检到爆冷给若爆冷场景)");
+  const us = r.upsetScenario;
+  assert.match(String(us.drawScore), /^\d+-\d+$/, "被逼平比分=矩阵派生(h-a)");
+  assert.ok(us.drawScoreProb > 0 && us.drawScoreProb < 1, "平局比分概率∈(0,1)·真派生非编造");
+  assert.ok(["小球(闷平低分)", "大球(对攻)", "中性"].includes(us.goalsLean), `大小球lean合法: ${us.goalsLean}`);
+  if (us.reverseProb != null) assert.ok(us.drawProb >= us.reverseProb - 0.01, "悬殊场被逼平≥被翻盘(平局头号盲区)");
+});
+
 test("Elo→λ:Elo 差越大 λ 差越大(单调)", () => {
   const big = predictWcMatch("西班牙", "南非", {});   // diff ~726
   const small = predictWcMatch("日本", "韩国", {});     // diff ~120

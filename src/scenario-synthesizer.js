@@ -208,7 +208,21 @@ export function synthesizeScenario(prediction) {
   if (dims.xgQuality?.lean && dims.xgQuality.lean !== "xG 接近") bits.push(dims.xgQuality.lean);
   if (dims.importance && dims.importance.level !== "常规") bits.push(`重要度${dims.importance.level}`);
   const headline = bits.filter(Boolean).join(" · ");
-  return { headline, dims, marketGuidance: buildMarketGuidance(dims) };
+  return { headline, dims, marketGuidance: buildMarketGuidance(dims), upsetScenario: buildUpsetScenarioNote(prediction, dims.upset) };
+}
+
+/** 爆冷场景(2026-06-16 用户:检到爆冷必给"若爆冷→具体比分/半全场/大小球"·拿真盘说话)。
+ *  只在爆冷风险中/高时渲染;全读 prediction.upsetScenario(wc-match-model 从真矩阵/真半全场分布派生),零编造。 */
+function buildUpsetScenarioNote(prediction, upsetDimVal) {
+  const us = prediction?.upsetScenario;
+  if (!us) return null;
+  if (!/高|中/.test(String(upsetDimVal?.band ?? ""))) return null; // 低风险不渲染(避噪声)
+  const bits = [];
+  if (us.drawScore && us.drawScoreProb != null) bits.push(`被逼平最可能 ${us.drawScore}(${Math.round(us.drawScoreProb * 100)}%)`);
+  if (us.drawHalfFull != null) bits.push(`半全场平局-平局 ${Math.round(us.drawHalfFull * 100)}%`);
+  if (us.reverseScore && us.reverseScoreProb != null) bits.push(`被翻盘最可能 ${us.reverseScore}(${Math.round(us.reverseScoreProb * 100)}%)`);
+  if (us.goalsLean) bits.push(`大小球倾向${us.goalsLean}`);
+  return bits.length ? `若爆冷(热门不胜·🔶模型矩阵派生·非500真盘):${bits.join(" · ")}——防平为主,勿单押热门当胆` : null;
 }
 
 /** 把情景研判拼成一段挂进 narrative 的文本(供 xlsx 选择理由列展示)。 */
@@ -220,5 +234,6 @@ export function scenarioNarrative(scenario) {
   if (lines.length) parts.push(`  ${lines.join("；")}`);
   if (scenario.marketGuidance?.length)
     parts.push(`【玩法指引】${scenario.marketGuidance.map((g) => `${g.market}→${g.lean}`).join("；")}`);
+  if (scenario.upsetScenario) parts.push(`【爆冷场景】${scenario.upsetScenario}`);
   return parts.join("\n");
 }
