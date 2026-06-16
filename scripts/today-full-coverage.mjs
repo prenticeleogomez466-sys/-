@@ -46,7 +46,7 @@ import { snapshotEuroProvenance } from "../src/market-data-store.js";
 // 2026-06-14 情报系统(展示层·不动概率):预测/确认首发+阵型 / 伤停 / 近期热身 / 新闻动机聚合 → 「情报详情」sheet。
 //   复用已采集层(advanced:sync 的 layers.lineups/injuries/news)+ 国家队近赛缓存 + 预测首发缓存;缺即标缺不编。
 import { loadAdvancedData } from "../src/advanced-data-store.js";
-import { loadNationalResults, recentForm } from "../src/wc-national-form.js";
+import { loadNationalResults, recentForm, headToHead } from "../src/wc-national-form.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
 import { buildMatchIntel } from "../src/match-intel.js";
 import { handicapSanity, histUpsetRate } from "../src/handicap-sanity.js";
@@ -517,7 +517,12 @@ const deriveWcWeb = (p, pred) => {
   const stage = wm.stage ?? null;
   const groupBody = (gh && gh === ga) ? `同${gh}组` : (gh || ga) ? `${p.fixture.homeTeam}${gh ?? "?"}组/${p.fixture.awayTeam}${ga ?? "?"}组` : null;
   const group = (gh || ga || stage) ? [stage ? `阶段:${stage}` : null, groupBody].filter(Boolean).join(" · ") + " 🔶groups.json真实分组" : null;
-  return { venue, style, group };
+  // 派生情报的真实来源(供「情报来源」列可追溯;每条数据来自哪个公开源)
+  const sources = [];
+  if (venue) sources.push("场地/海拔=FIFA 2026官方赛历+match-venues.json | 天气=Open-Meteo 历史气候 https://open-meteo.com/");
+  if (group) sources.push("分组/阶段=FIFA官方抽签(groups.json,Wikipedia 2026_FIFA_World_Cup 核) https://en.wikipedia.org/wiki/2026_FIFA_World_Cup");
+  if (style && (ch?.home || ch?.away)) sources.push("主帅=team-priors.json(各队官方公布主帅);阵型/常用主力=近期真实首发频次聚合(ESPN国际赛)");
+  return { venue, style, group, sources };
 };
 const intelByMatch = {};
 for (const p of games) {
@@ -529,9 +534,21 @@ for (const p of games) {
   // 媒体缓存(✅)优先,WC派生(🔶)只补 venue/style/group 空缺;其余字段(h2h/odds/injuries/sources)保持媒体源
   const web = (web0 || wcWeb) ? (() => {
     const base = { ...(web0 || {}) };
-    if (wcWeb) { if (base.venue == null) base.venue = wcWeb.venue; if (base.style == null) base.style = wcWeb.style; if (base.group == null) base.group = wcWeb.group; }
+    if (wcWeb) {
+      if (base.venue == null) base.venue = wcWeb.venue;
+      if (base.style == null) base.style = wcWeb.style;
+      if (base.group == null) base.group = wcWeb.group;
+      // 来源:媒体源(✅)在前,WC派生源(🔶)补后,使「情报来源」列对派生情报也可追溯
+      base.sources = [...(base.sources ?? []), ...(wcWeb.sources ?? [])];
+    }
     return base;
   })() : null;
+  // 交锋史(H2H深化):coverage(ESPN近期)为主;空则退国家队近2年缓存真实交手(headToHead),仍无→如实标缺
+  let h2hList = h2hToStatsList(covFor(p)?.h2h);
+  if (!h2hList || !h2hList.length) {
+    const nh = headToHead(natCache, p.fixture.homeTeam, p.fixture.awayTeam);
+    if (nh?.list?.length) h2hList = nh.list.map((x) => ({ date: x.date, score: x.score, res: x.r }));
+  }
   intelByMatch[key] = buildMatchIntel({
     fixture: p.fixture,
     lineupSide: layerFor("lineups", p.fixture.id),
@@ -542,7 +559,7 @@ for (const p of games) {
     homeForm: recentForm(natCache, canonicalTeamName(p.fixture.homeTeam)),
     awayForm: recentForm(natCache, canonicalTeamName(p.fixture.awayTeam)),
     webIntel: web,
-    h2hList: h2hToStatsList(covFor(p)?.h2h), // 结构化交锋史(49k库优先/ESPN回退)→ h2hStats 深化统计,填补⚠️空缺
+    h2hList, // 结构化交锋史(ESPN近期→国家队近2年缓存回退)→ h2hStats 深化统计,填补⚠️空缺
   });
 }
 
