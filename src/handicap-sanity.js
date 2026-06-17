@@ -59,7 +59,7 @@ const OU_DECIMAL_BANDS = [
 export function handicapReferenceRows() {
   const pct = (x) => `${(x * 100).toFixed(0)}%`;
   const rg = (a) => `${a[0]}–${a[2]}(中${a[1]})`;
-  const rows = [["让球线", "热门胜率正常区间(P5–P95)", "热门胜赔", "平赔", "客(冷)赔", "历史不胜率(爆冷)", "样本N"]];
+  const rows = [["让球线", "热门胜率正常区间(下限–上限·中)", "热门胜赔", "平赔", "客(冷)赔", "历史不胜率(爆冷)", "样本N"]];
   for (const k of Object.keys(LINE_DECIMAL_BANDS).map(Number).sort((a, b) => a - b)) {
     const d = LINE_DECIMAL_BANDS[k], f = LINE_FAV_BANDS[k];
     const ur = LINE_UPSET_RATE[k];
@@ -102,12 +102,70 @@ export function handicapSanity({ ahLine, p1x2Fav } = {}) {
   return { line, favProb: round(p), depth, refLine: key, band, verdict, gapPp, exceeded };
 }
 
+/** 欧赔(胜负平/直胜)正常区间:按让球线锚定强度档 → 热门胜/平/客(冷)十进制 [P5,中,P95]。无对应档→null,不硬套。 */
+export function europeanBand(ahLine) {
+  if (ahLine == null || ahLine === "") return null;   // Number(null)===0 会误套让0档,显式拦
+  const line = Number(ahLine);
+  if (!Number.isFinite(line)) return null;
+  const key = nearestLineKey(Math.abs(line));
+  if (key == null) return null;
+  const b = LINE_DECIMAL_BANDS[key];
+  return b ? { refLine: key, win: b.win, draw: b.draw, dog: b.dog, n: b.n } : null;
+}
+
+/** 大小球正常区间:按本场大球隐含%落入历史档 → {over:[P5,中,P95], underMid, lo, hi, n}。无→null,不编。 */
+export function ouBand(overImplied) {
+  const p = Number(overImplied);
+  if (!Number.isFinite(p) || p <= 0 || p >= 1) return null;
+  for (const b of OU_DECIMAL_BANDS) if (p >= b.lo && p < b.hi) return b;
+  const first = OU_DECIMAL_BANDS[0], last = OU_DECIMAL_BANDS[OU_DECIMAL_BANDS.length - 1];
+  if (p < first.lo) return first;       // 低于最低档→用最低档参照
+  if (p >= last.hi) return last;        // 高于最高档→用最高档参照
+  return null;
+}
+
+// 亚盘水位历史区间(12393场实测·decimal):水位近乎与让球线无关(强度被让球线吸收·全档中位≈1.92),
+//   故用单一聚合带而非按线分档(避免假精度)。深=被重注(赔付低)、高=冷清(赔付高)、失衡=钱压一侧过盘。
+const WATER_BAND = { p5: 1.77, mid: 1.92, p95: 2.10, n: 12393 };
+/**
+ * 亚盘水位合理性 + 失衡判读。实盘水位多为 HK 盘口(0.98=1.98 decimal),自动换算后对历史带。
+ * @returns {null | { homeDec, awayDec, band, homeVerdict, awayVerdict, lean, gap }}
+ */
+export function waterSanity(homeWater, awayWater) {
+  const toDec = (w) => { const x = Number(w); if (!Number.isFinite(x) || x <= 0) return null; return x < 1.5 ? round2(x + 1) : round2(x); }; // HK→decimal
+  const h = toDec(homeWater), a = toDec(awayWater);
+  if (h == null && a == null) return null;
+  const judge = (d) => d == null ? null : d < WATER_BAND.p5 ? "深(被重注·赔付低)" : d > WATER_BAND.p95 ? "高(冷清·赔付高)" : "正常";
+  let lean = "均衡", gap = null;
+  if (h != null && a != null) {
+    gap = round2(h - a);
+    if (gap <= -0.08) lean = "钱压主队过盘(主水更低)";
+    else if (gap >= 0.08) lean = "钱压客队过盘(客水更低)";
+  }
+  return { homeDec: h, awayDec: a, band: WATER_BAND, homeVerdict: judge(h), awayVerdict: judge(a), lean, gap };
+}
+function round2(x) { return Math.round(x * 100) / 100; }
+
 /** 历史同档爆冷率:给球热门在该让球线上的真实"不胜"频次(12458场实测)。无该档样本→null,不编。 */
 export function histUpsetRate(ahLine) {
   const line = Number(ahLine);
   if (!Number.isFinite(line)) return null;
   const key = nearestLineKey(Math.abs(line));
   return key == null ? null : (LINE_UPSET_RATE[key] ?? null);
+}
+
+/**
+ * 深浅裁决分级标签(诚实:仅差<1.5pp=擦边接近常态,标🟡临界而非🔴,避免夸大;≥1.5pp才🔴)。
+ * @returns {{ tag:string, marginal:boolean, severe:boolean }}
+ */
+export function sanityVerdictLabel(s) {
+  if (!s || !s.band) return { tag: "—", marginal: false, severe: false };
+  if (!s.exceeded) return { tag: "🟢合理", marginal: false, severe: false };
+  const marginal = s.gapPp < 1.5;
+  return {
+    tag: marginal ? `🟡临界${s.verdict}(仅差${s.gapPp}pp·接近常态)` : `🔴${s.verdict}${s.gapPp}pp`,
+    marginal, severe: !marginal,
+  };
 }
 
 /** 人读一行:本场值 vs 区间 + 超临界多少。 */

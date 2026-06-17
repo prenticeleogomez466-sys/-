@@ -10,7 +10,9 @@ import { honestPass } from "./honest-pass-gate.js";
 import { rankByDivergence } from "./market-divergence-radar.js";
 import { assessPortfolioRisk } from "./portfolio-kelly.js";
 import { selectHighConfidence } from "./selective-picks.js";
-import { handicapReferenceRows, ouReferenceRows } from "./handicap-sanity.js";
+import { handicapReferenceRows, ouReferenceRows, europeanBand, ouBand, waterSanity, sanityVerdictLabel } from "./handicap-sanity.js";
+import { playerDisplay } from "./player-name-zh.js";
+import { formationPosture } from "./lineup-source.js";
 
 // ── 日期解析:显式参数必须合法,缺参用本机 UTC+8 当日;非法直接 throw(fail-loud,绝不猜) ──
 export function resolveDeliveryDate(arg, now = new Date()) {
@@ -362,10 +364,32 @@ export function buildAuditSheet({ date, rows, contentAudit }) {
 // ── 情报详情工作表(2026-06-14 情报系统·展示层,不动概率) ──
 // 每场:预测/确认首发XI+阵型 / 关键伤停 / 近期热身赛 / 新闻动机,每格带 ✅实测/🔶推断/⚠️缺 来源标签。
 // intelByMatch[`home|away`] = src/match-intel.buildMatchIntel 产物;缺该场 → 整行如实标缺(不编)。
+// 阵型态势标签(formationPosture 真解析:N后N中N前→攻势/守势/均衡);无法解析→空串不编。
+function postureTag(formation) {
+  const p = formationPosture(formation);
+  if (!p) return "";
+  const t = p.attacking ? "攻势" : p.defensive ? "守势" : "均衡";
+  return `(${t}·${p.defenders}后${p.midfielders}中${p.forwards}前)`;
+}
+// 阵型对位研判(主客 posture 对撞→阵地战/对攻/反击,真解析派生,无则缺)。
+function formationMatchup(homeF, awayF) {
+  const ph = formationPosture(homeF), pa = formationPosture(awayF);
+  if (!ph || !pa) return null;
+  const lab = (p) => p.attacking ? "攻" : p.defensive ? "守" : "衡";
+  const h = lab(ph), a = lab(pa);
+  let read;
+  if (h === "攻" && a === "守") read = "主攻客守→主队压上打阵地战·客队摆大巴反击(易闷或被反)";
+  else if (h === "守" && a === "攻") read = "主守客攻→客队压上·主队防反";
+  else if (h === "攻" && a === "攻") read = "双攻对攻→开放·大球倾向";
+  else if (h === "守" && a === "守") read = "双守→闷战·小球倾向";
+  else read = "均衡对位→看临场";
+  return `主${homeF}(${ph.defenders}后${ph.midfielders}中${ph.forwards}前·${h}) vs 客${awayF}(${pa.defenders}后${pa.midfielders}中${pa.forwards}前·${a})→${read}`;
+}
 function intelLineupCell(side) {
   if (!side || !side.xi) return "⚠️缺";
-  const names = side.xi.map((p) => p.name).join("、");
-  const form = side.formation ? ` ${side.formation}` : "";
+  // 2026-06-16 用户:情报详情用中文+细胞级。知名球员转公认中文名+位置中文+逐人首发频次(X/N·铁主力/轮换),生僻保留原文不瞎音译(防编造)。
+  const names = side.xi.map((p) => playerDisplay(p, side.n)).join("、");
+  const form = side.formation ? ` ${side.formation}${postureTag(side.formation)}` : "";
   const head = `${side.tag} ${side.status}${form}`;
   if (!names) return `${head}(${side.source ?? "无名单"})`;
   const prov = side.status === "预测首发" ? `\n〔${side.source}〕` : (side.source ? `\n〔${side.source}〕` : "");
@@ -377,10 +401,10 @@ const intelSourcesCell = (web) => {
   return s.length ? s.map((u, i) => `[${i + 1}] ${u}`).join("\n") : "⚠️缺";
 };
 export function buildIntelSheet({ date, rows, intelByMatch }) {
-  const banner = `🕵️ 情报详情 · ${date} · 预测首发+阵型/伤停停赛/近期战绩/交锋史/小组形势/球队风格·关键球员·主帅/场地天气/新闻战意/来源(展示层·不动概率·每格带✅实测/🔶推断/⚠️缺)`;
-  const header = ["#", "对阵", "主队预测/确认首发(阵型·稳定度·缺阵)", "客队预测/确认首发(阵型·稳定度·缺阵)", "关键伤停/停赛",
+  const banner = `🕵️ 情报详情 · ${date} · 细胞级:逐球员预测首发(中文名·位置·近N场首发频次X/N·铁主力/轮换)+阵型态势/对位·伤停停赛/近期战绩多维统计/交锋史/小组形势/球队风格·关键球员·主帅/场地天气/新闻战意/来源(展示层·不动概率·每格带✅实测/🔶推断/⚠️缺)`;
+  const header = ["#", "对阵", "主队预测/确认首发(逐人位置·首发频次·阵型态势·稳定度·缺阵)", "客队预测/确认首发(逐人位置·首发频次·阵型态势·稳定度·缺阵)", "关键伤停/停赛",
     "主队近期战绩·统计(进失/胜率/BTTS/大球/主客/动量/攻防/赛程)", "客队近期战绩·统计(进失/胜率/BTTS/大球/主客/动量/攻防/赛程)", "交锋史(H2H深化)", "小组形势/重要性", "球队风格·关键球员·主帅", "场地·天气",
-    "新闻·战意/动机", "情报来源(URL)", "情报成熟度", "情报对位研判(🔶不进概率)"];
+    "新闻·战意/动机", "情报来源(URL)", "情报成熟度", "阵型对位+情报对位研判(🔶不进概率)"];
   const EMPTY = [String, "", "⚠️缺(无情报)", "⚠️缺(无情报)", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "⚠️缺", "0/5", "⚠️缺"];
   // 近期战绩单元格=原始赛果 + 统计层(📊场均进失/胜率/BTTS/大球 🏠主客拆分 📈动量 ⚔️攻防 🗓️赛程),全✅/🔶可追溯
   const formCell = (side) => {
@@ -414,12 +438,15 @@ export function buildIntelSheet({ date, rows, intelByMatch }) {
     const it = intelByMatch?.[r.match] ?? null;
     if (!it) return [String(r.idx), r.match, ...EMPTY.slice(2)];
     const w = it.web ?? null;
+    // 阵型对位(formationPosture 真解析派生·细胞级):主客攻防态势对撞→阵地战/对攻/反击,接进对位研判
+    const fm = formationMatchup(it.home.lineup?.formation, it.away.lineup?.formation);
+    const compText = [fm ? "🎯阵型对位:" + fm : null, it.comparison?.text].filter(Boolean).join("\n") || "⚠️缺";
     return [String(r.idx), r.match,
       lineupPlus(it.home.lineup, it.home.stats), lineupPlus(it.away.lineup, it.away.stats),
       intelCell(it.injuries.text), formCell(it.home), formCell(it.away),
       h2hCell(it, w), intelCell(w?.group), intelCell(w?.style),
       intelCell(w?.venue), intelCell(it.news.text), intelSourcesCell(w), `${it.maturity}/5`,
-      intelCell(it.comparison?.text)];
+      compText];
   });
   const tail = [[""],
     ["情报口径", "预测首发=🔶近期真实首发频次聚合(赛前1h官方阵容出即转✅);近期战绩=✅ESPN国际赛真实赛果(含友谊/预选);伤停停赛/交锋史/小组形势/球队风格·主帅/场地天气/新闻战意=全网公开赛前情报(Sports Mole/ESPN/RotoWire/FOX/Goal/Opta/FIFA等),媒体报道·🔶非官方确认,逐条URL见'情报来源'列;🔶为媒体存疑项。免费结构化伤停源对国家队为空墙,故改走全网媒体核录(中文)。"],
@@ -521,76 +548,302 @@ export function buildDecisionAidsSheet({ date, rows }) {
   return { name: "决策辅助", rows: out };
 }
 
-// ── 盘口合理性工作表(2026-06-16 用户:给直观历史区间·自己判超临界多少=深/浅)──
-//   标准=12458场五大联赛(7季)亚盘线↔1X2热门隐含历史分位;本场落 P5..P95 内=合理,<P5过深·>P95过浅。
+// ── 盘口合理性工作表(2026-06-16 用户重写:逐场写清胜负平/让球胜负平/让球线/欧赔/亚盘水位/大小球的真实赔率数字,
+//    对照历史正常区间(直接写赔率数字),判深浅,临界也写数字,不用 P5/P95 黑话)──
+//   标准=12458场五大联赛(7季)实测;每场按亚盘线锚定实力档→给同档欧赔正常区间;赔率落区外=过深/过浅。
 export function buildHandicapSanitySheet({ date, rows }) {
-  const banner = `📐 盘口合理性 · ${date} · 标准=12458场五大联赛(7季)历史区间;本场热门隐含落 P5–P95=合理,低于P5=过深(让太多/热门被高估),高于P95=过浅(让太少/热门更强)。✅历史频次,供你自行判断,非下注edge。`;
-  const header = ["对阵", "亚盘线", "本场热门胜率(来源)", "该线历史正常区间(P5–P95·中位)", "落点判定", "超临界多少", "解读"];
-  const body = rows.map((r) => {
+  const banner = `📐 盘口合理性 · ${date} · 逐场细胞级:【胜负平/让球胜负平/让球线/亚盘水位/大小球】真实赔率→对照12458场五大联赛(7季)历史正常区间(直接写数字)判深浅+差临界(数字);再加【亚盘水位失衡(钱压谁过盘)/初盘→即时盘口移动(被加注56.4%胜 vs 退烧45.5%·5年实证)/综合盘口裁决】。规则:热门胜赔比历史最低还低=盘口过浅(热门更强·让太少·受让方过盘易);比历史最高还高=过深(热门被高估·让太多·受让方/爆冷有值)。✅历史频次,供你自行判断,非下注edge(公开盘口打不过收盘线)。`;
+  const num = (x) => (x == null || !Number.isFinite(Number(x)) ? null : Number(x));
+  const dec = (x) => { const v = num(x); return v == null ? "—" : v.toFixed(2); };
+  const pc = (x) => (x == null ? "—" : (x * 100).toFixed(1) + "%");
+  const rg = (a) => (a ? `${a[0]}–${a[2]}(中${a[1]})` : "—");
+  // 热门胜赔深浅:赔率低=热门强=让太少=过浅;赔率高=热门弱=让太多=过深(与热门隐含%口径一致)
+  const judgeFav = (val, band) => {
+    if (val == null || !band) return { tag: "—", gap: "—" };
+    if (val < band[0]) return { tag: "🔴过浅", gap: `本场${val.toFixed(2)} 低于历史最低${band[0]}(差${(band[0] - val).toFixed(2)})` };
+    if (val > band[2]) return { tag: "🔴过深", gap: `本场${val.toFixed(2)} 高于历史最高${band[2]}(差${(val - band[2]).toFixed(2)})` };
+    return { tag: "🟢合理", gap: `本场${val.toFixed(2)} 落在${band[0]}–${band[2]}内` };
+  };
+  // 平赔/冷赔纯描述(非热门方不判深浅)
+  const judgePlain = (val, band) => {
+    if (val == null || !band) return { tag: "—", gap: "—" };
+    if (val < band[0]) return { tag: "偏低", gap: `本场${val.toFixed(2)} 低于最低${band[0]}` };
+    if (val > band[2]) return { tag: "偏高", gap: `本场${val.toFixed(2)} 高于最高${band[2]}` };
+    return { tag: "区间内", gap: `本场${val.toFixed(2)} 在${band[0]}–${band[2]}` };
+  };
+  // 7 列(与底部历史总表同宽);列头只在顶部出现一次,配合冻结窗格——区块用 ━━ 分隔,各行对齐顶部列头。
+  const colHeader = ["玩法/盘口", "本场真实赔率", "历史正常区间(数字)", "落点深浅", "差临界(数字)", "解读", "数据标签"];
+  const SEP = (txt) => [txt, "", "", "", "", "", ""];   // 区段标题行:补满 7 列(首列承载文本)
+  const out = [[banner], colHeader];
+
+  for (const r of rows) {
+    const o = r.sanityOdds ?? {};
     const s = r.sanity;
     const isModel = /模型/.test(String(r.favProbSource ?? ""));
-    if (!s) return [r.match, r.ahLineEspn ?? "—", "—", "—", "⚠️无亚盘线或1X2隐含", "—", "缺数据不判(不编)"];
-    const pc = (x) => x == null ? "—" : (x * 100).toFixed(1) + "%";
-    const probCell = `${pc(s.favProb)}${isModel ? "·🔶模型(1X2未开售)" : "·✅盘口"}`;
-    if (!s.band) return [r.match, s.line, probCell, "无该线≥30样本", s.verdict, "—", "该让球线历史样本不足,不硬套"];
-    const range = `${pc(s.band.p5)}–${pc(s.band.p95)}(中${pc(s.band.p50)})·N=${s.band.n}`;
-    const verdict = (isModel ? "🔶仅参考·" : "") + (s.verdict === "合理" ? "🟢合理(区间内)" : s.verdict === "过深" ? "🔴过深(低于P5)" : "🔴过浅(高于P95)");
-    const gap = s.exceeded ? `${s.verdict === "过深" ? "低于下限" : "高于上限"} ${s.gapPp}pp` : "区间内·0";
-    const read = isModel
-      ? "⚠️1X2未开售→用模型估非盘口,盘口合理性不适用(只卖让球盘),仅参考"
-      : s.verdict === "合理" ? "盘口与历史同线常态一致" : s.verdict === "过深" ? "让球比同强度该有的深→受让方/爆冷有值" : "让球比该有的浅→热门实际更强·受让方过盘易";
-    return [r.match, s.line, probCell, range, verdict, gap, read];
-  });
+    const anchor = o.anchorLine ?? o.ahLine ?? o.jcLine;                 // 强度锚=亚盘优先,缺则竞彩让球线兜底
+    const eb = europeanBand(anchor);                                     // 欧赔区间(按强度锚档)
+    const favHome = o.euro ? num(o.euro.home) <= num(o.euro.away) : (anchor != null ? num(anchor) < 0 : null);
+    const jcCell = o.jcLine == null ? "让球线未抓到" : (Number(o.jcLine) === 0 ? "平手(让0)" : `让${o.jcLine}球`);
+    const ahCell = o.ahLine == null
+      ? (o.anchorIsAsian ? "亚盘线未抓到" : `亚盘未抓到→用竞彩让球线${anchor != null ? (Number(anchor) === 0 ? "(平手)" : `(让${anchor})`) : ""}锚强度`)
+      : `${o.ahLine}(主水${dec(o.ahHomeWater)}/客水${dec(o.ahAwayWater)})`;
+    out.push(SEP(""));
+    out.push(SEP(`━━ ${r.match} ━━　竞彩${jcCell}　｜亚盘 ${ahCell}　｜${favHome == null ? "热门方未定" : favHome ? "主队=热门" : "客队=热门"}`));
+
+    // ① 胜负平 / 欧洲赔率(让0直胜)
+    if (o.euro) {
+      const homeBand = eb ? (favHome ? eb.win : eb.dog) : null;
+      const awayBand = eb ? (favHome ? eb.dog : eb.win) : null;
+      const drawBand = eb ? eb.draw : null;
+      const noBand = eb ? "—" : "⚠️亚盘线无对应历史档·不硬套";
+      const jh = (favHome ? judgeFav : judgePlain)(num(o.euro.home), homeBand);
+      const jd = judgePlain(num(o.euro.draw), drawBand);
+      const ja = (favHome ? judgePlain : judgeFav)(num(o.euro.away), awayBand);
+      out.push([`胜负平·主胜(欧洲${favHome ? "·热门" : "·冷门"})`, dec(o.euro.home), homeBand ? rg(homeBand) : noBand, jh.tag, jh.gap, favHome ? "主队=热门:赔率比历史更低→让太少(过浅)、更高→让太多(过深)" : "主队=冷门方·参照同档冷赔", "✅实测500欧赔"]);
+      out.push([`胜负平·平局(欧洲)`, dec(o.euro.draw), drawBand ? rg(drawBand) : noBand, jd.tag, jd.gap, "平赔偏低=市场看高平局概率", "✅实测500欧赔"]);
+      out.push([`胜负平·客胜(欧洲${favHome ? "·冷门" : "·热门"})`, dec(o.euro.away), awayBand ? rg(awayBand) : noBand, ja.tag, ja.gap, favHome ? "客队=冷门方·参照同档冷赔" : "客队=热门:赔率更低→让太少(过浅)、更高→过深", "✅实测500欧赔"]);
+    } else {
+      out.push([`胜负平·欧洲赔率`, "⚠️1X2未开售(悬殊盘只卖让球)", eb ? `同档热门胜${rg(eb.win)}/平${rg(eb.draw)}/客${rg(eb.dog)}` : "—", "—", "—", "1X2未开售→无直胜赔可比,下行用模型热门隐含仅参考", "⚠️缺"]);
+    }
+
+    // ② 热门隐含胜率(综合深浅裁决·盘口合理性核心)
+    if (s && s.band) {
+      const vCell = `${pc(s.favProb)}${isModel ? "·🔶模型" : "·✅盘口de-vig"}`;
+      const verdict = (isModel ? "🔶仅参考·" : "") + sanityVerdictLabel(s).tag;
+      const gap = s.exceeded
+        ? `热门隐含${pc(s.favProb)} ${s.verdict === "过深" ? `低于正常下限${pc(s.band.p5)}` : `高于正常上限${pc(s.band.p95)}`} ${s.gapPp}个百分点`
+        : `落在${pc(s.band.p5)}–${pc(s.band.p95)}内`;
+      out.push([`热门隐含胜率(综合裁决)`, vCell, `${pc(s.band.p5)}–${pc(s.band.p95)}(中${pc(s.band.p50)})·N=${s.band.n}`, verdict, gap,
+        isModel ? "1X2未开售·模型估非盘口·仅参考" : s.verdict === "合理" ? "盘口与历史同强度常态一致" : s.verdict === "过深" ? "让球比该强度该有的深→受让方/爆冷有值" : "让球比该有的浅→热门更强·受让方过盘易",
+        isModel ? "🔶模型" : "✅盘口de-vig"]);
+    } else if (s) {
+      out.push([`热门隐含胜率(综合裁决)`, `${pc(s.favProb)}${isModel ? "·🔶模型" : ""}`, "无该线≥30样本历史档", "—", "—", "该让球线历史样本不足·不硬套", isModel ? "🔶模型" : "✅盘口"]);
+    } else {
+      out.push([`热门隐含胜率(综合裁决)`, "—", "—", "⚠️缺", "—", "缺亚盘线或1X2隐含·不判(不编)", "⚠️缺"]);
+    }
+
+    // ③ 让球胜负平(竞彩让球后真实赔率·竞彩让球盘无独立历史区间→仅列值)
+    if (o.hcp) {
+      out.push([`让球胜负平·竞彩${jcCell}`, `主${dec(o.hcp.home)}/平${dec(o.hcp.draw)}/客${dec(o.hcp.away)}`, "竞彩让球盘暂无独立历史区间", "仅列值", "—", "竞彩让球后胜平负真实赔率·深浅判读以上方欧赔/亚盘为准", "✅实测500让球"]);
+    } else {
+      out.push([`让球胜负平·竞彩`, "⚠️让球赔率未抓到", "—", "—", "—", "缺·不编", "⚠️缺"]);
+    }
+
+    // ④ 大小球 2.5(竞彩de-vig隐含%·给同档历史over/under赔参照,不做深浅裁决)
+    const ob = ouBand(o.over25);
+    if (o.over25 != null) {
+      out.push([`大小球2.5`, `大${pc(o.over25)}/小${pc(o.under25)}(竞彩de-vig隐含)`, ob ? `该档over赔${rg(ob.over)}·under中${ob.underMid}(N=${ob.n})` : "—", "参考", o.over25 >= 0.55 ? "偏大球档" : o.over25 <= 0.45 ? "偏小球档" : "中性档", "本场为竞彩总进球de-vig隐含%(非原始over/under赔)→只给同档历史赔率参照", "✅实测500总进球"]);
+    } else {
+      out.push([`大小球2.5`, "⚠️总进球未抓到", "—", "—", "—", "缺·不编", "⚠️缺"]);
+    }
+
+    // ⑤ 亚盘水位(失衡/被重注)——水位近乎与让球线无关(中位≈1.92),深=被重注·失衡=钱压一侧过盘
+    const ws = waterSanity(o.ahHomeWater, o.ahAwayWater);
+    if (ws && (ws.homeDec != null || ws.awayDec != null)) {
+      const b = ws.band;
+      out.push([`亚盘水位(主/客)`, `主${ws.homeDec ?? "—"}/客${ws.awayDec ?? "—"}(decimal)`, `正常${b.p5}–${b.p95}(中${b.mid}·N=${b.n})`,
+        ws.lean === "均衡" ? "🟢均衡" : "🟠" + ws.lean, ws.gap != null ? `主客水差${ws.gap > 0 ? "+" : ""}${ws.gap}` : "—",
+        `水位深(<${b.p5})=该侧被重注赔付低;失衡=资金压低水一侧过盘(亚盘玩家更信);水位本身近乎与让球线无关`, "✅实测亚盘"]);
+    } else {
+      out.push([`亚盘水位(主/客)`, "⚠️水位未抓到", "—", "—", "—", "缺·不编", "⚠️缺"]);
+    }
+
+    // ⑥ 盘口移动(初盘→即时):欧赔热门隐含漂移 + 亚盘线移动 + 经验命中率(被加注56.4%胜/退烧45.5%·5年实证)
+    const movParts = [];
+    if (o.euro && o.euroInit) {
+      const im = (oo) => { const h = num(oo.home), d = num(oo.draw), a = num(oo.away); if (!(h > 1 && d > 1 && a > 1)) return null; const s2 = 1 / h + 1 / d + 1 / a; return { home: (1 / h) / s2, draw: (1 / d) / s2, away: (1 / a) / s2 }; };
+      const ii = im(o.euroInit), cc = im(o.euro);
+      if (ii && cc) {
+        const fk = favHome ? "home" : "away";
+        const drift = cc[fk] - ii[fk];
+        const tag = drift > 0.02 ? `热门被加注(+${(drift * 100).toFixed(0)}pp)→5年实证该类热门56.4%胜(更可靠)` : drift < -0.02 ? `热门退烧(${(drift * 100).toFixed(0)}pp)→5年实证仅45.5%胜(更危险)` : `欧赔平稳(${(drift * 100).toFixed(0)}pp)`;
+        movParts.push(tag);
+      }
+    }
+    if (o.ahLine != null && o.ahLineInit != null && Number(o.ahLine) !== Number(o.ahLineInit)) {
+      movParts.push(`亚盘线移动 ${o.ahLineInit}→${o.ahLine}(${Math.abs(o.ahLine) > Math.abs(o.ahLineInit) ? "加深·更笃定" : "收浅·走软"})`);
+    }
+    const movTag = movParts.length ? "🔶有移动" : "🟢平稳/无初盘";
+    out.push([`盘口移动(初盘→即时)`, movParts.length ? movParts.join(" · ") : "无明显移动或无初盘", "经验:被加注热门56.4%胜 vs 退烧45.5%(33278场·弱信号)", movTag, "—",
+      "⚠️回测证1X2初→收走势对命中=弱信号/噪声,仅作市场修正方向参考,非下注edge", o.euroInit ? "✅实测初/即时" : "⚠️无初盘"]);
+
+    // ⑦ 跨源交叉验证(竞彩500 vs 国际外盘DraftKings亚盘 + The Odds API大小球)——外盘更接近收盘sharp,分歧=值得多看
+    const xParts = [];
+    let xDiverge = false;
+    if (o.dkAsianLine != null && (o.ahLine != null || o.jcLine != null)) {
+      const jcRef = o.ahLine ?? o.jcLine;
+      const gap = Math.abs(o.dkAsianLine) - Math.abs(jcRef);
+      const dir = Math.abs(gap) < 0.13 ? "一致" : Math.abs(o.dkAsianLine) > Math.abs(jcRef) ? "外盘更深(外盘更看好热门→竞彩受让方或有值)" : "外盘更浅(外盘更看淡热门)";
+      if (Math.abs(gap) >= 0.13) xDiverge = true;
+      xParts.push(`亚盘线:竞彩${jcRef} vs ${o.dkAsianSrc}${o.dkAsianLine}→${dir}`);
+    }
+    if (o.intlOverProb != null && o.over25 != null) {
+      const gap = o.intlOverProb - o.over25;
+      const dir = Math.abs(gap) < 0.04 ? "一致" : gap > 0 ? `外盘更看大球(+${(gap * 100).toFixed(0)}pp)` : `外盘更看小球(${(gap * 100).toFixed(0)}pp)`;
+      if (Math.abs(gap) >= 0.04) xDiverge = true;
+      xParts.push(`大小球:竞彩大${pc(o.over25)} vs 国际${o.intlOverBooks ?? ""}家大${pc(o.intlOverProb)}→${dir}`);
+    }
+    if (xParts.length) {
+      out.push([`跨源交叉验证(竞彩vs国际外盘)`, xParts.join(" · "), "外盘(DraftKings/The Odds API)更接近收盘sharp;与竞彩分歧=竞彩线或滞后/有值", xDiverge ? "🟠有分歧" : "🟢一致",
+        "—", "国际盘与竞彩分歧→受让/大小球方向值得多看一眼(非保证,公开盘仍打不过收盘线)", "✅实测外盘"]);
+    }
+
+    // ⑧ 综合盘口裁决(汇总本场各深浅旗标·一眼定性)
+    const flags = [];
+    if (s?.exceeded) flags.push(`热门隐含${s.verdict}(${s.gapPp}pp)`);
+    if (ws && ws.lean !== "均衡") flags.push(ws.lean);
+    if (movParts.length) flags.push("盘口有移动");
+    if (xDiverge) flags.push("跨源分歧");
+    if (o.over25 != null && (o.over25 >= 0.58 || o.over25 <= 0.44)) flags.push(o.over25 >= 0.58 ? "大球档" : "小球档");
+    const overall = flags.length ? `🟠注意:${flags.join(" · ")}` : "🟢盘口各维度均在历史常态区间内";
+    out.push([`综合盘口裁决`, overall, "汇总上方各玩法深浅/失衡/移动/跨源旗标", flags.length ? "有异常项" : "常态", "—", "异常项越多越值得多看一眼;非买卖信号(公开盘口打不过收盘线)", "—"]);
+  }
+
   // 全量历史标准区间参照(用户:全写出来·什么区间合理)——每条让球线 胜率+胜/平/客赔 + 大小球区间。
   const refHead = [[""], ["━━ 历史标准区间总表(12458场7季·所有让球线·本场赔率落区外=过深/过浅)━━"]];
   const ref = handicapReferenceRows();
   const ouHead = [[""], ["━━ 大小球(总进球2.5)标准区间 ━━"]];
   const ou = ouReferenceRows();
-  return { name: "盘口合理性", rows: [[banner], header, ...body, ...refHead, ...ref, ...ouHead, ...ou] };
+  return { name: "盘口合理性", rows: [...out, ...refHead, ...ref, ...ouHead, ...ou] };
 }
 
-// ── 爆冷研判工作表(2026-06-16 用户:单独·据数据排序哪场最可能爆冷+若爆冷的比分半全场+怎么防)──
+// ── 爆冷研判工作表(2026-06-16 用户:细胞级展开·只接引擎已算的 OOS 验证信号,零臆造)──
+//   结构:① 排行榜(一眼看哪场最可能冷·按热门不胜%降序)→ ② 逐场细胞级因子分解(每个爆冷因子=一行:
+//   本场读数 + 历史/OOS依据 + 信号方向 + 对玩法的提示)。信号源=diagnoseUpsetRisk/analyzeUpsetTrap/
+//   analyzeTotalsMovement/经验库,全部回测/OOS 验证过(见各模块注),诚实 caveat 保留,不替用户弃赛。
 export function buildUpsetAnalysisSheet({ date, rows }) {
-  const banner = `🎲 爆冷研判 · ${date} · 据真实盘口+历史区间排序:哪场最可能爆冷(不胜%越高越易冷)+实力差Elo+平局隐含+历史同档爆冷率(12458场真赛果)+盘口深浅+若爆冷最可能结果(🔶模型矩阵派生·非500真盘·具体比分=不可约方差仅供参考)+怎么防。证伪只标注,买不买你定。`;
-  const header = ["排名", "对阵", "热门不胜%(盘口)", "实力差Elo", "平局隐含(盘口)", "历史同档爆冷率", "盘口深浅(超临界)", "若爆冷最可能(🔶模型派生)", "怎么防"];
+  const banner = `🎲 爆冷研判 · ${date} · ①排行榜按热门不胜%降序(越高越易冷)②逐场细胞级因子分解。爆冷锚=热门1X2不胜的市场共识概率(最诚实);辅以实力差Elo/让球线深浅(vs同实力档中位)/大小球进球预期/平局隐含(OOS最干净·≥30%→实际31.5%)/大小球走势(唯一z>4真edge:加注→大球63%·退烧→小球44%)/历史同档爆冷率(12458场真赛果)。盘口1X2走势对爆冷=噪声(回测证)仅描述不升档。盘口只上调风险非必爆(瑞典5-1反例),证伪只标注·买不买你定。`;
+  const pc = (x) => (x == null || !Number.isFinite(Number(x)) ? "—" : Math.round(Number(x) * 100) + "%");
+  const isModelOf = (r) => /模型/.test(String(r.favProbSource ?? ""));
+  const eloCellOf = (r) => Number.isFinite(r.eloDiff) ? `${r.eloDiff > 0 ? "+" : ""}${r.eloDiff}${r.eloDiff > 0 ? "(主强)" : r.eloDiff < 0 ? "(客强)" : "(均势)"}` : "—";
+  // 统一防守建议(与分型同源·消除"强热可胆 vs 别当胆"矛盾·逐场差异化):势均→别当胆;中等→别重注;强热→可胆控注;再叠加过浅/防平
+  const guardOf = (r, nw, depth) => {
+    const ut = r.upsetDiag?.upsetType ?? "";
+    const parts = [];
+    if (nw >= 42 || /势均|双向/.test(ut)) parts.push("别当胆·双选含平·串关排除");
+    else if (nw >= 28) parts.push("中等热门·别重注当胆·可双选护一手");
+    else if (/可胆|低风险|强热/.test(ut)) parts.push("强热·可作胆但控注勿满仓");
+    else parts.push("按盘口控注");
+    if (depth && depth.includes("过浅")) parts.push("盘口过浅→受让方过盘易·别买深让当胆");
+    if (r.drawImpliedPct >= 0.30) parts.push("🔴防平");
+    return parts.join("·");
+  };
   const ranked = rows
     .map((r) => ({ r, nw: Number.isFinite(r.notWinPct) ? r.notWinPct : -1 }))
     .sort((a, b) => b.nw - a.nw);
-  const body = ranked.map(({ r, nw }, i) => {
-    const s = r.sanity;
-    const depth = !s || !s.band ? "—" : s.verdict === "合理" ? "🟢合理" : `🔴${s.verdict} ${s.gapPp}pp`;
-    const us = r.upsetData;
+
+  // ── ① 排行榜(9 列;最宽行→writer 以此为列头行,避免整块被当标题合并)──
+  const sumHeader = ["排名", "对阵", "热门不胜%", "分型", "实力差Elo", "平局隐含", "历史同档爆冷率", "盘口深浅", "一句话防守"];
+  const sumRows = ranked.map(({ r, nw }, i) => {
+    const s = r.sanity, d = r.upsetDiag;
+    const depth = !s || !s.band ? "—" : sanityVerdictLabel(s).tag;
+    const nwCell = nw >= 0 ? `${nw}%${isModelOf(r) ? "·🔶模型" : "·✅盘口"}` : "—";
+    const di = r.drawImpliedPct;
+    const drawCell = di != null ? `${Math.round(di * 100)}%${di >= 0.30 ? "·🔴防平" : ""}` : "—";
+    const hu = r.histLineUpset;
+    const huCell = hu != null ? `${Math.round(hu * 100)}%${hu >= 0.45 ? "·🟠高基线" : ""}` : "—";
+    const typeCell = d?.upsetType ?? (nw >= 42 ? "🔴双向爆冷(势均)" : nw >= 0 && nw < 22 ? "🟢低风险(强热)" : "中性");
+    const guard = guardOf(r, nw, depth);
+    const rankTag = i === 0 ? "1·最可能" : i === ranked.length - 1 ? `${i + 1}·最稳` : String(i + 1);
+    return [rankTag, r.match, nwCell, typeCell, eloCellOf(r), drawCell, huCell, depth, guard];
+  });
+
+  // ── ② 逐场细胞级因子分解 ──
+  const SEP = (t) => [t, "", "", "", ""];
+  const blkHeader = ["爆冷因子", "本场读数", "历史/OOS依据", "信号方向", "对玩法的提示"];
+  const blocks = [];
+  ranked.forEach(({ r, nw }, i) => {
+    const d = r.upsetDiag, tr = r.upsetTrap, tm = r.totalsMove, s = r.sanity, us = r.upsetData;
+    const isModel = isModelOf(r);
+    blocks.push(SEP(""));
+    blocks.push(SEP(`■ 排名${i + 1} ${i === 0 ? "(最可能爆冷)" : i === ranked.length - 1 ? "(最稳)" : ""}　${r.match}　分型:${d?.upsetType ?? "—"}`));
+    blocks.push(blkHeader);
+
+    // 1) 市场共识锚:热门1X2不胜%
+    blocks.push(["①热门1X2不胜%(市场共识锚)", nw >= 0 ? `${nw}%${isModel ? "·🔶模型(1X2未开售)" : "·✅盘口de-vig"}` : "⚠️缺",
+      "市场对热门不胜的共识概率=最诚实爆冷基准(打不过收盘线)", d?.band ? `档位:${d.band}` : (nw >= 42 ? "高" : nw >= 25 ? "中" : "低"),
+      nw >= 42 ? "势均·双选含平·勿当胆" : nw >= 25 ? "中等热门·别重注当胆" : "强热·可作胆但仍控注"]);
+
+    // 2) 实力差 Elo
+    blocks.push(["②实力差Elo(WC national-elo真先验)", eloCellOf(r),
+      "世界杯模型国家队Elo真实先验·非DC拟合(可追溯)", Number.isFinite(r.eloDiff) ? (Math.abs(r.eloDiff) >= 150 ? "实力悬殊" : Math.abs(r.eloDiff) >= 60 ? "明显差距" : "接近") : "非WC/缺",
+      Number.isFinite(r.eloDiff) && Math.abs(r.eloDiff) < 60 ? "实力接近→爆冷/平局温床" : "实力差大→热门更稳"]);
+
+    // 3) 让球线深浅(vs 同实力档中位基准)
+    if (d?.lineDepth || d?.marginExpect) {
+      blocks.push(["③让球线深浅(vs同实力档中位)", `${d.marginExpect ?? "—"}${d.lineDepth ? `·${d.lineDepth}` : ""}`,
+        "基准=同1X2实力档亚盘中位(mine-upset-drivers 8906场);深浅看残差非绝对值",
+        d.lineDepth === "深于同类(市场敢加码)" ? "市场敢深让=更笃定" : d.lineDepth === "浅于同类" ? "线浅(边缘平局信号z=2.2)" : "同类正常",
+        d.lineDepth === "浅于同类" ? "深热+线浅→边缘防平·别买深让当胆" : "按盘口控注"]);
+    }
+
+    // 4) 大小球进球预期
+    if (d?.goalsExpect && d.goalsExpect !== "未知") {
+      blocks.push(["④大小球进球预期", `${d.goalsExpect}${r.sanityOdds?.over25 != null ? `·大球${pc(r.sanityOdds.over25)}` : ""}`,
+        "低线=闷战(净胜薄+平局多);德4.5血洗 vs 西3.5闷局的真区分点", /低球|偏小/.test(d.goalsExpect) ? "闷战倾向" : /高球|偏大/.test(d.goalsExpect) ? "对攻倾向" : "中性",
+        /低球|偏小/.test(d.goalsExpect) ? "闷战→热门易被逼平·防平" : "进球多→爆冷以被翻盘为主"]);
+    }
+
+    // 5) 平局隐含(OOS 最干净信号)
+    const di = r.drawImpliedPct;
+    blocks.push(["⑤平局隐含%(OOS最干净·防平)", di != null ? `${pc(di)}${di >= 0.30 ? "·🔴" : ""}` : "⚠️1X2未开售缺",
+      "OOS校准:平局隐含≥30%→历史实际平局31.5%(最干净的隐藏平局信号)", di != null ? (di >= 0.30 ? "🔴防平(高发档)" : di >= 0.25 ? "中性偏防" : "平局低") : "缺",
+      di != null && di >= 0.30 ? "胜负平双选含平·半全场加平-平" : "平局风险一般"]);
+
+    // 6) 大小球走势(唯一 z>4 真 edge)
+    if (tm && tm.lean) {
+      blocks.push(["⑥大小球走势(唯一z>4真edge)", `${tm.lean}${tm.move != null ? `(移动${(tm.move * 100).toFixed(0)}pp)` : ""}${tm.empiricalOverRate != null ? `·历史大球${pc(tm.empiricalOverRate)}` : ""}`,
+        "8906场实证:加注→大球63%·退烧→小球44%(z=4.4/-4.7,唯一过统计强度的真edge)", tm.band ?? "—",
+        tm.lean === "大球" ? "大小球玩法倾向大球(有据)" : tm.lean === "小球" ? "倾向小球(有据)·小球常伴闷平" : "无走势信号"]);
+    } else {
+      blocks.push(["⑥大小球走势(唯一z>4真edge)", "⚠️无初盘大小球·无法判走势", "需初→收双盘;本场仅收盘(不编造走势)", "—", "大小球走势信号本场不可用"]);
+    }
+
+    // 7) 盘口移动/诱盘(1X2走势=噪声,仅描述)
+    if (tr && tr.movement) {
+      const MVZH = { "flat": "盘口平稳", "stable": "盘口平稳", "mild": "轻微移动", "drift": "缓慢移动", "strong-steam": "剧烈异动(steam)" };
+      const mv = MVZH[tr.movement.classification] ?? tr.movement.classification;
+      blocks.push(["⑦1X2盘口移动/诱盘判读", `${mv}${tr.movement.favoriteDrift != null ? `·热门漂移${(tr.movement.favoriteDrift * 100).toFixed(0)}pp` : ""}·${tr.trapVerdict ?? "—"}`,
+        "⚠️回测证1X2初→收走势对爆冷=噪声(分歧时市场更准);仅作诊断", tr.upsetLevel ? `诱盘判读置信${pc(tr.trapConfidence)}` : "—",
+        "仅诊断·非弃注/弃热门依据(回测背书)"]);
+    }
+
+    // 8) 历史同档爆冷率(12458场真赛果)
+    const hu = r.histLineUpset;
+    blocks.push(["⑧历史同档爆冷率(12458场真赛果)", hu != null ? `${pc(hu)}${hu >= 0.45 ? "·🟠高基线" : ""}` : "—",
+      "该让球线上给球热门历史真实'不胜'频次(跨场可比爆冷基线)", hu != null ? (hu >= 0.45 ? "高基线" : hu >= 0.30 ? "中" : "低") : "缺",
+      hu != null && hu >= 0.45 ? "该档历史本就易冷·让得越少越易冷" : "该档历史较稳"]);
+
+    // 9) 经验库平局基线(WC场落全局~26%,非窄情境匹配——如实标注不过度声称)
+    if (r.drawRateExp != null) {
+      const wide = r.drawRateExpN && r.drawRateExpN > 5000;  // 大N=全局基线非窄匹配
+      blocks.push(["⑨经验库平局基线", `${pc(r.drawRateExp)}${r.drawRateExpN ? `(N=${r.drawRateExpN}${wide ? "·全局基线" : "·同情境"})` : ""}`,
+        wide ? "经验库整体平局频次(WC场无窄情境匹配·落全局基线·仅背景参照)" : "历史同联赛/同档真实平局频次", r.drawRateExp >= 0.30 ? "偏高" : "一般",
+        wide ? "背景参照·以本场平局隐含(⑤)为准" : (r.drawRateExp >= 0.30 ? "兼顾平局" : "—")]);
+    }
+
+    // 10) 若爆冷最可能结果(真盘优先,模型矩阵兜底)
     let shape = "—";
     if (us) {
-      const pc = (x) => x == null ? "" : Math.round(x * 100) + "%";
       const parts = [];
-      // 被逼平比分:优先500真盘平局格(✅),无则模型矩阵(🔶)——用户:拿真盘说话
       const md = r.upsetMarketDraw;
       if (md?.score) parts.push(`被逼平 ${md.score}(${pc(md.prob)}·✅500真盘)`);
       else if (us.drawScore && us.drawScoreProb != null) parts.push(`被逼平 ${us.drawScore}(${pc(us.drawScoreProb)}·🔶模型)`);
       if (us.drawHalfFull != null) parts.push(`半全场平-平 ${pc(us.drawHalfFull)}`);
       if (us.reverseScore && us.reverseScoreProb != null) parts.push(`或被翻盘 ${us.reverseScore}(${pc(us.reverseScoreProb)}·🔶模型)`);
-      if (us.goalsLean) parts.push(`大小球倾向${us.goalsLean}`);
       shape = parts.join(" · ") || "—";
     }
+    blocks.push(["⑩若爆冷最可能结果", shape, "比分=不可约方差·仅参考;被逼平格优先500真盘", "—", "若防爆冷:按上方比分加平局格/半全场平-平"]);
+
+    // 11) 综合分型 + 怎么防 + 诚实 caveat
     const drawGrid = r.upsetMarketDraw?.score ?? us?.drawScore;
-    const guard = nw >= 25
-      ? "别当胆·胜负平双选含平" + (drawGrid ? `·比分加平局格${drawGrid}` : "") + "·半全场加平-平·深让球减注·串关排除"
-      : (s?.verdict === "过浅" ? "1X2难爆冷但盘口过浅→受让方过盘易·别买热门深让当胆" : "相对稳·按盘口控注");
-    const rankTag = i === 0 ? "1·最可能" : i === ranked.length - 1 ? `${i + 1}·最稳` : String(i + 1);
-    const isModel = /模型/.test(String(r.favProbSource ?? ""));
-    const nwCell = nw >= 0 ? `${nw}%${isModel ? "·🔶模型(1X2未开售)" : "·✅盘口"}` : "—";
-    // 实力差Elo:正=主队强(世界杯模型 national-elo 真先验);非WC/缺=—
-    const eloCell = Number.isFinite(r.eloDiff) ? `${r.eloDiff > 0 ? "+" : ""}${r.eloDiff}${r.eloDiff > 0 ? "(主强)" : r.eloDiff < 0 ? "(客强)" : "(均势)"}` : "—";
-    // 平局隐含:500欧赔de-vig真盘口(✅);≥30%标红=爆冷头号路径(被逼平)历史高发档
-    const di = r.drawImpliedPct;
-    const drawCell = di != null ? `${Math.round(di * 100)}%${di >= 0.30 ? "·🔴防平" : ""}` : "—";
-    // 历史同档爆冷率:该让球线12458场真实赛果"热门不胜"频次(跨场可比爆冷基线)
-    const hu = r.histLineUpset;
-    const huCell = hu != null ? `${Math.round(hu * 100)}%${hu >= 0.45 ? "·🟠高基线" : ""}` : "—";
-    return [rankTag, r.match, nwCell, eloCell, drawCell, huCell, depth, shape, guard];
+    const depthTag = !s || !s.band ? "" : sanityVerdictLabel(s).tag;
+    const guard = guardOf(r, nw, depthTag) + (nw >= 28 && drawGrid ? `·比分加平局格${drawGrid}·半全场加平-平` : "");
+    blocks.push(["⑪综合裁决·怎么防", d?.upsetType ?? "—", d?.reason ?? "—", "—", guard]);
+    if (d?.caveat) blocks.push(["⚠️诚实边界", d.caveat, "", "", ""]);
   });
-  return { name: "爆冷研判", rows: [[banner], header, ...body] };
+
+  return { name: "爆冷研判", rows: [[banner], sumHeader, ...sumRows, SEP(""), SEP("━━━━ 以下为逐场细胞级因子分解 ━━━━"), ...blocks] };
 }
 
 // ── 14场/任选9 闸裁决工作表(buildFourteenPlan 闸如实判定;不能出写明依据,绝不硬凑) ──
@@ -861,6 +1114,10 @@ export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, 
     `<div class="drow"><b>比分</b>${br(r.score)}<span class="g"> · 赔率 ${esc(r.scoreMkt)}</span></div>` +
     `<div class="drow"><b>半全场</b>${br(r.halffull)}<span class="g"> · 赔率 ${esc(r.hfMkt)}</span></div>` +
     `<div class="drow"><b>大小球</b>${esc(r.ouReal)}<span class="g"> · 进球分布 ${esc(r.dist)}</span></div>` +
+    // 📐盘口体检(细胞级精华·详见 xlsx「盘口合理性」):热门隐含 vs 同强度历史区间→深浅
+    (r.sanity?.band ? `<div class="drow"><b>📐盘口体检</b>热门隐含${Math.round(r.sanity.favProb * 100)}% ${sanityVerdictLabel(r.sanity).tag}<span class="g"> · 同强度历史正常${Math.round(r.sanity.band.p5 * 100)}–${Math.round(r.sanity.band.p95 * 100)}%(详见xlsx盘口合理性表)</span></div>` : "") +
+    // 🎲爆冷因子(细胞级精华·详见 xlsx「爆冷研判」):分型+热门不胜%+防平
+    (r.upsetDiag ? `<div class="drow"><b>🎲爆冷因子</b>${esc(r.upsetDiag.upsetType ?? "—")} · 热门不胜${Math.round(r.upsetDiag.baseUpsetProb * 100)}%${r.drawImpliedPct >= 0.30 ? ' · <span class="w2">🔴防平</span>' : ""}${r.totalsMove?.lean && r.totalsMove.lean !== "无明显走势" ? ` · 大小球走势倾向${esc(r.totalsMove.lean)}` : ""}<span class="g">(详见xlsx爆冷研判表)</span></div>` : "") +
     `<div class="drow"><b>近5</b>${esc(r.homeRec)} <span class="g">${esc(r.homeLast5)}</span><br><span class="ind">${esc(r.awayRec)} <span class="g">${esc(r.awayLast5)}</span></span></div>` +
     `<div class="drow"><b>H2H</b>${esc(r.h2h)}</div>` +
     `<div class="drow"><b>攻防</b>${esc(r.profile)}</div>` +
@@ -913,7 +1170,7 @@ export function resolveHtmlWriteTarget({ existingHtml, date, canonicalPath, date
 // ── 英文固定URL页 football.html(手机收藏夹固定地址;缺陷#16:跟随当日,与 xlsx/手机页同源同日期) ──
 export function renderEnglishHtml({ date, rows, riskNote, intlN, wcN, banner, auditFoot, parlayPlan = null, recordLine = null, stakeSum = null }) {
   const br = (s) => esc(s).replace(/\n/g, "<br>");
-  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}</td><td>${esc(r.wld)}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(r.hcView)}</td><td>${esc(r.score)}〔${esc(r.scoreSrc)}〕</td><td>${esc(r.halffull)}〔${esc(r.hfSrc)}〕</td><td>${esc(r.ouReal)}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
+  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}${r.sanity?.band ? `<br><span style="color:#888;font-size:11px">📐热门隐含${Math.round(r.sanity.favProb * 100)}%${sanityVerdictLabel(r.sanity).tag}(正常${Math.round(r.sanity.band.p5 * 100)}–${Math.round(r.sanity.band.p95 * 100)}%)</span>` : ""}${r.upsetDiag ? `<br><span style="color:#888;font-size:11px">🎲${esc(r.upsetDiag.upsetType ?? "")}·热门不胜${Math.round(r.upsetDiag.baseUpsetProb * 100)}%${r.drawImpliedPct >= 0.30 ? "·🔴防平" : ""}</span>` : ""}</td><td>${esc(r.wld)}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(r.hcView)}</td><td>${esc(r.score)}〔${esc(r.scoreSrc)}〕</td><td>${esc(r.halffull)}〔${esc(r.hfSrc)}〕</td><td>${esc(r.ouReal)}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>⚡神选·足球·${date}</title>

@@ -37,7 +37,7 @@ import { buildStakeSuggestion, stakeSummary } from "../src/stake-plan.js";
 import { buildRecordLine } from "../src/recap-record-line.js";
 import { worldCupContextLine } from "../src/worldcup-context.js";
 import { worldCupMatchPrior } from "../src/world-cup-priors.js";
-import { buildFourteenPlan } from "../src/prediction-engine.js";
+import { buildFourteenPlan, predictFixture } from "../src/prediction-engine.js";
 import { loadFixtures } from "../src/fixture-store.js";
 import { jingcaiWeekdayLabel, sequenceWeekdayPrefix, isTodayDeliveryFixture } from "../src/jingcai-business-day.js";
 // fetch-gate-500-1 刀③(2026-06-11):✅500欧赔/✅实测标签从快照来源派生,见值即打✅是缺陷
@@ -420,9 +420,37 @@ const rows = games.map((p, i) => {
     scen: p.scenario?.headline ?? "",
     // 爆冷场景(2026-06-16:从对阵格移出→独立「爆冷研判」sheet;主表保持干净·用户要求)
     upsetScen: p.scenario?.upsetScenario ?? null,
-    // 盘口合理性(独立「盘口合理性」sheet):亚盘线 vs 同实力档历史区间(12458场)→ 深浅+超临界多少
-    sanity: handicapSanity({ ahLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line, p1x2Fav: p.upsetDiagnosis?.favWinProb }),
+    // 盘口合理性(独立「盘口合理性」sheet):盘口强度档 vs 同实力档历史区间(12458场)→ 深浅+超临界多少
+    //   强度锚=亚盘线优先,亚盘本次未抓到则退竞彩官方让球线(同为让球线·稳定在·避免亚盘抓挂致整块判不了)。
+    sanity: handicapSanity({ ahLine: (s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? s.jingcaiHandicap?.line), p1x2Fav: p.upsetDiagnosis?.favWinProb }),
     ahLineEspn: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null,
+    // 盘口合理性逐玩法真实赔率(2026-06-16 用户:写清每场胜负平/让球胜负平/让球/欧洲/亚洲/大小球的数字+对比正常区间数字+深浅+临界数字)
+    //   全✅实测=本次500/亚盘快照原值;缺=null 由 sheet 标缺不编。
+    sanityOdds: {
+      euro: s.europeanOdds?.current ?? null,                                   // 胜负平/欧洲赔率(让0直胜){home,draw,away}
+      euroInit: s.europeanOdds?.initial ?? null,                               // 欧赔初盘(线/赔率移动分析)
+      hcp: s.handicapOdds?.current ?? null,                                    // 让球胜负平(竞彩让球后){home,draw,away}
+      hcpInit: s.handicapOdds?.initial ?? null,                               // 让球初盘
+      jcLine: s.jingcaiHandicap?.line ?? null,                                 // 竞彩官方让球线
+      ahLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null,   // 亚盘让球线(即时,缺=未抓到)
+      ahLineInit: s.asianHandicap?.initial?.line ?? null,                      // 亚盘初盘线(线移动)
+      ahHomeWater: s.asianHandicap?.current?.homeWater ?? s.asianHandicap?.initial?.homeWater ?? null, // 亚盘主水(即时)
+      ahAwayWater: s.asianHandicap?.current?.awayWater ?? s.asianHandicap?.initial?.awayWater ?? null, // 亚盘客水(即时)
+      ahHomeWaterInit: s.asianHandicap?.initial?.homeWater ?? null,            // 亚盘主水初盘(水位移动)
+      ahAwayWaterInit: s.asianHandicap?.initial?.awayWater ?? null,            // 亚盘客水初盘
+      // 强度锚=亚盘线优先,缺则竞彩让球线兜底(供 europeanBand/区间锚;非显示用)
+      anchorLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? s.jingcaiHandicap?.line ?? null,
+      anchorIsAsian: (s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line) != null,
+      over25: s.totalGoalsOdds?.over25 ?? null,                                // 大2.5隐含(de-vig)
+      under25: s.totalGoalsOdds?.under25 ?? null,                              // 小2.5隐含
+      over25Init: s.totalGoalsOdds?.initialOver25 ?? null,                     // 大球初盘隐含(若有)
+      // 跨源(国际外盘)交叉验证:DraftKings亚盘线 + The Odds API大小球de-vig(13家书)→ 与竞彩(500)对比是否一致
+      dkAsianLine: c?.espnOdds?.asian?.line != null && Number.isFinite(Number(c.espnOdds.asian.line)) ? Number(c.espnOdds.asian.line) : null,
+      dkAsianSrc: c?.espnOdds?.provider ?? "DraftKings",
+      intlOverProb: Number.isFinite(Number(c?.overUnder?.pOver)) ? Number(c.overUnder.pOver) : null,
+      intlOverBooks: c?.overUnder?.books ?? null,
+      intlTotalLine: c?.overUnder?.line ?? c?.espnOdds?.total?.line ?? null,
+    },
     // 热门胜率来源:有1X2盘口=盘口de-vig(真盘口合理性);1X2未开售(悬殊盘只卖让球)=模型prob,标🔶仅参考不冒充盘口
     favProbSource: s.europeanOdds?.current ? "盘口" : "模型(1X2未开售)",
     notWinPct: p.upsetDiagnosis?.baseUpsetProb != null ? Math.round(p.upsetDiagnosis.baseUpsetProb * 100) : null,
@@ -436,8 +464,17 @@ const rows = games.map((p, i) => {
       const inv = 1 / h + 1 / d + 1 / a; return Math.round((1 / d) / inv * 1000) / 1000;
     })(),
     // 历史同档爆冷率(✅12458场五大联赛真实赛果:该让球线上给球热门"不胜"频次):跨场可比的爆冷基线锚。
-    histLineUpset: histUpsetRate(s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line),
+    //   锚=亚盘优先,缺则竞彩让球线兜底(与盘口合理性同口径,避免亚盘抓挂致缺)。
+    histLineUpset: histUpsetRate(s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? s.jingcaiHandicap?.line),
     upsetData: p.upsetScenario ?? null,
+    // 爆冷机制细胞级(2026-06-16 用户:展开到细胞·只接引擎已算的OOS验证信号,零臆造):
+    //   upsetDiag=diagnoseUpsetRisk(多因子分解+signals数组+分型+caveat);upsetTrap=诱盘/steam(1X2走势=噪声已标);
+    //   totalsMove=大小球走势(唯一z>4真edge·需初盘);drawRateExp=经验库历史同情境平局率。
+    upsetDiag: p.upsetDiagnosis ?? null,
+    upsetTrap: p.upsetTrap ?? null,
+    totalsMove: p.totalsMovementSignal ?? null,
+    drawRateExp: p.experienceContext?.historicalDrawRate ?? null,
+    drawRateExpN: p.experienceContext?.n ?? null,
     // 若爆冷比分优先用500真盘平局格(✅·非模型0-0),无500盘才退模型矩阵(用户裁决:拿真盘说话)
     upsetMarketDraw: (() => {
       const so = s.scoreOdds?.top; if (!Array.isArray(so) || !so.length) return null;
@@ -578,16 +615,29 @@ try {
     const periodLabel = (fourteenLegs[0].notes ?? "").match(/第\d+期/)?.[0] ?? "本期";
     const stopIso = (fourteenLegs[0].notes ?? "").match(/停售=([0-9T:.\-Z]+)/)?.[1] ?? null;
     const stopBj = stopIso ? new Intl.DateTimeFormat("zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "short" }).format(new Date(stopIso)) : "未知";
-    const views = []; const missing = [];
+    const views = []; const missing = []; const onDemand = [];
     for (const leg of fourteenLegs) {
-      const pred = byMatch.get(`${leg.homeTeam}|${leg.awayTeam}`);
-      if (!pred) { missing.push(`${leg.homeTeam} vs ${leg.awayTeam}`); continue; }
+      let pred = byMatch.get(`${leg.homeTeam}|${leg.awayTeam}`);
+      if (!pred) {
+        // ingest 窗口未覆盖到的世界杯腿(本期常跨4天,第4天场次未进当日抓取):用同一 predictFixture
+        //   引擎按需补预测(世界杯自动路由48强Elo WC模型,同模型同口径,非编造)。非世界杯腿无数据才真判缺。
+        const isWcLeg = String(leg.competition ?? leg.notes ?? "").includes("世界杯");
+        if (isWcLeg) {
+          try {
+            const fx = { homeTeam: leg.homeTeam, awayTeam: leg.awayTeam, competition: "世界杯", kickoff: leg.kickoff, marketType: "shengfucai" };
+            pred = predictFixture(fx, [], 0, {});
+            if (pred) onDemand.push(`${leg.homeTeam} vs ${leg.awayTeam}`);
+          } catch { pred = null; }
+        }
+        if (!pred) { missing.push(`${leg.homeTeam} vs ${leg.awayTeam}`); continue; }
+      }
       // 视图包装:模型预测原样(同场同模型),fixture 换成胜负彩腿元数据(期号/停售/marketType)供闸读取——非编造
-      views.push({ ...pred, fixture: { ...pred.fixture, marketType: "shengfucai", notes: leg.notes, tags: leg.tags ?? pred.fixture.tags, sequence: leg.sequence } });
+      views.push({ ...pred, fixture: { ...pred.fixture, homeTeam: leg.homeTeam, awayTeam: leg.awayTeam, competition: pred.fixture?.competition ?? "世界杯", kickoff: leg.kickoff ?? pred.fixture?.kickoff, marketType: "shengfucai", notes: leg.notes, tags: leg.tags ?? pred.fixture?.tags, sequence: leg.sequence } });
     }
     if (missing.length) {
       fourteenFacts.push(["期次事实", `${periodLabel}(store=${fourteenStoreDate})14腿中 ${missing.length} 腿未映射到今日预测:${missing.join("/")}——不硬凑,不发`]);
     } else {
+      if (onDemand.length) fourteenFacts.push(["期次事实", `${onDemand.length} 腿(${onDemand.join("/")})未在当日抓取窗内,已用同一 predictFixture 引擎(世界杯→48强Elo WC模型,同口径)按需补预测,非编造`]);
       fourteen = buildFourteenPlan(views, date);
       const kos = fourteenLegs.map((l) => String(l.kickoff ?? "").slice(0, 10)).filter(Boolean).sort();
       const matchOnDate = kos.includes(date);
