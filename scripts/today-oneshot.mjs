@@ -80,6 +80,11 @@ if (!skipCoverage) step({ title: "⑤ 近5/H2H/大小球覆盖 fetch-match-cover
 // ⑥ 标准交付(关键:fail-loud)
 step({ title: "⑥ 标准交付 today-full-coverage(盘口为主·三处同源)", script: "today-full-coverage.mjs", scriptArgs: ["--jconly", "--write", `--date=${date}`], critical: true });
 
+// ⑥b 配套专业xlsx(软:焊进一条龙,杜绝"每次忘跑配套"——专业标准4配套之2有现成生成器)
+//     盘口标准区间(深浅临界)+ 盘口共性挖掘与触发条件,落同一交付夹 桌面\足球推荐\<date>\
+step({ title: "⑥b-1 配套·盘口标准区间(深浅临界)", script: "build-odds-reference-bands.mjs", optional: true });
+step({ title: "⑥b-2 配套·盘口共性挖掘与触发条件", script: "export-handicap-patterns-xlsx.mjs", optional: true });
+
 // ⑦ 本地硬闸(关键:红=拒交付)
 {
   console.log(`\n── ⑦ audit:suite 本地硬闸(24项) ──`);
