@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { loadFixtures } from "../src/fixture-store.js";
 import { buildCoverageTargets, loadZhToEn } from "../src/coverage-targets.js";
 import { resolveDeliveryDate } from "../src/today-delivery-lib.js";
+import { clubLeagueForm } from "../src/club-league-form.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(2026-06-10 缺陷#20:废写死历史日期默认)。
 let DATE;
@@ -170,12 +171,17 @@ for (const m of MATCHES) {
     ? espnOdds.find((x) => new RegExp(m.home.re, "i").test(x.name) && new RegExp(m.away.re, "i").test(x.name)) || null
     : null;
 
+  // 俱乐部联赛(ESPN不覆盖,如芬超)赛季战绩兜底:ESPN近5为空时,用真实积分榜补攻防/赛季战绩(诚实标"本季",非近5)
+  const hLast5 = last5(hHist), aLast5 = last5(aHist);
+  const hSeason = hLast5.length ? null : clubLeagueForm(m.home.zh, m.comp);
+  const aSeason = aLast5.length ? null : clubLeagueForm(m.away.zh, m.comp);
+
   out.matches.push({
     match: m.zh, comp: m.comp,
     home: { zh: m.home.zh, espn: ht?.name ?? null, abbr: ht?.abbr ?? null,
-      last5: last5(hHist), record5: rec(last5(hHist)) },
+      last5: hLast5, record5: rec(hLast5), seasonForm: hSeason },
     away: { zh: m.away.zh, espn: at?.name ?? null, abbr: at?.abbr ?? null,
-      last5: last5(aHist), record5: rec(last5(aHist)) },
+      last5: aLast5, record5: rec(aLast5), seasonForm: aSeason },
     h2h,
     overUnder: ou ? { ...ou, source: "The Odds API (eu, 2.5线de-vig)" }
       : { source: m.wc ? "The Odds API 缺该场" : "❌ 无源(友谊赛The Odds API无key + odds.500退役)", line: null },

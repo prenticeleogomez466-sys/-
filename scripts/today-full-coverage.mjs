@@ -128,14 +128,20 @@ const compTag = (p) => (isWc(p) ? "世界杯·单场" : (p.fixture.competition |
 
 // 补全层渲染(全真实,缺标缺)
 // 2026-06-12 诚实标注:ESPN 实取不足5场时(如美国仅4场)明标"仅N场",不让"近5"表头冒充满额。
-const recStr = (side) => side.record5?.n ? `${side.record5.w}胜${side.record5.d}平${side.record5.l}负·进${side.record5.gf}失${side.record5.ga}${side.record5.n < 5 ? `(⚠️ESPN仅${side.record5.n}场)` : ""}` : "❌未取到";
+const recStr = (side) => side.record5?.n
+  ? `${side.record5.w}胜${side.record5.d}平${side.record5.l}负·进${side.record5.gf}失${side.record5.ga}${side.record5.n < 5 ? `(⚠️ESPN仅${side.record5.n}场)` : ""}`
+  : (side.seasonForm
+      ? `本季${side.seasonForm.M}场 ${side.seasonForm.record}·进${side.seasonForm.gf}失${side.seasonForm.ga}(${side.seasonForm.league}第${side.seasonForm.rank}·worldfootball真实积分榜·${side.seasonForm.fetchedAt}·非近5)`
+      : "❌未取到");
 // 比分一律本队视角 gf-ga(胜必然 X>Y,避免"主-客"朝向出现"胜1-2"自相矛盾)+ 对手简称
 const last5Str = (side) => side.last5?.length ? side.last5.map((x) => `${x.res}${x.gf}-${x.ga}(${x.homeAway === "home" ? "主" : "客"}${x.oppAbbr})`).join(" ") : "";
 // H2H 从当前主队视角 gf-ga(h2h=主队历史筛对手,gf/ga 即主队)
 const h2hStr = (c) => c?.h2h?.length ? c.h2h.map((x) => `${x.date} ${c.home.zh}${x.gf}-${x.ga}(${x.res})`).join(" / ") : "近赛季窗口无交锋(ESPN免费源限近赛季)";
 const profileStr = (c) => {
   if (!c) return "❌未取到";
-  const ap = (s) => s.record5?.n ? `场均进${(s.record5.gf / s.record5.n).toFixed(1)}失${(s.record5.ga / s.record5.n).toFixed(1)}` : "近5缺";
+  const ap = (s) => s.record5?.n
+    ? `场均进${(s.record5.gf / s.record5.n).toFixed(1)}失${(s.record5.ga / s.record5.n).toFixed(1)}`
+    : (s.seasonForm ? `本季场均进${s.seasonForm.gfpg}失${s.seasonForm.gapg}(${s.seasonForm.M}场·胜率${s.seasonForm.winPct}%)` : "近5缺");
   return `${c.home.zh} ${ap(c.home)} / ${c.away.zh} ${ap(c.away)};真xG缺(FBref·Cloudflare墙)`;
 };
 
@@ -320,7 +326,8 @@ const auditFor = (p, s, c, prior, wcCtx) => {
     "亚盘titan007": c?.asianHandicap?.titan007 ? auditCell("✅实测", `即时主让${c.asianHandicap.titan007.live?.line}(${c.asianHandicap.titan007.companiesCount}家)`, "vip.titan007.com即时盘", c.asianHandicap.titan007.fetchedAt) : MISS(cov ? "titan007无该场" : "coverage缺"),
     "欧赔参考(外盘)": c?.euroRef?.value ? auditCell("🔶推断(外盘均值,仅方向参考)", `${c.euroRef.value.home}/${c.euroRef.value.draw}/${c.euroRef.value.away}(${c.euroRef.companies}家)`, "titan007 1x2百家平均", c.euroRef.fetchedAt)
       : (s.europeanOdds?.current ? "—(竞彩已开售,无需外盘参考)" : MISS(cov ? "外盘参考也未抓到" : "coverage缺")),
-    "近5": c?.home?.record5?.n ? auditCell("✅实测", `主${c.home.record5.n}场/客${c.away?.record5?.n ?? 0}场`, "ESPN跨league真实战绩", tCov) : MISS(cov ? "ESPN未取到该场近5" : "coverage缺"),
+    "近5": c?.home?.record5?.n ? auditCell("✅实测", `主${c.home.record5.n}场/客${c.away?.record5?.n ?? 0}场`, "ESPN跨league真实战绩", tCov)
+      : (c?.home?.seasonForm || c?.away?.seasonForm ? auditCell("✅实测", `本季战绩 主${c.home?.seasonForm?.M ?? "缺"}场/客${c.away?.seasonForm?.M ?? "缺"}场(俱乐部联赛·非近5)`, "worldfootball真实积分榜", c.home?.seasonForm?.fetchedAt ?? c.away?.seasonForm?.fetchedAt) : MISS(cov ? "ESPN未取到该场近5" : "coverage缺")),
     "H2H": c?.h2h ? (Array.isArray(c.h2h)
       ? auditCell("✅实测", `${c.h2h.length}次(近赛季)`, "ESPN", tCov)
       : (c.h2h.meetings?.length
