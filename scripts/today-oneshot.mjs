@@ -84,6 +84,7 @@ step({ title: "⑥ 标准交付 today-full-coverage(盘口为主·三处同源)"
 //     盘口标准区间(深浅临界)+ 盘口共性挖掘与触发条件,落同一交付夹 桌面\足球推荐\<date>\
 step({ title: "⑥b-1 配套·盘口标准区间(深浅临界)", script: "build-odds-reference-bands.mjs", optional: true });
 step({ title: "⑥b-2 配套·盘口共性挖掘与触发条件", script: "export-handicap-patterns-xlsx.mjs", optional: true });
+step({ title: "⑥b-3 配套·模型全面体检与提升", script: "export-scorecard-xlsx.mjs", optional: true });
 
 // ⑦ 本地硬闸(关键:红=拒交付)
 {
