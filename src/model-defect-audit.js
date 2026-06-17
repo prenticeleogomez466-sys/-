@@ -20,17 +20,19 @@ export function auditModelDefects(date = todayInShanghai(), env = process.env) {
   const advancedData = loadAdvancedData(date);
   const advancedLayers = advancedDataLayerStatus(env, advancedData);
   const recommendations = safeLoad(() => recommendFixtures(date), null);
+  const worldCupDay = isWorldCupRoutedDay(recommendations);
 
   inspectFixtureCoverage(fixtureSet, defects);
-  inspectMarketCoverage(marketStatus, defects);
+  inspectMarketCoverage(marketStatus, defects, { worldCupDay });
   inspectMarketDuplicates(marketSet, defects);
-  inspectRealtimeGate(date, defects, env);
+  inspectRealtimeGate(date, defects, env, { worldCupDay });
   inspectAdvancedLayers(advancedLayers, defects);
   inspectRecommendations(recommendations, defects, env);
 
   const result = {
     ok: !defects.some((item) => item.severity === "P0"),
     date,
+    worldCupDay,
     generatedAt: new Date().toISOString(),
     summary: summarize(defects, fixtureSet, marketStatus, recommendations, advancedLayers),
     defects,
@@ -41,16 +43,29 @@ export function auditModelDefects(date = todayInShanghai(), env = process.env) {
   return result;
 }
 
-function inspectFixtureCoverage(fixtureSet, defects) {
+// 世界杯日判定：当日预测全部走 worldcup-match-model 路由(0611 唯一大模型铁律)。
+// 据此豁免俱乐部联赛专属口径(14场胜负彩/realtime crawler 闸门)，避免世界杯期稳定吐假 P0 掩盖真问题。
+export function isWorldCupRoutedDay(recommendations) {
+  const predictions = recommendations?.predictions ?? [];
+  if (!predictions.length) return false;
+  const routed = predictions.filter((p) => p?.provenance === "worldcup-match-model" || Boolean(p?.wcModel)).length;
+  return routed === predictions.length;
+}
+
+export function inspectFixtureCoverage(fixtureSet, defects) {
   const fixtures = fixtureSet.fixtures ?? [];
   const jingcai = fixtures.filter((fixture) => fixture.marketType === "jingcai");
   const shengfucai = fixtures.filter((fixture) => fixture.marketType === "shengfucai");
   if (!fixtures.length) add(defects, "P0", "赛程层", "今日赛程为空", "先运行官方/授权赛程同步，不能用空赛程生成推荐。");
   if (!jingcai.length) add(defects, "P1", "赛程层", "竞彩场次为空", "检查中国竞彩网抓取或授权赛程兜底。");
-  if (shengfucai.length !== 14) add(defects, "P0", "赛程层", `14场数量异常：${shengfucai.length}/14`, "必须补齐完整 14 场后才能生成胜负彩正式版。");
+  // 14场胜负彩本就不是每天开售(世界杯期更常无售)：0场=今日无业务，非阻断缺陷；
+  // 只有"已开售但抓取不全"(0<n<14)才是真异常 P0。
+  if (shengfucai.length > 0 && shengfucai.length !== 14) {
+    add(defects, "P0", "赛程层", `14场胜负彩抓取不完整：${shengfucai.length}/14`, "已开售14场但抓取不全，补齐后才能生成胜负彩正式版。");
+  }
 }
 
-function inspectMarketCoverage(status, defects) {
+export function inspectMarketCoverage(status, defects, { worldCupDay = false } = {}) {
   if (!status) {
     add(defects, "P0", "赔率层", "赔率覆盖状态无法读取", "先修复 market-data-store 或重新抓取赔率快照。");
     return;
@@ -59,9 +74,11 @@ function inspectMarketCoverage(status, defects) {
   const incompleteRows = status.rows?.filter((row) => !row.complete) ?? [];
   if (status.fixtures > 0 && status.usable < status.fixtures) add(defects, "P0", "赔率层", `可用赔率不完整：${status.usable}/${status.fixtures}；缺口=${examples(unusableRows)}`, "正式推荐前必须补齐每场至少一个真实盘口/赔率快照。");
   if (status.fixtures > 0 && status.complete < status.fixtures) add(defects, "P1", "赔率层", `完整赔率不完整：${status.complete}/${status.fixtures}；缺口=${examples(incompleteRows)}`, "继续补欧洲赔率、亚洲盘口、竞彩让球/14场核心盘口。");
+  // 实时(in-play)新鲜度闸是俱乐部 realtime crawler 口径；世界杯场走 wc:odds-capture 定时快照，
+  // realTime 字段恒 false，其盘口新鲜度由 preflight[odds-fresh] + audit:suite[s1-odds-cover] 把关。
   const realtime = status.rows?.filter((row) => row.realTime).length ?? 0;
   const staleRows = status.rows?.filter((row) => !row.realTime) ?? [];
-  if (status.fixtures > 0 && realtime < status.fixtures) add(defects, "P0", "实时闸门", `实时赔率不足：${realtime}/${status.fixtures}；缺口=${examples(staleRows)}`, "重新跑 realtime crawler，过期快照不得进入正式版。");
+  if (!worldCupDay && status.fixtures > 0 && realtime < status.fixtures) add(defects, "P0", "实时闸门", `实时赔率不足：${realtime}/${status.fixtures}；缺口=${examples(staleRows)}`, "重新跑 realtime crawler，过期快照不得进入正式版。");
   const missingScore = status.rows?.filter((row) => row.hasSnapshot && row.missing?.includes("比分赔率")).length ?? 0;
   if (missingScore) add(defects, "P2", "细分玩法", `比分赔率缺口：${missingScore} 场`, "比分可由模型派生，但表格必须标注为模型派生，不可冒充市场赔率。");
 }
@@ -76,7 +93,10 @@ function inspectMarketDuplicates(marketSet, defects) {
   if (duplicates.length) add(defects, "P1", "赔率层", `重复赔率快照：${duplicates.length} 组`, "按 fixtureId 合并去重，避免重复快照污染盘口变化判断。");
 }
 
-function inspectRealtimeGate(date, defects, env) {
+export function inspectRealtimeGate(date, defects, env, { worldCupDay = false } = {}) {
+  // 世界杯日不走俱乐部 realtime crawler，不产生 realtime-source-gate 文件；
+  // 盘口新鲜度由 preflight[odds-fresh] + audit:suite[s1-odds-cover] 覆盖，跳过此俱乐部口径检查。
+  if (worldCupDay) return;
   const gatePath = join(exportDir, `realtime-source-gate-${date}.json`);
   if (!existsSync(gatePath)) {
     add(defects, "P0", "实时闸门", "缺少实时闸门文件", "正式推荐前必须先刷新实时闸门。");
@@ -176,6 +196,7 @@ function renderMarkdown(result) {
     `# 足球大模型缺陷审计 ${result.date}`,
     "",
     `状态：${result.ok ? "通过" : "存在阻断缺陷"}`,
+    `审计口径：${result.worldCupDay ? "世界杯日(豁免俱乐部 14场/realtime crawler 口径，盘口新鲜度由 preflight+audit:suite 把关)" : "俱乐部联赛日"}`,
     `P0：${result.summary.bySeverity.P0}，P1：${result.summary.bySeverity.P1}，P2：${result.summary.bySeverity.P2}`,
     "",
     "| 严重级别 | 层级 | 缺陷 | 修复建议 |",
