@@ -41,6 +41,27 @@ export function clubLeagueForm(zhName, leagueName) {
   return null;
 }
 
+// 近期交锋(主队视角) → [{date, gf, ga, res}] 或 [];数据=worldfootball真实交锋史,代码定向避免手算错
+export function clubLeagueH2H(homeZh, awayZh, leagueName) {
+  const db = load();
+  const leagues = leagueName ? [db.leagues?.[leagueName]] : Object.values(db.leagues || {});
+  for (const ld of leagues) {
+    const entry = ld?.h2h?.[`${homeZh}|${awayZh}`];
+    if (!entry?.rows?.length) continue;
+    const homeEn = (entry.homeEn || "").toLowerCase();
+    return entry.rows.map((r) => {
+      const [l, rt] = String(r.matchup).split(" - ").map((s) => s.trim());
+      const m = String(r.score).match(/(\d+):(\d+)/);
+      if (!m) return null;
+      const ls = +m[1], rs = +m[2];
+      const homeIsLeft = l.toLowerCase().includes(homeEn) || homeEn.includes(l.toLowerCase());
+      const gf = homeIsLeft ? ls : rs, ga = homeIsLeft ? rs : ls;
+      return { date: r.date, gf, ga, res: gf > ga ? "胜" : gf < ga ? "负" : "平", source: "worldfootball" };
+    }).filter(Boolean);
+  }
+  return [];
+}
+
 export function hasClubLeague(leagueName) {
   return !!load().leagues?.[leagueName];
 }
