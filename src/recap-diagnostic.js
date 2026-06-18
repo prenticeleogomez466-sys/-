@@ -5,8 +5,26 @@
 // 盘口热门=该场 europeanOdds 直胜最低赔(✅实测),悬殊盘只卖让球→直胜赔缺,如实标⚠️不冒充(no-fabrication)。
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { computeCLV } from "./clv-tracker.js";
 
 const WLD = { 主胜: "home", 平局: "draw", 客胜: "away" };
+const PICK_IDX = { 主胜: 0, 平局: 1, 客胜: 2 };   // primary 中文 → euCloseTriple "h/d/a" 索引
+
+// 单行 CLV(收盘价值):下注价=推荐时开盘价(primaryOpeningOdds·缺则 euOpen 对应选项) vs 收盘价(euClose 对应选项)。
+//   口径=按推荐当时开盘价下注、对比临场收盘价,衡量"推荐时下注能抓到多少收盘价值"(正=收盘朝你方向收紧)。
+//   measured=收盘三元组≠开盘三元组(真捕获了收盘移动·非单次快照同价);否则不计入统计(诚实·遵 no-fabrication)。
+//   注:primaryOdds 实测≈收盘价(系统临场刷新)→ 用它 CLV 恒≈0 无意义,故下注价取开盘价。
+function clvOfRow(r) {
+  const idx = PICK_IDX[r.primary];
+  if (idx == null || !r.euCloseTriple) return null;
+  const close = String(r.euCloseTriple).split("/").map(Number)[idx];
+  const openTriple = String(r.euOpenTriple || "").split("/").map(Number);
+  const bet = Number(r.primaryOpeningOdds) > 1 ? Number(r.primaryOpeningOdds) : openTriple[idx];
+  if (!(bet > 1) || !(close > 1)) return null;
+  const measured = Boolean(r.euOpenTriple && r.euCloseTriple && String(r.euOpenTriple) !== String(r.euCloseTriple));
+  const c = computeCLV(bet, close);
+  return c.clv == null ? null : { clv: c.clv, verdict: c.verdict, bet, close, measured };
+}
 const OUT_ZH = { home: "主胜", draw: "平局", away: "客胜" };
 
 function marketFavoriteOf(row, dataDir, cache) {
@@ -104,6 +122,23 @@ export function buildRecapDiagnostic(ledger, opts = {}) {
     comboRate: pct(primHit + secHit, total), missAttr,
   };
 
+  // ④ CLV(收盘价值)汇总:真 KPI=下注价 vs 收盘价(收盘=有效市场最优估计),衡量下注质量胜过短期命中率。
+  //   只统计 measured(收盘≠开盘=真捕获收盘线)的行;收盘线采集(ClosingLineLive)接通后样本随每日累积。
+  const clvRecords = settled.map(clvOfRow).filter((x) => x && x.measured);
+  const clvSamples = clvRecords.length;
+  const clvAvg = clvSamples ? clvRecords.reduce((s, r) => s + r.clv, 0) / clvSamples : null;
+  const clvBeat = clvRecords.filter((r) => r.clv > 0).length;
+  const clvBeatRate = clvSamples ? clvBeat / clvSamples : null;
+  const clvNum = clvSamples ? `平均 CLV ${(clvAvg * 100).toFixed(2)}%·${Math.round(clvBeatRate * 100)}% 击败收盘线` : "";
+  const clvSummary = {
+    samples: clvSamples, avgCLV: clvAvg, beat: clvBeat, beatRate: clvBeatRate,
+    // 口径=按推荐开盘价下注 vs 收盘价;最小样本门槛 30(防薄样本误判 edge·与21405场backtest无edge调和)
+    verdict: !clvSamples ? "⚪ 暂无可测 CLV(需真收盘线;ClosingLineLive 已接通·今晚起每日累积)"
+      : clvSamples < 30 ? `⚪ 样本不足(${clvSamples}场·需≥30才定论·防薄样本误判)·暂参考:${clvNum}(口径=按推荐开盘价下注)`
+      : (clvAvg > 0 && clvBeatRate >= 0.55) ? `🟢 ${clvNum} → 长期盈利信号(早盘下注抓到收盘价值)`
+      : `🔴 ${clvNum}(需≥55%)→ 下注质量弱(模型本质市场跟随器·实证一致)`,
+  };
+
   const verdict = stats.edgePp < 0 ? "模型跑输盘口(本质跟随且更差)" : stats.edgePp > 0 ? "模型略优于盘口" : "持平=纯跟随";
   const summaryRows = [
     ["诊断型复盘", onlyDate || "全 ledger"],
@@ -122,11 +157,16 @@ export function buildRecapDiagnostic(ledger, opts = {}) {
     ["③ 未中归因(" + (total - primHit) + " 场未主选命中)", "场数", ""],
     ...Object.entries(missAttr).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, v, ""]),
     [],
+    ["④ CLV(收盘价值·真KPI:下注价vs收盘价·衡量下注质量胜过短期命中率)", "", ""],
+    ["平均 CLV", clvSummary.samples ? `${(clvSummary.avgCLV * 100).toFixed(2)}%` : "—", clvSummary.verdict],
+    ["击败收盘线", clvSummary.samples ? `${clvSummary.beat}/${clvSummary.samples}` : "0/0", clvSummary.samples ? `${Math.round(clvSummary.beatRate * 100)}%(需≥55%才长期盈利)` : "需真收盘线快照"],
+    ["可测样本", `${clvSummary.samples} 场(收盘≠开盘·真捕获收盘线)`, "收盘线采集 ClosingLineLive 已接通·样本每日累积"],
+    [],
     ["样本说明", `去重后 ${total} 场真实比赛(原始 ${rawCount} 行,去重 ${dupRemoved} 重复推荐)`, ""],
     ["口径", "盘口热门=europeanOdds直胜最低赔(✅实测);悬殊盘直胜赔缺如实标⚠️不冒充", ""],
   ];
   const detailHdr = ["日期", "对阵", "赛事", "模型主选", "模型次选", "双选", "盘口热门", "盘口命中", "实际", "比分", "命中级别", "比分中", "半全场中", "未中归因"];
   const detailRows = perMatch.map((r) => [r.date, r.match, r.comp, r.model, r.sec, r.dc, r.marketFav, r.marketHit, r.actual, r.score, r.hitLevel, r.scoreHit, r.hfHit, r.miss]);
 
-  return { stats, perMatch, summaryRows, detailRows: [detailHdr, ...detailRows] };
+  return { stats, clvSummary, perMatch, summaryRows, detailRows: [detailHdr, ...detailRows] };
 }
