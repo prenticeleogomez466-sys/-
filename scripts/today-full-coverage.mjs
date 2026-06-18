@@ -79,6 +79,12 @@ const COV_MISS = "⚠️未补全(coverage缺)";
 let advData = null;
 try { advData = JSON.parse(readFileSync(`D:/football-model-data/adversarial/${date}.json`, "utf8")).verdicts || null; } catch { advData = null; }
 const advFor = (p) => advData?.[`${p.fixture.homeTeam}|${p.fixture.awayTeam}`] ?? null;
+// 全网赛前情报缓存(伤停/交锋史/小组形势/新闻战意/异动冷门研判,中文+来源URL;展示层不进概率)。
+//   提前到此加载(rows.map 需用 anomaly 把"异动冷门·防什么·指向哪"写进竞彩完整+盘口合理性两表)。
+let webIntel = null;
+try { webIntel = JSON.parse(readFileSync(`D:/football-model-data/intel/web-intel-${date}.json`, "utf8")); }
+catch { console.log(`ℹ️ 全网情报缓存缺(intel/web-intel-${date}.json):伤停/交锋史/异动研判等扩展情报列标⚠️缺(预测首发/近赛照出)。`); }
+const anomalyFor = (p) => webIntel?.matches?.[`${p.fixture.homeTeam}|${p.fixture.awayTeam}`]?.anomaly ?? null;
 
 // 竞彩交付 = 竞彩在售(marketType=jingcai)+ 世界杯场(14场/预售,store 标 marketType=shengfucai)。
 // 修2026-06-10(审计rank2+13):废 WC_SINGLES 硬编码4场——世界杯场从当日 fixtures store 动态判定
@@ -459,6 +465,9 @@ const rows = games.map((p, i) => {
     // 盘口合理性(独立「盘口合理性」sheet):盘口强度档 vs 同实力档历史区间(12458场)→ 深浅+超临界多少
     //   强度锚=亚盘线优先,亚盘本次未抓到则退竞彩官方让球线(同为让球线·稳定在·避免亚盘抓挂致整块判不了)。
     sanity: handicapSanity({ ahLine: (s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? s.jingcaiHandicap?.line), p1x2Fav: p.upsetDiagnosis?.favWinProb }),
+    // 实时核查·异动冷门研判(本次web核查:伤停/H2H克星/Opta超算 → 防什么·最大可能指向哪;全✅可追溯·来源见情报详情)
+    //   写进「盘口合理性」(每场加一行)+「竞彩完整」对抗证伪列(只追加不增列·不破27列契约);缺=null 不编。
+    liveCheck: anomalyFor(p),
     ahLineEspn: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null,
     // 盘口合理性逐玩法真实赔率(2026-06-16 用户:写清每场胜负平/让球胜负平/让球/欧洲/亚洲/大小球的数字+对比正常区间数字+深浅+临界数字)
     //   全✅实测=本次500/亚盘快照原值;缺=null 由 sheet 标缺不编。
@@ -576,10 +585,7 @@ try { advLayers = loadAdvancedData(date); } catch { advLayers = null; }
 let predictedXi = null;
 try { predictedXi = JSON.parse(readFileSync(`D:/football-model-data/intel/predicted-lineups-${date}.json`, "utf8")); }
 catch { console.log(`⚠️ 预测首发缓存缺(intel/predicted-lineups-${date}.json):预测首发列标⚠️(确认首发/伤停/近赛照出),先跑 node scripts/sync-predicted-lineups.mjs ${date} 可补。`); }
-// 全网赛前情报缓存(伤停/交锋史/小组形势/球队风格·主帅/场地天气/新闻战意,中文+来源URL;展示层不进概率)。
-let webIntel = null;
-try { webIntel = JSON.parse(readFileSync(`D:/football-model-data/intel/web-intel-${date}.json`, "utf8")); }
-catch { console.log(`ℹ️ 全网情报缓存缺(intel/web-intel-${date}.json):伤停/交锋史等扩展情报列标⚠️缺(预测首发/近赛照出)。`); }
+// webIntel 已在文件顶部(advData 旁)提前加载,供 rows.map 的 anomaly 与本处情报详情共用。
 const natCache = loadNationalResults();
 const layerFor = (layer, fxId) => advLayers?.layers?.[layer]?.fixtureData?.[fxId] ?? null;
 // 对话紧凑版首发摘要(详情见 xlsx「情报详情」表;缺标缺不编)

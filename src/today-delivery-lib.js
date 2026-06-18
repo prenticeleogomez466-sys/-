@@ -854,6 +854,33 @@ export function buildHandicapSanitySheet({ date, rows }) {
       ? `📌 怎么用:本场有 ${flags.length} 个偏离常态的信号(${flags.join("、")}),偏离越多越值得多看一眼;但公开盘口打不过收盘线,这些只帮你看懂庄家定价倾向,不是稳赢的买卖信号,买不买你定。`
       : `📌 怎么用:本场盘口各维度都落在历史常态区间内、无明显异常,按主表推荐与信心档正常对待即可(公开盘口打不过收盘线)。`;
     out.push([`综合盘口裁决·本场解读`, overall, "汇总上方各玩法深浅/失衡/移动/跨源旗标", flags.length ? "有异常项" : "常态", "—", read.join("\n") + "\n" + takeaway, "—"]);
+
+    // ⑨ 实时核查·异动冷门(2026-06-18 用户:抓异动冷门当参考·必须真实有实质·有异动要给防什么+最大可能指向哪)
+    //   数据=本次 web 核查(伤停/H2H克星/Opta超算等,✅可追溯·来源见「情报详情」);缺=如实标缺不编。
+    const lc = r.liveCheck;
+    if (lc) {
+      // 三方对账:系统Elo先验(🔶模型) vs 500市场de-vig(✅) vs Opta超算(✅web,缺则不写)——一眼看"偏离是模型问题还是盘口问题"
+      const recon = [
+        svm ? `系统Elo ${p1(svm.eloFavProb)}%(🔶)` : null,
+        s?.favProb != null ? `市场 ${pc(s.favProb)}(✅)` : null,
+        lc.opta != null ? `Opta超算 ${lc.opta}%(✅)` : null,
+      ].filter(Boolean).join(" / ") || "—";
+      // defend 字段本身是名词(如"平局"),渲染时智能加"防"前缀;"无…"类不加(避免"防无需…"病句)
+      const noPrefix = !lc.defend || /^(无|不|没)/.test(lc.defend);
+      const defendCol = !lc.defend ? "—" : (noPrefix ? lc.defend : `防${lc.defend}`);
+      const defendLine = !lc.defend ? "" : (noPrefix ? `\n🛡️防什么:${lc.defend}。` : `\n🛡️防什么:重点防【${lc.defend}】。`);
+      const note = [
+        lc.note ?? "",
+        defendLine,
+        lc.direction ? `\n🎯最大可能指向:${lc.direction}` : "",
+      ].filter(Boolean).join("");
+      out.push([`🔍实时核查·异动冷门(本次web核查·参考)`, recon, "实力先验 vs 市场 vs Opta超算 三方对账", lc.verdict ?? "—",
+        defendCol, note,
+        "✅本次web核查(伤停/H2H/Opta·来源见「情报详情」)"]);
+    } else {
+      out.push([`🔍实时核查·异动冷门(本次web核查·参考)`, "⚠️本场未做web核查或无显著异动", "—", "—", "—",
+        "本场无实时核查到的异动/冷门信号(标缺不编;以上方盘口深浅/实力匹配为准)", "⚠️缺/无"]);
+    }
   }
 
   // 全量历史标准区间参照(用户:全写出来·什么区间合理)——每条让球线 胜率+胜/平/客赔 + 大小球区间。
@@ -1318,9 +1345,17 @@ export function buildAuditFoot({ rows, advData }) {
 }
 
 // ── 对抗证伪单元格(无当日审计文件 → 如实标⚠️未跑,绝不编造结论) ──
+//   2026-06-18 用户:实时核查到的异动/冷门(防什么·指向哪)也写进竞彩完整 → 追加在本列末(不增列·守27列契约;详见「盘口合理性」⑨行)。
 export function advCellText(r, advDataPresent) {
-  if (r.adv) return `${r.adv.label}${r.adv.ev != null ? ` EV=${r.adv.ev}` : ""} ｜ ${r.adv.kill}`;
-  return advDataPresent ? "—(该场未审计)" : "⚠️未跑(football-signal-verify 当日未出审计文件)";
+  const lc = r.liveCheck;
+  const lcDefend = !lc?.defend ? "" : (/^(无|不|没)/.test(lc.defend) ? `｜🛡️${lc.defend}` : `｜🛡️防${lc.defend}`);
+  const lcLine = lc
+    ? `\n🔍实时核查·异动冷门:${lc.verdict ?? ""}${lcDefend}${lc.direction ? `｜🎯最大可能→${lc.direction}` : ""}（✅本次web核查·依据见「情报详情」来源;详细对账见「盘口合理性」）`
+    : "";
+  let base;
+  if (r.adv) base = `${r.adv.label}${r.adv.ev != null ? ` EV=${r.adv.ev}` : ""} ｜ ${r.adv.kill}`;
+  else base = advDataPresent ? "—(该场未审计)" : "⚠️未跑(football-signal-verify 当日未出审计文件)";
+  return base + lcLine;
 }
 
 // ── xlsx 25列(2026-06-11 升级:20列专业版 + 世界杯模型先验列组3列 + 让球真实裁决列 + 串关安全度列;
@@ -1332,7 +1367,32 @@ export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事)",
   "竞彩让球(模型让/受让后胜平负vs市场)", "竞彩让球赔率✅", "博彩亚盘✅(DK+titan007双源)",
   "信号面板✅(欧赔异动·亚盘水位·让球盘资金·共振/背离·阵容)",
   "比分(盘口✅真实热门主推+模型🔶次行)", "比分赔率✅", "半全场(盘口✅真实热门主推+模型🔶次行)", "半全场赔率✅", "大小球✅", "进球分布✅",
-  "主队近5✅", "客队近5✅", "H2H(本地49k历史库)", "攻防画像", "信心档", "💰建议注金🔶(基础100元分层)", "串关安全度", "🔴对抗证伪(三视角·只标注不弃赛)"];
+  "主队近5✅", "客队近5✅", "H2H(本地49k历史库)", "攻防画像", "信心档", "💰建议注金🔶(基础100元分层)", "串关安全度", "🔴对抗证伪(三视角·只标注不弃赛)",
+  "🎯综合研判·最终建议(盘口+情报+异动·大白话)"];
+
+// ── 综合研判·最终建议(2026-06-18 用户:把情报详情+盘口合理性的实时分析揉进竞彩完整·重新给推荐) ──
+//   纯组合现成字段(盘口主推/信心/盘口合理性深浅/实时核查关键情报+异动+最终建议),不新增推断、不编造。
+export function synthesisCell(r) {
+  const lc = r.liveCheck;
+  // 盘口主推首行(✅盘口为主);r.primary.text 已自带"盘口主推:"前缀,去重避免"盘口主推:盘口主推:"
+  const pick = (r.primary?.text ? String(r.primary.text).split("\n")[0] : (r.wld || "—")).replace(/^盘口主推[:：]\s*/, "");
+  const sane = r.sanity?.band ? sanityVerdictLabel(r.sanity).tag : "—";
+  const lines = [
+    `① 盘口主推:${pick}`,
+    `② 盘口合理性:${sane}`,
+  ];
+  if (lc) {
+    if (lc.keyIntel) lines.push(`③ 关键情报:${lc.keyIntel}`);
+    const defendTxt = !lc.defend ? "" : (/^(无|不|没)/.test(lc.defend) ? lc.defend : `防${lc.defend}`);
+    lines.push(`④ 异动:${lc.verdict ?? "—"}${defendTxt ? `(${defendTxt})` : ""}`);
+    if (lc.action) lines.push(`👉 最终建议:${lc.action}`);
+    lines.push(`〔依据:盘口合理性表三方对账 + 情报详情来源;实时核查✅〕`);
+  } else {
+    lines.push(`👉 最终建议:本场无实时核查到的异动,按盘口主推与信心档正常对待即可。`);
+  }
+  lines.push(`⚠️诚实:公开盘口打不过收盘线、模型本质市场跟随器,以上是研判参考不是稳赢,买不买你定。`);
+  return lines.join("\n");
+}
 
 export function buildXlsxSheets({ date, rows, banner, advDataPresent, recordLine = null, stakeNote = null }) {
   // 对阵列附加行:每场情景研判(🏆赛会 出线/夺冠% 已移到专属"世界杯模型"列,不再塞对阵格)
@@ -1344,7 +1404,7 @@ export function buildXlsxSheets({ date, rows, banner, advDataPresent, recordLine
     r.hcView, r.hc, r.asian, r.signals ?? "⚠️未拼装", `${r.score}〔${r.scoreSrc}〕`, r.scoreMkt, `${r.halffull}〔${r.hfSrc}〕`, r.hfMkt, r.ouReal, r.dist,
     `${r.homeRec} ${r.homeLast5}`, `${r.awayRec} ${r.awayLast5}`, r.h2h, r.profile, `${r.tier}(${Math.round(r.conf)})`,
     r.stake?.text ?? "—(档位缺不给金额)",
-    r.parlay?.text ?? "⚠️未评", advCellText(r, advDataPresent)]);
+    r.parlay?.text ?? "⚠️未评", advCellText(r, advDataPresent), synthesisCell(r)]);
   // 战绩行/注金口径行紧跟 banner(2026-06-12 用户裁决:战绩透明化进表头;缺=不出该行,不留空假象)
   const headRows = [[`⚡ 神选 · 竞彩完整覆盖 · ${date}`], [banner],
     ...(recordLine ? [[recordLine]] : []), ...(stakeNote ? [[stakeNote]] : [])];
