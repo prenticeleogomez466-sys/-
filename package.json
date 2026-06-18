@@ -159,7 +159,8 @@
     "mine:jleague": "node scripts/mine-jleague-profiles.mjs",
     "backtest:jleague-homeaway": "node scripts/backtest-jleague-homeaway.mjs",
     "capture:closing-live": "node scripts/capture-closing-live.mjs",
-    "backtest:jleague-cal": "node scripts/backtest-jleague-calibration.mjs"
+    "backtest:jleague-cal": "node scripts/backtest-jleague-calibration.mjs",
+    "backtest:intent": "node scripts/backtest-bookmaker-intent.mjs"
   },
   "engines": {
     "node": ">=20"
