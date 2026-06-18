@@ -1385,8 +1385,19 @@ export function synthesisCell(r) {
     if (lc.keyIntel) lines.push(`③ 关键情报:${lc.keyIntel}`);
     const defendTxt = !lc.defend ? "" : (/^(无|不|没)/.test(lc.defend) ? lc.defend : `防${lc.defend}`);
     lines.push(`④ 异动:${lc.verdict ?? "—"}${defendTxt ? `(${defendTxt})` : ""}`);
-    if (lc.action) lines.push(`👉 最终建议:${lc.action}`);
-    lines.push(`〔依据:盘口合理性表三方对账 + 情报详情来源;实时核查✅〕`);
+    // 逐玩法·结合实时研判后重新推荐(2026-06-18 用户:不能只合并·要按异动/情报重新给胜负平/比分/半全场/大小球)
+    //   🔶选法建议=由✅盘口主推(各玩法既有列真实数值)+✅实时情报/异动 叠加推出;不改盘口数值、只调"选哪个/双选/防哪边"。
+    const pl = lc.plays;
+    if (pl) {
+      lines.push(`📋 逐玩法·结合实时研判重新推荐(🔶选法·依据✅盘口+✅情报):`);
+      if (pl.wld) lines.push(`   • 胜负平:${pl.wld}`);
+      if (pl.handicap) lines.push(`   • 让球:${pl.handicap}`);
+      if (pl.score) lines.push(`   • 比分:${pl.score}`);
+      if (pl.halfFull) lines.push(`   • 半全场:${pl.halfFull}`);
+      if (pl.ou) lines.push(`   • 大小球:${pl.ou}`);
+    }
+    if (lc.action) lines.push(`👉 一句话:${lc.action}`);
+    lines.push(`〔依据:盘口合理性表三方对账 + 情报详情来源;逐玩法选法=盘口主推🔶叠加实时情报推得〕`);
   } else {
     lines.push(`👉 最终建议:本场无实时核查到的异动,按盘口主推与信心档正常对待即可。`);
   }
