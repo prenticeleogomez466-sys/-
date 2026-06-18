@@ -18,7 +18,7 @@ import {
   wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
   renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
   auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet, buildDecisionAidsSheet,
-  buildHandicapSanitySheet, buildUpsetAnalysisSheet,
+  buildHandicapSanitySheet, buildUpsetAnalysisSheet, buildOddsValueSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
   XLSX_HEADERS, h2hToStatsList, marketWldPrimary,
@@ -464,6 +464,15 @@ const rows = games.map((p, i) => {
       intlOverBooks: c?.overUnder?.books ?? null,
       intlTotalLine: c?.overUnder?.line ?? c?.espnOdds?.total?.line ?? null,
     },
+    // 返还率与盘口动向(独立「返还率与盘口动向」sheet):各玩法三阶段原始赔率→返还率/抽水/公平价/初→终盘漂移。
+    //   全✅实测本次快照原值;缺=null 由 sheet 标缺不编。
+    valueOdds: {
+      euro: { init: s.europeanOdds?.initial ?? null, cur: s.europeanOdds?.current ?? null, fin: s.europeanOdds?.final ?? null },
+      hcp: { init: s.handicapOdds?.initial ?? null, cur: s.handicapOdds?.current ?? null, fin: s.handicapOdds?.final ?? null },
+      ah: { init: s.asianHandicap?.initial ?? null, cur: s.asianHandicap?.current ?? null, fin: s.asianHandicap?.final ?? null },
+      totals: { init: s.totals?.initial ?? null, cur: s.totals?.current ?? null, fin: s.totals?.final ?? null },
+      jcLine: s.jingcaiHandicap?.line ?? null,
+    },
     // 热门胜率来源:有1X2盘口=盘口de-vig(真盘口合理性);1X2未开售(悬殊盘只卖让球)=模型prob,标🔶仅参考不冒充盘口
     favProbSource: s.europeanOdds?.current ? "盘口" : "模型(1X2未开售)",
     notWinPct: p.upsetDiagnosis?.baseUpsetProb != null ? Math.round(p.upsetDiagnosis.baseUpsetProb * 100) : null,
@@ -753,6 +762,7 @@ const sheets = [
   buildAuditSheet({ date, rows, contentAudit }),
   buildIntelSheet({ date, rows, intelByMatch }),
   buildHandicapSanitySheet({ date, rows }),
+  buildOddsValueSheet({ date, rows }),
   buildUpsetAnalysisSheet({ date, rows }),
   buildDecisionAidsSheet({ date, rows }),
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },

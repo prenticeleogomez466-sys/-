@@ -13,6 +13,7 @@ import { selectHighConfidence } from "./selective-picks.js";
 import { riskScore } from "./risk-score.js";
 import { jointUpsetBreakdown } from "./upset-trap-detector.js";
 import { handicapReferenceRows, ouReferenceRows, europeanBand, ouBand, waterSanity, sanityVerdictLabel } from "./handicap-sanity.js";
+import { assessMatchOdds, payoutVerdict } from "./odds-value-lib.js";
 import { playerDisplay } from "./player-name-zh.js";
 import { formationPosture } from "./lineup-source.js";
 
@@ -721,6 +722,67 @@ export function buildHandicapSanitySheet({ date, rows }) {
   const ouHead = [[""], ["━━ 大小球(总进球2.5)标准区间 ━━"]];
   const ou = ouReferenceRows();
   return { name: "盘口合理性", rows: [...out, ...refHead, ...ref, ...ouHead, ...ou] };
+}
+
+// ── 返还率与盘口动向工作表(2026-06-18:买球者绝对有用·平台从不告诉散户的三件事)──
+//   ① 各玩法真实返还率/抽水(Σ(1/赔率)算·亚盘 vs 1X2 抽水差一倍)→ 同样看好押抽水低的长期更划算;
+//   ② de-vig(shin)公平价 vs 竞彩开价的价差;③ 初→即时→终盘 热门隐含漂移(33278场实证·弱信号)。
+//   全部真实赔率算·缺市场标缺不编(遵 feedback_no_fabrication_live_only)。非下注 edge(公开盘打不过收盘线)。
+export function buildOddsValueSheet({ date, rows }) {
+  const banner = `💰 返还率与盘口动向 · ${date} · 平台从不告诉散户、却直接决定长期盈亏的三件事:【①返还率/抽水】每玩法 Σ(1/赔率)算真实抽水——同一场押亚盘(抽水~5%)比押1X2(抽水~11%)成本差一倍,同样看好优先押抽水低的玩法;【②公平价】de-vig(Shin)还原真概率→公平赔率,看竞彩开价被"加价"多少;【③初→即时→终盘】热门隐含漂移(33278场实证:被加注热门56.4%胜 vs 退烧45.5%·弱信号仅方向参考)。✅全部本次真实赔率算,缺标缺不编;非下注edge(公开盘打不过收盘线),帮你看清成本与动向、自行决策。`;
+  const pcVig = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
+  const pcPay = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
+  const colHeader = ["对阵/项目", "玩法", "真实返还率", "抽水(成本)", "本场真实赔率", "判读", "数据标签"];
+  const SEP = (txt) => [txt, "", "", "", "", "", ""];
+  const out = [[banner], colHeader];
+
+  let withData = 0;
+  for (const r of rows) {
+    const vo = r.valueOdds;
+    const a = vo ? assessMatchOdds(vo) : null;
+    out.push(SEP(""));
+    if (!a || !a.hasData) {
+      out.push(SEP(`━━ ${r.match} ━━`));
+      out.push(["返还率", "—", "—", "—", "⚠️本场赔率未抓全", "缺·不编(遵不编造铁律)", "⚠️缺"]);
+      continue;
+    }
+    withData++;
+    const cheap = a.cheapest, dear = a.dearest;
+    const head = `━━ ${r.match} ━━　最划算=${cheap ? cheap.zh + "(抽水" + pcVig(cheap.vig) + ")" : "—"}　｜最贵=${dear ? dear.zh + "(抽水" + pcVig(dear.vig) + ")" : "—"}`;
+    out.push(SEP(head));
+    // ① 各市场返还率/抽水
+    for (const m of a.markets) {
+      const v = payoutVerdict(m.payout);
+      const cheapMark = cheap && m.key === cheap.key ? "⭐最划算" : (dear && m.key === dear.key && a.markets.length > 1 ? "🔻最贵" : "");
+      out.push([m === a.markets[0] ? "返还率·逐玩法" : "", m.zh, pcPay(m.payout), pcVig(m.vig) + (cheapMark ? " " + cheapMark : ""), m.detail ?? "—", `${v.tag}·${v.note}`, "✅实测500/亚盘"]);
+    }
+    // 抽水价差洞察(同看好换玩法省多少)
+    if (cheap && dear && cheap.key !== dear.key) {
+      const save = (dear.vig - cheap.vig);
+      out.push(["", "💡省成本", "—", `押「${cheap.zh}」比「${dear.zh}」抽水低${pcVig(save)}`, "—", "同样看好同一方向时,选返还率高的玩法长期少交成本", "—"]);
+    }
+    // ② 公平价 vs 竞彩开价(1X2)
+    if (a.fair) {
+      const parts = a.fair.map((f) => `${f.zh} 开${f.offered.toFixed(2)}/公平${f.fair.toFixed(2)}`);
+      out.push(["公平价对照(de-vig)", "胜平负", "—", "—", parts.join(" · "), "公平价=去抽水后真概率对应赔率;开价普遍低于公平价=被抽水(常态)", "✅Shin de-vig"]);
+    }
+    // ③ 初→即时→终盘动向
+    const mv = a.movement;
+    if (mv) {
+      out.push(["盘口动向", "初→即时→终盘", "—", "—", `热门隐含 ${mv.openPp.toFixed(1)}% → ${mv.closePp.toFixed(1)}%(${mv.driftPp >= 0 ? "+" : ""}${mv.driftPp.toFixed(1)}pp)`,
+        `${mv.dir}·${mv.label}`, mv.stageNote.includes("终盘") ? "✅实测初+终盘" : "✅实测初+即时"]);
+    } else {
+      out.push(["盘口动向", "初→即时→终盘", "—", "—", "⚠️无初盘/即时对比数据", "缺·不编", "⚠️缺"]);
+    }
+  }
+  // 返还率常识参照(全局·帮判读合理区间)
+  out.push([""], ["━━ 返还率合理区间参照(越高对你越有利·全为真实盘口常见水平)━━"]);
+  out.push(["项目", "玩法", "典型返还率", "典型抽水", "说明", "", ""]);
+  out.push(["参照", "亚盘让球/大小球", "94–98%", "2–6%", "抽水最低·两路盘竞争充分→最接近公平价(国际sharp盘可达98%)", "", ""]);
+  out.push(["参照", "欧赔胜平负(1X2)", "88–95%", "5–12%", "三路盘抽水中等;国际大公司(Pinnacle/Bet365)更高,小公司更低", "", ""]);
+  out.push(["参照", "竞彩官方(让球/胜平负)", "≈88–90%(本表实测)", "≈10–12%", "竞彩单玩法盘口抽水偏重;比分/半全场等多路玩法实际返还更低", "", ""]);
+  out.push(["铁律", "—", "—", "—", "返还率/抽水是结构性成本,长期决定盈亏;同看好优先押抽水低的玩法。但任何公开盘口都打不过收盘线→不保证盈利。", "", ""]);
+  return { name: "返还率与盘口动向", rows: out, _withData: withData };
 }
 
 // ── 爆冷研判工作表(2026-06-16 用户:细胞级展开·只接引擎已算的 OOS 验证信号,零臆造)──
