@@ -28,8 +28,20 @@ export function buildExtendedMarkets(matrix, options = {}) {
     asianHandicap: buildAsianHandicaps(matrix),
     doubleChance: buildDoubleChance(matrix),
     scoreGroup: buildScoreGroups(matrix),
-    totalGoalsExact: buildTotalGoalsExact(matrix)
+    totalGoalsExact: buildTotalGoalsExact(matrix),
+    teamGoals: buildTeamGoals(matrix)
   };
+}
+
+// ───── 分队进球数大小(主/客各自进球 over X.5)─────
+// 边际化矩阵:P(主进k)=Σ_a P[k][a],P(客进k)=Σ_h P[h][k]。竞彩不单卖→供🔶模型派生。
+function buildTeamGoals(matrix) {
+  const homeMarg = [], awayMarg = [];
+  for (let h = 0; h < matrix.length; h++) { let s = 0; for (let a = 0; a < matrix[h].length; a++) s += matrix[h][a]; homeMarg[h] = s; }
+  for (let a = 0; a < matrix[0].length; a++) { let s = 0; for (let h = 0; h < matrix.length; h++) s += matrix[h][a]; awayMarg[a] = s; }
+  const over = (marg, line) => { let o = 0; for (let k = 0; k < marg.length; k++) if (k > line) o += marg[k]; return round(o); };
+  const side = (marg) => ({ over05: over(marg, 0.5), over15: over(marg, 1.5), over25: over(marg, 2.5) });
+  return { home: side(homeMarg), away: side(awayMarg) };
 }
 
 // ───── 大小球(over X.5)─────

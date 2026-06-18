@@ -191,6 +191,29 @@ const ouRealStr = (s, p) => {
 const distStr = (s) => { const d = s.totalGoalsOdds?.dist; if (!d) return ""; return Object.entries(d).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([g, pp]) => `${g}球${Math.round(pp * 100)}%`).join(" "); };
 const scoreMktStr = (s) => { const t = s.scoreOdds?.top; return t?.length ? t.slice(0, 5).map((x) => `${x.score}@${x.odds}`).join(" ") + " ✅500比分" : "⚠️未取到"; };
 const hfMktStr = (s) => { const t = s.halfFullOdds?.top; return t?.length ? t.slice(0, 4).map((x) => `${x.halfFull}@${x.odds}`).join(" ") + " ✅500半全场" : "⚠️未取到"; };
+// 半场胜负平 de-vig 边际(✅500半全场bqc·标签首段=半场结果·主队视角)。
+//   标签真实格式="主胜-平局"(连字符分段,首段=半场:主胜/客胜/平局),兼容旧"胜胜"2字格式。
+//   ≥6个结果(9宫格大半)+ 三种半场结果都有质量 才算可信✅;否则 null(退🔶模型 firstHalf,绝不冒充✅)。
+const devigHalfFullHT = (top) => {
+  if (!Array.isArray(top) || top.length < 6) return null;
+  const htSide = (label) => {
+    const s = String(label ?? "");
+    const seg = s.includes("-") ? s.split("-")[0] : s.slice(0, 1);   // 首段=半场结果
+    if (/^(主|胜)/.test(seg)) return "home";
+    if (/^(客|负)/.test(seg)) return "away";
+    if (/^平/.test(seg)) return "draw";
+    return null;
+  };
+  let inv = 0; const sum = { home: 0, draw: 0, away: 0 };
+  for (const x of top) {
+    const o = Number(x.odds), side = htSide(x.halfFull);
+    if (!(o > 1) || !side) continue;
+    sum[side] += 1 / o; inv += 1 / o;
+  }
+  // 铁律:三种半场结果必须都有质量,否则=标签解析不全/格式异常→null(退🔶,不冒充✅脏值)
+  if (!(inv > 0) || sum.home === 0 || sum.draw === 0 || sum.away === 0) return null;
+  return { home: sum.home / inv, draw: sum.draw / inv, away: sum.away / inv, books: top.length };
+};
 const asianStr = (eo) => eo?.asian?.line != null
   ? `让${eo.asian.line} 主${eo.asian.homeOdds}/客${eo.asian.awayOdds}${eo.asian.openLine && eo.asian.openLine !== eo.asian.line ? `(开${eo.asian.openLine}→异动)` : ""} ✅${eo.source}`
   : "⚠️未取到(亚盘源降级,无免费源)";
@@ -463,6 +486,10 @@ const rows = games.map((p, i) => {
       intlOverProb: Number.isFinite(Number(c?.overUnder?.pOver)) ? Number(c.overUnder.pOver) : null,
       intlOverBooks: c?.overUnder?.books ?? null,
       intlTotalLine: c?.overUnder?.line ?? c?.espnOdds?.total?.line ?? null,
+      // 扩展玩法合理区间/异动(2026-06-18 用户:让球胜负平/分队进球/半场胜负平/半场进球 也要区间+异动):
+      //   半场胜负平=✅500半全场bqc de-vig边际(缺则 sheet 退🔶);ext=🔶DC矩阵派生(分队进球/半场/让球cover)。
+      htResult: devigHalfFullHT(s.halfFullOdds?.top),
+      ext: p.extendedMarkets ?? null,
     },
     // 返还率与盘口动向(独立「返还率与盘口动向」sheet):各玩法三阶段原始赔率→返还率/抽水/公平价/初→终盘漂移。
     //   全✅实测本次快照原值;缺=null 由 sheet 标缺不编。
