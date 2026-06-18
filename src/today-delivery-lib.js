@@ -10,6 +10,8 @@ import { honestPass } from "./honest-pass-gate.js";
 import { rankByDivergence } from "./market-divergence-radar.js";
 import { assessPortfolioRisk } from "./portfolio-kelly.js";
 import { selectHighConfidence } from "./selective-picks.js";
+import { riskScore } from "./risk-score.js";
+import { jointUpsetBreakdown } from "./upset-trap-detector.js";
 import { handicapReferenceRows, ouReferenceRows, europeanBand, ouBand, waterSanity, sanityVerdictLabel } from "./handicap-sanity.js";
 import { playerDisplay } from "./player-name-zh.js";
 import { formationPosture } from "./lineup-source.js";
@@ -471,22 +473,33 @@ export function buildDecisionAidsSheet({ date, rows }) {
 
   // ── A 逐场诚实过关闸 ──
   out.push([]);
-  out.push([`【A】逐场诚实过关闸(honest-pass-gate·5条硬伤任一不过=观望;判据=walk-forward校准档/风险档命中/EV/逆市/soft-league先验)`]);
-  out.push(["对阵", "推荐方向", "模型概率", "本地EV", "风险", "诚实裁决", "硬伤明细(过则空)"]);
+  out.push([`【A】逐场诚实过关闸 + 连续风险分(honest-pass-gate 5条硬伤=观望;风险分=市场隐含"这注不中"概率0-100·OOS校准[25531场]·因子只标注不计入分数=不双重计数)`]);
+  out.push(["对阵", "推荐方向", "模型概率", "本地EV", "风险分(0-100)", "风险档", "风险驱动(为什么)", "诚实裁决", "硬伤明细(过则空)"]);
   let passN = 0;
   for (const d of di) {
     const hp = honestPass({ prob: d.prob, ev: d.ev, risk: d.risk, competition: d.competition, divergencePp: d.divergencePp, aligned: d.aligned });
     if (hp.pass) passN++;
+    // 连续风险分(2026-06-18 工作流A):核心分=市场隐含 pick 不中概率;缺市场→null 如实标
+    const rs = riskScore({
+      pick: d.pickKey, marketProbs: d.marketProbs, modelProbs: d.modelProbs,
+      over25: d.over25, ahLineAbs: d.ahLineAbs, softLeague: d.softLeague,
+    });
     out.push([
       d.match, d.dir,
       d.modelProb != null ? `${Math.round(d.modelProb * 100)}%` : (d.marketProb != null ? `盘口${Math.round(d.marketProb * 100)}%(1X2未开售)` : "⚠️缺"),
       d.ev != null ? d.ev.toFixed(4) : "⚠️缺(无赔率无法验证价值)",
-      d.risk ?? "⚠️缺",
+      rs ? `${rs.score}` : "⚠️缺(无市场隐含无法量化)",
+      rs ? rs.band : (d.risk ?? "⚠️缺"),
+      rs && rs.drivers.length ? rs.drivers.map((x) => `${x.tag}(${x.note})`).join(" ｜ ") : "无额外风险旗标",
       hp.verdict,
       hp.failReasons.length ? hp.failReasons.join(" ｜ ") : "—",
     ]);
   }
+  // EV 缺值统计(2026-06-18 工作流②):多少注因缺当前赔率无法验证 EV → 覆盖率健康度
+  const evMissing = di.filter((d) => d.ev == null).length;
+  const evCovPct = di.length ? Math.round((di.length - evMissing) / di.length * 100) : 0;
   out.push([`小结`, `诚实过关 ${passN}/${di.length} 注进推荐池,其余转观望(只标注·守 feedback_confidence_not_autosuppress 不替你弃赛)`]);
+  out.push([`EV覆盖`, `${di.length - evMissing}/${di.length} 注有当前赔率可验证EV(覆盖率${evCovPct}%)` + (evMissing ? `·${evMissing}注缺赔率无法验证价值(已在EV列标缺·非过关项)` : `·全覆盖`)]);
 
   // ── B 今日精选 ──
   out.push([]);
@@ -528,11 +541,11 @@ export function buildDecisionAidsSheet({ date, rows }) {
   // ── E 爆冷风险档(upset-trap-detector·经验基线锚:势均60%/微热门52%/中等热门42%/强热门30%/超级大热18%) ──
   //   实证(reference_data_change_5yr_empirics 33278场+复盘):爆冷不可预测、只可分档管理。中等热门以下=高爆冷区,
   //   单押命中骤降→建议双选/观望(复盘"双选救回8场"即此机理);不反向押冷(逆市命中仅22.7%)。
-  const ups = di.filter((d) => d.upset).map((d) => d.upset ? { ...d.upset, match: d.match, dir: d.dir } : null).filter(Boolean);
+  const ups = di.filter((d) => d.upset).map((d) => d.upset ? { ...d.upset, match: d.match, dir: d.dir, marketProbs: d.marketProbs } : null).filter(Boolean);
   if (ups.length) {
     out.push([]);
-    out.push([`【E】爆冷风险档(upset-trap·favorite越弱爆冷基线越高;中等热门以下=高爆冷区·建议双选/观望不单押;不反向押冷)`]);
-    out.push(["对阵", "盘口主推", "热门档", "爆冷风险", "档位", "玩法建议"]);
+    out.push([`【E】爆冷风险档 + 平局/冷胜联合拆解(upset-trap 经验基线锚 + jointUpsetBreakdown 把"热门不胜"拆成 平局+冷胜·OOS校准[25531场]·drawShare定失败模式→精准玩法指引;不反向押冷)`]);
+    out.push(["对阵", "盘口主推", "热门档", "爆冷风险", "档位", "热门不胜拆解(平/冷胜)", "失败模式", "玩法建议"]);
     const advice = (lvl, tier) => {
       const hot = /超级大热|强热门/.test(tier || "");
       if (hot && (lvl === "低" || lvl === "标准")) return "可单押(强热门·爆冷基线低)";
@@ -540,9 +553,12 @@ export function buildDecisionAidsSheet({ date, rows }) {
       return "🟡中爆冷·偏向双选护一手";
     };
     for (const u of ups.sort((a, b) => (b.risk ?? 0) - (a.risk ?? 0))) {
-      out.push([u.match, u.dir, u.tier ?? "—", u.risk != null ? `${Math.round(u.risk * 100)}%` : "—", u.level ?? "—", advice(u.level, u.tier)]);
+      // 联合拆解(2026-06-18 工作流B):纯市场devig·缺市场则该格标缺不编
+      const j = jointUpsetBreakdown(u.marketProbs);
+      const breakdown = j ? `不胜${Math.round(j.notWin * 100)}%=平${Math.round(j.draw * 100)}%+冷胜${Math.round(j.dogWin * 100)}%(平占${Math.round(j.drawShare * 100)}%)` : "⚠️无市场分布";
+      out.push([u.match, u.dir, u.tier ?? "—", u.risk != null ? `${Math.round(u.risk * 100)}%` : "—", u.level ?? "—", breakdown, j ? j.failureMode : "—", j ? j.guidance : advice(u.level, u.tier)]);
     }
-    out.push(["机理", "爆冷不可预测只可分档:复盘实证中等热门以下高发(昨日多场均势/中等热门场打平或被翻)·市场也测不准(逆市无edge)→管理风险而非预测冷门"]);
+    out.push(["机理", "爆冷不可预测只可分档:复盘实证中等热门以下高发·市场也测不准(逆市无edge)→管理风险而非预测冷门。联合拆解告诉你'不胜'主要来自被逼平还是被翻盘:平占高→双选含平护得住;冷胜占高→平局护不住,要么强信心要么观望。"]);
   }
 
   return { name: "决策辅助", rows: out };

@@ -25,6 +25,7 @@ import {
 } from "../src/today-delivery-lib.js";
 // 2026-06-15 用户裁决:盘口推荐为主、模型只当参考 → 信心/注金按真盘口热门概率定档(selectionTier 本就吃市场隐含)
 import { selectionTier } from "../src/selection-tier.js";
+import { isSoftLeague } from "../src/honest-pass-gate.js"; // 2026-06-18 工作流②:soft-league 判定集中化(防两处正则分叉)
 import { stakeMultiplier, STAKE_BASE } from "../src/stake-plan.js";
 // 2026-06-13 交付契约硬闸(根治版式漂移/另起野页):写完产物自检,违约 fail-loud 拒认成功交付
 import { checkContract, CONTRACT_PATH } from "./freeze-delivery-contract.mjs";
@@ -285,10 +286,15 @@ function buildDecisionInput(p, s, mkPrimary, adv) {
     match: `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
     competition: p.fixture.competition ?? "",
     dir: mkPrimary.dir, tier: mkPrimary.tier ?? null,
+    pickKey, // 2026-06-18 工作流A:供 risk-score 算连续风险分(市场隐含"pick不中")
     prob: modelProb != null ? modelProb : marketProb, // honest-pass-gate 校准档优先看模型概率;1X2未开售退市场概率
     modelProb, marketProb, odds, ev, risk: p.risk ?? null, divergencePp, aligned,
     modelProbs: { home: pr.home ?? null, draw: pr.draw ?? null, away: pr.away ?? null },
     marketProbs: mp?.dist ?? null,
+    // 2026-06-18 工作流A 风险分驱动标注上下文(只标注不计入分数·见 src/risk-score.js)
+    over25: Number.isFinite(s.totalGoalsOdds?.over25) ? s.totalGoalsOdds.over25 : null,
+    ahLineAbs: Number.isFinite(s.jingcaiHandicap?.line) ? Math.abs(s.jingcaiHandicap.line) : (Number.isFinite(p.handicapPick?.line) ? Math.abs(p.handicapPick.line) : null),
+    softLeague: isSoftLeague(p.fixture.competition),
     stakeUnits: mkPrimary.mult ?? null, stakeAmount: mkPrimary.stakeAmount ?? null,
     // 爆冷风险档(读 prediction-engine 已算的 analyzeUpsetTrap 产物·经验基线锚·零重算):
     //   势均60%/微热门52%/中等热门42%/强热门30%/超级大热18% 基线 upset(reference_data_change_5yr_empirics)。

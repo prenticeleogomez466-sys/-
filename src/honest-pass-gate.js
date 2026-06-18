@@ -40,6 +40,20 @@ export const HONEST_PASS_CONST = {
   },
 };
 
+/**
+ * soft-international 判定(2026-06-18 工作流②集中化)。
+ * 国家队/友谊/热身/邀请赛 等"统计先验弱、信号多未学习"的赛事 → 单选不过关。
+ * 谨慎扩词:只纳入明确的国家队/友谊同义词;**不纳入 资格/预选/cup** —— 那些会误伤
+ *   俱乐部资格赛(欧冠资格赛等是俱乐部赛, 有画像, 不该被 soft 拦)。WC 预选属国家队,
+ *   由 isWorldCup 路由另行处理, 不靠此正则。
+ * @param {string} competition
+ * @returns {boolean}
+ */
+export function isSoftLeague(competition) {
+  if (typeof competition !== "string") return false;
+  return /国际|國際|友谊|友誼|友賽|友赛|热身|熱身|邀请赛|邀請賽|表演赛|国家队|國家隊|nations|friendly|exhibition/i.test(competition);
+}
+
 function bandOf(p) {
   for (const k of Object.keys(HONEST_PASS_CONST.bands)) {
     const b = HONEST_PASS_CONST.bands[k];
@@ -62,8 +76,7 @@ export function honestPass(row) {
   const risk = row.risk ?? null;
   const div = row.divergencePp == null ? null : Math.abs(Number(row.divergencePp));
   const aligned = row.aligned;
-  const soft = row.softLeague === true ||
-    (typeof row.competition === "string" && /国际|友谊|国家|nations/i.test(row.competition));
+  const soft = row.softLeague === true || isSoftLeague(row.competition);
   const band = bandOf(p);
   const C = HONEST_PASS_CONST;
 

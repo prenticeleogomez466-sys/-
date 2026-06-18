@@ -289,6 +289,42 @@ function buildUpsetReason({ band, baseUpsetProb, marginExpect, goalsExpect, line
   return `${head} · 1X2本身即非稳胆,${goalsExpect}/${marginExpect},按市场共识控注`;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// 平局+爆冷联合概率拆解(2026-06-18 工作流B)。
+//   把"热门不胜"干净拆成 P(平局)+P(冷门胜)(均市场 devig), 并算"不胜里平局占比"
+//   (drawShare)→ 区分失败模式: 偏被逼平 vs 偏被翻盘 → 指引玩法。
+//   OOS 校准(backtest-joint-upset, 25531 场): P平 RMSE1.27pp / P冷胜 RMSE1.68pp /
+//   drawShare 条件校准 max3.2pp — 三者均校准, 故纯市场锚、不编加成。
+//   诚实: 冷门胜市场略高估(favorite-longshot bias, 实际比隐含低~1-2pp), 已在 caveat 标。
+//
+// @param {Object} market {home,draw,away} devig 隐含概率(必填)
+// @param {"home"|"away"} [favSide] 指定热门方向(默认 market 推断; 平局为最大→返回 null)
+// @returns {null | { favSide, favWin, draw, dogWin, notWin, drawShare, upsetShare,
+//   failureMode, guidance, summary }}
+export function jointUpsetBreakdown(market, favSide = null) {
+  if (!market || !OUTCOMES.every((o) => Number.isFinite(market[o]))) return null;
+  if (market.draw >= market.home && market.draw >= market.away) return null; // 平局为热门=无单边热门
+  const fav = favSide && (favSide === "home" || favSide === "away") ? favSide
+    : (market.home >= market.away ? "home" : "away");
+  const dog = fav === "home" ? "away" : "home";
+  const favWin = round(market[fav]), draw = round(market.draw), dogWin = round(market[dog]);
+  const notWin = round(draw + dogWin);
+  if (notWin <= 0) return null;
+  const drawShare = round(draw / notWin);
+  const upsetShare = round(dogWin / notWin);
+  // 失败模式: 不胜里平局占比 ≥58% 偏被逼平 / ≤42% 偏被翻盘 / 之间平负参半
+  const failureMode = drawShare >= 0.58 ? "偏被逼平(磨平)"
+    : drawShare <= 0.42 ? "偏被翻盘(真冷)" : "平负参半";
+  const guidance = drawShare >= 0.58
+    ? "不胜风险以平局为主→双选含平(1X/X2)最护一手·别单押热门做胆"
+    : drawShare <= 0.42
+      ? "不胜风险以被翻盘为主→平局护不住·要么强信心单押要么直接观望(双选含客护一手)"
+      : "平负各半→若要护一手用双选(1X或X2),单押胆需高信心";
+  const pc = (x) => `${Math.round(x * 100)}%`;
+  const summary = `热门不胜${pc(notWin)} = 平局${pc(draw)} + 冷胜${pc(dogWin)}(其中平局占${pc(drawShare)})·${failureMode}`;
+  return { favSide: fav, favWin, draw, dogWin, notWin, drawShare, upsetShare, failureMode, guidance, summary };
+}
+
 // 供回测/汇总:把一场标成是否"爆冷已发生"(热门未胜)。
 export function favoriteUpset(closingImplied, result) {
   if (!closingImplied || !result) return null;
