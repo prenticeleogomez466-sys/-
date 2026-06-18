@@ -14,6 +14,7 @@ import { riskScore } from "./risk-score.js";
 import { jointUpsetBreakdown } from "./upset-trap-detector.js";
 import { handicapReferenceRows, ouReferenceRows, europeanBand, ouBand, waterSanity, sanityVerdictLabel } from "./handicap-sanity.js";
 import { assessMatchOdds, payoutVerdict } from "./odds-value-lib.js";
+import { bookmakerIntent } from "./bookmaker-intent.js";
 import { playerDisplay } from "./player-name-zh.js";
 import { formationPosture } from "./lineup-source.js";
 
@@ -729,7 +730,7 @@ export function buildHandicapSanitySheet({ date, rows }) {
 //   ② de-vig(shin)公平价 vs 竞彩开价的价差;③ 初→即时→终盘 热门隐含漂移(33278场实证·弱信号)。
 //   全部真实赔率算·缺市场标缺不编(遵 feedback_no_fabrication_live_only)。非下注 edge(公开盘打不过收盘线)。
 export function buildOddsValueSheet({ date, rows }) {
-  const banner = `💰 返还率与盘口动向 · ${date} · 平台从不告诉散户、却直接决定长期盈亏的三件事:【①返还率/抽水】每玩法 Σ(1/赔率)算真实抽水——同一场押亚盘(抽水~5%)比押1X2(抽水~11%)成本差一倍,同样看好优先押抽水低的玩法;【②公平价】de-vig(Shin)还原真概率→公平赔率,看竞彩开价被"加价"多少;【③初→即时→终盘】热门隐含漂移(33278场实证:被加注热门56.4%胜 vs 退烧45.5%·弱信号仅方向参考)。✅全部本次真实赔率算,缺标缺不编;非下注edge(公开盘打不过收盘线),帮你看清成本与动向、自行决策。`;
+  const banner = `💰 返还率与盘口动向 · ${date} · 平台从不告诉散户、却直接决定长期盈亏的三件事:【①返还率/抽水】每玩法 Σ(1/赔率)算真实抽水——同一场押亚盘(抽水~5%)比押1X2(抽水~11%)成本差一倍,同样看好优先押抽水低的玩法;【②公平价】de-vig(Shin)还原真概率→公平赔率,看竞彩开价被"加价"多少;【③初→即时→终盘】热门隐含漂移(33278场实证:被加注热门56.4%胜 vs 退烧45.5%·弱信号仅方向参考)。【④CLV风险】模型方向vs市场共识(同向🟢低/逆市🔴高);【⑤庄家意图研判】竞彩 vs 国际sharp盘(DraftKings/The Odds API)偏离+1X2移动→庄家/公众定价倾向与相对价值方向(sharp最接近真实概率,竞彩偏离方向暴露意图)。✅全部本次真实数据算,缺标缺不编;非下注edge(公开盘打不过收盘线),帮你看清成本/动向/庄家倾向、自行决策。`;
   const pcVig = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
   const pcPay = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
   const colHeader = ["对阵/项目", "玩法", "真实返还率", "抽水(成本)", "本场真实赔率", "判读", "数据标签"];
@@ -781,6 +782,21 @@ export function buildOddsValueSheet({ date, rows }) {
       out.push(["CLV风险(市场一致性)", clv.aligned ? "同向" : clv.fightLevel, "—", clv.level, divCell, clv.label, "✅模型方向vs市场de-vig(赛前代理)"]);
     } else {
       out.push(["CLV风险(市场一致性)", "—", "—", "—", "缺模型方向或1X2赔率", "缺·不编", "⚠️缺"]);
+    }
+    // ⑤ 庄家意图研判(竞彩 vs 国际 sharp 盘偏离 + 1X2 移动 → 庄家/公众定价倾向·相对价值方向)
+    const so = r.sanityOdds ?? {};
+    const intent = bookmakerIntent({
+      euroInit: so.euroInit, euroCur: so.euro,
+      jcAhLine: so.ahLine ?? so.jcLine, dkAsianLine: so.dkAsianLine, dkSrc: so.dkAsianSrc,
+      jcOver: so.over25, intlOver: so.intlOverProb, intlBooks: so.intlOverBooks,
+    });
+    if (intent) {
+      out.push(["庄家意图研判(综合)", intent.dataStrength, "—", "—", intent.intent, intent.caveat, "✅跨源sharp+500移动"]);
+      for (const sg of intent.signals) {
+        out.push(["", `· ${sg.type}`, "—", "—", sg.dir, sg.read, ""]);
+      }
+      if (intent.publicSide) out.push(["", "· 公众side", "—", "—", intent.publicSide, "资金倾向方(赔率被压·价值通常更差)", ""]);
+      if (intent.valueHint) out.push(["", "· 相对价值方向", "—", "—", intent.valueHint, "sharp暗示竞彩此侧定价偏离(非保证·公开盘打不过收盘线)", ""]);
     }
   }
   // 返还率常识参照(全局·帮判读合理区间)
