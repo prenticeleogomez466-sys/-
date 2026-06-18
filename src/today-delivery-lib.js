@@ -14,6 +14,7 @@ import { riskScore } from "./risk-score.js";
 import { jointUpsetBreakdown } from "./upset-trap-detector.js";
 import { handicapReferenceRows, ouReferenceRows, europeanBand, ouBand, waterSanity, sanityVerdictLabel } from "./handicap-sanity.js";
 import { handicapResultBand, htResultBand, teamGoalsBand, htGoalsBand, anomalyVs, depthLabel, depthBin, handicapResultReferenceRows, extendedDepthReferenceRows } from "./extended-market-bands.js";
+import { assessStrengthVsMarket, ppgOf } from "./strength-market-match.js";
 import { assessMatchOdds, payoutVerdict } from "./odds-value-lib.js";
 import { bookmakerIntent } from "./bookmaker-intent.js";
 import { playerDisplay } from "./player-name-zh.js";
@@ -591,7 +592,7 @@ export function buildDecisionAidsSheet({ date, rows }) {
 //    对照历史正常区间(直接写赔率数字),判深浅,临界也写数字,不用 P5/P95 黑话)──
 //   标准=12458场五大联赛(7季)实测;每场按亚盘线锚定实力档→给同档欧赔正常区间;赔率落区外=过深/过浅。
 export function buildHandicapSanitySheet({ date, rows }) {
-  const banner = `📐 盘口合理性 · ${date} · 逐场细胞级:【胜负平/让球胜负平(亚洲让球)/让球线/大小球/分队进球数大小/半场胜负平/半场进球数/亚盘水位】真实赔率或🔶模型派生→对照12458场五大联赛(7季)历史正常区间/真实赛果频次(直接写数字)判深浅/异动+差临界(数字);再加【亚盘水位失衡(钱压谁过盘)/初盘→即时盘口移动(被加注56.4%胜 vs 退烧45.5%·5年实证)/跨源交叉验证/综合盘口裁决】。规则:①欧赔热门胜赔比历史最低还低=过浅(热门更强·让太少·受让方过盘易)、比最高还高=过深;②让球胜负平/分队进球/半场=本场隐含或🔶派生 vs 历史真实赛果频次,偏离≥8pp=🟠异动。数据标签:✅实测(500/亚盘真盘de-vig)·🔶模型(竞彩不单卖→DC矩阵派生·注明)·⚠️缺(标缺不编)。✅历史频次供你自行判断,非下注edge(公开盘口打不过收盘线)。`;
+  const banner = `📐 盘口合理性 · ${date} · 逐场细胞级:先做【独立实力对比】(✅WC国家队Elo先验+✅ESPN近5·不看盘口)→换算实力应得让球线/胜率→与盘口实际定价比【实力↔盘口匹配度·是否合理】(匹配=合理/盘口高估热门/低估热门/方向背离·诚实:分歧时市场通常更准不鼓励逆市);再逐玩法【胜负平/让球胜负平(亚洲让球)/让球线/大小球/分队进球数大小/半场胜负平/半场进球数/亚盘水位】真实赔率或🔶模型派生→对照12458场五大联赛(7季)历史正常区间/真实赛果频次(直接写数字)判深浅/异动+差临界(数字);再加【亚盘水位失衡(钱压谁过盘)/初盘→即时盘口移动(被加注56.4%胜 vs 退烧45.5%·5年实证)/跨源交叉验证/综合盘口裁决】。规则:①欧赔热门胜赔比历史最低还低=过浅(热门更强·让太少·受让方过盘易)、比最高还高=过深;②让球胜负平/分队进球/半场=本场隐含或🔶派生 vs 历史真实赛果频次,偏离≥8pp=🟠异动。数据标签:✅实测(500/亚盘真盘de-vig)·🔶模型(竞彩不单卖→DC矩阵派生·注明)·⚠️缺(标缺不编)。✅历史频次供你自行判断,非下注edge(公开盘口打不过收盘线)。`;
   const num = (x) => (x == null || !Number.isFinite(Number(x)) ? null : Number(x));
   const dec = (x) => { const v = num(x); return v == null ? "—" : v.toFixed(2); };
   const pc = (x) => (x == null ? "—" : (x * 100).toFixed(1) + "%");
@@ -669,6 +670,29 @@ export function buildHandicapSanitySheet({ date, rows }) {
       out.push([`热门隐含胜率(综合裁决)`, `${pc(s.favProb)}${isModel ? "·🔶模型" : ""}`, "无该线≥30样本历史档", "—", "—", "该让球线历史样本不足·不硬套", isModel ? "🔶模型" : "✅盘口"]);
     } else {
       out.push([`热门隐含胜率(综合裁决)`, "—", "—", "⚠️缺", "—", "缺亚盘线或1X2隐含·不判(不编)", "⚠️缺"]);
+    }
+
+    // ②b 独立实力对比 + 实力↔盘口匹配度(2026-06-18 用户:不能只看盘口自洽·要先独立实力对比再判盘口是否匹配·合理)
+    //   实力=✅纯Elo先验(独立于盘口)+✅ESPN近5;换算"实力应得让球线/胜率" vs 盘口实际→匹配=合理/高估/低估/方向背离。
+    const svm = r.strengthInputs ? assessStrengthVsMarket(r.strengthInputs) : null;
+    if (svm) {
+      const ep = r.strengthInputs.eloProb;
+      const eloFavZh = svm.eloFavSide === "home" ? "主队" : "客队";
+      const hp = svm.homePpg, ap = svm.awayPpg;
+      const formStr = (hp != null && ap != null) ? `近5场均分 主${hp}/客${ap}${svm.formAgreesElo === false ? "(⚠️与Elo强弱相反)" : ""}` : "近5场均分缺";
+      // 行1:独立实力基准(不看盘口)
+      out.push([`实力对比(独立·不看盘口)`,
+        `Elo先验 主胜${p1(ep.home)}%/平${p1(ep.draw)}%/客胜${p1(ep.away)}%(eloDiff${svm.eloDiff >= 0 ? "+" : ""}${svm.eloDiff})`,
+        `${formStr}`, "—", "—",
+        `✅WC国家队Elo(独立于盘口)+ESPN近5真实战绩=纸面实力基准;${eloFavZh}为实力热门(胜率${p1(svm.eloFavProb)}%)`,
+        "✅实测Elo+✅ESPN近5"]);
+      // 行2:实力↔盘口匹配度裁决(本块结论·回答"盘口给的是否合理")
+      const expCell = `实力应得≈让${svm.eloFairLine ?? "—"}球·热门胜率${p1(svm.eloFavProb)}%`;
+      const mktCell = `盘口实际让${svm.marketLineAbs ?? "—"}球·热门隐含${svm.marketFavProb != null ? p1(svm.marketFavProb) + "%" : "—"}`;
+      const diffCell = `${svm.probGapPp != null ? `胜率${sgn(svm.probGapPp)}pp` : ""}${svm.lineGap != null ? `${svm.probGapPp != null ? "·" : ""}让球${sgn(svm.lineGap)}球` : ""}` || "—";
+      out.push([`🎯实力↔盘口匹配度(是否合理)`, `${expCell}　VS　${mktCell}`, "实力基准 vs 盘口定价", svm.verdict, diffCell, svm.read, "✅Elo+✅盘口·诚实:分歧时市场通常更准不鼓励逆市"]);
+    } else if (r.strengthInputs === null || r.strengthInputs === undefined) {
+      out.push([`🎯实力↔盘口匹配度(是否合理)`, "⚠️Elo先验缺(非48强名单/非WC)→无法独立实力对比", "—", "—", "—", "无独立实力源·标缺不编(不拿盘口自我循环冒充实力判断)", "⚠️缺"]);
     }
 
     // ③ 让球胜负平(竞彩=亚洲让球·2026-06-18 用户:补合理区间):实测赔率→de-vig隐含% vs 该让球线历史真实赛果频次→异动
@@ -807,10 +831,13 @@ export function buildHandicapSanitySheet({ date, rows }) {
     if (movParts.length) flags.push("盘口有移动");
     if (xDiverge) flags.push("跨源分歧");
     if (o.over25 != null && (o.over25 >= 0.58 || o.over25 <= 0.44)) flags.push(o.over25 >= 0.58 ? "大球档" : "小球档");
+    if (svm && svm.severity !== "ok" && svm.severity !== "na") flags.push(svm.verdict.replace(/^[🔴🟠🟢]/, ""));
     const overall = flags.length ? `🟠注意:${flags.join(" · ")}` : "🟢盘口各维度均在历史常态区间内";
-    // 综合盘口解读(2026-06-18 用户:解读要写清楚)——用人话把本场盘口画像讲透:谁是热门/庄家定价偏深偏浅意味着什么/钱往哪压/盘怎么动/对你怎么用
+    // 综合盘口解读(2026-06-18 用户:解读要写清楚 + 要先实力对比再判盘口是否合理)——用人话把本场盘口画像讲透
     const favTxt = favHome == null ? "本场热门方未明(1X2未开售或赔率缺)" : (favHome ? "本场主队是热门" : "本场客队是热门");
     const read = [`${favTxt}。`];
+    // 实力↔盘口匹配="是否合理"的核心结论,置顶
+    if (svm) read.push(`【实力匹配】${svm.verdict}:${svm.read}`);
     if (s && s.band) {
       if (s.verdict === "过深") read.push(`庄家给的让球比"${pc(s.favProb)}强度档"历史该有的更深(热门隐含高出正常上限约${s.gapPp}个百分点)——等于把热门定得偏强、让球让得偏多;含义:受让方/爆冷端相对更有空间,买深让热门当胆要谨慎。`);
       else if (s.verdict === "过浅") read.push(`庄家给的让球比该强度档历史该有的更浅(热门隐含低出正常下限约${s.gapPp}个百分点)——热门被定得偏弱、让得偏少;含义:受让方过盘相对容易,别盲目把热门让球当胆。`);

@@ -507,6 +507,26 @@ const rows = games.map((p, i) => {
     notWinPct: p.upsetDiagnosis?.baseUpsetProb != null ? Math.round(p.upsetDiagnosis.baseUpsetProb * 100) : null,
     // 实力差Elo(✅世界杯模型 national-elo;非WC无):正=主强。worldCupMatchPrior 真实先验,缺则wcModel。
     eloDiff: prior?.eloDiff ?? p.wcModel?.elo?.diff ?? null,
+    // 独立实力 vs 盘口匹配度输入(2026-06-18 用户:盘口合理性要先独立实力对比再判盘口是否匹配·合理):
+    //   eloProb=✅纯Elo先验(独立于盘口)·marketFavProb=✅盘口de-vig热门·form=✅ESPN近5。供 sheet assessStrengthVsMarket。
+    strengthInputs: (() => {
+      const eloProb = prior?.probabilities ?? p.wcModel?.elo?.probabilities ?? null;
+      if (!eloProb) return null;
+      const eo = s.europeanOdds?.current;
+      let marketFavProb = null, favSideIsHome = null;
+      if (eo) {
+        const h = Number(eo.home), d = Number(eo.draw), a = Number(eo.away);
+        if (h > 1 && d > 1 && a > 1) { const inv = 1 / h + 1 / d + 1 / a; const ph = (1 / h) / inv, pa = (1 / a) / inv; favSideIsHome = ph >= pa; marketFavProb = Math.max(ph, pa); }
+      }
+      const r5 = (side) => side?.record5?.n ? { ppg: null, w: side.record5.w, d: side.record5.d, n: side.record5.n, gf: Math.round(side.record5.gf / side.record5.n * 100) / 100, ga: Math.round(side.record5.ga / side.record5.n * 100) / 100 } : null;
+      const aLine = Number(s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? s.jingcaiHandicap?.line);
+      return {
+        eloProb, eloDiff: prior?.eloDiff ?? p.wcModel?.elo?.diff ?? null,
+        marketFavProb, favSideIsHome,
+        marketLineAbs: Number.isFinite(aLine) ? Math.abs(aLine) : null,
+        homeForm: r5(c?.home), awayForm: r5(c?.away),
+      };
+    })(),
     // 平局隐含%(✅500欧赔de-vig真盘口;1X2未开售→null不编):爆冷头号路径=被逼平,平局隐含越高越要防平。
     drawImpliedPct: (() => {
       const eo = s.europeanOdds?.current; if (!eo) return null;
