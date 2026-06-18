@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  bookMetrics, waterToDecimal, fairVsOffered, lineMovement, favSideOf, assessMatchOdds, payoutVerdict,
+  bookMetrics, waterToDecimal, fairVsOffered, lineMovement, favSideOf, assessMatchOdds, payoutVerdict, clvRisk,
 } from "../src/odds-value-lib.js";
 
 test("bookMetrics: 返还率=1/Σ(1/o)·抽水=1-返还率(真实赔率)", () => {
@@ -102,6 +102,37 @@ test("assessMatchOdds: 全缺→hasData false·不报错", () => {
   assert.equal(a.markets.length, 0);
   assert.equal(a.cheapest, null);
   assert.equal(assessMatchOdds(null), null);
+});
+
+test("clvRisk: 模型同向=低·逆市最冷=高·次热=中", () => {
+  const odds = { home: 1.30, draw: 4.5, away: 8.0 };   // 市场热门=home
+  const aligned = clvRisk(3, 0.75, odds);              // 模型也押 home(3=主)
+  assert.equal(aligned.aligned, true);
+  assert.equal(aligned.level, "🟢低");
+  const cold = clvRisk(0, 0.30, odds);                 // 模型押 away(市场最冷)
+  assert.equal(cold.aligned, false);
+  assert.equal(cold.level, "🔴高");
+  const mid = clvRisk(1, 0.30, odds);                  // 模型押 draw(市场次热)
+  assert.equal(mid.level, "🟡中");
+});
+
+test("clvRisk: 缺 pick/赔率→null(不编)", () => {
+  assert.equal(clvRisk(null, 0.5, { home: 1.3, draw: 4, away: 8 }), null);
+  assert.equal(clvRisk(3, 0.5, null), null);
+});
+
+test("clvRisk: modelProb 缺仍能判等级(divergence=NaN不崩)", () => {
+  const r = clvRisk(3, null, { home: 1.30, draw: 4.5, away: 8.0 });
+  assert.ok(r && r.level === "🟢低");
+});
+
+test("assessMatchOdds: 含 clv 字段(同向场)", () => {
+  const vo = {
+    euro: { cur: { home: 1.30, draw: 4.5, away: 8.0 } }, hcp: {}, ah: {}, totals: {},
+    modelPickCode: 3, modelProb: 0.75,
+  };
+  const a = assessMatchOdds(vo);
+  assert.ok(a.clv && a.clv.aligned === true);
 });
 
 test("payoutVerdict: 分档标签", () => {

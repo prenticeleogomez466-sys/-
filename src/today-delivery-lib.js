@@ -774,6 +774,14 @@ export function buildOddsValueSheet({ date, rows }) {
     } else {
       out.push(["盘口动向", "初→即时→终盘", "—", "—", "⚠️无初盘/即时对比数据", "缺·不编", "⚠️缺"]);
     }
+    // ④ CLV 风险(市场一致性·赛前 CLV 唯一可落地形态):模型方向 vs 市场共识
+    const clv = a.clv;
+    if (clv) {
+      const divCell = Number.isFinite(clv.divergencePp) ? `模型比市场${clv.divergencePp >= 0 ? "高" : "低"}${Math.abs(clv.divergencePp).toFixed(1)}pp` : "模型概率缺";
+      out.push(["CLV风险(市场一致性)", clv.aligned ? "同向" : clv.fightLevel, "—", clv.level, divCell, clv.label, "✅模型方向vs市场de-vig(赛前代理)"]);
+    } else {
+      out.push(["CLV风险(市场一致性)", "—", "—", "—", "缺模型方向或1X2赔率", "缺·不编", "⚠️缺"]);
+    }
   }
   // 返还率常识参照(全局·帮判读合理区间)
   out.push([""], ["━━ 返还率合理区间参照(越高对你越有利·全为真实盘口常见水平)━━"]);
@@ -782,6 +790,11 @@ export function buildOddsValueSheet({ date, rows }) {
   out.push(["参照", "欧赔胜平负(1X2)", "88–95%", "5–12%", "三路盘抽水中等;国际大公司(Pinnacle/Bet365)更高,小公司更低", "", ""]);
   out.push(["参照", "竞彩官方(让球/胜平负)", "≈88–90%(本表实测)", "≈10–12%", "竞彩单玩法盘口抽水偏重;比分/半全场等多路玩法实际返还更低", "", ""]);
   out.push(["铁律", "—", "—", "—", "返还率/抽水是结构性成本,长期决定盈亏;同看好优先押抽水低的玩法。但任何公开盘口都打不过收盘线→不保证盈利。", "", ""]);
+  // CLV(收盘价值)监控说明——真 KPI、但受收盘线采集限制,诚实交代现状(遵 feedback_no_fabrication_live_only)。
+  out.push([""], ["━━ CLV(收盘价值)说明:衡量下注质量的黄金标准·真KPI ━━"]);
+  out.push(["概念", "—", "—", "—", "CLV=你的下注价 vs 收盘价的差(收盘线=有效市场最准概率)。长期正CLV≈你比市场快/准,比单场命中率更能预测长期盈亏。", "", ""]);
+  out.push(["现状", "—", "—", "—", "真CLV需采集收盘线(临场封盘价);本系统赔率快照 final(收盘)目前未采集→真CLV暂只能事后算,赛前用上方「CLV风险(市场一致性)」作代理。", "", ""]);
+  out.push(["实证基线", "—", "—", "—", "backtest:clv(45788场)实证:纯模型 pick 平均 CLV −0.063%(无独立 edge)·逆市真分歧场 −0.796%(高风险)→ 坐实模型本质市场跟随器,跟随盘口漂移亦是反指(命中41.7%<跟开盘热门52.4%),不作下注 edge。", "", ""]);
   return { name: "返还率与盘口动向", rows: out, _withData: withData };
 }
 

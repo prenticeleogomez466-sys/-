@@ -472,6 +472,8 @@ const rows = games.map((p, i) => {
       ah: { init: s.asianHandicap?.initial ?? null, cur: s.asianHandicap?.current ?? null, fin: s.asianHandicap?.final ?? null },
       totals: { init: s.totals?.initial ?? null, cur: s.totals?.current ?? null, fin: s.totals?.final ?? null },
       jcLine: s.jingcaiHandicap?.line ?? null,
+      modelPickCode: p.pick?.code ?? null,                    // 模型胜负平方向(3主/1平/0客)→CLV风险:模型方向vs市场共识
+      modelProb: p.pick?.probability ?? p.pick?.prob ?? null, // 模型主推概率(算 divergence·缺则风险等级仍可判)
     },
     // 热门胜率来源:有1X2盘口=盘口de-vig(真盘口合理性);1X2未开售(悬殊盘只卖让球)=模型prob,标🔶仅参考不冒充盘口
     favProbSource: s.europeanOdds?.current ? "盘口" : "模型(1X2未开售)",

@@ -12,8 +12,27 @@
  * de-vig 复用 src/market-devig.js(shin),不重造。
  */
 import { devig } from "./market-devig.js";
+import { gate as clvGate } from "./clv-confidence-gate.js";
 
 const num = (x) => { const n = Number(x); return Number.isFinite(n) ? n : null; };
+
+/**
+ * 赛前 CLV 风险(市场一致性)——CLV 在赛前唯一能诚实落地的形态。
+ * 真 CLV=下注价 vs 收盘价(需收盘线,系统 final 现全 null→事后才能算);赛前用"模型方向 vs 市场共识方向"
+ * 作代理:与市场同向→收盘大概率不反向(低 CLV 风险);逆市→收盘常反向修正(高 CLV 风险)。
+ * 实证(reference_signal_backtest:9363场同向命中54.2%/次热32.2%/逆市22.7%;真分歧场 CLV −0.796%)。
+ * 复用已验证的 clv-confidence-gate.gate(纯函数·Power de-vig)。缺 pick/赔率→null。
+ */
+export function clvRisk(modelPickCode, modelProb, euroOdds) {
+  if (modelPickCode == null || !euroOdds) return null;
+  const g = clvGate({ pickCode: modelPickCode, probability: modelProb, odds: euroOdds });
+  if (!g || g.aligned == null) return null;
+  let level, label;
+  if (g.aligned) { level = "🟢低"; label = "与市场共识同向→收盘大概率不反向(实证同向54.2%胜·CLV风险低)"; }
+  else if (g.fightLevel === "次热") { level = "🟡中"; label = "押市场次热项→略降档(实证次热32.2%)"; }
+  else { level = "🔴高"; label = "硬逆市(押市场最冷项)→收盘常反向修正(实证逆市仅22.7%·真分歧场CLV −0.8%)"; }
+  return { level, label, aligned: g.aligned, fightLevel: g.fightLevel, divergencePp: g.divergence, marketPick: g.marketPick, modelPick: g.modelPick };
+}
 
 /** 水位→十进制赔率:亚盘 homeWater=0.88 表示净赔 0.88 → decimal 1.88;若已是 >1 的 decimal 原样返回。 */
 export function waterToDecimal(w) {
@@ -120,8 +139,9 @@ export function assessMatchOdds(vo) {
 
   const fair = fairVsOffered(euroCur, "shin");
   const movement = lineMovement(vo.euro ? { init: vo.euro.init, cur: vo.euro.cur, fin: vo.euro.fin } : null);
+  const clv = clvRisk(vo.modelPickCode, vo.modelProb, euroCur);
 
-  return { markets, cheapest, dearest, fair, movement, hasData: markets.length > 0 };
+  return { markets, cheapest, dearest, fair, movement, clv, hasData: markets.length > 0 };
 }
 
 /** 返还率档位标签(供 sheet 直观判读;基于真实赔率算出的 payout)。 */
