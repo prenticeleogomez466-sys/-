@@ -257,4 +257,38 @@ if (!process.argv.includes("--no-xlsx")) {
   writeFileSync(jsonPath, JSON.stringify(jsonOut, null, 1));
   console.log(`\n✅ xlsx → ${xlsxPath}`);
   console.log(`✅ json → ${jsonPath}`);
+
+  // ── 手机页(端口80 共享目录,独立页不碰受审计的 worldcup.html) ──
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const groupCards = GLETTERS.map((g) => {
+    const j = jsonOut.groups[g];
+    const trows = j.table.map((r) => `<tr><td class=l>${esc(r.team)}</td><td>${r.pts}</td><td>${r.gd >= 0 ? "+" + r.gd : r.gd}</td><td>${r.advance}%</td><td>${r.p1}%</td><td>${r.p2}%</td></tr>`).join("");
+    const easier = j.easierPath;
+    return `<div class=card><h3>${g} 组</h3>
+      <table><tr><th class=l>队</th><th>分</th><th>差</th><th>出线</th><th>第1</th><th>第2</th></tr>${trows}</table>
+      <div class=path><b>第1名</b>(${j.pos1.half}/${j.pos1.quarter})→R32 ${esc(j.pos1.oppTop)} <span class=elo>对手Elo≈${j.pos1.oppElo}</span></div>
+      <div class=path><b>第2名</b>(${j.pos2.half}/${j.pos2.quarter})→R32 ${esc(j.pos2.oppTop)} <span class=elo>对手Elo≈${j.pos2.oppElo}</span></div>
+      <div class=verdict>⇒ 路径更轻 = 争<b>${easier}</b>(想躲强队/碰弱旅同理)</div></div>`;
+  }).join("");
+  const html = `<!doctype html><html lang=zh><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>世界杯·名次→淘汰赛路径</title><style>
+body{margin:0;background:#1a1033;color:#eee;font:15px/1.5 -apple-system,system-ui,sans-serif;padding:12px}
+h1{font-size:19px;color:#d8b4fe;margin:4px 0}.sub{color:#a78bca;font-size:12px;margin-bottom:12px}
+.card{background:#2a1a4a;border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 2px 8px #0005}
+h3{margin:0 0 8px;color:#f0abfc;font-size:16px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:4px 6px;text-align:center;border-bottom:1px solid #ffffff14}
+th{color:#a78bca;font-weight:600}.l{text-align:left}
+.path{font-size:13px;margin-top:6px;color:#ddd}.path b{color:#fcd34d}.elo{color:#9ca3af;font-size:11px}
+.verdict{margin-top:6px;font-size:13px;color:#86efac}.verdict b{color:#bbf7d0}
+.foot{color:#8b7aa8;font-size:11px;margin-top:8px}</style></head><body>
+<h1>2026 世界杯 · 名次→淘汰赛路径</h1>
+<div class=sub>生成 ${today} · 条件MC N=${N} · 已踢 ${playedByPair.size} 场真实赛果注入,未踢按真实分组+Elo模拟 · 上半区=Q1/Q2 下半区=Q3/Q4</div>
+${groupCards}
+<div class=foot>名次→R32对手/半区=FIFA官方bracket.json结构;第三名对手随"哪8个第三出线"动态变(Annex C);末轮赛果一变路径即变。出线/第1/第2%=蒙特卡洛非编造。</div>
+</body></html>`;
+  const WEB = process.env.WC_WEB_DIR || "D:\\Temp\\webshare_lingdao";
+  try {
+    if (existsSync(WEB)) { writeFileSync(pjoin(WEB, "worldcup-path.html"), html, "utf8"); console.log(`✅ 手机页 → ${pjoin(WEB, "worldcup-path.html")}`); }
+  } catch (e) { console.log(`⚠ 手机页写入跳过:${e.message}`); }
 }
