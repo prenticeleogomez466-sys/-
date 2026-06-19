@@ -8,7 +8,7 @@
  *
  * 用法:node scripts/run-worldcup-supercomputer.mjs [--n 20000] [--seed 20260611] [--json] [--xlsx]
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { getDataSubdir, getExportDir } from "../src/paths.js";
 import { teamPrior, groupVenueMults, matchVenueMult, marketWeOf, worldCupMatchOdds } from "../src/world-cup-priors.js";
@@ -88,9 +88,24 @@ console.log(bracket
   : "⚠️ 诚实边界:未找到 bracket.json,R32 回退强度种子树;点球 50/50;命中率上限不变。");
 
 if (argv.includes("--json")) {
-  const p = join(getExportDir(), "worldcup-supercomputer.json");
-  writeFileSync(p, JSON.stringify({ n: N, seed: SEED, alpha: ALPHA, audit: res.audit, rows }, null, 1));
-  console.log("已写 JSON:", p);
+  // canonical 落 WC 数据目录(audit-wc-pipeline 的 s3-sc-fresh 闸读此处 generatedAt 判 ≤72h 新鲜;
+  //   build-model-map 也读此处)。2026-06-18 根修:旧版写精简对象到 exports 目录且无 generatedAt
+  //   → 重跑超算永远刷不到闸读的文件 → 72h 后必红需人工返厂。改为就地刷新 WC 目录 canonical,
+  //   合并保留人工/同步维护的富集字段(note/titleOddsVintage),重算 generatedAt+marketFusedMatches。
+  const p = join(getDataSubdir("world-cup"), "2026", "worldcup-supercomputer.json");
+  let prev = {};
+  try { if (existsSync(p)) prev = JSON.parse(readFileSync(p, "utf8")); } catch { prev = {}; }
+  const merged = {
+    ...prev,
+    kind: prev.kind ?? "worldcup-supercomputer",
+    generatedAt: new Date().toISOString(),
+    n: N, seed: SEED, alpha: ALPHA, bracketMode,
+    marketFusedMatches: oddsCount,
+    // titleOddsVintage 由 sync:wc-winner 维护,保留 prev(本脚本不抓夺冠盘)
+    audit: res.audit, rows,
+  };
+  writeFileSync(p, JSON.stringify(merged, null, 1));
+  console.log("已写 canonical JSON:", p, "| generatedAt 已刷新, marketFusedMatches=", oddsCount);
 }
 if (argv.includes("--xlsx")) {
   // 复用 polish-xlsx 之外的最简写法:直接调 python openpyxl(项目里已有 polish 脚本依赖 openpyxl)

@@ -389,8 +389,14 @@ if (ONLY.includes("s5")) {
           try {
             const fx = JSON.parse(readFileSync(p, "utf8"));
             const list = Array.isArray(fx) ? fx : fx.fixtures || [];
-            const zh = [zhName(m.homeTeam), zhName(m.awayTeam)];
-            if (list.some((r) => [r.homeTeam, r.awayTeam].filter(Boolean).every((t) => zh.includes(t)) && (r.result || r.finalScore))) { found = true; break; }
+            // 2026-06-19 假阴修:三套命名各异(matchDates"Congo DR" / 官方组别图"DR Congo→刚果民主共和国" / 500 store"刚果(金)")
+            //   致字面 includes 漏判已结算场(Portugal-Congo DR 赛果 1:1 真在 store 却报无)。复用 normTeam(别名表单一权威,
+            //   已把全部 Congo 变体→"dr congo"),每队候选 = {normTeam(英文), normTeam(zh名)},store 行 normTeam 命中候选即同队。
+            //   赛果仍须真实存在(r.result||r.finalScore)才算 found——只放宽队名匹配,不会造假 PASS。
+            const cand = (t) => new Set([normTeam(t), normTeam(zhName(t))].filter(Boolean));
+            const [hc, ac] = [cand(m.homeTeam), cand(m.awayTeam)];
+            const teamHit = (t) => hc.has(normTeam(t)) || ac.has(normTeam(t));
+            if (list.some((r) => [r.homeTeam, r.awayTeam].filter(Boolean).length === 2 && [r.homeTeam, r.awayTeam].every(teamHit) && (r.result || r.finalScore))) { found = true; break; }
           } catch { /* 坏文件由store探针管 */ }
         }
         if (!found) missing.push(`${m.homeTeam}-${m.awayTeam}@${m.localDate}`);

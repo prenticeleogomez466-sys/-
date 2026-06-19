@@ -84,19 +84,22 @@ def main(path):
         if GARBAGE.search(joined):
             errors.append(f"{row_name} 单元格含渲染垃圾(undefined/NaN/None)")
 
-        # 胜负平: 主选X(p%) 或 ⛔未开售(带原因); 双选前缀必含主选方向
+        # 胜负平(2026-06-19 新口径:盘口主推✅ 方向(p%·@赔) + 模型🔶次选;或 ⛔未开售带原因;或退让球档 simpleWldCell 主选/双选)
         wld = cells.get("胜负平", "")
         if "未开售" in wld:
             if "(" not in wld:
                 errors.append(f"{row_name} 未开售无原因标注")
         else:
-            mm = re.search(r"主选\s*(主胜|平局|客胜)\((\d+)%\)", wld)
+            mm = re.search(r"(主胜|平局|客胜)\((\d+)%", wld)  # 取首个方向(p%)=盘口主推(模型次选行在其后)
             if not mm:
-                errors.append(f"{row_name} 胜负平缺'主选 方向(p%)': {wld[:30]}")
+                errors.append(f"{row_name} 胜负平缺'方向(p%)': {wld[:30]}")
             else:
                 p = int(mm.group(2))
                 if not 1 <= p <= 99:
                     errors.append(f"{row_name} 主选概率{p}%越界")
+                # 守口径:盘口主推/主选/双选 标识至少其一(确保不是裸方向、确保盘口为主)
+                if not any(k in wld for k in ("盘口主推", "主选", "双选")):
+                    errors.append(f"{row_name} 胜负平缺'盘口主推/主选'标识: {wld[:30]}")
                 ds = re.search(r"双选([^\s(]+)", wld)
                 if ds and mm.group(1) not in ds.group(1):
                     errors.append(f"{row_name} 双选'{ds.group(1)}'不含主选方向{mm.group(1)}(方向锚破)")

@@ -134,6 +134,72 @@ async function fetchWcTotals() {
   return { ok: true, remaining, byPair };
 }
 
+// ── 俱乐部联赛亚盘(The Odds API spreads·补ESPN/DK不覆盖的联赛如芬超)──
+const CLUB_LEAGUE_SPORTKEY = { "芬兰超级联赛": "soccer_finland_veikkausliiga" };
+// 队名归一:小写、去常见后/前缀词(fc/if/ifk/sk/ps/vps/kups/fk)、去非字母。跨源(The Odds API ↔ 积分榜en)匹配用。
+const normTeamEn = (s) => String(s || "").toLowerCase().replace(/\b(fc|if|ifk|sk|vps|kups|ps|fk)\b/g, "").replace(/[^a-z]/g, "");
+
+// 积分榜(club-league-standings.json)的 en/oddsAlias → 中文队名 + 联赛名。
+//   The Odds API 英文队名(如 "FC Inter Turku"/"KuPS Kuopio")与积分榜 en("Inter Turku"/"Kuopion PS")
+//   写法略异 → 用 normTeamEn 归一后建桥;不可归一者由积分榜 oddsAlias 显式补(纯名称归一,非数据编造)。
+function buildClubEnToZh() {
+  const map = {}; // normEn -> { zh, league }
+  try {
+    const p = join(process.env.FOOTBALL_DATA_DIR || "D:/football-model-data", "club-league-standings.json");
+    const db = JSON.parse(readFileSync(p, "utf8"));
+    for (const [lg, ld] of Object.entries(db.leagues || {})) {
+      for (const [zh, t] of Object.entries(ld.teams || {})) {
+        for (const nm of [t.en, ...(Array.isArray(t.oddsAlias) ? t.oddsAlias : [])]) {
+          const k = normTeamEn(nm);
+          if (k) map[k] = { zh, league: lg };
+        }
+      }
+    }
+  } catch (e) { console.error(`  俱乐部en→zh桥失败: ${e.message}`); }
+  return map;
+}
+
+// 返回 { `${homeZh}|${awayZh}`: { line(主队视角让球), homeOdds, awayOdds, books, source } }(中文键,主循环精确查)。
+async function fetchClubLeagueAsian(leagues) {
+  if (!KEY) return {};
+  const median = (a) => { const s = a.filter((x) => Number.isFinite(x)).sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
+  const enToZh = buildClubEnToZh();
+  const resolve = (en) => enToZh[normTeamEn(en)]?.zh ?? null; // 解不出=不编,跳过该场
+  const byPair = {};
+  for (const lg of [...new Set(leagues)]) {
+    const sport = CLUB_LEAGUE_SPORTKEY[lg];
+    if (!sport) continue;
+    try {
+      // US 区给亚盘让球线(quarter handicap);取各家主队让球线/水位中位作共识
+      const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${KEY}&regions=us&markets=spreads&oddsFormat=decimal`);
+      if (r.status !== 200) { console.error(`  俱乐部亚盘 ${lg}: HTTP ${r.status}`); continue; }
+      const events = await r.json();
+      let hit = 0;
+      for (const ev of Array.isArray(events) ? events : []) {
+        const pts = [], hw = [], aw = [];
+        for (const b of ev.bookmakers || []) {
+          const m = (b.markets || []).find((x) => x.key === "spreads");
+          if (!m) continue;
+          const ho = m.outcomes.find((o) => o.name === ev.home_team);
+          const ao = m.outcomes.find((o) => o.name === ev.away_team);
+          if (ho && ao && Number.isFinite(ho.point)) { pts.push(ho.point); hw.push(ho.price); aw.push(ao.price); }
+        }
+        const line = median(pts);
+        if (line == null) continue;
+        const homeZh = resolve(ev.home_team), awayZh = resolve(ev.away_team);
+        if (!homeZh || !awayZh) { console.error(`  俱乐部亚盘 ${lg}: 队名未解 ${ev.home_team} / ${ev.away_team}(标缺不编)`); continue; }
+        byPair[`${homeZh}|${awayZh}`] = {
+          line: +line.toFixed(2), homeOdds: +median(hw).toFixed(2), awayOdds: +median(aw).toFixed(2),
+          books: pts.length, source: `The Odds API(US亚盘${pts.length}家中位)`,
+        };
+        hit++;
+      }
+      console.error(`  俱乐部亚盘 ${lg}: ${hit}场匹配`);
+    } catch (e) { console.error(`  俱乐部亚盘 ${lg} 失败: ${e.message}`); }
+  }
+  return byPair;
+}
+
 // ── 主流程 ──
 console.error("建 ESPN 队名表…");
 const tmap = await buildTeamMap();
@@ -146,6 +212,15 @@ console.error(`  ESPN赔率: ${espnOdds.length}场带盘口`);
 console.error("抓 Odds API 世界杯大小球…");
 const tot = await fetchWcTotals();
 console.error(`  Odds API totals: ${tot.ok ? `ok, remaining=${tot.remaining}, ${Object.keys(tot.byPair).length}场` : "失败 " + tot.reason}`);
+
+// 俱乐部联赛亚盘(ESPN/DK不覆盖如芬超):仅当当日有此类联赛在售时才抓(省 Odds API credit)
+const clubLeagues = [...new Set(MATCHES.filter((m) => !m.wc && CLUB_LEAGUE_SPORTKEY[m.comp]).map((m) => m.comp))];
+let clubAsian = {};
+if (clubLeagues.length) {
+  console.error(`抓俱乐部联赛亚盘(${clubLeagues.join("/")})…`);
+  clubAsian = await fetchClubLeagueAsian(clubLeagues);
+  console.error(`  俱乐部亚盘命中: ${Object.keys(clubAsian).length}场`);
+}
 
 const out = { date: DATE, generatedAt: new Date().toISOString(), oddsApiRemaining: tot.remaining ?? null, matches: [] };
 
@@ -170,6 +245,16 @@ for (const m of MATCHES) {
   const espn = (m.home.re && m.away.re)
     ? espnOdds.find((x) => new RegExp(m.home.re, "i").test(x.name) && new RegExp(m.away.re, "i").test(x.name)) || null
     : null;
+  // 俱乐部联赛(ESPN不覆盖如芬超)亚盘兜底:ESPN缺时用 The Odds API 让球线,挂 espnOdds.asian 供盘口锚/显示读(真线,不编)
+  let espnFinal = espn;
+  if (!espnFinal && CLUB_LEAGUE_SPORTKEY[m.comp]) {
+    const ca = clubAsian[`${m.home.zh}|${m.away.zh}`];
+    if (ca) espnFinal = {
+      name: m.zh, provider: "The Odds API",
+      asian: { line: ca.line, homeOdds: ca.homeOdds, awayOdds: ca.awayOdds, openLine: null },
+      ml: null, total: null, _clubSource: ca.source,
+    };
+  }
 
   // 俱乐部联赛(ESPN不覆盖,如芬超)赛季战绩兜底:ESPN近5为空时,用真实积分榜补攻防/赛季战绩(诚实标"本季",非近5)
   const hLast5 = last5(hHist), aLast5 = last5(aHist);
@@ -187,7 +272,7 @@ for (const m of MATCHES) {
     h2h: h2hFinal,
     overUnder: ou ? { ...ou, source: "The Odds API (eu, 2.5线de-vig)" }
       : { source: m.wc ? "The Odds API 缺该场" : "❌ 无源(友谊赛The Odds API无key + odds.500退役)", line: null },
-    espnOdds: espn ? { ...espn, source: `ESPN/${espn.provider}` } : null,
+    espnOdds: espnFinal ? { ...espnFinal, source: espnFinal._clubSource ?? `ESPN/${espnFinal.provider}` } : null,
   });
 }
 

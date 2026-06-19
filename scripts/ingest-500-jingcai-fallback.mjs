@@ -163,7 +163,7 @@ async function main() {
     // 逐场互换残留守护(缺陷#13):旧守护读 oddsSet 不存在的 .latest 字段=死代码,且只告警不阻断。
     //   改用共享 swapGuardViolation(读 .current);命中即记违例,循环后统一 exitCode≠0 阻断落盘。
     //   2026-06-10 洞1:传竞彩让球线,|线|≥1 整数深线提阈到 ×5 防均势场误报(韩捷/科厄实测假阳致整日断供)。
-    const guardLine = parseJingcaiHandicapLine(hcapByHome[`${m.home}|${m.away}`] ?? hcapByHome[m.home]);
+    const guardLine = parseJingcaiHandicapLine(lookupHandicapLine(hcapByHome, m.home, m.away));
     const violation = swapGuardViolation(euro, handicap, { line: guardLine });
     if (violation) swapViolations.push(`${m.matchnum} ${m.home} vs ${m.away}: ${violation}`);
     const goalLine = euroEntry?.latest?.goalline ?? "";
@@ -508,6 +508,23 @@ function oddsSet(match, hKey, dKey, aKey) {
 
 function attrMap(tag) {
   return Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
+}
+
+// 让球线查找容错(2026-06-17):官方让球 DOM 把长队名截断(塞伊奈约基→塞伊奈),
+//   精确键 `${home}|${away}` 与存键 `塞伊奈|瓦萨` 不匹配 → line=null → 守护退回 ×2 误杀让1深盘场。
+//   退而做双向前缀容错(home 与 away 都需前缀命中,防同前缀误配);只为给 swapGuard 选对阈值
+//   + 补全显示让球线,不进任何赔率口径(铁律:不冒充、不兜底,只把真线匹配到正确场次)。
+export function lookupHandicapLine(hcapByHome, home, away) {
+  if (!hcapByHome || !home) return undefined;
+  const exact = hcapByHome[`${home}|${away}`] ?? hcapByHome[home];
+  if (exact != null) return exact;
+  const pfx = (a, b) => Boolean(a) && Boolean(b) && (a.startsWith(b) || b.startsWith(a));
+  for (const [k, v] of Object.entries(hcapByHome)) {
+    const i = k.indexOf("|");
+    if (i < 0) { if (pfx(home, k)) return v; continue; }
+    if (pfx(home, k.slice(0, i)) && pfx(away, k.slice(i + 1))) return v;
+  }
+  return undefined;
 }
 
 function safeName(value) {
