@@ -18,7 +18,7 @@ import {
   wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
   renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
   auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet, buildDecisionAidsSheet,
-  buildHandicapSanitySheet, buildUpsetAnalysisSheet, buildOddsValueSheet,
+  buildHandicapSanitySheet, buildUpsetAnalysisSheet, buildOddsValueSheet, buildRadarDetailSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
   XLSX_HEADERS, h2hToStatsList, marketWldPrimary,
@@ -255,6 +255,18 @@ const hcParts = (p, s) => {
 };
 const hcViewStr = (p, s) => { const h = hcParts(p, s); return `${h.line} ‖ 模型:${h.model} ‖ 市场de-vig:${h.market}${h.diverge ? " ⚠️模型与市场分歧大(市场更准·谨慎)" : ""}`; };
 
+// 胜负平列(2026-06-19 用户裁决:与比分/半全场口径统一=盘口主推✅在前、模型🔶次选在后;
+//   分歧一律以盘口为准·铁证"分歧越大市场越对")。mkPrimary 已含盘口de-vig热门+模型方向/%/同向判定。
+//   1X2未开售(mkPrimary.code==null·悬殊盘只让球)→ 退回 simpleWldCell(保留⛔未开售/⚠️直胜仅参考真实性闸)。
+function wldCellMarketLed(p, mkPrimary) {
+  if (!mkPrimary || mkPrimary.code == null) return simpleWldCell(p);
+  const home = p.fixture.homeTeam, away = p.fixture.awayTeam;
+  const named = (c) => c === "3" ? `${home}主胜` : c === "0" ? `${away}客胜` : c === "1" ? "平局" : "—";
+  const modelTxt = mkPrimary.modelCode != null ? `${named(mkPrimary.modelCode)}${mkPrimary.modelPct != null ? `(${mkPrimary.modelPct}%)` : ""}` : "模型缺";
+  const tag = mkPrimary.agree ? "·与盘口同向" : "·⚠️与盘口分歧(以盘口为准)";
+  return `盘口主推✅ ${mkPrimary.dir}(${mkPrimary.pct}%·@${mkPrimary.odds})\n模型🔶次选 ${modelTxt}${tag}`;
+}
+
 // ── 盘口为主决策(2026-06-15 用户裁决:盘口推荐为主,模型只当参考)──
 //   主推方向/信心档/注金 = 500竞彩 1X2 真盘口 de-vig 热门定;1X2未开售(悬殊盘只卖让球)→ 退让球档 de-vig 热门;
 //   模型方向/概率只作"参考",并标与盘口同向/分歧(分歧时铁律"以盘口为准")。两套数都给,买不买你定。
@@ -423,8 +435,8 @@ const rows = games.map((p, i) => {
   return {
     idx: i + 1, ko: ko(p), comp: compTag(p),
     match: `${p.fixture.homeTeam} vs ${p.fixture.awayTeam}`,
-    // 模型方向概率(🔶,由500真盘de-vig+DC推得)
-    wld: simpleWldCell(p), handicap: simpleHandicapCell(p), hcView: hcViewStr(p, s), hcP,
+    // 胜负平=盘口主推✅+模型🔶次选(2026-06-19统一口径,与比分/半全场一致)
+    wld: wldCellMarketLed(p, mkPrimary), handicap: simpleHandicapCell(p), hcView: hcViewStr(p, s), hcP,
     score: scoreCell, halffull: hfCell,
     msv, mhv, signals: panel.text, signalDirs: panel.dirs,
     scoreSrc: msv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC", hfSrc: mhv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC",
@@ -462,6 +474,8 @@ const rows = games.map((p, i) => {
     scen: p.scenario?.headline ?? "",
     // 爆冷场景(2026-06-16:从对阵格移出→独立「爆冷研判」sheet;主表保持干净·用户要求)
     upsetScen: p.scenario?.upsetScenario ?? null,
+    // 爆冷研判(upsetTrap·供综合研判⑤"为什么爆冷"+④风险点·零重算读引擎产物;缺=null不编)
+    upset: p.upsetTrap ? { level: p.upsetTrap.upsetLevel, risk: p.upsetTrap.upsetRisk, favLabel: p.upsetTrap.favoriteLabel, reason: p.upsetTrap.reason } : null,
     // 盘口合理性(独立「盘口合理性」sheet):盘口强度档 vs 同实力档历史区间(12458场)→ 深浅+超临界多少
     //   强度锚=亚盘线优先,亚盘本次未抓到则退竞彩官方让球线(同为让球线·稳定在·避免亚盘抓挂致整块判不了)。
     sanity: handicapSanity({ ahLine: (s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? s.jingcaiHandicap?.line), p1x2Fav: p.upsetDiagnosis?.favWinProb }),
@@ -767,7 +781,7 @@ if (!dirMatrix.ok) throw new Error(`方向矩阵审计FAIL(存在不同向但无
 const scoreDiv = rows.filter((r) => r.msv?.sameAsWld === false).length;
 const hfDiv = rows.filter((r) => r.mhv?.sameAsWld === false).length;
 const resonate = rows.filter((r) => r.msv?.sameAsWld === true && r.mhv?.sameAsWld === true && r.hv?.sameDir !== false).length;
-const cohNote = `四玩法独立真实裁决(2026-06-11用户裁决):胜负平=模型综合;让球=模型vs市场过盘裁决(${hvDiverge.length}场与胜负平不同向,逐场注逻辑);比分主推=500比分盘de-vig真实热门(${scoreDiv}场与胜负平不同向);半全场主推=500半全场盘de-vig真实热门(${hfDiv}场不同向);${resonate}场四玩法盘口真实共振同向。方向矩阵逐场审计通过(不同向均带依据,绝无模板复制、绝无人造分歧)。`;
+const cohNote = `四玩法口径(2026-06-19统一:盘口主推为主·模型次选):胜负平主推=500欧赔de-vig热门(模型🔶仅次选参考·分歧以盘口为准);比分主推=500比分盘de-vig真实热门(${scoreDiv}场与胜负平不同向);半全场主推=500半全场盘de-vig真实热门(${hfDiv}场不同向);让球=模型vs市场过盘真实裁决(${hvDiverge.length}场与胜负平不同向,逐场注逻辑·🔶诚实标);${resonate}场四玩法盘口真实共振同向。方向矩阵逐场审计通过(不同向均带依据,绝无模板复制、绝无人造分歧)。`;
 const parlayCount = { g: rows.filter((r) => r.parlay?.grade === "🟢").length, y: rows.filter((r) => r.parlay?.grade === "🟡").length, b: rows.filter((r) => r.parlay?.grade === "⛔").length };
 const parlayNote = `串关安全度:🟢${parlayCount.g}/🟡${parlayCount.y}/⛔${parlayCount.b}。${PARLAY_ORDER_NOTE}`;
 
@@ -813,6 +827,7 @@ const contentAudit = [
 // ── xlsx(25列专业版 + 数据审计 + 14场闸裁决,经 xlsx-writer:深紫FF4A148C表头/banner跨列合并/内容感知行高/冻结筛选) ──
 const sheets = [
   ...buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length), recordLine: recordLine?.text ?? null, stakeNote: stakeSum.note }),
+  buildRadarDetailSheet({ date, rows }), // 2026-06-19 异动雷达全文(主表综合研判格已降至≤2行,长文下沉此 sheet)
   buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
   buildAuditSheet({ date, rows, contentAudit }),
   buildIntelSheet({ date, rows, intelByMatch }),

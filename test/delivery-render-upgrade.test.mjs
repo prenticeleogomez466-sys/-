@@ -273,7 +273,7 @@ test("XLSX_HEADERS:模型归属注明+新列齐全+末列综合研判", () => {
   // 28列(2026-06-18 用户裁决:把情报详情+盘口合理性实时分析揉进竞彩完整,末位新增「综合研判·最终建议」列;
   //   原27列=2026-06-12 注金裁决+2026-06-11 四玩法独立裁决)
   assert.equal(XLSX_HEADERS.length, 28);
-  assert.match(XLSX_HEADERS[3], /足球大模型/);
+  assert.match(XLSX_HEADERS[3], /盘口✅主推·模型🔶次选/); // 2026-06-19 文案随契约重冻结同步(盘口为主、模型参考)
   assert.match(XLSX_HEADERS[4], /市场锚/);
   assert.equal(XLSX_HEADERS.filter((h) => h.includes("世界杯模型")).length, 3);
   assert.match(XLSX_HEADERS[8], /真实裁决.*可与胜平负不同向/);

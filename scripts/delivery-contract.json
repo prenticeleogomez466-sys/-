@@ -1,11 +1,11 @@
 {
   "_note": "交付契约冻结档。改列序/canonical名/签名是显式动作:改 src/today-delivery-lib.js 或本脚本后,跑 node scripts/freeze-delivery-contract.mjs --write 重冻并提交(增减都要过用户)。audit:suite 的 delivery-contract 探针守它。野页判法=内容签名(只盯带交付banner的页须唯一),不扫整共享目录。",
-  "frozenAt": "2026-06-18",
+  "frozenAt": "2026-06-19",
   "xlsxHeaders": [
     "#",
     "开赛",
     "对阵(赛事)",
-    "胜负平🔶(足球大模型)",
+    "胜负平(盘口✅主推·模型🔶次选)",
     "胜平负赔率✅(市场锚)",
     "🌍世界杯模型·Elo先验三概率(洲际校正)",
     "🌍世界杯模型·场馆λ乘子",
