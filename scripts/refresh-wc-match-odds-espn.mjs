@@ -85,6 +85,22 @@ export function scoreboardStamps(dateStrs) {
   return [...stamps].sort();
 }
 
+/** 播种候选:match-dates 中「未来 windowMs 内、未开球、且不在已有 fixtures」的场。纯函数(now 注入便于测)。
+ *  2026-06-20 discovery 缺口修:refresh 原只刷已有 fixtures、从不播种新一轮小组赛场次 → 这些场 ESPN 明明有真盘却恒缺。 */
+export function selectSeedCandidates(matchDate, existingPairs, { now = new Date(), windowMs = 48 * 3600e3 } = {}) {
+  const out = []; const seen = new Set();
+  for (const m of Object.values(matchDate ?? {})) {
+    if (!m?.homeTeam || !m?.awayTeam || !m?.dateUtc) continue;
+    const t = new Date(String(m.dateUtc).replace(" ", "T"));
+    if (Number.isNaN(t.getTime()) || t.getTime() <= now.getTime() || t.getTime() > now.getTime() + windowMs) continue;
+    const key = pairKey(m.homeTeam, m.awayTeam);
+    if (existingPairs.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ home: m.homeTeam, away: m.awayTeam, dateUtc: m.dateUtc, localDate: String(m.dateUtc).match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null });
+  }
+  return out;
+}
+
 /** 单条续鲜决策:返回 {action:'refresh'|'skip', reason?, entry?}。纯函数(now 注入便于测)。 */
 export function refreshDecision(fx, parsedEvent, coreParsed, { now = new Date(), gate = eloContradiction } = {}) {
   if (!coreParsed) return { action: "skip", reason: "ESPN core odds 无完整三向赔率(不臆造,保留旧盘)" };
@@ -129,15 +145,20 @@ async function main() {
   // 扫描日期 = match-dates.json 中与 fixtures 对得上的场次的 UTC 日期(精确,不盲扫整月)。
   const wantedPairs = new Set(fixtures.map((f) => pairKey(f.home, f.away)));
   const dates = new Set();
+  let seedCandidates = [];
   const mdFile = join(wcDir, "match-dates.json");
   if (existsSync(mdFile)) {
     const md = JSON.parse(readFileSync(mdFile, "utf8"));
-    for (const m of Object.values(md.matchDate ?? {})) {
+    const matchDate = md.matchDate ?? {};
+    for (const m of Object.values(matchDate)) {
       if (m?.homeTeam && m?.awayTeam && wantedPairs.has(pairKey(m.homeTeam, m.awayTeam))) {
         const d = String(m.dateUtc ?? "").match(/\d{4}-\d{2}-\d{2}/)?.[0];
         if (d) dates.add(d);
       }
     }
+    // 播种:窗口内(默认未来48h)在 match-dates 但 match-odds 还没有的场,把它们的日期也纳入 scoreboard 扫描
+    seedCandidates = selectSeedCandidates(matchDate, wantedPairs, { now: new Date() });
+    for (const s of seedCandidates) if (s.localDate) { dates.add(s.localDate); }
   }
   if (!dates.size) { // match-dates 缺位时退化为今天起 7 天窗(仍真实枚举,不臆造)
     const t0 = Date.now();
@@ -145,10 +166,12 @@ async function main() {
   }
   const stamps = scoreboardStamps([...dates]);
   console.log(`目标 ${fixtures.length} 场 / scoreboard 日期戳 ${stamps.length} 个(${stamps[0]}..${stamps[stamps.length - 1]}),league=${LEAGUE}`);
+  if (seedCandidates.length) console.log(`待播种候选(窗口内在 match-dates 但 match-odds 缺): ${seedCandidates.map((s) => `${s.home}-${s.away}`).join("; ")}`);
 
   // ① scoreboard 枚举 event id(免 key)。
   const headers = { "User-Agent": "Mozilla/5.0 football-ai-copilot/wc-odds-refresh" };
   const eventByPair = new Map();
+  const seedEventByPair = new Map();
   for (const stamp of stamps) {
     try {
       const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${LEAGUE}/scoreboard?dates=${stamp}`, { headers });
@@ -160,6 +183,12 @@ async function main() {
         if (m) {
           const key = pairKey(m.fixture.home, m.fixture.away);
           if (!eventByPair.has(key)) eventByPair.set(key, { parsed, ...m });
+          continue;
+        }
+        const sm = matchEventToFixture(parsed, seedCandidates); // 没匹配到已有场 → 看是不是待播种候选
+        if (sm) {
+          const key = pairKey(sm.fixture.home, sm.fixture.away);
+          if (!seedEventByPair.has(key)) seedEventByPair.set(key, { parsed, ...sm });
         }
       }
     } catch (err) { console.warn(`⚠️ scoreboard ${stamp} 失败:${err.message}`); }
@@ -192,6 +221,34 @@ async function main() {
 
   console.log(`\n续鲜 ${refreshed}/${fixtures.length} 场;未刷 ${skipped.length} 场:`);
   for (const s of skipped) console.log(`  ⚠️ ${s}`);
+
+  // ③ 播种:窗口内未在 fixtures 的场,用真 ESPN core odds 新建 fixture(源标 ESPN·过同一常识闸/已开球跳过·绝不臆造)。
+  let seeded = 0; const seedSkipped = [];
+  for (const cand of seedCandidates) {
+    const hit = seedEventByPair.get(pairKey(cand.home, cand.away));
+    if (!hit) { seedSkipped.push(`${cand.home} vs ${cand.away}:ESPN scoreboard 未出该场盘(真没出则不播种,不臆造)`); continue; }
+    let coreParsed = null;
+    try {
+      const url = `https://sports.core.api.espn.com/v2/sports/soccer/leagues/${LEAGUE}/events/${hit.parsed.eventId}/competitions/${hit.parsed.eventId}/odds`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      const items = Array.isArray(json.items) ? json.items : [];
+      const item = items.find((it) => it.homeTeamOdds && it.awayTeamOdds && it.drawOdds) ?? items[0] ?? null;
+      coreParsed = parseEspnCoreOdds(item, { swap: hit.swap });
+    } catch (err) { seedSkipped.push(`${cand.home} vs ${cand.away}:core odds 拉取失败(${err.message}),不播种`); continue; }
+    const decision = refreshDecision({ home: cand.home, away: cand.away }, hit.parsed, coreParsed, { now });
+    if (decision.action !== "refresh") { seedSkipped.push(`${cand.home} vs ${cand.away}:${decision.reason}`); continue; }
+    const entry = { ...decision.entry, kickoff: cand.dateUtc, source: decision.entry.source.replace("开赛前续鲜", "discovery 首次播种"), seeded: true };
+    doc.fixtures.push(entry);
+    console.log(`🌱 播种 ${cand.home} vs ${cand.away}: ${entry.odds.home}/${entry.odds.draw}/${entry.odds.away}(event ${hit.parsed.eventId})`);
+    seeded += 1;
+  }
+  if (seedCandidates.length) {
+    console.log(`\n播种 ${seeded}/${seedCandidates.length} 场;未播种 ${seedSkipped.length} 场:`);
+    for (const s of seedSkipped) console.log(`  ⚠️ ${s}`);
+  }
+
   if (!DRY) { writeFileSync(oddsFile, JSON.stringify(doc, null, 1)); console.log(`✅ 写 ${oddsFile}`); }
   else console.log("(--dry 不写盘)");
 }

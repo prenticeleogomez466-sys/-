@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   wcCanon, pairKey, parseScoreboardEvent, matchEventToFixture,
-  scoreboardStamps, refreshDecision, maxDriftPct,
+  scoreboardStamps, refreshDecision, maxDriftPct, selectSeedCandidates,
 } from "../scripts/refresh-wc-match-odds-espn.mjs";
 
 // ── wcCanon:ESPN displayName 与 groups.json 规范名的 4 个已知缺口必须闭合(2026-06-11 实测) ──
@@ -90,4 +90,23 @@ test("maxDriftPct:三向取最大百分比漂移,无效腿忽略", () => {
   assert.equal(maxDriftPct({ home: 1.405, draw: 4.325, away: 8.125 }, { home: 1.417, draw: 4.4, away: 8.5 }), 4.6);
   assert.equal(maxDriftPct({ home: 2, draw: 3, away: 4 }, { home: 2, draw: 3, away: 4 }), 0);
   assert.equal(maxDriftPct(null, { home: 2, draw: 3, away: 4 }), 0);
+});
+
+// ── selectSeedCandidates(2026-06-20 discovery 缺口修):窗口内+未开球+不在已有 fixtures 才播种,去重 ──
+test("selectSeedCandidates:只选窗口内·未开球·不在已有 fixtures 的场,带空格 dateUtc 可解析,去重", () => {
+  const now = new Date("2026-06-19T16:00:00Z");
+  const matchDate = {
+    "1": { homeTeam: "Brazil", awayTeam: "Haiti", dateUtc: "2026-06-20 00:30:00Z" },        // 窗口内·未踢·不在已有 → 播种
+    "2": { homeTeam: "Ecuador", awayTeam: "Curaçao", dateUtc: "2026-06-21 00:00:00Z" },      // 窗口内 → 播种
+    "3": { homeTeam: "Mexico", awayTeam: "South Africa", dateUtc: "2026-06-20 01:00:00Z" },  // 已在已有 fixtures → 排除
+    "4": { homeTeam: "Spain", awayTeam: "Brazil", dateUtc: "2026-06-25 00:00:00Z" },         // 窗口外(>48h)→ 排除
+    "5": { homeTeam: "Iran", awayTeam: "New Zealand", dateUtc: "2026-06-19 10:00:00Z" },     // 已开球(早于 now)→ 排除
+    "6": { homeTeam: "Brazil", awayTeam: "Haiti", dateUtc: "2026-06-20 00:30:00Z" },         // 与①同对阵 → 去重
+  };
+  const existing = new Set([pairKey("Mexico", "South Africa")]);
+  const got = selectSeedCandidates(matchDate, existing, { now });
+  const pairs = got.map((s) => pairKey(s.home, s.away)).sort();
+  assert.deepEqual(pairs, [pairKey("Brazil", "Haiti"), pairKey("Ecuador", "Curaçao")].sort());
+  assert.equal(got.length, 2, "应恰好2场(去重后),不含已有/窗口外/已开球");
+  assert.ok(got.every((s) => s.localDate && /\d{4}-\d{2}-\d{2}/.test(s.localDate)), "localDate 应可被 scoreboard 扫描用");
 });
