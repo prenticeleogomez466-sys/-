@@ -181,25 +181,39 @@ test("threeColumnCoherence:同向全过/违例点名/未开售跳过", () => {
 });
 
 // ── ④d 数据审计表 + 14场闸裁决表 ──
-test("buildAuditSheet:12维表头+每行铺审计格+内容审计区;auditCell=标签+值+来源+时间", () => {
-  assert.equal(AUDIT_DIMENSIONS.length, 12);
+test("buildAuditSheet:15维表头(末3维采集完整性)+每行铺审计格+内容审计区;auditCell=标签+值+来源+时间", () => {
+  assert.equal(AUDIT_DIMENSIONS.length, 15);
+  assert.deepEqual(AUDIT_DIMENSIONS.slice(-3), ["初盘异动", "阵容", "伤病红牌"]); // 2026-06-20 追加3维·在末尾
   const cell = auditCell("✅实测", "1.3/4.15/8.4", "500竞彩XML(spf)", "2026-06-10T12:00:00Z");
   assert.match(cell, /^✅实测 1\.3\/4\.15\/8\.4｜源:500竞彩XML\(spf\)｜抓取:2026-06-10T12:00:00Z$/);
   assert.match(auditCell("⚠️缺", "x", "y", null), /抓取:时间未记录/);
   const sheet = buildAuditSheet({
     date: "2026-06-11",
-    rows: [{ idx: 1, match: "A vs B", audit: { "欧赔": "✅实测 …", "世界杯先验": "—(非世界杯场)" } }],
+    rows: [{ idx: 1, match: "A vs B", audit: { "欧赔": "✅实测 …", "世界杯先验": "—(非世界杯场)" },
+      signals: "欧赔:热门=主胜·热门主胜水位走高(1.80→1.95,资金出) ‖ 阵容:⚠️未公布" }],
     contentAudit: [["三列同向自检", "✅ 1场全同向"], "单串行说明"],
+    intelByMatch: { "A vs B": { injuries: { text: "客队主力前锋停赛" }, home: { lineup: { status: "确认首发" } }, away: { lineup: { status: "预测首发" } } } },
   });
   assert.equal(sheet.name, "数据审计");
-  assert.match(sheet.rows[0][0], /数据审计 · 2026-06-11 · 1场×12维/);
+  assert.match(sheet.rows[0][0], /数据审计 · 2026-06-11 · 1场×15维/);
   assert.deepEqual(sheet.rows[1].slice(0, 2), ["#", "对阵"]);
-  assert.equal(sheet.rows[1].length, 14); // #+对阵+12维
+  assert.equal(sheet.rows[1].length, 17); // #+对阵+15维
   assert.equal(sheet.rows[2][2], "✅实测 …");
   assert.match(sheet.rows[2][3], /⚠️缺\(该维未登记\)/, "未登记维度不空格,显式标缺");
+  // 末3维=完整性派生(从signals+情报真值,非r.audit):
+  assert.match(sheet.rows[2][14], /初盘已捕获·有异动/, "初盘异动维从signals欧赔段派生");
+  assert.match(sheet.rows[2][15], /主:确认首发 客:预测首发/, "阵容维取情报lineup status真值");
+  assert.match(sheet.rows[2][16], /客队主力前锋停赛/, "伤病红牌维取情报injuries真值·标🔶非官方");
   const flat = JSON.stringify(sheet.rows);
   assert.match(flat, /内容审计区/);
   assert.match(flat, /三列同向自检/);
+});
+
+test("buildAuditSheet:缺信号/缺情报时末3维诚实标缺(不编)", () => {
+  const sheet = buildAuditSheet({ date: "2026-06-11", rows: [{ idx: 1, match: "C vs D", audit: {} }] });
+  assert.match(sheet.rows[2][14], /⚠️缺 初盘未捕获/);
+  assert.match(sheet.rows[2][15], /⚠️缺 阵容状态未登记/);
+  assert.match(sheet.rows[2][16], /⚠️缺 免费结构化伤停源/);
 });
 
 test("buildFourteenSheetRows:闸不过→⛔+依据原话+期次事实,绝不渲染腿表;闸过→腿表+任选9", () => {

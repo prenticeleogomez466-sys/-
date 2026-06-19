@@ -356,15 +356,44 @@ export function directionMatrixAudit(entries) {
   return { ok: errors.length === 0, lines, errors };
 }
 
-export const AUDIT_DIMENSIONS = ["欧赔", "让球", "比分", "半全场", "大小球", "亚盘DK", "亚盘titan007", "欧赔参考(外盘)", "近5", "H2H", "国际赛画像", "世界杯先验"];
+// 2026-06-20 用户:审计完整性要覆盖 初盘异动/阵容/伤病红牌(末尾追加3维·保留原12维列序)。
+// 这3维=「数据是否真采到」的完整性维度,从行内真实字段(signals)+情报(intelByMatch)派生,缺即标缺不编。
+export const AUDIT_DIMENSIONS = ["欧赔", "让球", "比分", "半全场", "大小球", "亚盘DK", "亚盘titan007", "欧赔参考(外盘)", "近5", "H2H", "国际赛画像", "世界杯先验", "初盘异动", "阵容", "伤病红牌"];
 export function auditCell(tag, value, src, t) {
   return `${tag} ${value}｜源:${src}｜抓取:${t ?? "时间未记录"}`;
 }
-export function buildAuditSheet({ date, rows, contentAudit }) {
+// 完整性三维(诚实派生·不编):初盘异动从 signals 欧赔段判初盘是否捕获+异动;阵容/伤病优先取情报真值,缺则标缺。
+export function auditCompleteness(r, it) {
+  const sig = String(r.signals || "");
+  const segs = sig.split("‖").map((s) => s.trim());
+  const euroSeg = segs.find((s) => /^欧赔/.test(s)) || "";
+  let opening;
+  if (/资金进|水位压入|资金出|水位走高|退烧/.test(euroSeg)) opening = `✅实测 初盘已捕获·有异动(${euroSeg.replace(/^欧赔[:：]/, "").trim().slice(0, 40)})｜源:500/ESPN 初→现`;
+  else if (/初现持平/.test(euroSeg)) opening = "✅实测 初盘已捕获·无明显移动｜源:500/ESPN 初→现";
+  else if (/未开售/.test(euroSeg)) opening = "⚠️缺 欧赔未开售·无初盘可比";
+  else opening = "⚠️缺 初盘未捕获→无法判异动/庄家意图(标缺不编·续鲜后可判)";
+  const hs = it?.home?.lineup?.status, as = it?.away?.lineup?.status;
+  let lineup;
+  if (hs || as) {
+    const tag = (s) => /确认|官方/.test(String(s)) ? "✅实测" : "🔶推断";
+    lineup = `${tag(hs || as)} 主:${hs ?? "⚠️缺"} 客:${as ?? "⚠️缺"}｜源:情报详情(近N场首发频次·官方出转✅)`;
+  } else if (/阵容[:：]\s*✅已出/.test(sig)) lineup = "✅实测 首发已出·已按首发重算";
+  else if (/阵容[:：]\s*⚠️未公布/.test(sig)) lineup = "⚠️缺 首发未公布·开赛前~1h LineupWatch 按首发重分析";
+  else lineup = "⚠️缺 阵容状态未登记";
+  const itx = it?.injuries?.text;
+  const inj = (itx && !/^⚠️/.test(String(itx)))
+    ? `🔶推断 ${String(itx).replace(/\n/g, " ").slice(0, 90)}｜源:全网媒体(见情报详情·非官方确认·不进概率)`
+    : "⚠️缺 免费结构化伤停源对国家队为空墙→见情报详情媒体核录列(标缺不编·不进概率)";
+  return { "初盘异动": opening, "阵容": lineup, "伤病红牌": inj };
+}
+export function buildAuditSheet({ date, rows, contentAudit, intelByMatch }) {
   const header = ["#", "对阵", ...AUDIT_DIMENSIONS];
-  const body = rows.map((r) => [String(r.idx), r.match, ...AUDIT_DIMENSIONS.map((d) => r.audit?.[d] ?? "⚠️缺(该维未登记)")]);
+  const body = rows.map((r) => {
+    const comp = auditCompleteness(r, intelByMatch?.[r.match] ?? null);
+    return [String(r.idx), r.match, ...AUDIT_DIMENSIONS.map((d) => comp[d] ?? r.audit?.[d] ?? "⚠️缺(该维未登记)")];
+  });
   const tail = [[""], ["—— 内容审计区(2026-06-11 口径) ——"], ...(contentAudit ?? []).map((x) => (Array.isArray(x) ? x : [x]))];
-  return { name: "数据审计", rows: [[`🔍 数据审计 · ${date} · ${rows.length}场×${AUDIT_DIMENSIONS.length}维(每格=三标签+值+来源+抓取时间)`], header, ...body, ...tail] };
+  return { name: "数据审计", rows: [[`🔍 数据审计 · ${date} · ${rows.length}场×${AUDIT_DIMENSIONS.length}维(每格=三标签+值+来源+抓取时间;末3维=采集完整性)`], header, ...body, ...tail] };
 }
 
 // ── 情报详情工作表(2026-06-14 情报系统·展示层,不动概率) ──

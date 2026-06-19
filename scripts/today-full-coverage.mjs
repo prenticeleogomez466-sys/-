@@ -829,7 +829,7 @@ const sheets = [
   ...buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length), recordLine: recordLine?.text ?? null, stakeNote: stakeSum.note }),
   buildRadarDetailSheet({ date, rows }), // 2026-06-19 异动雷达全文(主表综合研判格已降至≤2行,长文下沉此 sheet)
   buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
-  buildAuditSheet({ date, rows, contentAudit }),
+  buildAuditSheet({ date, rows, contentAudit, intelByMatch }), // 2026-06-20 末3维(初盘异动/阵容/伤病红牌)采集完整性·从signals+情报真值派生
   buildIntelSheet({ date, rows, intelByMatch }),
   buildHandicapSanitySheet({ date, rows }),
   buildOddsValueSheet({ date, rows }),
