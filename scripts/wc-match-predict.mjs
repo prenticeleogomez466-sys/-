@@ -16,6 +16,8 @@ import { getExportDir } from "../src/paths.js";
 import { writeXlsxWorkbook } from "../src/xlsx-writer.js";
 import { predictWcMatch } from "../src/wc-match-model.js";
 import { loadNationalResults } from "../src/wc-national-form.js";
+import { groupTable, remainingPairs } from "../src/wc-group-standings.js";
+import { getDataSubdir } from "../src/paths.js";
 import { preflightOrDie } from "../src/preflight-selfcheck.js";
 
 // 启动自检(2026-06-11 用户裁决:所有生成入口启动必检,红=拒跑;--skip-preflight 仅诊断)
@@ -57,17 +59,63 @@ function loadOddsIndex() {
   return { idx, collectedAt, source };
 }
 
+/** 用真实已踢赛果(fixture-store,跨彩种去重)建 12 组当前积分榜 + 队→组索引 + 每队剩余场数。 */
+function loadGroupTables() {
+  const dir = join(getDataSubdir("world-cup"), "2026");
+  const gdoc = JSON.parse(readFileSync(join(dir, "groups.json"), "utf8"));
+  const zh = gdoc.team_name_zh || {};
+  const ALIAS = { "刚果(金)": "刚果民主共和国", "刚果（金）": "刚果民主共和国" };
+  const norm = (t) => ALIAS[t] || t;
+  const groups = {};
+  for (const [g, ens] of Object.entries(gdoc.groups)) groups[g] = ens.map((e) => zh[e] || e);
+  // 收集真实已结算赛果并按对阵去重
+  const seen = new Map();
+  for (let d = 11; d <= 30; d++) {
+    const date = `2026-06-${String(d).padStart(2, "0")}`;
+    let fx; try { fx = loadFixtures(date); } catch { continue; }
+    for (const f of (fx?.fixtures || [])) {
+      if (!/世界杯|world/i.test(f.competition || "")) continue;
+      if (f.result?.home == null || f.result?.away == null) continue;
+      const h = norm(f.homeTeam), a = norm(f.awayTeam);
+      seen.set([h, a].sort((x, y) => x.localeCompare(y, "zh")).join("|"), { home: h, away: a, ga: f.result.home, gb: f.result.away });
+    }
+  }
+  const dedup = [...seen.values()];
+  const playedPairs = new Set(seen.keys()); // 已踢对阵键(home|away 排序)
+  const byGroup = {}, teamGroup = {}, remTeam = {};
+  for (const [g, teams] of Object.entries(groups)) {
+    for (const t of teams) teamGroup[t] = g;
+    const gm = dedup.filter((m) => teams.includes(m.home) && teams.includes(m.away));
+    const rem = remainingPairs(teams, gm);
+    byGroup[g] = { teams, table: groupTable(teams, gm) };
+    const rc = {}; for (const t of teams) rc[t] = 0;
+    for (const [x, y] of rem) { rc[x]++; rc[y]++; }
+    for (const t of teams) remTeam[t] = rc[t];
+  }
+  const pk = (a, b) => [a, b].sort((x, y) => x.localeCompare(y, "zh")).join("|");
+  return { byGroup, teamGroup, remTeam, norm, playedPairs, pk };
+}
+
 function runMain() {
   const matches = collectMatches();
   const { idx: oddsIdx, collectedAt, source } = loadOddsIndex();
   const formCache = loadNationalResults();
   const today = new Date().toISOString().slice(0, 10);
+  const grp = loadGroupTables();
 
   const results = [];
   for (const f of matches) {
     const enHome = teamPrior(f.homeTeam)?.en;
     const odds = enHome ? oddsIdx.get(enHome) : null;
-    const r = predictWcMatch(f.homeTeam, f.awayTeam, f, odds || null, { formCache });
+    // 名次路径/末轮动机:解析本场所属组 + 当前积分榜;末轮=两队各仅剩1场(即本场)。透明观察,不改概率。
+    const hN = grp.norm(f.homeTeam), aN = grp.norm(f.awayTeam);
+    const g = grp.teamGroup[hN];
+    const gctx = g && grp.teamGroup[aN] === g ? grp.byGroup[g] : null;
+    // 末轮收官战=本场对阵【本身未踢】且两队各仅剩1场(即互为 MD3 对手);已踢的 MD1/MD2 场不触发动机。
+    const unplayed = !!gctx && !grp.playedPairs.has(grp.pk(hN, aN));
+    const finalRound = unplayed && grp.remTeam[hN] === 1 && grp.remTeam[aN] === 1;
+    const r = predictWcMatch(f.homeTeam, f.awayTeam, f, odds || null,
+      { formCache, groupTable: gctx?.table || null, finalRound });
     if (r.error) { results.push({ home: f.homeTeam, away: f.awayTeam, matchDate: String(f.kickoff || "").slice(0, 10), error: r.error }); continue; }
     results.push(r);
   }

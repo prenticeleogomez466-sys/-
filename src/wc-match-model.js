@@ -15,7 +15,26 @@ import { buildDerivedScoreModel, bestScoreFromMatrix, handicapLadder, totalGoals
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { devig } from "./market-devig.js";
 import { recentForm, headToHead } from "./wc-national-form.js";
+import { matchPathScenario } from "./wc-qualification-scenario.js";
 import { getDataSubdir } from "./paths.js";
+
+// 小组赛【名次→淘汰赛路径】透明观察:懒加载 bracket/groups(中文队名→组字母),解析本场两队所属组的第1/第2名半区与R32对手位次。
+let _wcBracket = null, _zhToGroup = null;
+function wcGroupOf(homeZh, awayZh) {
+  try {
+    if (_wcBracket === null) {
+      const dir = join(getDataSubdir("world-cup"), "2026");
+      _wcBracket = JSON.parse(readFileSync(join(dir, "bracket.json"), "utf8"));
+      const gdoc = JSON.parse(readFileSync(join(dir, "groups.json"), "utf8"));
+      const zh = gdoc.team_name_zh || {};
+      _zhToGroup = {};
+      for (const [g, ens] of Object.entries(gdoc.groups)) for (const en of ens) _zhToGroup[zh[en] || en] = g;
+    }
+  } catch { _wcBracket = false; return null; }
+  if (!_wcBracket) return null;
+  const gh = _zhToGroup[homeZh], ga = _zhToGroup[awayZh];
+  return gh && gh === ga ? { groupLetter: gh, bracketR32: _wcBracket.r32 } : null;
+}
 
 const CODE_CN = { "3": "主胜", "1": "平局", "0": "客胜" };
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -139,6 +158,29 @@ export function predictWcMatch(homeZh, awayZh, fixture = {}, marketOdds = null, 
     };
   })();
 
+  // ── 名次→淘汰赛路径(透明观察,不改概率;末轮情景由 caller 传 opts.groupTable/finalRound 时附带) ──
+  const wcg = wcCtx.isWC && wcCtx.phase === "group" ? wcGroupOf(homeZh, awayZh) : null;
+  const pathScenario = wcg ? matchPathScenario({
+    bracketR32: wcg.bracketR32, groupLetter: wcg.groupLetter,
+    table: opts.groupTable || null, home: homeZh, away: awayZh, finalRound: !!opts.finalRound,
+  }) : null;
+  if (pathScenario?.path) {
+    const p1 = pathScenario.path.pos1, p2 = pathScenario.path.pos2;
+    factors.push({
+      key: "名次→淘汰赛路径",
+      detail: `本组(${wcg.groupLetter})第1名落${p1.half}(对R32 ${p1.oppSlot}位)、第2名落${p2.half}(对R32 ${p2.oppSlot}位)——名次决定淘汰赛对手/半区,末轮算计动机源`,
+      weight: 20, tag: "📐赛制结构(透明观察·不改概率)",
+    });
+    const sc = pathScenario.scenario;
+    if (sc) {
+      const TIER_CN = { "must-win": "必须取胜方能出线", "must-win-and-pray": "需取胜且看其他场配合", "draw-enough": "平局即可保前2", "win-to-secure": "需不败确保前2", "likely-through": "已基本锁定出线", "unknown": null };
+      const tag = (s, who) => { const t = TIER_CN[s?.tier]; if (t) factors.push({ key: `末轮动机·${who}`, detail: `${t}(${s.note})`, weight: s.tier?.startsWith("must") ? 45 : 30, tag: "⚠️动机观察(不偷改概率)" }); };
+      tag(sc.home, "主队"); tag(sc.away, "客队");
+      if (sc.mutualDrawSuspect) factors.push({ key: "默契球嫌疑", detail: "双方均靠平局即可携手出线 → 平局概率上修嫌疑、进球偏低", weight: 50, tag: "⚠️动机观察(不偷改概率)" });
+    }
+  }
+  factors.sort((a, b) => b.weight - a.weight);
+
   const gaps = [];
   if (!formHome || !formAway) gaps.push("部分队近2年国际赛样本缺(归一不到/未参赛)");
   if (!h2h) gaps.push("近2年内无交手记录(H2H 标缺)");
@@ -164,6 +206,7 @@ export function predictWcMatch(homeZh, awayZh, fixture = {}, marketOdds = null, 
     overUnder: ou,
     halfFull: hf,
     upsetScenario,
+    pathScenario,
     market,
     recentForm: { home: formHome, away: formAway },
     h2h,

@@ -148,6 +148,7 @@
     "wc:suite": "node scripts/worldcup-suite.mjs",
     "wc:validate": "node scripts/worldcup-prior-validation.mjs",
     "wc:groups": "node scripts/run-worldcup-group-sim.mjs",
+    "wc:knockout-path": "node scripts/wc-knockout-path.mjs",
     "wc:backfill": "node scripts/backfill-worldcup-history.mjs",
     "backtest:intl-elo": "node scripts/run-intl-elo-backtest.mjs",
     "backtest:devig": "node scripts/run-devig-backtest.mjs",
