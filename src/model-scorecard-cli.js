@@ -159,7 +159,8 @@ function countCrawlerRetries() {
     const hasRetry = code.includes("fetchWithRetry");
     const hasUaPool = code.includes("pickJingcaiUserAgent");
     const hasWaf = code.includes("567");
-    return { score: (hasRetry ? 1.5 : 0) + (hasUaPool ? 1.5 : 0) + (hasWaf ? 1 : 0) + (hasFile("public-jingcai-fixtures.js") ? 1 : 0), max: 5 };
+    // 2026-06-20:public-jingcai-fixtures.js(GG档删的旧孤儿)→改指生产 jingcai-fivehundred-stage.js(500竞彩赛程真源·现役),不再对坟墓打分。
+    return { score: (hasRetry ? 1.5 : 0) + (hasUaPool ? 1.5 : 0) + (hasWaf ? 1 : 0) + (hasFile("jingcai-fivehundred-stage.js") ? 1 : 0), max: 5 };
   } catch {
     return { score: 0, max: 5 };
   }
