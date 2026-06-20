@@ -880,27 +880,55 @@ export function buildHandicapSanitySheet({ date, rows }) {
     if (o.over25 != null && (o.over25 >= 0.58 || o.over25 <= 0.44)) flags.push(o.over25 >= 0.58 ? "大球档" : "小球档");
     if (svm && svm.severity !== "ok" && svm.severity !== "na") flags.push(svm.verdict.replace(/^[🔴🟠🟢]/, ""));
     const overall = flags.length ? `🟠注意:${flags.join(" · ")}` : "🟢盘口各维度均在历史常态区间内";
-    // 综合盘口解读(2026-06-18 用户:解读要写清楚 + 要先实力对比再判盘口是否合理)——用人话把本场盘口画像讲透
-    const favTxt = favHome == null ? "本场热门方未明(1X2未开售或赔率缺)" : (favHome ? "本场主队是热门" : "本场客队是热门");
-    const read = [`${favTxt}。`];
-    // 实力↔盘口匹配="是否合理"的核心结论,置顶
-    if (svm) read.push(`【实力匹配】${svm.verdict}:${svm.read}`);
+    // 综合盘口解读(2026-06-20 用户:说简单通俗·不玄乎·全用数据·最后明确"怎么买+防什么")——短句,一行一个数据结论
+    const favSide = favHome == null ? null : (favHome ? "主队" : "客队");
+    const favDir = favHome == null ? null : (favHome ? "主胜" : "客胜");
+    let drawImp = null;
+    if (o.euro && num(o.euro.draw) && num(o.euro.home) && num(o.euro.away)) {
+      const ih = 1 / num(o.euro.home), id = 1 / num(o.euro.draw), ia = 1 / num(o.euro.away);
+      drawImp = id / (ih + id + ia);
+    }
+    const cooling = movParts.some((m) => /退烧/.test(m)), heating = movParts.some((m) => /加注/.test(m));
+    const read = [];
+    if (favSide && s) read.push(`①谁热门:${favSide}热门,盘口给它赢球${pc(s.favProb)}${isModel ? "(🔶模型)" : "(✅盘口)"}。`);
+    else if (favSide) read.push(`①谁热门:${favSide}热门(1X2未开售,只卖让球)。`);
+    else read.push(`①本场1X2未开售,只卖让球。`);
+    if (svm) {
+      const sv = svm.severity === "ok" ? "盘口定价对得起实力,合理" : svm.severity === "high" ? "盘口热门跟纸面强队相反→信盘口别信纸面" : svm.verdict.replace(/^[🔴🟠🟢⚠️]/, "");
+      read.push(`②实力对得上吗:${sv}(Elo差${sgn(svm.eloDiff ?? 0)})。`);
+    }
     if (s && s.band) {
-      if (s.verdict === "过深") read.push(`庄家给的让球比"${pc(s.favProb)}强度档"历史该有的更深(热门隐含高出正常上限约${s.gapPp}个百分点)——等于把热门定得偏强、让球让得偏多;含义:受让方/爆冷端相对更有空间,买深让热门当胆要谨慎。`);
-      else if (s.verdict === "过浅") read.push(`庄家给的让球比该强度档历史该有的更浅(热门隐含低出正常下限约${s.gapPp}个百分点)——热门被定得偏弱、让得偏少;含义:受让方过盘相对容易,别盲目把热门让球当胆。`);
-      else read.push(`让球深浅与同强度历史常态一致(热门隐含${pc(s.favProb)}落在${pc(s.band.p5)}–${pc(s.band.p95)}内),盘口没透出明显的高估/低估信号。`);
+      if (s.verdict === "过浅") read.push(`③让球深浅:偏浅(比同档历史低${s.gapPp}pp)→热门让得少,受让方容易过盘,让球别当胆。`);
+      else if (s.verdict === "过深") read.push(`③让球深浅:偏深(比历史高${s.gapPp}pp)→热门要赢得多才过盘,深让别当胆。`);
+      else read.push(`③让球深浅:正常(热门隐含${pc(s.favProb)}落在${pc(s.band.p5)}–${pc(s.band.p95)}内)。`);
     }
-    if (ws && ws.lean && ws.lean !== "均衡") read.push(`亚盘水位${ws.lean}:资金更压向低水一侧(亚盘玩家更信那边)。`);
-    if (movParts.length) read.push(`盘口在动——${movParts.join(";")}。`);
-    if (xDiverge) read.push(`与国际外盘(更接近收盘sharp)出现分歧:竞彩这条线可能滞后或定价偏离,值得多看一眼。`);
-    if (o.over25 != null) {
-      if (o.over25 >= 0.58) read.push(`总进球偏大球档(大球隐含${pc(o.over25)})。`);
-      else if (o.over25 <= 0.44) read.push(`总进球偏小球档(大球隐含${pc(o.over25)}),常伴闷局/逼平。`);
+    if (heating) read.push(`④资金/异动:钱在进热门(被加注)→这类盘5年实证56%胜,偏可靠。`);
+    else if (cooling) read.push(`④资金/异动:钱在撤热门(退烧)→这类盘5年实证仅45%胜,偏危险。`);
+    else if (ws && ws.lean && ws.lean !== "均衡") read.push(`④资金:亚盘${ws.lean}(钱压低水一侧)。`);
+    if (o.over25 != null && o.over25 >= 0.58) read.push(`⑤进球数:偏大球(大球${pc(o.over25)})。`);
+    else if (o.over25 != null && o.over25 <= 0.44) read.push(`⑤进球数:偏小球(易闷平,大球仅${pc(o.over25)})。`);
+    // 怎么买 + 防什么(明确动作)
+    let buy, guard = [];
+    if (favDir == null) {
+      buy = `本场只卖让球→只能按让球盘热门方向小注,1X2没得直接买。`;
+    } else {
+      const needDouble = (drawImp != null && drawImp >= 0.27) || (svm && (svm.severity === "high" || svm.severity === "mid")) || xDiverge;
+      const handicapWord = s?.verdict === "过浅" ? "让球容易过不了,优先买直胜、别拿让球当胆" : s?.verdict === "过深" ? "深让别单押,想稳就买直胜" : "直胜或让球都可以跟";
+      buy = needDouble
+        ? `先双选「${favDir}/平」兜一手;敢搏再单押${favDir}直胜。${handicapWord}。`
+        : `主推${favDir}直胜,${handicapWord}。`;
     }
-    const takeaway = flags.length
-      ? `📌 怎么用:本场有 ${flags.length} 个偏离常态的信号(${flags.join("、")}),偏离越多越值得多看一眼;但公开盘口打不过收盘线,这些只帮你看懂庄家定价倾向,不是稳赢的买卖信号,买不买你定。`
-      : `📌 怎么用:本场盘口各维度都落在历史常态区间内、无明显异常,按主表推荐与信心档正常对待即可(公开盘口打不过收盘线)。`;
-    out.push([`综合盘口裁决·本场解读`, overall, "汇总上方各玩法深浅/失衡/移动/跨源旗标", flags.length ? "有异常项" : "常态", "—", read.join("\n") + "\n" + takeaway, "—"]);
+    if (drawImp != null && drawImp >= 0.27) guard.push(`防平局(隐含${pc(drawImp)}偏高)`);
+    if (s?.verdict === "过浅") guard.push(`防"赢球输盘"(让球过不了)`);
+    if (s?.verdict === "过深") guard.push(`防受让方咬住/爆冷`);
+    if (cooling) guard.push(`防热门走软(钱在撤)`);
+    if (svm?.severity === "high") guard.push(`防盘口背离(纸面强队不一定赢)`);
+    if (o.over25 != null && o.over25 >= 0.58) guard.push(`大球场,押小球/闷平要小心`);
+    if (xDiverge) guard.push(`竞彩线与外盘有分歧,可能滞后`);
+    const verdictText = read.join("\n")
+      + `\n✅怎么买:${buy}`
+      + `\n⚠️防什么:${guard.length ? guard.join(";") : "无明显需防项,按信心档正常买即可"}`;
+    out.push([`综合盘口裁决·本场解读`, overall, "汇总上方各玩法深浅/失衡/移动/跨源旗标", flags.length ? "有异常项" : "常态", "—", verdictText, "—"]);
 
     // ⑨ 实时核查·异动冷门(2026-06-18 用户:抓异动冷门当参考·必须真实有实质·有异动要给防什么+最大可能指向哪)
     //   数据=本次 web 核查(伤停/H2H克星/Opta超算等,✅可追溯·来源见「情报详情」);缺=如实标缺不编。

@@ -53,6 +53,7 @@ import { buildMatchIntel } from "../src/match-intel.js";
 import { handicapSanity, histUpsetRate } from "../src/handicap-sanity.js";
 import { formationPosture } from "../src/lineup-source.js";
 import { teamGroupOf } from "../src/world-cup-priors.js";
+import { translatePlayer, translateCoach } from "../src/player-name-zh.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(缺陷#20:绝不再默认写死历史日期)。
 let date;
@@ -141,7 +142,9 @@ const recStr = (side) => side.record5?.n
       ? `本季${side.seasonForm.M}场 ${side.seasonForm.record}·进${side.seasonForm.gf}失${side.seasonForm.ga}(${side.seasonForm.league}第${side.seasonForm.rank}·worldfootball真实积分榜·${side.seasonForm.fetchedAt}·非近5)`
       : "❌未取到");
 // 比分一律本队视角 gf-ga(胜必然 X>Y,避免"主-客"朝向出现"胜1-2"自相矛盾)+ 对手简称
-const last5Str = (side) => side.last5?.length ? side.last5.map((x) => `${x.res}${x.gf}-${x.ga}(${x.homeAway === "home" ? "主" : "客"}${x.oppAbbr})`).join(" ") : "";
+// 对手名中文化(2026-06-20 用户:表内不留英文):canon 命中中文用中文,未收录保留原简称(不瞎译·守不编造铁律)
+const oppZh = (x) => { const c = canonicalTeamName(x.oppName ?? ""); return /[一-鿿]/.test(c) ? c : (x.oppAbbr ?? x.oppName ?? "?"); };
+const last5Str = (side) => side.last5?.length ? side.last5.map((x) => `${x.res}${x.gf}-${x.ga}(${x.homeAway === "home" ? "主" : "客"}${oppZh(x)})`).join(" ") : "";
 // H2H 从当前主队视角 gf-ga(h2h=主队历史筛对手,gf/ga 即主队)
 const h2hStr = (c) => c?.h2h?.length ? c.h2h.map((x) => `${x.date} ${c.home.zh}${x.gf}-${x.ga}(${x.res})`).join(" / ") : "近赛季窗口无交锋(ESPN免费源限近赛季)";
 const profileStr = (c) => {
@@ -617,12 +620,12 @@ const deriveWcWeb = (p, pred) => {
   const v = wm.venue;
   const venue = v ? [v.city, v.stadium, v.altitude_m ? `海拔${v.altitude_m}m` : null, v.temp != null ? `均温${v.temp}℃` : null, v.indoor ? "室内控温" : "露天"].filter(Boolean).join("·") + " 🔶WC赛历场馆+Open-Meteo真实预报" : null;
   const ch = wm.coach;
-  const coachPart = (ch && (ch.home || ch.away)) ? `主帅 ${p.fixture.homeTeam}:${ch.home ?? "⚠️缺"} / ${p.fixture.awayTeam}:${ch.away ?? "⚠️缺"}` : null;
+  const coachPart = (ch && (ch.home || ch.away)) ? `主帅 ${p.fixture.homeTeam}:${ch.home ? translateCoach(ch.home) : "⚠️缺"} / ${p.fixture.awayTeam}:${ch.away ? translateCoach(ch.away) : "⚠️缺"}` : null;
   const styleSide = (predSide) => {
     if (!predSide) return null;
     const f = predSide.formation; const post = f ? formationPosture(f) : null;
     const desc = post ? (post.attacking ? "压上" : post.defensive ? "低位防守" : "均衡") : null;
-    const keys = (predSide.xi ?? []).slice(0, 4).map((x) => x.name).filter(Boolean).join("、");
+    const keys = (predSide.xi ?? []).slice(0, 4).map((x) => translatePlayer(x.name)).filter(Boolean).join("、");
     const parts = [];
     if (f) parts.push(`${f}${desc ? "·" + desc : ""}`);
     if (keys) parts.push(`常用主力 ${keys}`);
@@ -701,6 +704,25 @@ try {
     const stopDate = stopIso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(stopIso)) : null;
     if (stopDate && stopDate < date) continue; // 过期期次不算(诚实跳过)
     fourteenLegs = legs; fourteenStoreDate = dd;
+  }
+  // 兜底自愈(2026-06-20):官方竞彩源当天=0 时 crawler 跳过 fixtureSync→14场腿没落 store→直接读 china-web 官方解析数据
+  //   (shengfucai.fixtures 已映射好·含期号/停售,非编造),开赛时刻从 store 竞彩孪生补全。免每日手动补。
+  if (!fourteenLegs) {
+    for (let k = 0; k <= 6 && !fourteenLegs; k++) {
+      const dd = addDaysIso(date, -k);
+      let cw = null;
+      try { cw = JSON.parse(readFileSync(`D:/football-model-data/china-web/${dd}.json`, "utf8")); } catch { continue; }
+      const legs0 = cw?.shengfucai?.fixtures ?? [];
+      if (legs0.length !== 14 || !legs0.every((l) => /第\d+期/.test(l.notes ?? ""))) continue;
+      const stopIso = (legs0[0].notes ?? "").match(/停售=([0-9T:.\-Z]+)/)?.[1] ?? null;
+      const stopDate = stopIso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(stopIso)) : null;
+      if (stopDate && stopDate < date) continue; // 过期跳过
+      let storeFx = [];
+      try { storeFx = loadFixtures(date).fixtures ?? []; } catch { storeFx = []; }
+      const koByPair = new Map(storeFx.filter((f) => f.marketType === "jingcai").map((f) => [`${f.homeTeam}|${f.awayTeam}`, f.kickoff]));
+      fourteenLegs = legs0.map((l) => { const ko = koByPair.get(`${l.homeTeam}|${l.awayTeam}`); return ko ? { ...l, kickoff: ko } : l; });
+      fourteenStoreDate = `${dd}·china-web官方兜底`;
+    }
   }
   if (fourteenLegs) {
     const periodLabel = (fourteenLegs[0].notes ?? "").match(/第\d+期/)?.[0] ?? "本期";

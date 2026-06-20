@@ -99,7 +99,79 @@ const PLAYER_ZH = {
   "Marko Arnautovic": "阿瑙托维奇",    // (奥地利·已收同名保险)
   "Derrick Köhn": "科恩",              // 刚果金·加拉塔萨雷左后卫
   "Samuel Moutoussamy": "穆图萨米",    // 刚果金·南特
+  // 2026-06-20 扩充(今日竞彩4场+14场各队知名球员·公认中文译名/日本汉字名,仍只收有把握的,生僻保留原文)
+  // 荷兰
+  "Cody Gakpo": "加克波", "Donyell Malen": "马伦", "Virgil van Dijk": "范戴克",
+  "Bart Verbruggen": "维尔布鲁根", "Denzel Dumfries": "邓弗里斯", "Micky van de Ven": "范德文",
+  "Ryan Gravenberch": "赫拉文贝赫", "Tijjani Reijnders": "雷因德斯", "Frenkie de Jong": "弗兰基·德容",
+  "Memphis Depay": "德佩", "Nathan Aké": "阿克", "Xavi Simons": "哈维·西蒙斯",
+  "Crysencio Summerville": "萨默维尔", "Jurriën Timber": "蒂姆贝尔",
+  // 瑞典
+  "Alexander Isak": "伊萨克", "Viktor Gyökeres": "约克雷斯", "Dejan Kulusevski": "库卢塞夫斯基",
+  "Emil Forsberg": "福斯贝里", "Anthony Elanga": "埃兰加", "Isak Hien": "希恩",
+  "Gabriel Gudmundsson": "古德蒙松", "Kristoffer Nordfeldt": "诺德费尔特",
+  // 德国
+  "Florian Wirtz": "维尔茨", "Jonathan Tah": "塔", "Joshua Kimmich": "基米希",
+  "Nico Schlotterbeck": "施洛特贝克", "Kai Havertz": "哈弗茨", "Jamal Musiala": "穆夏拉",
+  "Leroy Sané": "萨内", "Aleksandar Pavlovic": "帕夫洛维奇", "Oliver Baumann": "鲍曼",
+  "Antonio Rüdiger": "吕迪格", "Serge Gnabry": "格纳布里", "İlkay Gündoğan": "京多安",
+  "Marc-André ter Stegen": "特尔施特根", "Niclas Füllkrug": "菲尔克鲁格", "Felix Nmecha": "恩梅查",
+  // 科特迪瓦
+  "Franck Kessié": "凯西", "Nicolas Pépé": "佩佩", "Seko Fofana": "塞科·福法纳",
+  "Wilfried Singo": "辛戈", "Simon Adingra": "阿丁格拉", "Elye Wahi": "瓦希",
+  // 厄瓜多尔
+  "Moisés Caicedo": "凯塞多", "Enner Valencia": "瓦伦西亚", "Gonzalo Plata": "普拉塔",
+  "Willian Pacho": "帕乔", "Pervis Estupiñán": "埃斯图皮尼安", "Piero Hincapié": "因卡皮耶",
+  "Félix Torres": "费利克斯·托雷斯", "Joel Ordóñez": "奥多涅斯",
+  // 库拉索(多数生僻保留原文,仅收效力顶级联赛者)
+  "Riechedly Bazoer": "巴泽尔", "Tahith Chong": "钟", "Leandro Bacuna": "莱安德罗·巴库纳", "Juninho Bacuna": "胡尼尼奥·巴库纳",
+  // 突尼斯
+  "Ellyes Skhiri": "斯基里", "Hannibal Mejbri": "梅杰布里", "Montassar Talbi": "塔尔比",
+  "Rani Khedira": "拉尼·赫迪拉",
+  // 补充(顶级/次顶级联赛主力·有通用译名)
+  "Jan Paul van Hecke": "范赫克",      // 荷兰·布莱顿
+  "Daniel Svensson": "斯文森",          // 瑞典·多特蒙德
+  "Emmanuel Agbadou": "阿格巴杜",       // 科特迪瓦·狼队(英超)
+  "Guela Doué": "杜埃",                 // 科特迪瓦·斯特拉斯堡
+  "Yasin Ayari": "阿亚里",              // 瑞典·布莱顿
+  // 2026-06-20 二次扩充(次顶级联赛常规主力·有可查通用译名)
+  "Hernán Galíndez": "加林德斯",        // 厄瓜多尔·主力门将
+  "Eloy Room": "鲁姆",                  // 库拉索·门将(MLS)
+  "Omar Rekik": "雷基克",               // 突尼斯·阿森纳青训
+  "Ghislain Konan": "科南",             // 科特迪瓦·兰斯(法甲)
+  "Benjamin Nygren": "尼格伦",          // 瑞典·凯尔特人
+  "Anis Slimane": "斯利曼",             // 突尼斯·雷恩/布莱克本
+  "Ismaël Gharbi": "加尔比",            // 突尼斯·PSG青训/布拉加
+  "Elias Saad": "埃利亚斯·萨德",        // 突尼斯·圣保利(德甲)
+  "Nathaniel Brown": "纳撒尼尔·布朗",   // 德国·法兰克福
+  "Yahia Fofana": "亚希亚·福法纳",      // 科特迪瓦·昂热门将(法甲)
+  // 日本(汉字名·精确)
+  "Zion Suzuki": "铃木彩艳", "Ayase Ueda": "上田绮世", "Ritsu Doan": "堂安律",
+  "Daichi Kamada": "镰田大地", "Daizen Maeda": "前田大然", "Hiroki Ito": "伊藤洋辉",
+  "Keito Nakamura": "中村敬斗", "Junya Ito": "伊东纯也", "Ao Tanaka": "田中碧",
+  "Takefusa Kubo": "久保建英", "Wataru Endo": "远藤航", "Kaoru Mitoma": "三笘薫",
+  "Takehiro Tomiyasu": "富安健洋", "Ko Itakura": "板仓滉", "Tsuyoshi Watanabe": "渡边刚",
+  "Kaishu Sano": "佐野海舟",
 };
+
+// 主帅 → 中文(2026-06-20 用户:表内不留英文;只收有把握的,生僻保留原名·不瞎译)。键=team-priors 原名。
+const COACH_ZH = {
+  "Ronald Koeman": "罗纳德·科曼", "Graham Potter": "格雷厄姆·波特", "Julian Nagelsmann": "朱利安·纳格尔斯曼",
+  "Emerse Faé": "埃默斯·法埃", "Sebastián Beccacece": "塞巴斯蒂安·贝卡塞塞", "Dick Advocaat": "迪克·阿德沃卡特",
+  "Sabri Lamouchi": "萨布里·拉穆奇", "Hajime Moriyasu": "森保一",
+  "Luis de la Fuente": "路易斯·德拉富恩特", "Hervé Renard": "埃尔韦·勒纳尔", "Marcelo Bielsa": "马塞洛·别尔萨",
+  "Hossam Hassan": "侯萨姆·哈桑", "Lionel Scaloni": "斯卡洛尼", "Ralf Rangnick": "拉尔夫·朗尼克",
+  "Didier Deschamps": "德尚", "Ståle Solbakken": "索尔巴肯", "Vladimir Petković": "彼得科维奇",
+  "Roberto Martínez": "罗伯托·马丁内斯", "Thomas Tuchel": "图赫尔", "Otto Addo": "奥托·阿多",
+  "Thomas Christiansen": "克里斯蒂安森", "Zlatko Dalić": "达利奇", "Néstor Lorenzo": "内斯托尔·洛伦索",
+};
+
+/** 主帅名 → 中文(知名才转);无权威中文名→保留原名(不瞎译)。 */
+export function translateCoach(name) {
+  if (name == null) return "";
+  const n = String(name).trim();
+  return COACH_ZH[n] ?? n;
+}
 
 /** 位置代码 → 中文;未知码原样返回(不编)。 */
 export function translatePosition(code) {
@@ -131,4 +203,4 @@ export function playerDisplay(p, n = null) {
   return inner ? `${nm}(${inner})` : nm;
 }
 
-export { POSITION_ZH, PLAYER_ZH };
+export { POSITION_ZH, PLAYER_ZH, COACH_ZH };

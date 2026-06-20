@@ -34,7 +34,10 @@ export function recentForm(cache, team, n = 5) {
   const list = ms.map((m) => {
     const home = isTeam(homeName(m), T);
     const my = home ? m.homeGoals : m.awayGoals, opp = home ? m.awayGoals : m.homeGoals;
-    const opName = home ? awayName(m) : homeName(m);
+    // 对手名中文化(2026-06-20 用户:表内不留英文):canon 命中中文则用中文,未收录国名保留原文(不瞎译·守不编造铁律)
+    const opRaw = home ? awayName(m) : homeName(m);
+    const opCanon = canon(opRaw);
+    const opName = /[一-鿿]/.test(opCanon) ? opCanon : opRaw;
     const r = RES(my, opp); if (r === "胜") w++; else if (r === "平") d++; else l++;
     gf += my; ga += opp;
     return { date: m.date, vs: opName, ha: home ? "主" : "客", score: `${my}-${opp}`, r };
