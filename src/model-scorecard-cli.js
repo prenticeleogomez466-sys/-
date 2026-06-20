@@ -222,9 +222,10 @@ function countMarketTypes() {
 
 function hasDecisionLabels() {
   const ev = hasFile("prediction-engine.js");
-  const dut = hasFile("dutching-optimizer.js");
+  // 2026-06-20:dutching-optimizer.js 是已删48僵尸之一→改指生产 portfolio-kelly.js(组合注金相关性闸+全天暴露上限·真注金/分配决策件,接 buildDecisionAidsSheet),不再对坟墓打分。
+  const stake = hasFile("portfolio-kelly.js");
   const clv = hasFile("clv-tracker.js");
-  return { score: (ev ? 2 : 0) + (dut ? 2 : 0) + (clv ? 1 : 0), max: 5 };
+  return { score: (ev ? 2 : 0) + (stake ? 2 : 0) + (clv ? 1 : 0), max: 5 };
 }
 
 function hasComboBuilder() {
