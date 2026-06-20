@@ -16,7 +16,10 @@ function blobOf(dirs) {
   }
   return t.join("\n");
 }
-const prodBlob = blobOf([".", "src", "scripts"]);   // production + entrypoints
+// 2026-06-20 加固:hasFile("x.js")/existsSync(...,"x.js") 是「文件存不存在」检查(如 model-scorecard 评分卡),
+//   不是真消费,却会被 reOf 当成生产引用 → 掩盖真僵尸(combo-builder 当年就这么漏掉)。计引用前先中和这类存在性检查。
+const neutralizeExistenceChecks = (s) => s.replace(/hasFile\(\s*["'`][^"'`]+["'`]\s*\)/g, "hasFile(EXISTENCE_CHECK)");
+const prodBlob = neutralizeExistenceChecks(blobOf([".", "src", "scripts"]));   // production + entrypoints
 const testBlob = blobOf(["test"]);
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const reOf = (base) => new RegExp("[\\/\"'\\.]" + esc(base) + "(\\.js|\\.mjs)?[\"'`]", "g");

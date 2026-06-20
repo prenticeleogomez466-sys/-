@@ -228,7 +228,8 @@ function hasDecisionLabels() {
 }
 
 function hasComboBuilder() {
-  if (!hasFile("combo-builder.js")) return { score: 1, max: 4 };
+  // 2026-06-20:combo-builder.js(旧二串一·+EV前提被回测证伪)已删,串关走生产 parlay-builder.js → 改指它,不再对坟墓打分。
+  if (!hasFile("parlay-builder.js")) return { score: 1, max: 4 };
   return { score: 3.5, max: 4 };
 }
 
