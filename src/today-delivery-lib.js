@@ -1427,6 +1427,43 @@ export function buyAdvice(r) {
   return `按盘口主推与信心档(${r.tier || "—"})正常对待`;
 }
 
+// 直接研判(2026-06-20 用户:不要虚的·先严密读盘口/庄家意图/异动,再一句话直接给"看好X方向·比分Y")。
+//   比分只用真值:盘口主推比分(r.score)/真盘平局格(r.upsetMarketDraw·✅500 de-vig),无则只给方向不编比分。
+export function directCall(r) {
+  const dirM = String(r.wld || r.primary?.text || "").match(/(主胜|平局|客胜)/);
+  const dir = dirM ? dirM[1] : "—";
+  const mainScore = (String(r.score || "").match(/\d+-\d+/) || [])[0] || null;          // 盘口主推比分(真盘众数)
+  const drawScore = r.upsetMarketDraw?.score || null;                                    // ✅500真盘最可能平局格(1-1等)
+  const sig = String(r.signals || "");
+  const moneyIn = /资金进|水位压入/.test(sig);     // 资金加注热门=sharp更看好·更可靠
+  const moneyOut = /资金出|水位走高|退烧/.test(sig); // 退烧=公众追捧但盘口看淡·历史−12.6%坑
+  const reson = /三盘共振/.test(sig);
+  const diverge = /盘口信号分歧/.test(sig);
+  const drawPct = r.drawImpliedPct != null ? Math.round(r.drawImpliedPct * 100) : null;
+  const drawHigh = r.drawImpliedPct >= 0.30;
+  const upsetHigh = r.upset?.level === "高";
+  const refuted = r.adv?.label && /🔴|证伪/.test(r.adv.label);
+  // 悬殊盘只卖让球=1X2真未开售(不是光scen含"悬殊"就算·否则有1X2的强热门被误判)
+  const noWld = dir === "—" || /未开售/.test(String(r.wld || ""));
+  // 1X2未开售时定真热门:① WC模型Elo先验(主X%/客Y%·最权威)② 竞彩让球赔率(主/客胜odds低者=热门)。
+  //   绝不用亚盘水位lean——深盘水位反映"谁覆盖让球"非"谁赢"(深热门水位常偏客=误判)。
+  const elo = String(r.wcElo || "").match(/主(\d+)%[^客]*客(\d+)%/);
+  const hcOdds = String(r.hc || "").match(/(\d+\.\d+)\/\d+(?:\.\d+)?\/(\d+\.\d+)/);
+  const favSide = elo ? (Number(elo[1]) >= Number(elo[2]) ? "主队" : "客队")
+    : hcOdds ? (Number(hcOdds[1]) <= Number(hcOdds[2]) ? "主队" : "客队") : "热门";
+  // 严密分析后 → 一句直接判断(按主导信号差异化,不千篇一律)
+  if (noWld) return `看好${favSide}赢球(1X2未开售·悬殊盘)→只买${favSide}胜、不买深让(净胜要够·易赢球输盘)`;
+  if (moneyOut && (drawHigh || refuted)) return `庄家退烧(资金流出)${drawPct != null ? `·平局隐含${drawPct}%` : ""}→防爆平,看好${drawScore || "平局1-1"};别拿${dir}当胆`;
+  if (upsetHigh) return `爆冷风险高→${dir}别当胆,可博平${drawScore ? `(${drawScore})` : ""}或冷门`;
+  if (drawHigh) return `平局隐含${drawPct}%偏高→防爆平,看好${drawScore || "平局"};${dir}走双选保平`;
+  if (moneyIn && reson) return `资金加注+三盘共振→看好${dir}${mainScore ? ` ${mainScore}` : ""}(今日方向最硬)`;
+  if (moneyIn) return `资金加注热门(钱在涌入)→看好${dir}${mainScore ? ` ${mainScore}` : ""}`;
+  if (refuted) return `证伪未过·无独立edge→${dir}方向跟盘口但轻仓,别当胆`;
+  if (diverge) return `盘口信号分歧(赢球难赢盘)→${dir}方向可,让球/比分谨慎`;
+  if (reson) return `三盘共振${dir}→看好${dir}${mainScore ? ` ${mainScore}` : ""}`;
+  return `盘口稳·看好${dir}${mainScore ? ` ${mainScore}` : ""}`;
+}
+
 // ── 异动雷达(2026-06-19 用户:把数据/阵容/赔率异动/大小球/情报/战意/伤病/红牌/重要性大融合给综合判断) ──
 //   纯透明分析层:只从行内已算好的真实字段提取「排序后的因子」,绝不改 1X2 概率方向(方向恒=盘口主推)。
 //   每个因子带:严重度(🔴高/🟡中/🟢观察) + 类别 + 三标签溯源(✅实测/🔶推断/⚠️待) + 大白话。零编造:字段缺=不出。
@@ -1485,9 +1522,10 @@ export function buildAnomalyRadar(r) {
   factors.sort((a, b) => ord[a.sev] - ord[b.sev]);
   const how = buyAdvice(r);
   const topFlags = factors.filter((f) => f.sev !== "🟢").slice(0, 3).map((f) => `${f.sev}${f.cat}`).join(" ");
-  // 主表「综合研判」格:≤2行(方向+top风险标 / 一句买法),长文下沉到「研判详情」sheet
-  const short = `🎯${dir}${conf != null ? `·${tier}(${conf})` : ""}${topFlags ? `｜${topFlags}` : "｜盘口各维度常态"}\n买法:${how}`;
-  return { dir, tier, conf, factors, how, short };
+  const call = directCall(r);
+  // 主表「综合研判」格:≤2行——①直接研判(看好X·比分Y) ②信心+怎么买(长文下沉「研判详情」sheet)
+  const short = `🎯${call}\n信心${tier}${conf != null ? `(${conf})` : ""}·${how}`;
+  return { dir, tier, conf, factors, how, call, short };
 }
 
 export function synthesisCell(r) { return buildAnomalyRadar(r).short; }
@@ -1498,10 +1536,10 @@ export function buildRadarDetailSheet({ date, rows }) {
   const UPSET = new Set(["爆冷高", "爆冷", "爆冷分型", "平局风险"]);
   const RISK = new Set(["盘口体检", "模型分歧", "对抗证伪", "阵容/伤病/红牌", "阵容"]);
   const fmt = (fs) => fs.length ? fs.map((f) => `${f.sev}${f.tag}〔${f.cat}〕${f.text}`).join("\n") : "—";
-  const headers = ["#", "对阵(赛事)", "🎯方向(盘口为锚·恒不改)", "🔴🟡风险点(按严重度排序)", "📊盘口异动·庄家意图·大小球走势", "🎲爆冷机理·平局风险", "🎯怎么买(你定)", "🔎web核查情报"];
+  const headers = ["#", "对阵(赛事)", "🎯直接研判(严密分析后·看好X方向·比分Y)", "🔴🟡风险点(按严重度排序)", "📊盘口异动·庄家意图·大小球走势", "🎲爆冷机理·平局风险", "🎯怎么买(你定)", "🔎web核查情报"];
   const body = rows.map((r) => {
     const rad = buildAnomalyRadar(r);
-    return [String(r.idx), `${r.match}(${r.comp})`, `${rad.dir}·${rad.tier}(${rad.conf ?? "—"})`,
+    return [String(r.idx), `${r.match}(${r.comp})`, `🎯${rad.call}\n〔盘口主推${rad.dir}·信心${rad.tier}(${rad.conf ?? "—"})〕`,
       fmt(rad.factors.filter((f) => RISK.has(f.cat))),
       fmt(rad.factors.filter((f) => MOVE.has(f.cat))),
       fmt(rad.factors.filter((f) => UPSET.has(f.cat))),

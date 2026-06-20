@@ -1,7 +1,7 @@
 // 异动雷达守护测试(2026-06-19):验证纯透明分析层——绝不改方向、按严重度排序、零编造标缺、研判格≤2行、详情 sheet 列齐。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildAnomalyRadar, synthesisCell, buildRadarDetailSheet, buyAdvice } from "../src/today-delivery-lib.js";
+import { buildAnomalyRadar, synthesisCell, buildRadarDetailSheet, buyAdvice, directCall } from "../src/today-delivery-lib.js";
 
 // 一场:公众追捧但盘口看淡的热门(欧赔退烧坑)+ 高爆冷 + 平局偏高 + 阵容未出 + 模型分歧
 const rowTrap = {
@@ -66,11 +66,29 @@ test("阵容/伤病/红牌:未出→⚠️待标缺不编(软信息不进概率)
   assert.match(f.text, /不进概率|标缺/);
 });
 
-test("综合研判格≤2行(降负·长文下沉)", () => {
+test("综合研判格≤2行·直接研判打头(不要虚的·看好X)", () => {
   const cell = synthesisCell(rowTrap);
   assert.ok(cell.split("\n").length <= 2, `研判格应≤2行,实得${cell.split("\n").length}行`);
-  assert.match(cell, /🎯主胜/);
-  assert.match(cell, /买法:/);
+  assert.match(cell, /🎯/);
+  assert.match(cell, /防爆平|看好/, "首行须是直接研判(看好X/防爆平),非含糊");
+  assert.match(cell, /信心/);
+});
+
+test("directCall:先严密读信号→一句直接判断(退烧+平局高→防爆平看好平局比分;加注+共振→看好主推方向)", () => {
+  // rowTrap=退烧(资金出)+平局隐含31%+证伪 → 防爆平·看好平局
+  assert.match(directCall(rowTrap), /退烧|防爆平/);
+  assert.match(directCall(rowTrap), /看好/);
+  // 加注+三盘共振 → 看好盘口主推方向+真盘比分
+  const rowFav = { wld: "主胜(70%)", primary: { text: "盘口主推:主胜", agree: true }, tier: "一档", conf: 70,
+    signals: "欧赔:热门=主胜·热门主胜水位压入(1.9→1.8,资金进) ‖ 🟣三盘共振主胜(欧赔/亚盘/让球盘同侧)",
+    score: "盘口主推 2-0/2-1 ✅500", drawImpliedPct: 0.16 };
+  assert.match(directCall(rowFav), /资金加注.*共振|看好主胜/);
+  assert.match(directCall(rowFav), /2-0/, "盘口稳场须带真盘主推比分");
+  // 悬殊盘 1X2未开售 → 真热门用 WC Elo 先验定(主X%/客Y%·非亚盘水位)·只买胜不买深让
+  assert.match(directCall({ wld: "未开售(悬殊盘)", wcElo: "主79%/平17%/客4%", score: "" }), /看好主队赢球.*只买主队胜.*不买深让/);
+  assert.match(directCall({ wld: "未开售", wcElo: "主5%/平20%/客75%", score: "" }), /看好客队/);
+  // 无Elo时退竞彩让球赔率(主胜odds低=主热门)
+  assert.match(directCall({ wld: "未开售", hc: "让-2 1.85/4/2.95 ✅500", score: "" }), /看好主队/);
 });
 
 test("干净场:无突出风险时不硬造异动(零编造)", () => {
