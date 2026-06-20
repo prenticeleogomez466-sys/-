@@ -620,6 +620,23 @@ export function buildDecisionAidsSheet({ date, rows }) {
 // ── 盘口合理性工作表(2026-06-16 用户重写:逐场写清胜负平/让球胜负平/让球线/欧赔/亚盘水位/大小球的真实赔率数字,
 //    对照历史正常区间(直接写赔率数字),判深浅,临界也写数字,不用 P5/P95 黑话)──
 //   标准=12458场五大联赛(7季)实测;每场按亚盘线锚定实力档→给同档欧赔正常区间;赔率落区外=过深/过浅。
+// 盘口合理性·一句话总结(2026-06-20 用户:简单直白·先严密分析后给直接结论)。
+//   核心=实力↔盘口匹配度(独立Elo+近5 vs 盘口定价)→直白说合理/高估热门/低估热门/背离 + 深浅怎么用。
+function sanityOneLine(r) {
+  const s = r.sanity;
+  const svm = r.strengthInputs ? assessStrengthVsMarket(r.strengthInputs) : null;
+  const v = svm?.verdict || "";
+  let core;
+  if (/背离/.test(v)) core = "盘口热门方与纸面实力相反→强烈信号:信市场别逆、谨慎";
+  else if (/高估/.test(v)) core = "盘口高估热门(让偏深/价偏低)→热门没Elo那么强,别追热门·受让方或平有值";
+  else if (/低估/.test(v)) core = "盘口低估热门(让偏浅)→热门比盘口更强,买热门/让球更稳";
+  else if (/匹配|合理/.test(v)) core = "盘口对得起两队实力·定价合理(按盘口正常对待)";
+  else core = "缺独立实力源(非48强/非WC)→只能看盘口自洽·标缺不编";
+  let depth = "";
+  if (s?.verdict === "过深") depth = ";让球偏深=热门要多进球才过盘→受让/爆冷有值·深让别当胆";
+  else if (s?.verdict === "过浅") depth = ";让球偏浅=热门更强→直胜稳·贪深让易赢球输盘";
+  return core + depth;
+}
 export function buildHandicapSanitySheet({ date, rows }) {
   const banner = `📐 盘口合理性 · ${date} · 逐场细胞级:先做【独立实力对比】(✅WC国家队Elo先验+✅ESPN近5·不看盘口)→换算实力应得让球线/胜率→与盘口实际定价比【实力↔盘口匹配度·是否合理】(匹配=合理/盘口高估热门/低估热门/方向背离·诚实:分歧时市场通常更准不鼓励逆市);再逐玩法【胜负平/让球胜负平(亚洲让球)/让球线/大小球/分队进球数大小/半场胜负平/半场进球数/亚盘水位】真实赔率或🔶模型派生→对照12458场五大联赛(7季)历史正常区间/真实赛果频次(直接写数字)判深浅/异动+差临界(数字);再加【亚盘水位失衡(钱压谁过盘)/初盘→即时盘口移动(被加注56.4%胜 vs 退烧45.5%·5年实证)/跨源交叉验证/综合盘口裁决】。规则:①欧赔热门胜赔比历史最低还低=过浅(热门更强·让太少·受让方过盘易)、比最高还高=过深;②让球胜负平/分队进球/半场=本场隐含或🔶派生 vs 历史真实赛果频次,偏离≥8pp=🟠异动。数据标签:✅实测(500/亚盘真盘de-vig)·🔶模型(竞彩不单卖→DC矩阵派生·注明)·⚠️缺(标缺不编)。✅历史频次供你自行判断,非下注edge(公开盘口打不过收盘线)。`;
   const num = (x) => (x == null || !Number.isFinite(Number(x)) ? null : Number(x));
@@ -668,6 +685,7 @@ export function buildHandicapSanitySheet({ date, rows }) {
       : `${o.ahLine}(主水${dec(o.ahHomeWater)}/客水${dec(o.ahAwayWater)})`;
     out.push(SEP(""));
     out.push(SEP(`━━ ${r.match} ━━　竞彩${jcCell}　｜亚盘 ${ahCell}　｜${favHome == null ? "热门方未定" : favHome ? "主队=热门" : "客队=热门"}`));
+    out.push(SEP(`📌一句话:${sanityOneLine(r)}`));
 
     // ① 胜负平 / 欧洲赔率(让0直胜)
     if (o.euro) {
