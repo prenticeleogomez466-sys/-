@@ -12,7 +12,7 @@ import { analyzeTotalsMovement, overImpliedProb } from "./totals-movement-signal
 import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
-import { applyWcCalibration } from "./wc-calibration-feedback.js";
+import { applyWcCalibration, loadWcCalibrationProfile } from "./wc-calibration-feedback.js";
 import { loadModelMemory, recallSegmentPerformance } from "./model-memory.js";
 import { loadNationalElo, nationalEloFor, eloToLambdas } from "./national-elo-source.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
@@ -96,6 +96,12 @@ export function recommendFixtures(date) {
   const marketSnapshots = loadMarketSnapshots(fixtureSet.date).snapshots;
   const advancedData = loadAdvancedData(fixtureSet.date);
   const calibrationProfile = loadCalibrationProfile();
+  // WC 专属校准反哺接线(2026-06-21):此前 buildWcCalibrationProfile 从未被生产调用→options.wcCalibrationProfile
+  //   恒 undefined→applyWcCalibration 永远 bypass(模块建于 2026-06-15 仅 23 样本被 gate 住,接线被推迟)。
+  //   现 WC 已结算去重 56 场(过 50 门槛),diag-wc-calibration-feedback walk-forward 证 leak-safe 改善
+  //   (LogLoss-0.019/Brier-0.012/命中+6.4pp),且复盘诊断 #1 失分根因即"国家队域无专属校准反馈"。
+  //   故在此装配:gate(<50)未过/缺文件→usable:false→仍 bypass(零行为变化);够样本自动激活。仅 WC 路由场生效。
+  const wcCalibrationProfile = loadWcCalibrationProfile();
   // 永久记忆(2026-06-01):模型分段真实战绩,用时召回给推荐附"本类历史命中率"。盘上无则 null,优雅降级。
   const modelMemory = loadModelMemory();
   // 国家队 Elo(2026-06-01):历史库无国家队时的模型先验源,盘上无则 null(优雅降级)。
@@ -124,7 +130,7 @@ export function recommendFixtures(date) {
   let wcFormCache = null;
   try { wcOddsIndex = loadWcMatchOddsIndex().idx; } catch { wcOddsIndex = null; }
   try { wcFormCache = loadWcNationalForm(); } catch { wcFormCache = null; }
-  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, modelMemory, nationalElo, dixonColesFitted, ratingsBootstrap, wcOddsIndex, wcFormCache, fusionContext: buildFusionContext(fixture, history), ...extra });
+  const predictOne = (fixture, index, extra = {}) => predictFixture(fixture, marketSnapshots, index, { advancedData, calibrationProfile, wcCalibrationProfile, modelMemory, nationalElo, dixonColesFitted, ratingsBootstrap, wcOddsIndex, wcFormCache, fusionContext: buildFusionContext(fixture, history), ...extra });
   let rawPredictions = scopedFixtures.map((fixture, index) => predictOne(fixture, index));
   // 「竞彩要全」铁律(2026-05-31):竞彩缺欧赔被判 data-missing 的场,若同场在 14 场有真实预测 → 借其 wld 重算补全。
   const shengfucaiByKey = new Map(

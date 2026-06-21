@@ -15,8 +15,11 @@
  * leak-safe:这是"生产档"用法——用历史已结算场学,应用到未来新场,天然不偷看。
  *   (回测评估另需按场时序 walk-forward,见 diag-wc-calibration-feedback.mjs。)
  */
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import { buildIsotonicMap, applyIsotonicMap } from "./model-calibration.js";
 import { isSoftCompetition } from "./competition-soft-recalibration.js";
+import { getExportDir } from "./paths.js";
 
 const OUTCOMES = ["home", "draw", "away"];
 
@@ -109,6 +112,26 @@ export function buildWcCalibrationProfile(rows, opts = {}) {
     isotonicMap,
     reliability
   };
+}
+
+/**
+ * 生产档加载(2026-06-21 接线):从 recommendation-ledger.json 读已结算行,构建 WC 专属校准档。
+ *   leak-safe:用历史已结算场学一张 favorite→实际命中 isotonic,应用到未来新场(天然不偷看)。
+ *   gate(去重唯一场 < minSamples=50)未过 → usable:false → applyWcCalibration 完全 bypass(零行为变化)。
+ *   缺文件/解析失败 → 返回 unusable 档(同样 bypass),绝不兜底假数据(守 feedback_no_fallback_absolute)。
+ * @param {{path?:string, minSamples?:number, minIsotonicSamples?:number}} opts
+ * @returns {object} buildWcCalibrationProfile 产物
+ */
+export function loadWcCalibrationProfile(opts = {}) {
+  try {
+    const p = opts.path ?? join(getExportDir(), "recommendation-ledger.json");
+    if (!existsSync(p)) return buildWcCalibrationProfile([], opts);
+    const raw = JSON.parse(readFileSync(p, "utf8"));
+    const rows = Array.isArray(raw) ? raw : Object.values(raw || {});
+    return buildWcCalibrationProfile(rows, opts);
+  } catch {
+    return buildWcCalibrationProfile([], opts);
+  }
 }
 
 /**

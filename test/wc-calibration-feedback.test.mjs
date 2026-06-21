@@ -1,7 +1,12 @@
 // WC 专属校准反哺守护(2026-06-15):去重/gate/漂移闸/应用一致性。
+//   2026-06-21 追加:loadWcCalibrationProfile 加载器契约 + 生产接线守护(防回退成 no-op)。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dedupeSettledWc, buildWcCalibrationProfile, applyWcCalibration } from "../src/wc-calibration-feedback.js";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { dedupeSettledWc, buildWcCalibrationProfile, applyWcCalibration, loadWcCalibrationProfile } from "../src/wc-calibration-feedback.js";
 
 function wcRow(match, score, settledAt, ph = 0.6, pd = 0.25, pa = 0.15) {
   return { match, competition: "世界杯", actual: "主胜", actualScore: score, settledAt,
@@ -70,4 +75,45 @@ test("正常应用:小幅校准生效且归一", () => {
   assert.ok(Math.abs(out.probabilities.home - 0.66) < 1e-9);
   const sum = out.probabilities.home + out.probabilities.draw + out.probabilities.away;
   assert.ok(Math.abs(sum - 1) < 1e-9);
+});
+
+// ── 2026-06-21 加载器契约:从 ledger 文件读已结算行构建档(对象/数组两种结构) ──
+test("loadWcCalibrationProfile:从 ledger(对象结构)读够样本 → usable:true", () => {
+  const dir = mkdtempSync(join(tmpdir(), "wccal-"));
+  try {
+    // ledger 真实结构=对象({0:row,1:row,...});造 55 场过门槛
+    const obj = {};
+    for (let i = 0; i < 55; i++) {
+      obj[i] = { match: `T${i} 对 O${i}`, competition: "世界杯", actual: "主胜",
+        actualScore: i % 5 < 3 ? "2-0" : "0-1", settledAt: `2026-06-${10 + (i % 18)}T0${i % 9}:00:00Z`,
+        probabilityHome: 0.7, probabilityDraw: 0.18, probabilityAway: 0.12 };
+    }
+    const p = join(dir, "recommendation-ledger.json");
+    writeFileSync(p, JSON.stringify(obj));
+    const prof = loadWcCalibrationProfile({ path: p, minSamples: 50, minIsotonicSamples: 50 });
+    assert.equal(prof.usable, true);
+    assert.equal(prof.samples, 55);
+    assert.ok(prof.isotonicMap?.knots?.length >= 1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("loadWcCalibrationProfile:缺文件 → unusable(bypass·绝不兜底假数据)", () => {
+  const prof = loadWcCalibrationProfile({ path: join(tmpdir(), "no-such-ledger-xyz.json"), minSamples: 50 });
+  assert.equal(prof.usable, false);
+  // 不抛、返回可被 applyWcCalibration 安全 bypass 的档
+  const out = applyWcCalibration({ home: 0.6, draw: 0.25, away: 0.15 }, prof);
+  assert.equal(out.applied, false);
+  assert.equal(out.probabilities.home, 0.6);
+});
+
+// ── 接线守护(防回退):prediction-engine 必须把 wcCalibrationProfile 装配进 predictFixture options ──
+//   背景:模块建于 2026-06-15 但 buildWcCalibrationProfile 从未被生产调用→恒 bypass;2026-06-21 接线。
+//   若有人删掉接线,WC 反哺会静默变回 no-op——本守护直接抓住。
+test("接线守护:recommendFixtures 经 loadWcCalibrationProfile 装配 wcCalibrationProfile 入 options", () => {
+  const enginePath = fileURLToPath(new URL("../src/prediction-engine.js", import.meta.url));
+  const src = readFileSync(enginePath, "utf8");
+  assert.match(src, /loadWcCalibrationProfile/, "须 import+调用 loadWcCalibrationProfile");
+  assert.match(src, /const\s+wcCalibrationProfile\s*=\s*loadWcCalibrationProfile\(/, "须在 recommendFixtures 构建 wcCalibrationProfile");
+  // predictFixture options 字面量里须带 wcCalibrationProfile(否则恒 undefined→bypass)
+  assert.match(src, /predictFixture\([^;]*\bwcCalibrationProfile\b/s, "predictFixture options 须传 wcCalibrationProfile");
 });
