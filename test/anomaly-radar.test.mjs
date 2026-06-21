@@ -66,12 +66,14 @@ test("阵容/伤病/红牌:未出→⚠️待标缺不编(软信息不进概率)
   assert.match(f.text, /不进概率|标缺/);
 });
 
-test("综合研判格≤2行·直接研判打头(不要虚的·看好X)", () => {
+test("综合研判格:直接研判打头+汇总爆冷/盘口关键依据(2026-06-21用户:别孤立解读·要把爆冷+盘口合理性+异动汇总进来)", () => {
   const cell = synthesisCell(rowTrap);
-  assert.ok(cell.split("\n").length <= 2, `研判格应≤2行,实得${cell.split("\n").length}行`);
-  assert.match(cell, /🎯/);
-  assert.match(cell, /防爆平|看好/, "首行须是直接研判(看好X/防爆平),非含糊");
-  assert.match(cell, /信心/);
+  const lines = cell.split("\n");
+  assert.ok(lines[0].startsWith("🎯"), "首行须是直接研判(🎯打头)");
+  assert.match(lines[0], /防爆平|看好/, "首行须是直接研判(看好X/防爆平),非含糊");
+  assert.match(cell, /关键依据|盘口平稳/, "须把排序后的真实因子(爆冷/盘口/异动)汇总进来,不孤立解读");
+  assert.match(cell, /怎么打/);
+  assert.ok(lines.length <= 8, `研判格应紧凑(≤8行),实得${lines.length}行`);
 });
 
 test("directCall:先严密读信号→一句直接判断(退烧+平局高→防爆平看好平局比分;加注+共振→看好主推方向)", () => {
@@ -101,8 +103,8 @@ test("干净场:无突出风险时不硬造异动(零编造)", () => {
 test("研判详情 sheet:标题+诚实行+表头8列+逐场行齐", () => {
   const sheet = buildRadarDetailSheet({ date: "2026-06-19", rows: [rowTrap, rowClean] });
   assert.equal(sheet.name, "研判详情");
-  assert.match(sheet.rows[0][0], /异动雷达/);
-  assert.match(sheet.rows[1][0], /诚实边界/);
+  assert.match(sheet.rows[0][0], /全汇总/);
+  assert.match(sheet.rows[1][0], /方向跟盘口/);
   assert.equal(sheet.rows[2].length, 8);
   assert.equal(sheet.rows.length, 2 + 1 + 2); // 标题+诚实+表头 + 2场
   // 每场行=8列,方向列恒含盘口主推方向

@@ -171,7 +171,7 @@ export function parlaySafety({ tier, risk, advLabel }) {
   if (!why.length) return { grade: "🟢", text: "🟢串关候选(一/二档·非高风险·未被证伪)" };
   return { grade: "🟡", text: `🟡谨慎(${why.join("·")})` };
 }
-export const PARLAY_ORDER_NOTE = "串关安全度三级:🟢串关候选=一/二档+非高风险+证伪未杀;🟡谨慎=档位/风险/审计覆盖任一不足;⛔串关排除=硬币场或三视角证伪场。只标注供搭串参考,买不买你定。";
+export const PARLAY_ORDER_NOTE = "串关安全度三级:🟢可串=一/二档+非高风险+证伪未杀;🟡谨慎=档位/风险/审计覆盖任一不足;⛔别串=硬币场或三视角证伪场。";
 
 // ── H2H 渲染:新版本地49k历史库对象({source,label,meetings})+ 旧版 ESPN 数组兼容;库无记录如实标⚠️ ──
 //   2026-06-16 诚实修正:库无记录 ≠ "已查证真零交锋"。49k库覆盖有限(如法国-塞内加尔2002世界杯交手过却未收),
@@ -517,7 +517,7 @@ export function buildIntelSheet({ date, rows, intelByMatch }) {
 //   D 组合注金相关性闸(portfolio-kelly:同场跨玩法相关簇+全天总暴露上限,纯保护真钱不抬注)
 // 入参 rows[].decision = today-full-coverage buildDecisionInput 产物(缺=该场不参与,如实标)。
 export function buildDecisionAidsSheet({ date, rows }) {
-  const banner = `🧭 决策辅助 · ${date} · 诚实过关闸/今日精选/分歧雷达/组合注金闸(全基于真回测实证·零token·只标注不替你弃赛·买不买你定)`;
+  const banner = `🧭 决策辅助 · ${date} · 诚实过关闸/今日精选/分歧雷达/组合注金闸(全基于真回测实证·只标注风险,不自动弃赛)`;
   const di = rows.map((r) => r.decision).filter(Boolean);
   if (!di.length) {
     return { name: "决策辅助", rows: [[banner], ["⚠️ 当日无可归一的盘口推荐行(1X2/让球盘口均未开售或缺),决策辅助本次不出(如实不编)。"]] };
@@ -551,7 +551,7 @@ export function buildDecisionAidsSheet({ date, rows }) {
   // EV 缺值统计(2026-06-18 工作流②):多少注因缺当前赔率无法验证 EV → 覆盖率健康度
   const evMissing = di.filter((d) => d.ev == null).length;
   const evCovPct = di.length ? Math.round((di.length - evMissing) / di.length * 100) : 0;
-  out.push([`小结`, `诚实过关 ${passN}/${di.length} 注进推荐池,其余转观望(只标注·守 feedback_confidence_not_autosuppress 不替你弃赛)`]);
+  out.push([`小结`, `诚实过关 ${passN}/${di.length} 注进推荐池,其余转观望(只标注风险,不自动弃赛)`]);
   out.push([`EV覆盖`, `${di.length - evMissing}/${di.length} 注有当前赔率可验证EV(覆盖率${evCovPct}%)` + (evMissing ? `·${evMissing}注缺赔率无法验证价值(已在EV列标缺·非过关项)` : `·全覆盖`)]);
 
   // ── B 今日精选 ──
@@ -589,7 +589,7 @@ export function buildDecisionAidsSheet({ date, rows }) {
   out.push(["全天建议总注(单位)", `${port.totalBefore}U`, "相关性闸调整后", `${port.totalAfter}U`, "基础注", `${100}元/单位档系数`]);
   if (port.warnings.length) for (const w of port.warnings) out.push(["⚠️闸触发", w]);
   else out.push(["闸状态", "未触发(全天总暴露在 10U 内·单场无多玩法相关簇超限);逐注注金见主表💰列"]);
-  out.push(["铁律", "只降额不抬注·缩放后仍>0由你定·这是组合风险提示非弃赛(守 feedback_confidence_not_autosuppress)"]);
+  out.push(["铁律", "只降额不抬注·这是组合风险提示,不是替你弃赛"]);
 
   // ── E 爆冷风险档(upset-trap-detector·经验基线锚:势均60%/微热门52%/中等热门42%/强热门30%/超级大热18%) ──
   //   实证(reference_data_change_5yr_empirics 33278场+复盘):爆冷不可预测、只可分档管理。中等热门以下=高爆冷区,
@@ -638,7 +638,11 @@ function sanityOneLine(r) {
   return core + depth;
 }
 export function buildHandicapSanitySheet({ date, rows }) {
-  const banner = `📐 盘口合理性 · ${date} · 逐场细胞级:先做【独立实力对比】(✅WC国家队Elo先验+✅ESPN近5·不看盘口)→换算实力应得让球线/胜率→与盘口实际定价比【实力↔盘口匹配度·是否合理】(匹配=合理/盘口高估热门/低估热门/方向背离·诚实:分歧时市场通常更准不鼓励逆市);再逐玩法【胜负平/让球胜负平(亚洲让球)/让球线/大小球/分队进球数大小/半场胜负平/半场进球数/亚盘水位】真实赔率或🔶模型派生→对照12458场五大联赛(7季)历史正常区间/真实赛果频次(直接写数字)判深浅/异动+差临界(数字);再加【亚盘水位失衡(钱压谁过盘)/初盘→即时盘口移动(被加注56.4%胜 vs 退烧45.5%·5年实证)/跨源交叉验证/综合盘口裁决】。规则:①欧赔热门胜赔比历史最低还低=过浅(热门更强·让太少·受让方过盘易)、比最高还高=过深;②让球胜负平/分队进球/半场=本场隐含或🔶派生 vs 历史真实赛果频次,偏离≥8pp=🟠异动。数据标签:✅实测(500/亚盘真盘de-vig)·🔶模型(竞彩不单卖→DC矩阵派生·注明)·⚠️缺(标缺不编)。✅历史频次供你自行判断,非下注edge(公开盘口打不过收盘线)。`;
+  const banner = `📐 盘口合理性 · ${date} · 一句话:这场盘口开得正不正常?用 12458 场五大联赛(7季)历史当尺子量。`
+    + `\n每场看三件事:①【实力 vs 盘口】先按国家队Elo+近5战算出这两队"该让几球",再对比庄家实际开的盘——一致=合理;庄家让多了=高估热门(冷门有价值);让少了=低估热门。`
+    + `\n②【逐玩法量深浅】胜负平/让球/大小球/比分/半全场/亚盘水位 的真实赔率,落在历史正常区间内=🟢正常;比历史最低还低=🔴过浅(热门被高估·让太少);比最高还高=🔴过深;"离临界还差多少"列写明还差几个赔率点踩线。`
+    + `\n③【资金动向】亚盘水位偏哪边=钱压谁;开盘→现在盘口怎么移动(历史:被加注的热门56.4%赢、退烧的只45.5%·仅方向参考)。`
+    + `\n数据标签:✅实测=500/亚盘真盘 · 🔶模型=竞彩不单卖该玩法→用DC矩阵算的 · ⚠️缺=没抓到就标缺、不编。历史频次只帮你判断,不是稳赢点(公开盘口打不过收盘线)。`;
   const num = (x) => (x == null || !Number.isFinite(Number(x)) ? null : Number(x));
   const dec = (x) => { const v = num(x); return v == null ? "—" : v.toFixed(2); };
   const pc = (x) => (x == null ? "—" : (x * 100).toFixed(1) + "%");
@@ -668,7 +672,7 @@ export function buildHandicapSanitySheet({ date, rows }) {
     return { tag: "区间内", gap: `本场${val.toFixed(2)} 在${band[0]}–${band[2]}` };
   };
   // 7 列(与底部历史总表同宽);列头只在顶部出现一次,配合冻结窗格——区块用 ━━ 分隔,各行对齐顶部列头。
-  const colHeader = ["玩法/盘口", "本场真实赔率", "历史正常区间(数字)", "落点深浅", "差临界(数字)", "解读", "数据标签"];
+  const colHeader = ["玩法/盘口", "本场真实赔率", "历史正常区间(数字)", "落点深浅", "离临界还差多少", "大白话解读", "数据标签"];
   const SEP = (txt) => [txt, "", "", "", "", "", ""];   // 区段标题行:补满 7 列(首列承载文本)
   const out = [[banner], colHeader];
 
@@ -1065,7 +1069,7 @@ export function buildOddsValueSheet({ date, rows }) {
 //   本场读数 + 历史/OOS依据 + 信号方向 + 对玩法的提示)。信号源=diagnoseUpsetRisk/analyzeUpsetTrap/
 //   analyzeTotalsMovement/经验库,全部回测/OOS 验证过(见各模块注),诚实 caveat 保留,不替用户弃赛。
 export function buildUpsetAnalysisSheet({ date, rows }) {
-  const banner = `🎲 爆冷研判 · ${date} · ①排行榜按热门不胜%降序(越高越易冷)②逐场细胞级因子分解。爆冷锚=热门1X2不胜的市场共识概率(最诚实);辅以实力差Elo/让球线深浅(vs同实力档中位)/大小球进球预期/平局隐含(OOS最干净·≥30%→实际31.5%)/大小球走势(唯一z>4真edge:加注→大球63%·退烧→小球44%)/历史同档爆冷率(12458场真赛果)。盘口1X2走势对爆冷=噪声(回测证)仅描述不升档。盘口只上调风险非必爆(瑞典5-1反例),证伪只标注·买不买你定。`;
+  const banner = `🎲 爆冷研判 · ${date} · ①排行榜按热门不胜%降序(越高越易冷)②逐场细胞级因子分解。爆冷锚=热门1X2不胜的市场共识概率(最诚实);辅以实力差Elo/让球线深浅(vs同实力档中位)/大小球进球预期/平局隐含(OOS最干净·≥30%→实际31.5%)/大小球走势(唯一z>4真edge:加注→大球63%·退烧→小球44%)/历史同档爆冷率(12458场真赛果)。盘口1X2走势对爆冷=噪声(回测证)仅描述不升档。盘口只上调风险非必爆(瑞典5-1反例),证伪只标注风险。`;
   const pc = (x) => (x == null || !Number.isFinite(Number(x)) ? "—" : Math.round(Number(x) * 100) + "%");
   const isModelOf = (r) => /模型/.test(String(r.favProbSource ?? ""));
   const eloCellOf = (r) => Number.isFinite(r.eloDiff) ? `${r.eloDiff > 0 ? "+" : ""}${r.eloDiff}${r.eloDiff > 0 ? "(主强)" : r.eloDiff < 0 ? "(客强)" : "(均势)"}` : "—";
@@ -1379,7 +1383,7 @@ export function renderParlayHtmlSection(plan, { compact = false } = {}) {
   const rows = plan.tiers.flatMap((t) => t.combos.map((c) =>
     `<tr><td>${esc2(t.tier)}</td><td>${c.legs.map((l, i) => `${CIRC[i] ?? i + 1}${esc2(l.match)}<br>买「<b>${esc2(l.sel)}</b>」@${l.odds}<span style="color:#9aa6b4">【${esc2(l.market)}·${Math.round(l.probMkt * 100)}%】</span>`).join("<hr style='border:none;border-top:1px dashed #ddd;margin:3px 0'>")}</td><td><b>${c.odds}</b></td><td><b>${Math.round(c.odds * 100)}元</b><br><span style="color:#9aa6b4">净+${Math.round(c.odds * 100) - 100}</span></td><td>${esc2(parlayPct(c.probMkt))}${c.probModel != null ? `<br><span style="color:#9aa6b4">模型${esc2(parlayPct(c.probModel))}</span>` : ""}</td></tr>`)).join("");
   return `<h2 style="font-size:15px;margin:16px 4px 6px;color:#4A148C">🔗 串关推荐(混合过关·全${legsN}串1·每注100元)</h2>
-<div class="note" style="font-size:11.5px">同场只能选一个玩法入串(竞彩规则)。串赔=✅500实测乘积;可中=串赔×100元含本金;概率=🔶de-vig×独立假设;串关EV恒负(双重抽水),数学期望劣于单注——只给搭法,买不买你定。${compact ? "" : "完整期望回收/说明列见 xlsx「串关推荐」表。"}</div>
+<div class="note" style="font-size:11.5px">同场只能选一个玩法入串(竞彩规则)。串赔=✅500实测乘积;可中=串赔×100元含本金;概率=🔶de-vig×独立假设;串关EV恒负(双重抽水),数学期望劣于单注——只给搭法参考。${compact ? "" : "完整期望回收/说明列见 xlsx「串关推荐」表。"}</div>
 <table${compact ? ` class="core" style="font-size:12px"` : ""}><tr><th>档位</th><th>搭法(${legsN}串1)</th><th>串赔✅</th><th>100元可中✅</th><th>联合概率🔶</th></tr>${rows}</table>`;
 }
 
@@ -1569,9 +1573,33 @@ export function buildAnomalyRadar(r) {
   const how = buyAdvice(r);
   const topFlags = factors.filter((f) => f.sev !== "🟢").slice(0, 3).map((f) => `${f.sev}${f.cat}`).join(" ");
   const call = directCall(r);
-  // 主表「综合研判」格:≤2行——①直接研判(看好X·比分Y) ②信心+怎么买(长文下沉「研判详情」sheet)
-  const short = `🎯${call}\n信心${tier}${conf != null ? `(${conf})` : ""}·${how}`;
-  return { dir, tier, conf, factors, how, call, short };
+  const upset = upsetOutcome(r);
+  // 综合研判格(2026-06-21 用户:别孤立解读·要把爆冷研判+盘口合理性+异动汇总进来再给推荐):
+  //   ①直接研判(看好X·比分Y) ②关键依据=排序后真实因子(庄家意图/盘口深浅/爆冷/平局,最多2条) ③若爆冷会怎样 ④怎么打。
+  const keyDrivers = factors.filter((f) => f.sev !== "🟢").slice(0, 2).map((f) => `${f.sev}${f.cat}:${f.text}`).join("\n");
+  const short = `🎯${call}`
+    + (keyDrivers ? `\n📊关键依据:\n${keyDrivers}` : `\n📊盘口平稳·无显著异动`)
+    + (upset ? `\n🎲若爆冷:${upset}` : "")
+    + `\n👉怎么打:信心${tier}${conf != null ? `(${conf})` : ""}·${how}`;
+  return { dir, tier, conf, factors, how, call, short, upset };
+}
+
+// 若爆冷会出现什么结果(2026-06-21 用户:研判要说"出现爆冷可能会出现什么结果"这种实际内容)。
+//   全用真值:真盘最可能平局格(✅500 de-vig)+ 冷门方向 + 爆冷机理;无则只给方向不编比分。
+export function upsetOutcome(r) {
+  const dirM = String(r.wld || r.primary?.text || "").match(/(主胜|平局|客胜)/);
+  const fav = dirM ? dirM[1] : null;
+  const cold = fav === "主胜" ? "客队偷分(平或客胜)" : fav === "客胜" ? "主队偷分(平或主胜)" : null;
+  const drawScore = r.upsetMarketDraw?.score || null;
+  const drawPct = r.drawImpliedPct != null ? Math.round(r.drawImpliedPct * 100) : null;
+  const lvl = r.upset?.level;
+  if (!cold && !drawScore && lvl == null) return null;
+  const bits = [];
+  if (drawScore) bits.push(`最可能踢成平局 ${drawScore}`);
+  else if (drawPct != null && drawPct >= 28) bits.push(`平局概率 ${drawPct}%`);
+  if (cold) bits.push(cold);
+  if (lvl === "高") bits.push("爆冷风险高");
+  return bits.length ? bits.join("、") : null;
 }
 
 export function synthesisCell(r) { return buildAnomalyRadar(r).short; }
@@ -1582,17 +1610,17 @@ export function buildRadarDetailSheet({ date, rows }) {
   const UPSET = new Set(["爆冷高", "爆冷", "爆冷分型", "平局风险"]);
   const RISK = new Set(["盘口体检", "模型分歧", "对抗证伪", "阵容/伤病/红牌", "阵容"]);
   const fmt = (fs) => fs.length ? fs.map((f) => `${f.sev}${f.tag}〔${f.cat}〕${f.text}`).join("\n") : "—";
-  const headers = ["#", "对阵(赛事)", "🎯直接研判(严密分析后·看好X方向·比分Y)", "🔴🟡风险点(按严重度排序)", "📊盘口异动·庄家意图·大小球走势", "🎲爆冷机理·平局风险", "🎯怎么买(你定)", "🔎web核查情报"];
+  const headers = ["#", "对阵(赛事)", "🎯我的判断(看好X方向·比分Y)", "🔴🟡风险点(按严重度排序)", "📊盘口异动·庄家意图·大小球走势", "🎲爆冷机理·平局风险", "🎲若爆冷会怎样(具体结果)", "🔎web核查情报"];
   const body = rows.map((r) => {
     const rad = buildAnomalyRadar(r);
     return [String(r.idx), `${r.match}(${r.comp})`, `🎯${rad.call}\n〔盘口主推${rad.dir}·信心${rad.tier}(${rad.conf ?? "—"})〕`,
       fmt(rad.factors.filter((f) => RISK.has(f.cat))),
       fmt(rad.factors.filter((f) => MOVE.has(f.cat))),
       fmt(rad.factors.filter((f) => UPSET.has(f.cat))),
-      rad.how, r.liveCheck?.keyIntel || "—"];
+      rad.upset || "盘口稳·爆冷信号不强", r.liveCheck?.keyIntel || "—"];
   });
-  const title = `🎯 研判详情 · 异动雷达(所有数据/赔率/盘口/大小球异动 + 软信息观察 大融合) · ${date}`;
-  const honest = "⚠️诚实边界:方向恒=盘口主推(市场为锚),雷达只做风险/异动观察、绝不改1X2概率方向。公开盘口打不过收盘线、模型本质市场跟随器;阵容/伤病/红牌/战意为「展示不进概率」(回测证软信号灌1X2为净负)。买不买/买多少你定。";
+  const title = `🎯 研判详情 · 把盘口异动+庄家意图+大小球走势+爆冷机理+盘口合理性 全汇总到一处 · ${date}`;
+  const honest = "⚠️怎么看:方向跟盘口主推(市场最准·公开盘打不过收盘线、模型只是跟随器);这张表把每场的资金异动、盘口深浅、爆冷机理、平局风险全列出来,让你一眼看清这场稳不稳、哪里有雷。阵容/伤病/红牌只摆出来看,不进概率(灌进去反而更差·回测证)。";
   return { name: "研判详情", rows: [[title], [honest], headers, ...body] };
 }
 
@@ -1626,7 +1654,8 @@ function radarBlockHtml(r) {
   if (!rad.factors.length) return `<div class="drow radar"><b>🎯异动雷达</b>盘口各维度落常态区间·无突出异动<div class="rbuy">买法:${esc(rad.how)}</div></div>`;
   // 不截断:因子本就少且都是短句;尤其大小球走势(唯一z>4真edge)severity为🟢若截断会丢失,必须全显
   const fs = rad.factors.map((f) => `<div class="rf">${f.sev} <b>${esc(f.cat)}</b> <span class="rtag">${esc(f.tag)}</span> ${esc(f.text)}</div>`).join("");
-  return `<div class="drow radar"><b>🎯异动雷达·综合研判(方向恒=盘口主推·只标风险不改概率)</b>${fs}<div class="rbuy">🎯买法:${esc(rad.how)}(下不下注你定)</div></div>`;
+  const upsetLine = rad.upset ? `<div class="rbuy">🎲若爆冷:${esc(rad.upset)}</div>` : "";
+  return `<div class="drow radar"><b>🎯异动雷达·综合研判(方向跟盘口主推·只标风险不改概率)</b>${fs}${upsetLine}<div class="rbuy">🎯怎么打:${esc(rad.how)}</div></div>`;
 }
 
 // ── 手机页(核心7列 + 点行展开全部;2026-06-09 用户选定专业版,绝不简化) ──
@@ -1634,7 +1663,7 @@ export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, 
   // 头条副标题=逐赔种真计数(buildCoverageSubtitle 内部 fail-loud:counts 缺/非法直接 throw,绝不默认自吹"全覆盖")。
   const coverageSub = buildCoverageSubtitle(counts);
   // 降级句(buildDegradeNote 产物)进手机页头条 risk 块——与 xlsx banner 同口径,头条不再只有平局/硬币档提示。
-  const riskBody = [degradeNote, riskNote || "模型只给信心+风险参考,买不买你定。"].filter(Boolean).map((s) => esc(s)).join("<br>");
+  const riskBody = [degradeNote, riskNote || "只给信心+风险提示,方向以盘口为准。"].filter(Boolean).map((s) => esc(s)).join("<br>");
   const br = (s) => esc(s).replace(/\n/g, "<br>");
   const detail = (r) => radarBlockHtml(r) + (r.primary ? `<div class="drow"><b>🎯盘口主推</b>${esc(r.primary.text)}<br><span class="g">${esc(r.primary.ref)}</span></div>` : "") +
     (r.wcLine ? `<div class="drow"><b>🏆赛会</b>${esc(r.wcLine)}</div>` : "") +
@@ -1655,9 +1684,9 @@ export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, 
     `<div class="drow"><b>近5</b>${esc(r.homeRec)} <span class="g">${esc(r.homeLast5)}</span><br><span class="ind">${esc(r.awayRec)} <span class="g">${esc(r.awayLast5)}</span></span></div>` +
     `<div class="drow"><b>H2H</b>${esc(r.h2h)}</div>` +
     `<div class="drow"><b>攻防</b>${esc(r.profile)}</div>` +
-    (r.stake ? `<div class="drow"><b>💰建议注金🔶</b>${esc(r.stake.text)}<span class="g">(分层口径建议,买不买你定)</span></div>` : "") +
+    (r.stake ? `<div class="drow"><b>💰建议注金🔶</b>${esc(r.stake.text)}<span class="g">(分层建议)</span></div>` : "") +
     (r.parlay ? `<div class="drow"><b>串关</b>${esc(r.parlay.text)}</div>` : "") +
-    (r.adv ? `<div class="adv"><b>${esc(r.adv.label)}${r.adv.ev != null ? ` · EV=${r.adv.ev}` : ""}</b><br>${esc(r.adv.kill)}<br><span class="g">三视角对抗证伪·只标注不弃赛,下不下你定</span></div>` : "");
+    (r.adv ? `<div class="adv"><b>${esc(r.adv.label)}${r.adv.ev != null ? ` · EV=${r.adv.ev}` : ""}</b><br>${esc(r.adv.kill)}<br><span class="g">三视角对抗证伪·只标注风险</span></div>` : "");
   const trs = rows.map((r) => `<tr class="r" onclick="tg(this)"><td class="m">${esc(r.match)}${r.adv && /证伪/.test(r.adv.label) ? ' <span class="kx">🔴</span>' : ""} <span class="ar">▾</span><i>${esc(r.ko)} · ${esc(r.comp)}</i></td><td><span class="b" style="background:${tierColor(r.tier)}">${Math.round(r.conf)}</span>${r.stake ? `<span class="stk">💰${r.stake.stake}</span>` : ""}</td><td>${esc(wldS(r.wld))}</td><td>${esc(r.hcP.line)}</td><td>${esc(scoreS(r.score))}</td><td>${esc(hfS(r.halffull))}</td><td>${esc(ouS(r.ouReal))}</td></tr><tr class="d"><td colspan="7">${detail(r)}</td></tr>`).join("");
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>神选·竞彩·${date}</title>
 <style>*{box-sizing:border-box}body{font-family:-apple-system,"Microsoft YaHei",system-ui,sans-serif;margin:0;background:#eef1f5;color:#1c2530;-webkit-text-size-adjust:100%}.wrap{max-width:720px;margin:0 auto;padding:14px 10px 40px}
@@ -1732,6 +1761,6 @@ ${stakeSum ? `<div class="note" style="border-color:#7b1fa2;background:#f3e5f5">
 <table><tr><th>开赛</th><th>对阵</th><th>胜负平</th><th>让球真实裁决</th><th>让球(模型vs市场)</th><th>比分</th><th>半全场</th><th>大小球</th><th>信心</th><th>💰注金🔶</th><th>串关</th></tr>${trs}</table>
 ${renderParlayHtmlSection(parlayPlan)}
 <a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(20列·含对抗证伪)</a>
-<div class="foot">本页与 手机页/桌面 xlsx 同一渲染出口(today-full-coverage)生成 · 真实端到端(${date})。${esc(auditFoot)}模型只给信心+风险,买不买由你决定。</div>
+<div class="foot">本页与 手机页/桌面 xlsx 同一渲染出口(today-full-coverage)生成 · 真实端到端(${date})。${esc(auditFoot)}</div>
 </div></body></html>`;
 }

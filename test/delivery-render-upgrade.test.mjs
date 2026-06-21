@@ -107,7 +107,7 @@ test("parlaySafety:硬币场/证伪场=⛔;一二档+非高风险+未证伪=🟢
   const y3 = parlaySafety({ tier: "🟢一档", risk: "低", advLabel: "" });
   assert.equal(y3.grade, "🟡", "未审计≠通过,降🟡");
   assert.match(y3.text, /证伪未覆盖/);
-  assert.match(PARLAY_ORDER_NOTE, /🟢串关候选.*🟡谨慎.*⛔串关排除/);
+  assert.match(PARLAY_ORDER_NOTE, /🟢可串.*🟡谨慎.*⛔别串/);
 });
 
 // ── ④a H2H 渲染(本地49k历史库新结构 + 零交锋⚠️ + 旧数组兼容) ──

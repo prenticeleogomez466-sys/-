@@ -494,15 +494,15 @@ const rows = games.map((p, i) => {
       hcp: s.handicapOdds?.current ?? null,                                    // 让球胜负平(竞彩让球后){home,draw,away}
       hcpInit: s.handicapOdds?.initial ?? null,                               // 让球初盘
       jcLine: s.jingcaiHandicap?.line ?? null,                                 // 竞彩官方让球线
-      ahLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null,   // 亚盘让球线(即时,缺=未抓到)
-      ahLineInit: s.asianHandicap?.initial?.line ?? null,                      // 亚盘初盘线(线移动)
-      ahHomeWater: s.asianHandicap?.current?.homeWater ?? s.asianHandicap?.initial?.homeWater ?? null, // 亚盘主水(即时)
-      ahAwayWater: s.asianHandicap?.current?.awayWater ?? s.asianHandicap?.initial?.awayWater ?? null, // 亚盘客水(即时)
-      ahHomeWaterInit: s.asianHandicap?.initial?.homeWater ?? null,            // 亚盘主水初盘(水位移动)
-      ahAwayWaterInit: s.asianHandicap?.initial?.awayWater ?? null,            // 亚盘客水初盘
+      ahLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? c?.asianHandicap?.titan007?.live?.line ?? c?.asianHandicap?.dk?.line ?? c?.espnOdds?.asian?.line ?? null,   // 亚盘让球线(即时,缺=回退coverage真盘)
+      ahLineInit: s.asianHandicap?.initial?.line ?? c?.asianHandicap?.titan007?.init?.line ?? c?.asianHandicap?.dk?.openLine ?? c?.espnOdds?.asian?.openLine ?? null,                      // 亚盘初盘线(线移动)
+      ahHomeWater: s.asianHandicap?.current?.homeWater ?? s.asianHandicap?.initial?.homeWater ?? c?.asianHandicap?.titan007?.live?.homeWater ?? c?.asianHandicap?.dk?.homeOdds ?? c?.espnOdds?.asian?.homeOdds ?? null, // 亚盘主水(回退DK/titan007/ESPN真盘)
+      ahAwayWater: s.asianHandicap?.current?.awayWater ?? s.asianHandicap?.initial?.awayWater ?? c?.asianHandicap?.titan007?.live?.awayWater ?? c?.asianHandicap?.dk?.awayOdds ?? c?.espnOdds?.asian?.awayOdds ?? null, // 亚盘客水(回退DK/titan007/ESPN真盘)
+      ahHomeWaterInit: s.asianHandicap?.initial?.homeWater ?? c?.asianHandicap?.titan007?.init?.homeWater ?? null,            // 亚盘主水初盘(水位移动)
+      ahAwayWaterInit: s.asianHandicap?.initial?.awayWater ?? c?.asianHandicap?.titan007?.init?.awayWater ?? null,            // 亚盘客水初盘
       // 强度锚=亚盘线优先,缺则竞彩让球线兜底(供 europeanBand/区间锚;非显示用)
-      anchorLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? s.jingcaiHandicap?.line ?? null,
-      anchorIsAsian: (s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line) != null,
+      anchorLine: s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? c?.asianHandicap?.titan007?.live?.line ?? c?.asianHandicap?.dk?.line ?? c?.espnOdds?.asian?.line ?? s.jingcaiHandicap?.line ?? null,
+      anchorIsAsian: (s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? c?.asianHandicap?.titan007?.live?.line ?? c?.asianHandicap?.dk?.line ?? c?.espnOdds?.asian?.line) != null,
       over25: s.totalGoalsOdds?.over25 ?? null,                                // 大2.5隐含(de-vig)
       under25: s.totalGoalsOdds?.under25 ?? null,                              // 小2.5隐含
       over25Init: s.totalGoalsOdds?.initialOver25 ?? null,                     // 大球初盘隐含(若有)
