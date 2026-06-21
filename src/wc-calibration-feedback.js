@@ -156,6 +156,12 @@ export function applyWcCalibration(probabilities, profile, opts = {}) {
     return { probabilities: normalized, applied: false, reason: "drift-block", drift: +drift.toFixed(4) };
   }
   const calibrated = moveFavorite(normalized, fav.key, target);
+  // argmax 保持守护(2026-06-21):校准只修概率幅度,绝不改方向。若把 favorite 拉低后次选反超
+  //   (临界热门带强次选的边界场),方向翻转会破坏下游让球/比分锚定(四者同向铁律)→ 该场 bypass。
+  //   实测 06-21 真实12场零触发;此为边界场robustness硬化(synthetic 0.9/0.1极端split才触发)。
+  if (favoriteOf(calibrated).key !== fav.key) {
+    return { probabilities: normalized, applied: false, reason: "argmax-flip-block", drift: +drift.toFixed(4) };
+  }
   return {
     probabilities: calibrated,
     applied: true,

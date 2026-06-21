@@ -77,6 +77,16 @@ test("正常应用:小幅校准生效且归一", () => {
   assert.ok(Math.abs(sum - 1) < 1e-9);
 });
 
+test("argmax 保持守护:校准把 favorite 拉低后次选反超 → bypass 不改方向(四者同向)", () => {
+  // 人造 profile:把任何概率映射到 0.40(把 0.55 的 favorite 拉低 0.15,刚到 block 边界内)
+  const profile = { usable: true, samples: 99, isotonicMap: { knots: [{ predictedMin: 0, predictedMax: 1, calibrated: 0.40 }], samples: 99 } };
+  // draw 是 favorite(0.55),home 强次选(0.43)→ 拉低 draw 后 home 反超
+  const out = applyWcCalibration({ home: 0.43, draw: 0.55, away: 0.02 }, profile, { maxDriftBlock: 0.2 });
+  assert.equal(out.applied, false);
+  assert.equal(out.reason, "argmax-flip-block");
+  assert.equal(out.probabilities.draw, 0.55); // 原值不动
+});
+
 // ── 2026-06-21 加载器契约:从 ledger 文件读已结算行构建档(对象/数组两种结构) ──
 test("loadWcCalibrationProfile:从 ledger(对象结构)读够样本 → usable:true", () => {
   const dir = mkdtempSync(join(tmpdir(), "wccal-"));
