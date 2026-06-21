@@ -13,7 +13,7 @@ import { analyzeAsianHandicapWater } from "./asian-handicap-water.js";
 import { buildBankrollRisk } from "./bankroll-risk.js";
 import { calibrateProbabilities, loadCalibrationProfile } from "./model-calibration.js";
 import { applyWcCalibration, loadWcCalibrationProfile } from "./wc-calibration-feedback.js";
-import { loadModelMemory, recallSegmentPerformance } from "./model-memory.js";
+import { loadModelMemory, buildModelMemoryFromLedger, recallSegmentPerformance } from "./model-memory.js";
 import { loadNationalElo, nationalEloFor, eloToLambdas } from "./national-elo-source.js";
 import { fitFromFixtureStore, predictFromFitted, blendWithOdds } from "./dixon-coles-engine.js";
 import { buildEnsemblePrediction } from "./ratings-ensemble.js";
@@ -103,7 +103,9 @@ export function recommendFixtures(date) {
   //   故在此装配:gate(<50)未过/缺文件→usable:false→仍 bypass(零行为变化);够样本自动激活。仅 WC 路由场生效。
   const wcCalibrationProfile = loadWcCalibrationProfile();
   // 永久记忆(2026-06-01):模型分段真实战绩,用时召回给推荐附"本类历史命中率"。盘上无则 null,优雅降级。
-  const modelMemory = loadModelMemory();
+  //   2026-06-21 接线修复:此前无代码写 model-memory.json → loadModelMemory 恒 null → 标注静默失效。
+  //   改为优先实时从 ledger digest(永不陈旧);保留 loadModelMemory 作显式快照覆盖路径。
+  const modelMemory = loadModelMemory() ?? buildModelMemoryFromLedger();
   // 国家队 Elo(2026-06-01):历史库无国家队时的模型先验源,盘上无则 null(优雅降级)。
   const nationalElo = loadNationalElo();
   // 全量历史拟合(2026-05-31):放开默认 120 天上限,吃满 34k+ 场/37 联赛/762 队语料,

@@ -138,3 +138,26 @@ export function loadModelMemory(path) {
     return null;
   }
 }
+
+/**
+ * 从 recommendation-ledger.json 实时 digest model-memory(2026-06-21 接线)。
+ *   背景:buildModelMemory 此前从未被生产调用 + 无任何代码写 model-memory.json →
+ *     loadModelMemory 恒 null → 推荐的"本类历史命中率"标注(memoryRecall)静默失效。
+ *   改为实时从 ledger 构建(纯 digest ~1ms,永不陈旧),与 wc-calibration loadWcCalibrationProfile 同型。
+ *   recallSegmentPerformance 内部已诚实 gate(样本<minN→sufficient:false 不外推);纯展示,不改概率。
+ *   缺文件/解析失败 → null(优雅降级,标注消失但不报错),绝不兜底假数据。
+ * @param {{path?:string, builtAt?:string}} opts
+ * @returns {object|null} buildModelMemory 产物
+ */
+export function buildModelMemoryFromLedger(opts = {}) {
+  try {
+    const p = opts.path ?? join(getExportDir(), "recommendation-ledger.json");
+    if (!existsSync(p)) return null;
+    const raw = JSON.parse(readFileSync(p, "utf8"));
+    const rows = Array.isArray(raw) ? raw : Object.values(raw || {});
+    const mem = buildModelMemory(rows, { builtAt: opts.builtAt ?? null });
+    return mem.settledTotal > 0 ? mem : null;
+  } catch {
+    return null;
+  }
+}

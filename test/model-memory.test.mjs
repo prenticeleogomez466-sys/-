@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildModelMemory, recallSegmentPerformance, favoriteTierFromProbs, confidenceBand } from "../src/model-memory.js";
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { buildModelMemory, buildModelMemoryFromLedger, recallSegmentPerformance, favoriteTierFromProbs, confidenceBand } from "../src/model-memory.js";
 
 function row(over = {}) {
   return {
@@ -58,5 +62,40 @@ describe("永久记忆 model-memory", () => {
     const m = buildModelMemory([]);
     assert.equal(m.settledTotal, 0);
     assert.equal(m.global.wldHit, null);
+  });
+});
+
+// ── 2026-06-21 接线:buildModelMemoryFromLedger 实时 digest(此前无代码写 model-memory.json→标注静默失效) ──
+describe("model-memory 实时 ledger 接线(2026-06-21)", () => {
+  it("buildModelMemoryFromLedger:从对象结构 ledger 实时 digest", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mmem-"));
+    try {
+      // ledger 真实结构=对象({0:row,...})
+      const obj = {};
+      for (let i = 0; i < 8; i++) obj[i] = row({ hit: i % 2 === 0, competition: "世界杯" });
+      const p = join(dir, "recommendation-ledger.json");
+      writeFileSync(p, JSON.stringify(obj));
+      const m = buildModelMemoryFromLedger({ path: p });
+      assert.equal(m.settledTotal, 8);
+      assert.ok(m.byLeague["世界杯"]);
+      assert.equal(m.byLeague["世界杯"].n, 8);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("buildModelMemoryFromLedger:缺文件/零结算 → null(优雅降级,绝不兜底)", () => {
+    assert.equal(buildModelMemoryFromLedger({ path: join(tmpdir(), "no-ledger-xyz.json") }), null);
+    const dir = mkdtempSync(join(tmpdir(), "mmem2-"));
+    try {
+      const p = join(dir, "recommendation-ledger.json");
+      writeFileSync(p, JSON.stringify({ 0: { competition: "X", hit: null } })); // 无已结算
+      assert.equal(buildModelMemoryFromLedger({ path: p }), null);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("接线守护:recommendFixtures 用 buildModelMemoryFromLedger 兜住缺 model-memory.json(防标注再死)", () => {
+    const enginePath = fileURLToPath(new URL("../src/prediction-engine.js", import.meta.url));
+    const src = readFileSync(enginePath, "utf8");
+    assert.match(src, /buildModelMemoryFromLedger/, "须 import+调用 buildModelMemoryFromLedger");
+    assert.match(src, /loadModelMemory\(\)\s*\?\?\s*buildModelMemoryFromLedger\(/, "缺持久档时须实时 digest 兜底");
   });
 });
