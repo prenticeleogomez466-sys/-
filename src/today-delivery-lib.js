@@ -1140,7 +1140,9 @@ export function buildComboTriggerSheet({ date, rows }) {
     const useEspn = !valid(so.euro) && valid(so.euroEspn);
     const euClose = valid(so.euro) ? so.euro : (useEspn ? so.euroEspn : null);
     const euOpen = valid(so.euro) ? so.euroInit : null;
-    const t = euClose ? comboTriggers({ euClose, euOpen, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null }) : null;
+    const t = euClose ? comboTriggers({ euClose, euOpen, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null,
+      ouClose: so.over25, ouOpen: so.over25Init,
+      waterHomeClose: so.ahHomeWater, waterHomeOpen: so.ahHomeWaterInit, waterAwayClose: so.ahAwayWater, waterAwayOpen: so.ahAwayWaterInit }) : null;
     if (!t) { out.push([r.match, "⚠️欧赔+ESPN盘均未抓到(缺不编)", "引擎不触发→看主表方向", buyScoreOf(r.msv), buyHfOf(r.mhv), "—"]); continue; }
     const f = t.features;
     const strong = t.triggers.filter((x) => x.tier === "高" || x.tier === "中");

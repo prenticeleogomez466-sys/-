@@ -3,6 +3,31 @@ import test from "node:test";
 import { comboTriggers, comboFeatures, parseLine, RULES } from "../src/combo-triggers.js";
 import { buildComboTriggerSheet } from "../src/today-delivery-lib.js";
 
+test("初→终movement信号(2026-06-22 scan-all-movements过测):大小球走势/让球线/水位叠加触发+dynPredict解析热门方向", () => {
+  // 主队热门 + 大球盘加注(0.52→0.60) + 让球线加深(-0.5→-1) + 1X2加注(收盘热门隐含↑) + 水位压主队
+  const t = comboTriggers({ euClose: { home: 1.6, draw: 3.8, away: 5.5 }, euOpen: { home: 1.7, draw: 3.7, away: 5.0 },
+    ahLineClose: "-1", ahLineOpen: "-0.5", ouClose: 0.60, ouOpen: 0.52,
+    waterHomeClose: 0.85, waterHomeOpen: 0.95, waterAwayClose: 1.0, waterAwayOpen: 0.95 });
+  const ids = t.triggers.map((x) => x.id);
+  assert.ok(ids.includes("大球盘加注→大球"), "大小球初→终走势规律须触发");
+  assert.ok(ids.includes("1X2加注+大球加注→大球"), "1X2+大小球双加注交叉须触发");
+  assert.ok(ids.includes("让球线加深→热门"), "让球线初→终走势须触发");
+  // dynPredict:主队热门→预测应为主胜(非静态占位)
+  const lineRule = t.triggers.find((x) => x.id === "让球线加深→热门");
+  assert.equal(lineRule.predict, "主胜");
+  // 客队热门时 dynPredict 应翻成客胜
+  const t2 = comboTriggers({ euClose: { home: 5.5, draw: 3.8, away: 1.6 }, euOpen: { home: 5.0, draw: 3.7, away: 1.7 }, ahLineClose: "1", ahLineOpen: "0.5" });
+  const lineRule2 = t2.triggers.find((x) => x.id === "让球线加深→热门");
+  assert.equal(lineRule2?.predict, "客胜");
+});
+
+test("movement信号缺初盘→诚实不触发(大小球/水位无开盘价时)", () => {
+  const t = comboTriggers({ euClose: { home: 1.6, draw: 3.8, away: 5.5 }, ouClose: 0.60 }); // 无 ouOpen/euOpen/water
+  const ids = t.triggers.map((x) => x.id);
+  assert.ok(!ids.includes("大球盘加注→大球"), "缺大球初盘→不触发(诚实)");
+  assert.ok(!ids.includes("1X2加注+大球加注→大球"), "缺1X2初盘→drift无法判→不触发");
+});
+
 test("parseLine 解析单值与分盘字符串", () => {
   assert.equal(parseLine(-0.75), -0.75);
   assert.equal(parseLine("-0.5/1"), -0.75); // (0.5+1)/2 带负号

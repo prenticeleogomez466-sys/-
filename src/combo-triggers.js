@@ -48,7 +48,14 @@ export function comboFeatures(m) {
   const lineC = parseLine(m.ahLineClose), lineO = parseLine(m.ahLineOpen);
   const ahAbs = lineC === null ? null : Math.abs(lineC);
   const lineMove = lineC !== null && lineO !== null ? Math.abs(lineC) - Math.abs(lineO) : null;
-  return { favHome, favSide, favOdds, dogOdds, drawOdds, favDrift, ahAbs, lineC, lineMove,
+  // 大小球初→终走势(over隐含 0-1):>0 大球盘被加注 <0 退烧(2026-06-22 scan-all-movements 回测过测)
+  const ouC = Number(m.ouClose), ouO = Number(m.ouOpen);
+  const ouDrift = Number.isFinite(ouC) && Number.isFinite(ouO) ? ouC - ouO : null;
+  // 亚盘水位初→终:钱压哪侧过盘。waterToFav<0=钱压热门过盘(热门水位下降)。单独是噪声,叠加1X2加注才有效。
+  const wHC = Number(m.waterHomeClose), wHO = Number(m.waterHomeOpen), wAC = Number(m.waterAwayClose), wAO = Number(m.waterAwayOpen);
+  const waterMove = [wHC, wHO, wAC, wAO].every(Number.isFinite) ? (wHC - wHO) - (wAC - wAO) : null; // <0 主水降(钱压主) >0 客
+  const waterToFav = waterMove === null ? null : (favHome ? waterMove : -waterMove); // <0 钱压热门过盘
+  return { favHome, favSide, favOdds, dogOdds, drawOdds, favDrift, ahAbs, lineC, lineMove, ouDrift, waterMove, waterToFav,
     drift: favDrift === null ? null : favDrift > 0.02 ? "加注" : favDrift < -0.02 ? "退烧" : "平稳" };
 }
 
@@ -90,6 +97,23 @@ export const RULES = [
     fire: (f) => f.ahAbs !== null && f.ahAbs >= 0.875 && f.ahAbs < 1.125 && f.drawOdds >= 4.0 && f.dogOdds >= 6.5, why: "让1球+平赔>4+负赔>6.5(用户:重热门盘平局轻微被低估·方差大仅倾向)" },
   { id: "让0.25中庸盘→倾向平", market: "胜平负", predict: "平局倾向", tier: "倾向", by: "盘口让球线+欧赔三门", hit: { tr: 0.293, te: 0.293, n: 532 }, base: 0.252, src: "用户规则",
     fire: (f) => f.ahAbs !== null && f.ahAbs >= 0.125 && f.ahAbs < 0.375 && f.favOdds >= 2.1 && f.favOdds <= 2.45 && f.drawOdds >= 3.05 && f.drawOdds <= 3.75 && f.dogOdds >= 3.0 && f.dogOdds <= 3.25, why: "让0.25+三门赔率中庸(用户:易平·实测平29%略高基线)" },
+
+  // ===== ④ 初→终 盘口移动(2026-06-22 scan-all-movements 回测·leak-safe 45788场·TRAIN&TEST同号过测) =====
+  //   dynPredict=true → 热门方向(主/客胜按盘口)。base=TEST基线(大球52.4%/热门51.8%)。
+  { id: "大球盘加注→大球", market: "大小球", predict: "大球", tier: "高", by: "大小球·初→终走势", hit: { tr: 0.592, te: 0.599, n: 1505 }, base: 0.524, src: "盘口走势",
+    fire: (f) => f.ouDrift != null && f.ouDrift >= 0.03, why: "大球盘从初盘到收盘被加注(over隐含↑≥3%)→偏大球" },
+  { id: "大球盘退烧→小球", market: "大小球", predict: "小球", tier: "中", by: "大小球·初→终走势", hit: { tr: 0.563, te: 0.534, n: 1448 }, base: 0.476, src: "盘口走势",
+    fire: (f) => f.ouDrift != null && f.ouDrift <= -0.03, why: "大球盘从初盘到收盘退烧(over隐含↓≥3%)→偏小球" },
+  { id: "让球线加深→热门", market: "胜平负", predict: "主胜", dynPredict: true, tier: "中", by: "盘口·让球线初→终", hit: { tr: 0.570, te: 0.556, n: 3005 }, base: 0.518, src: "盘口走势",
+    fire: (f) => f.lineMove != null && f.lineMove >= 0.25, why: "亚盘让球线从初盘到收盘加深≥0.25(强队被进一步看好)→热门方向" },
+  { id: "1X2加注+大球加注→大球", market: "大小球", predict: "大球", tier: "高", by: "1X2走势+大小球走势", hit: { tr: 0.610, te: 0.614, n: 606 }, base: 0.524, src: "盘口走势",
+    fire: (f) => f.drift === "加注" && f.ouDrift != null && f.ouDrift >= 0.03, why: "热门被加注 且 大球盘也被加注(双加注·最强大球信号)" },
+  { id: "让球线加深+大球加注→大球", market: "大小球", predict: "大球", tier: "高", by: "让球线走势+大小球走势", hit: { tr: 0.610, te: 0.610, n: 661 }, base: 0.524, src: "盘口走势",
+    fire: (f) => f.lineMove != null && f.lineMove >= 0.25 && f.ouDrift != null && f.ouDrift >= 0.03, why: "让球线加深 且 大球盘加注(强队压制+对攻→大球)" },
+  { id: "1X2加注+让球线加深→热门", market: "胜平负", predict: "主胜", dynPredict: true, tier: "中", by: "1X2走势+让球线走势", hit: { tr: 0.575, te: 0.570, n: 1729 }, base: 0.518, src: "盘口走势",
+    fire: (f) => f.drift === "加注" && f.lineMove != null && f.lineMove >= 0.25, why: "热门被加注 且 让球线加深(资金+盘口双确认热门)→热门方向" },
+  { id: "1X2加注+水位压热门→热门", market: "胜平负", predict: "主胜", dynPredict: true, tier: "中", by: "1X2走势+亚盘水位走势", hit: { tr: 0.570, te: 0.562, n: 888 }, base: 0.518, src: "盘口走势",
+    fire: (f) => f.drift === "加注" && f.waterToFav != null && f.waterToFav <= -0.06, why: "热门被加注 且 亚盘水位压向热门过盘(水位单独是噪声·叠加1X2加注才有效)→热门方向" },
 ];
 
 /**
@@ -101,7 +125,7 @@ export function comboTriggers(m) {
   if (!f) return null;
   const order = { 高: 0, 中: 1, 提醒: 2, 倾向: 3, 弱: 4 };
   const triggers = RULES.filter((r) => { try { return r.fire(f); } catch { return false; } })
-    .map((r) => ({ id: r.id, market: r.market, predict: r.predict, tier: r.tier, src: r.src, by: r.by,
+    .map((r) => ({ id: r.id, market: r.market, predict: r.dynPredict ? (f.favHome ? "主胜" : "客胜") : r.predict, tier: r.tier, src: r.src, by: r.by,
       hitRate: r.hit, lift: ((r.hit.tr + r.hit.te) / 2 - r.base), why: r.why }))
     .sort((a, b) => (order[a.tier] - order[b.tier]) || (b.hitRate.te - a.hitRate.te));
   return { features: f, triggers };
