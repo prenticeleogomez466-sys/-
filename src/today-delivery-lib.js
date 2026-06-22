@@ -17,7 +17,7 @@ import { handicapResultBand, htResultBand, teamGoalsBand, htGoalsBand, anomalyVs
 import { assessStrengthVsMarket, ppgOf } from "./strength-market-match.js";
 import { assessMatchOdds, payoutVerdict } from "./odds-value-lib.js";
 import { bookmakerIntent } from "./bookmaker-intent.js";
-import { comboTriggers } from "./combo-triggers.js";
+import { comboTriggers, RULES as COMBO_RULES } from "./combo-triggers.js";
 import { playerDisplay } from "./player-name-zh.js";
 import { formationPosture } from "./lineup-source.js";
 
@@ -1094,10 +1094,30 @@ export function buildOddsValueSheet({ date, rows }) {
 //   353真竞彩截图独立验证可迁移)。诚实:高命中≠盈利(打不过收盘线),价值=选择性出手把命中率拉到65-78%+标危险盘。
 //   全覆盖分档:每场都给;落在高命中组合→高/中信心+主推该市场;无组合→如实"普通·按主表研判"。让球过盘无高命中点(庄家做平)。
 export function buildComboTriggerSheet({ date, rows }) {
-  const banner = `🎯 交叉组合触发器 · ${date} · 把五大联赛全7赛季12458场回测出的高命中交叉组合 + 庄家意图(退烧热门=坑/加注=可靠) + 用户让球分线手感,合成一个引擎,每场自动标"触发了哪些规律·预测什么·历史命中多少·几档信心"。【诚实】高命中≠盈利(公开盘打不过收盘线),引擎价值=只在高把握组合出手把命中率从基线拉到65-78%、并标危险盘避坑;让球过盘(让胜/让平/让负)被庄家做到≈掷硬币,无高命中组合,如实不出。完整规则全表/逐场/验证见 桌面\\足球推荐\\组合触发器\\xlsx。`;
-  const header = ["对阵", "盘口主推(主表)", "触发的高/中命中组合(预测·信心·历史命中)", "避坑/倾向提醒", "数据标签"];
-  const out = [[banner], header];
+  const banner = `🎯 交叉组合触发器 · ${date} · 把五大联赛全7赛季12458场回测出的高命中交叉组合 + 庄家意图(退烧热门=坑/加注=可靠) + 用户让球分线手感合成一个引擎。【诚实】高命中≠盈利(公开盘打不过收盘线),价值=只在高把握组合出手把命中率从基线拉到65-78%、并标危险盘避坑;让球过盘被庄家做到≈掷硬币,无高命中组合如实不出。`;
   const tierIcon = { 高: "🟢高", 中: "🟡中", 提醒: "⚠️避坑", 倾向: "·倾向" };
+  const pc = (x) => `${Math.round(x * 100)}%`;
+  const out = [[banner]];
+
+  // ── 规律速查(2026-06-22 用户:补全"看到这种盘→直接买什么")——从引擎 RULES 动态生成,保持同步 ──
+  out.push(["📋 规律速查 · 看到这种盘 → 直接买什么(全7赛季12458场回测·TRAIN/TEST双稳)"]);
+  out.push(["把握", "看到这种盘(触发条件)", "→ 直接买", "历史命中", "样本N"]);
+  const order = { 高: 0, 中: 1, 提醒: 2 };
+  const cheatRules = COMBO_RULES.filter((r) => r.tier === "高" || r.tier === "中" || r.tier === "提醒")
+    .sort((a, b) => (order[a.tier] - order[b.tier]) || (b.hit.te - a.hit.te));
+  for (const r of cheatRules) {
+    const buy = r.market === "胜平负" || r.market === "大小球" ? `${r.market}·买【${r.predict}】`
+      : r.market === "可靠度" ? "该热门可作胆"
+        : r.market === "风险" ? "⚠️这热门别当胆·防爆" : `${r.market}·${r.predict}`;
+    out.push([tierIcon[r.tier], r.why, buy, pc(r.hit.te), r.hit.n]);
+  }
+  out.push(["·提醒", "亚盘让球(让胜/让平/让负)", "庄家做到≈掷硬币·无高命中点→不出(如实)", "≈50%", "—"]);
+  out.push([""]);
+
+  // ── 今日逐场落点 ──
+  out.push(["📍 今日逐场落点 · 这场触发了哪条 → 该买什么"]);
+  const header = ["对阵", "盘口主推(主表)", "👉这场怎么买(组合规律落点+原因)", "避坑/倾向提醒", "数据标签"];
+  out.push(header);
   let firedN = 0;
   for (const r of rows) {
     const so = r.sanityOdds ?? {};
@@ -1107,13 +1127,18 @@ export function buildComboTriggerSheet({ date, rows }) {
     const strong = t.triggers.filter((x) => x.tier === "高" || x.tier === "中");
     const warn = t.triggers.filter((x) => x.tier === "提醒" || x.tier === "倾向");
     if (strong.length) firedN++;
-    const strongCell = strong.length
-      ? strong.map((x) => `${tierIcon[x.tier]}[${x.market}]${x.predict}(历史命中${Math.round(x.hitRate.te * 100)}%)`).join("\n")
-      : "无高命中组合·本场普通(按主表研判)";
-    const warnCell = warn.length ? warn.map((x) => `${tierIcon[x.tier]}${x.predict}`).join("\n") : "—";
-    out.push([r.match, r.wld ?? "—", strongCell, warnCell, "✅实测组合(回测12458场+截图验证)"]);
+    // 大白话"怎么买":买玩法的→"买【X】(命中N%·因为触发条件)";可靠度/风险→提示;无→看主表
+    const buyLines = strong.map((x) => {
+      const hit = `命中${pc(x.hitRate.te)}`;
+      if (x.market === "胜平负" || x.market === "大小球") return `👉买【${x.predict}】(${hit}·因为${x.why})`;
+      if (x.market === "可靠度") return `👉主推热门偏可靠·可作胆(${hit})`;
+      return `${x.predict}(${hit})`;
+    });
+    const buyCell = buyLines.length ? buyLines.join("\n") : "本场无高把握组合 → 按主表方向研判即可(不硬凑)";
+    const warnCell = warn.length ? warn.map((x) => `${tierIcon[x.tier]}${x.predict}(${pc(x.hitRate.te)})·${x.why}`).join("\n") : "—";
+    out.push([r.match, r.wld ?? "—", buyCell, warnCell, "✅实测组合(回测12458场+截图验证)"]);
   }
-  out.push([""], [`━━ 共${rows.length}场,其中${firedN}场触发高/中命中组合。规律来源=全7赛季12458场walk-forward(TRAIN/TEST双稳)+353真竞彩截图交叉验证+庄家意图21405场。非下注edge(打不过收盘线),只标高把握/危险盘供选择性出手。`]);
+  out.push([""], [`━━ 共${rows.length}场,其中${firedN}场触发高/中命中组合。规律来源=全7赛季12458场walk-forward(TRAIN/TEST双稳)+353真竞彩截图交叉验证+庄家意图21405场。非下注edge(打不过收盘线),只标高把握/危险盘供选择性出手;无触发的场如实标"按主表研判",不硬凑。`]);
   return { name: "组合触发", rows: out };
 }
 
