@@ -278,9 +278,22 @@ export function marketScoreView(p) {
   const dir = SCORE_DIR(top[0].score);
   const sameAsWld = wld != null && dir != null ? dir === wld : null;
   const fmt = (d) => `${d.score}(${Math.round(d.probability * 100)}%)`;
-  const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500比分盘de-vig` +
-    (sameAsWld === false ? ` ⚠️与胜负平不同向:比分盘真实热门=${DIR_LABEL[dir]}方向(比分玩法按盘口热门下,胜负平玩法按方向下,两问不同)` : sameAsWld ? " ·与胜负平同向共振" : "");
-  return { fromMarket: true, dir, sameAsWld, cell, basis: "500比分盘de-vig真实众数", top };
+  // 方向一致比分(2026-06-22 修「说胜却推荐1-1」误解):比分盘里方向==胜负平、概率最高的那格——
+  //   顺胜负平方向买比分时选它,避免"看好主胜但比分给1-1"读成矛盾。
+  const sameDir = wld != null ? md.filter((d) => SCORE_DIR(d.score) === wld).sort((a, b) => b.probability - a.probability)[0] : null;
+  const wldName = wld != null ? DIR_LABEL[wld] : "?";
+  let tail;
+  if (sameAsWld === false) {
+    // 诠释清楚:单一最可能比分(可平局) ≠ 最可能结果(胜负平);两者并存不矛盾,并给顺方向比分。
+    tail = ` ｜ ⚠️不是矛盾:这是「单一最可能比分」=${top[0].score}(均势盘平局格单格最高);胜负平看好${wldName}是因为各种${wldName}比分概率加起来更大。`
+      + (sameDir ? `要顺${wldName}方向买比分→选 ${fmt(sameDir)}。` : `(盘口暂无明显${wldName}方向比分格。)`);
+  } else if (sameAsWld) {
+    tail = " ·与胜负平同向共振(主推比分方向=胜负平方向,放心顺买)";
+  } else {
+    tail = "";
+  }
+  const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500比分盘de-vig` + tail;
+  return { fromMarket: true, dir, sameAsWld, cell, basis: "500比分盘de-vig真实众数", top, sameDirScore: sameDir?.score ?? null };
 }
 
 export function marketHalfFullView(p) {
@@ -292,9 +305,20 @@ export function marketHalfFullView(p) {
   const dir = FT_DIR(top[0].halfFull);
   const sameAsWld = wld != null && dir != null ? dir === wld : null;
   const fmt = (d) => `${d.halfFull}(${Math.round(d.probability * 100)}%)`;
-  const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500半全场盘de-vig` +
-    (sameAsWld === false ? ` ⚠️与胜负平不同向:半全场盘真实热门终场=${DIR_LABEL[dir] ?? "?"}(按盘口热门下,非方向复制)` : sameAsWld ? " ·与胜负平同向共振" : "");
-  return { fromMarket: true, dir, sameAsWld, cell, basis: "500半全场盘de-vig真实众数", top };
+  // 方向一致半全场(同比分修法):终场方向==胜负平、概率最高那格,顺方向买半全场选它。
+  const sameDir = wld != null ? md.filter((d) => FT_DIR(d.halfFull) === wld).sort((a, b) => b.probability - a.probability)[0] : null;
+  const wldName = wld != null ? DIR_LABEL[wld] : "?";
+  let tail;
+  if (sameAsWld === false) {
+    tail = ` ｜ ⚠️不是矛盾:这是「单一最可能半全场」=${top[0].halfFull}(单格最高);胜负平看好${wldName}是因为${wldName}各半全场格概率加起来更大。`
+      + (sameDir ? `要顺${wldName}方向买半全场→选 ${fmt(sameDir)}。` : `(盘口暂无明显${wldName}方向格。)`);
+  } else if (sameAsWld) {
+    tail = " ·与胜负平同向共振(主推终场方向=胜负平方向)";
+  } else {
+    tail = "";
+  }
+  const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500半全场盘de-vig` + tail;
+  return { fromMarket: true, dir, sameAsWld, cell, basis: "500半全场盘de-vig真实众数", top, sameDirHalfFull: sameDir?.halfFull ?? null };
 }
 
 // 信号面板:只用本次实抓证据拼装(欧赔初→现、亚盘开→现+水位、竞彩让球盘de-vig、大小球),阵容未出如实标⚠️。

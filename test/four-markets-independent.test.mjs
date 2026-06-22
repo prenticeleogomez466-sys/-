@@ -17,7 +17,11 @@ test("marketScoreView:比分盘热门=平局1-1而胜负平=主胜 → 主推1-1
   assert.equal(v.dir, "1");
   assert.equal(v.sameAsWld, false);
   assert.match(v.cell, /盘口主推 1-1\(13%\)/);
-  assert.match(v.cell, /与胜负平不同向/);
+  // 2026-06-22 修「说胜却推荐1-1」:不同向时须诠释"非矛盾"+给顺胜负平方向的比分(此处主胜格=1-0)
+  assert.match(v.cell, /不是矛盾/);
+  assert.match(v.cell, /单一最可能比分/);
+  assert.match(v.cell, /顺主胜方向买比分→选 1-0/);
+  assert.equal(v.sameDirScore, "1-0");
   assert.match(v.basis, /500比分盘/);
 });
 
@@ -35,7 +39,8 @@ test("marketHalfFullView:半全场盘热门终场=客胜而胜负平=主胜 → 
   const div = marketHalfFullView({ pick: { code: "3" }, halfFullPicks: { marketDistribution: [{ halfFull: "客胜-客胜", probability: 0.21 }] } });
   assert.equal(div.dir, "0");
   assert.equal(div.sameAsWld, false);
-  assert.match(div.cell, /与胜负平不同向/);
+  assert.match(div.cell, /不是矛盾/);
+  assert.match(div.cell, /单一最可能半全场/);
   const same = marketHalfFullView({ pick: { code: "0" }, halfFullPicks: { marketDistribution: [{ halfFull: "平局-客胜", probability: 0.17 }] } });
   assert.equal(same.sameAsWld, true);
 });
