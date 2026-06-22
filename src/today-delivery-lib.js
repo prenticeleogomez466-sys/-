@@ -1163,6 +1163,13 @@ export function buildComboTriggerSheet({ date, rows }) {
       return `${tierIcon[g.tier]}买【${predict}】${hitStr}(${[...g.bys].join("+")})`;
     });
     if (!byPredict.size && strong.some((x) => x.market === "可靠度") && favName) buyLines.push(`🟡跟主表${favName}·偏可靠可作胆56%(资金加注)`);
+    // 历史背书(2026-06-22 用户:触发后89k真赛果最爱出的半全场/大球):取最强触发规律的 hist,热/冷翻成主/客方向
+    const topHist = strong.find((x) => x.hist && x.hist.n > 0)?.hist;
+    if (topHist && favName) {
+      const oppName = favName === "主胜" ? "客胜" : favName === "客胜" ? "主胜" : "平局";
+      const trans = (s) => String(s ?? "").split("-").map((p) => p === "热" ? favName : p === "冷" ? oppName : "平局").join("-");
+      buyLines.push(`📊89k史(这种盘):半全场爱${trans(topHist.hf)}${topHist.hfPct}%·大球${topHist.over}%·热门命中${topHist.favHit}%`);
+    }
     const ruleCell = buyLines.length ? buyLines.join("\n") : (favName ? `无高把握组合→跟主表${favName}(不硬凑)` : "无高把握组合→看主表");
     const warnCell = warn.length ? warn.map((x) => `${tierIcon[x.tier]}${x.market === "风险" ? "别当胆·防爆" : x.predict}(${pc(x.hitRate.te)})`).join("\n") : "—";
     out.push([r.match, condCell, ruleCell, buyScoreOf(r.msv), buyHfOf(r.mhv), warnCell]);

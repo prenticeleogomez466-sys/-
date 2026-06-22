@@ -116,6 +116,23 @@ export const RULES = [
     fire: (f) => f.drift === "加注" && f.waterToFav != null && f.waterToFav <= -0.06, why: "热门被加注 且 亚盘水位压向热门过盘(水位单独是噪声·叠加1X2加注才有效)→热门方向" },
 ];
 
+// 每条规律「触发后真实赛果分布」(scripts/_tmp_gen_rulehist 从 89k 真赛果·热门视角统计·非赔率)。
+//   hf=最爱半全场(热=热门方向/冷=冷门/平);hfPct=其占比;over=大球率%;favHit=热门命中%。2026-06-22 用户:历史最爱比分/半全场入表。
+export const RULE_HIST = {
+  "超大热门→主胜": { n: 1347, hf: "热-热", hfPct: 61, over: 70, favHit: 86 }, "超大热门(客)→客胜": { n: 229, hf: "热-热", hfPct: 62, over: 69, favHit: 81 },
+  "实力悬殊让2+→主胜": { n: 1829, hf: "热-热", hfPct: 60, over: 71, favHit: 84 }, "实力悬殊让2+→大球": { n: 2257, hf: "热-热", hfPct: 60, over: 70, favHit: 83 },
+  "超大热门→大球": { n: 1576, hf: "热-热", hfPct: 61, over: 70, favHit: 85 }, "让0.25+高平赔→大球": { n: 2356, hf: "热-热", hfPct: 26, over: 58, favHit: 43 },
+  "中热+高平赔→大球": { n: 2977, hf: "热-热", hfPct: 27, over: 58, favHit: 45 }, "胶着低平赔+平稳→小球": { n: 2075, hf: "平-平", hfPct: 23, over: 36, favHit: 38 },
+  "胶着低平赔+退烧→小球": { n: 874, hf: "平-平", hfPct: 23, over: 36, favHit: 39 }, "让0.25+低平赔+平稳→小球": { n: 1099, hf: "热-热", hfPct: 22, over: 36, favHit: 41 },
+  "让1.25小热+平稳→主胜": { n: 0, hf: null, hfPct: null, over: null, favHit: null },
+  "退烧热门→危险避坑": { n: 8547, hf: "热-热", hfPct: 29, over: 50, favHit: 49 }, "加注热门→偏可靠": { n: 12923, hf: "热-热", hfPct: 34, over: 52, favHit: 54 },
+  "让1+平高+负高→倾向平": { n: 1066, hf: "热-热", hfPct: 40, over: 51, favHit: 67 }, "让0.25中庸盘→倾向平": { n: 463, hf: "热-热", hfPct: 21, over: 54, favHit: 41 },
+  "大球盘加注→大球": { n: 4829, hf: "热-热", hfPct: 38, over: 59, favHit: 58 }, "大球盘退烧→小球": { n: 5425, hf: "热-热", hfPct: 29, over: 44, favHit: 48 },
+  "让球线加深→热门": { n: 9870, hf: "热-热", hfPct: 35, over: 53, favHit: 57 }, "1X2加注+大球加注→大球": { n: 2542, hf: "热-热", hfPct: 41, over: 60, favHit: 62 },
+  "让球线加深+大球加注→大球": { n: 2132, hf: "热-热", hfPct: 44, over: 61, favHit: 66 }, "1X2加注+让球线加深→热门": { n: 7494, hf: "热-热", hfPct: 36, over: 54, favHit: 57 },
+  "1X2加注+水位压热门→热门": { n: 5876, hf: "热-热", hfPct: 32, over: 52, favHit: 52 },
+};
+
 /**
  * 主入口:给一场比赛,返回所有触发的规律(按信心档+命中率排序)。
  * @returns {{features, triggers:Array}|null}
@@ -126,7 +143,7 @@ export function comboTriggers(m) {
   const order = { 高: 0, 中: 1, 提醒: 2, 倾向: 3, 弱: 4 };
   const triggers = RULES.filter((r) => { try { return r.fire(f); } catch { return false; } })
     .map((r) => ({ id: r.id, market: r.market, predict: r.dynPredict ? (f.favHome ? "主胜" : "客胜") : r.predict, tier: r.tier, src: r.src, by: r.by,
-      hitRate: r.hit, lift: ((r.hit.tr + r.hit.te) / 2 - r.base), why: r.why }))
+      hitRate: r.hit, lift: ((r.hit.tr + r.hit.te) / 2 - r.base), why: r.why, hist: RULE_HIST[r.id] ?? null }))
     .sort((a, b) => (order[a.tier] - order[b.tier]) || (b.hitRate.te - a.hitRate.te));
   return { features: f, triggers };
 }
