@@ -17,6 +17,7 @@ import { writeXlsxWorkbook } from "../src/xlsx-writer.js";
 import { predictWcMatch } from "../src/wc-match-model.js";
 import { loadNationalResults } from "../src/wc-national-form.js";
 import { groupTable, remainingPairs } from "../src/wc-group-standings.js";
+import { loadWcGroupContext, teamStandingLine, teamProblemLine } from "../src/wc-group-context.js";
 import { getDataSubdir } from "../src/paths.js";
 import { preflightOrDie } from "../src/preflight-selfcheck.js";
 
@@ -102,6 +103,7 @@ function runMain() {
   const formCache = loadNationalResults();
   const today = new Date().toISOString().slice(0, 10);
   const grp = loadGroupTables();
+  const wcGroupCtx = loadWcGroupContext(); // 真实ESPN正赛赛果→当前积分+面临问题(每场推荐都带,2026-06-22)
 
   const results = [];
   for (const f of matches) {
@@ -136,7 +138,7 @@ function runMain() {
 
   // 表1:逐场推荐(核心)
   const mainHead = ["比赛日", "阶段", "对阵", "主推", "胜平负概率(主/平/客)", "次选", "比分首选", "比分次选", "真实众数",
-    "让球线(模型)", "让球覆盖(主/走/客)", "大小球(2.5↑)", "半全场", "市场主推", "模型vs市场", "最强决定因素"];
+    "让球线(模型)", "让球覆盖(主/走/客)", "大小球(2.5↑)", "半全场", "市场主推", "模型vs市场", "小组积分·面临问题(主/客)", "最强决定因素"];
   const mainRows = ok.map((r) => {
     const overUnder = r.overUnder ? (1 - (r.overUnder.bands["0"] + r.overUnder.bands["1"] + r.overUnder.bands["2"])) : null;
     return [r.matchDate || "—", STAGE_CN[r.stage] || r.stage || "—", `${r.home} vs ${r.away}`,
@@ -147,6 +149,7 @@ function runMain() {
       r.halfFull.consistent ? `${r.halfFull.consistent.hf}(${pcf(r.halfFull.consistent.p)})` : "—",
       r.market ? `${cn(r.market.marketPickCode)}` : "⚠️无",
       r.market ? (r.market.agree ? `同向 +${(r.market.edgeVsMarket * 100).toFixed(1)}pp` : `⚠️分歧 ${(r.market.edgeVsMarket * 100).toFixed(1)}pp`) : "—",
+      ((t) => { const L = (nm) => { const s = teamStandingLine(wcGroupCtx, nm), p = teamProblemLine(wcGroupCtx, nm); return s ? `${nm}:${s}${p ? " · " + p : ""}` : `${nm}:⚠️无小组数据`; }; return `${L(r.home)}\n${L(r.away)}`; })(),
       r.decisiveFactors[0] ? `${r.decisiveFactors[0].key}:${r.decisiveFactors[0].detail}` : "—"];
   });
 
