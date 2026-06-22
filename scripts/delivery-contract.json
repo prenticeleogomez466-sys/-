@@ -1,6 +1,6 @@
 {
   "_note": "交付契约冻结档。改列序/canonical名/签名是显式动作:改 src/today-delivery-lib.js 或本脚本后,跑 node scripts/freeze-delivery-contract.mjs --write 重冻并提交(增减都要过用户)。audit:suite 的 delivery-contract 探针守它。野页判法=内容签名(只盯带交付banner的页须唯一),不扫整共享目录。",
-  "frozenAt": "2026-06-19",
+  "frozenAt": "2026-06-22",
   "xlsxHeaders": [
     "#",
     "开赛",
@@ -29,9 +29,10 @@
     "💰建议注金🔶(基础100元分层)",
     "串关安全度",
     "🔴对抗证伪(三视角·只标注不弃赛)",
-    "🎯综合研判·最终建议(盘口+情报+异动·大白话)"
+    "🎯综合研判·最终建议(盘口+情报+异动·大白话)",
+    "🌍世界杯小组形势(当前积分+面临问题·末轮胜平负出线推演)"
   ],
-  "xlsxHeaderCount": 28,
+  "xlsxHeaderCount": 29,
   "deliveryCanonical": [
     "今日足球推荐.html",
     "football.html"

@@ -38,6 +38,7 @@ import { buildStakeSuggestion, stakeSummary } from "../src/stake-plan.js";
 import { buildRecordLine } from "../src/recap-record-line.js";
 import { worldCupContextLine } from "../src/worldcup-context.js";
 import { worldCupMatchPrior } from "../src/world-cup-priors.js";
+import { loadWcGroupContext, teamStandingLine, teamProblemLine } from "../src/wc-group-context.js";
 import { buildFourteenPlan, predictFixture } from "../src/prediction-engine.js";
 import { loadFixtures } from "../src/fixture-store.js";
 import { jingcaiWeekdayLabel, sequenceWeekdayPrefix, isTodayDeliveryFixture } from "../src/jingcai-business-day.js";
@@ -391,6 +392,15 @@ const auditFor = (p, s, c, prior, wcCtx) => {
   };
 };
 
+// 世界杯小组形势(真实ESPN正赛赛果→当前积分+面临问题),每场WC比赛主表自动带(2026-06-22 用户裁决)
+let wcGroupCtx = null; try { wcGroupCtx = loadWcGroupContext(); } catch { wcGroupCtx = null; }
+const wcGroupCellFor = (p) => {
+  if (!isWc(p) || !wcGroupCtx) return "—";
+  const L = (nm) => { const s = teamStandingLine(wcGroupCtx, nm), q = teamProblemLine(wcGroupCtx, nm); return s ? `${nm}:${s}${q ? " · " + q : ""}` : null; };
+  const parts = [L(p.fixture.homeTeam), L(p.fixture.awayTeam)].filter(Boolean);
+  return parts.length ? parts.join("\n") : "⚠️小组数据未匹配";
+};
+
 const rows = games.map((p, i) => {
   const c = covFor(p);
   const s = p.marketSnapshot || {};
@@ -468,6 +478,7 @@ const rows = games.map((p, i) => {
     // 🏆赛会(出线/夺冠%)= 世界杯模型超算产物;另入专属列 wcTourney
     wcLine,
     wcElo: wcCells.elo, wcLambda: wcCells.lambda, wcTourney: wcCells.tourney,
+    wcGroupCell: wcGroupCellFor(p), // 🌍世界杯小组形势(真实积分+面临问题),非WC场="—"
     hv,
     // ③ 串关安全度(信心档+risk+证伪标签;只标注不替弃赛)
     parlay: parlaySafety({ tier: mkPrimary?.tier ?? p.selectionTier?.label ?? "", risk: p.risk, advLabel: adv?.label ?? "" }),

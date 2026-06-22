@@ -1476,7 +1476,8 @@ export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事)",
   "信号面板✅(欧赔异动·亚盘水位·让球盘资金·共振/背离·阵容)",
   "比分(盘口✅真实热门主推+模型🔶次行)", "比分赔率✅", "半全场(盘口✅真实热门主推+模型🔶次行)", "半全场赔率✅", "大小球✅", "进球分布✅",
   "主队近5✅", "客队近5✅", "H2H(本地49k历史库)", "攻防画像", "信心档", "💰建议注金🔶(基础100元分层)", "串关安全度", "🔴对抗证伪(三视角·只标注不弃赛)",
-  "🎯综合研判·最终建议(盘口+情报+异动·大白话)"];
+  "🎯综合研判·最终建议(盘口+情报+异动·大白话)",
+  "🌍世界杯小组形势(当前积分+面临问题·末轮胜平负出线推演)"];
 
 // ── 综合研判·最终建议(2026-06-18 用户:把情报详情+盘口合理性的实时分析揉进竞彩完整·重新给推荐) ──
 //   纯组合现成字段(盘口主推/信心/盘口合理性深浅/实时核查关键情报+异动+最终建议),不新增推断、不编造。
@@ -1663,7 +1664,7 @@ export function buildXlsxSheets({ date, rows, banner, advDataPresent, recordLine
     r.hcView, r.hc, r.asian, r.signals ?? "⚠️未拼装", `${r.score}〔${r.scoreSrc}〕`, r.scoreMkt, `${r.halffull}〔${r.hfSrc}〕`, r.hfMkt, r.ouReal, r.dist,
     `${r.homeRec} ${r.homeLast5}`, `${r.awayRec} ${r.awayLast5}`, r.h2h, r.profile, `${r.tier}(${Math.round(r.conf)})`,
     r.stake?.text ?? "—(档位缺不给金额)",
-    r.parlay?.text ?? "⚠️未评", advCellText(r, advDataPresent), synthesisCell(r)]);
+    r.parlay?.text ?? "⚠️未评", advCellText(r, advDataPresent), synthesisCell(r), r.wcGroupCell ?? "—"]);
   // 战绩行/注金口径行紧跟 banner(2026-06-12 用户裁决:战绩透明化进表头;缺=不出该行,不留空假象)
   const headRows = [[`⚡ 神选 · 竞彩完整覆盖 · ${date}`], [banner],
     ...(recordLine ? [[recordLine]] : []), ...(stakeNote ? [[stakeNote]] : [])];
