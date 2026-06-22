@@ -293,7 +293,7 @@ export function marketScoreView(p) {
     tail = "";
   }
   const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500比分盘de-vig` + tail;
-  return { fromMarket: true, dir, sameAsWld, cell, basis: "500比分盘de-vig真实众数", top, sameDirScore: sameDir?.score ?? null };
+  return { fromMarket: true, dir, sameAsWld, cell, basis: "500比分盘de-vig真实众数", top, wld, sameDir: sameDir ?? null, sameDirScore: sameDir?.score ?? null };
 }
 
 export function marketHalfFullView(p) {
@@ -318,7 +318,7 @@ export function marketHalfFullView(p) {
     tail = "";
   }
   const cell = `盘口主推 ${top.map(fmt).join(" / ")} ✅500半全场盘de-vig` + tail;
-  return { fromMarket: true, dir, sameAsWld, cell, basis: "500半全场盘de-vig真实众数", top, sameDirHalfFull: sameDir?.halfFull ?? null };
+  return { fromMarket: true, dir, sameAsWld, cell, basis: "500半全场盘de-vig真实众数", top, wld, sameDir: sameDir ?? null, sameDirHalfFull: sameDir?.halfFull ?? null };
 }
 
 // 信号面板:只用本次实抓证据拼装(欧赔初→现、亚盘开→现+水位、竞彩让球盘de-vig、大小球),阵容未出如实标⚠️。
@@ -1094,14 +1094,14 @@ export function buildOddsValueSheet({ date, rows }) {
 //   353真竞彩截图独立验证可迁移)。诚实:高命中≠盈利(打不过收盘线),价值=选择性出手把命中率拉到65-78%+标危险盘。
 //   全覆盖分档:每场都给;落在高命中组合→高/中信心+主推该市场;无组合→如实"普通·按主表研判"。让球过盘无高命中点(庄家做平)。
 export function buildComboTriggerSheet({ date, rows }) {
-  const banner = `🎯 交叉组合触发器 · ${date} · 把五大联赛全7赛季12458场回测出的高命中交叉组合 + 庄家意图(退烧热门=坑/加注=可靠) + 用户让球分线手感合成一个引擎。【诚实】高命中≠盈利(公开盘打不过收盘线),价值=只在高把握组合出手把命中率从基线拉到65-78%、并标危险盘避坑;让球过盘被庄家做到≈掷硬币,无高命中组合如实不出。`;
+  const banner = `🎯 交叉组合触发器 · ${date} · 把五大联赛全7赛季12458场回测出的高命中交叉组合 + 庄家意图(退烧热门=坑/加注=可靠) + 用户让球分线手感合成一个引擎。每场明确标:触发了什么数据条件→倾向买方向/比分/半全场。【触发依据只用回测过真有效的4类:①欧赔(热门赔/平赔)②盘口·亚盘让球线③资金动向(初→收盘漂移=加注/退烧)。⚠️亚盘水位单独看是噪声(回测映射1X2命中仅43.8%最差)→不作触发,只在主表信号面板供判读。】【诚实】高命中≠盈利(公开盘打不过收盘线),价值=高把握选择性出手+危险盘避坑;让球过盘被庄家做成≈掷硬币,无高命中组合如实不出。`;
   const tierIcon = { 高: "🟢高", 中: "🟡中", 提醒: "⚠️避坑", 倾向: "·倾向" };
   const pc = (x) => `${Math.round(x * 100)}%`;
   const out = [[banner]];
 
-  // ── 规律速查(2026-06-22 用户:补全"看到这种盘→直接买什么")——从引擎 RULES 动态生成,保持同步 ──
-  out.push(["📋 规律速查 · 看到这种盘 → 直接买什么(全7赛季12458场回测·TRAIN/TEST双稳)"]);
-  out.push(["把握", "看到这种盘(触发条件)", "→ 直接买", "历史命中", "样本N"]);
+  // ── 规律速查(2026-06-22 用户:明确"看什么数据触发→倾向买什么")——从引擎 RULES 动态生成,保持同步 ──
+  out.push(["📋 规律速查 · 看哪类数据触发 → 倾向买什么(全7赛季12458场回测·TRAIN/TEST双稳)"]);
+  out.push(["把握", "触发依据(看哪类数据)", "看到这种盘(具体条件)", "→ 倾向买", "历史命中", "样本N"]);
   const order = { 高: 0, 中: 1, 提醒: 2 };
   const cheatRules = COMBO_RULES.filter((r) => r.tier === "高" || r.tier === "中" || r.tier === "提醒")
     .sort((a, b) => (order[a.tier] - order[b.tier]) || (b.hit.te - a.hit.te));
@@ -1109,42 +1109,66 @@ export function buildComboTriggerSheet({ date, rows }) {
     const buy = r.market === "胜平负" || r.market === "大小球" ? `${r.market}·买【${r.predict}】`
       : r.market === "可靠度" ? "该热门可作胆"
         : r.market === "风险" ? "⚠️这热门别当胆·防爆" : `${r.market}·${r.predict}`;
-    out.push([tierIcon[r.tier], r.why, buy, pc(r.hit.te), r.hit.n]);
+    out.push([tierIcon[r.tier], r.by ?? "—", r.why, buy, pc(r.hit.te), r.hit.n]);
   }
-  out.push(["·提醒", "亚盘让球(让胜/让平/让负)", "庄家做到≈掷硬币·无高命中点→不出(如实)", "≈50%", "—"]);
+  out.push(["·提醒", "盘口·亚盘让球过盘", "亚盘让球(让胜/让平/让负)", "庄家做到≈掷硬币·无高命中点→不出(如实)", "≈50%", "—"]);
   out.push([""]);
 
-  // ── 今日逐场落点 ──
-  out.push(["📍 今日逐场落点 · 这场触发了哪条 → 该买什么"]);
-  const header = ["对阵", "盘口主推(主表)", "👉这场怎么买(组合规律落点+原因)", "避坑/倾向提醒", "数据标签"];
+  // ── 今日逐场落点(2026-06-22 用户:明确指出触发了什么条件→倾向买方向/比分/半全场)──
+  out.push(["📍 今日逐场落点 · 明确触发条件 → 倾向买:方向/比分/半全场"]);
+  const header = ["对阵", "明确触发了什么条件(本场实际值)", "触发的规律(依据·命中%)", "倾向买·方向", "倾向买·比分", "倾向买·半全场", "避坑/倾向提醒"];
   out.push(header);
+  const dec = (x) => (x == null || !Number.isFinite(Number(x)) ? "—" : Number(x).toFixed(2));
+  // 顺方向比分/半全场(顺胜负平方向那一格,✅500盘 de-vig 真实):不同向取 sameDir,同向取 top[0]
+  const buyScoreOf = (msv) => {
+    if (!msv || !msv.fromMarket) return "🔶看主表比分(此盘未单卖→模型DC)";
+    const pickEntry = msv.sameAsWld === false ? msv.sameDir : msv.top?.[0];
+    return pickEntry ? `${pickEntry.score}(${pc(pickEntry.probability)})✅500` : "—";
+  };
+  const buyHfOf = (mhv) => {
+    if (!mhv || !mhv.fromMarket) return "🔶看主表半全场(模型半场联合)";
+    const pickEntry = mhv.sameAsWld === false ? mhv.sameDir : mhv.top?.[0];
+    return pickEntry ? `${pickEntry.halfFull}(${pc(pickEntry.probability)})✅500` : "—";
+  };
   let firedN = 0;
   for (const r of rows) {
     const so = r.sanityOdds ?? {};
     const valid = (e) => e && [e.home, e.draw, e.away].every((x) => Number(x) > 1);
     // 悬殊盘 500 的 1X2 常未开售→so.euro 缺;按"缺口能补就补"铁律回退 ESPN/DK moneyline 真盘(非编造),
-    //   让法国vs伊拉克这种超大热门场也能触发"超大热门→主胜/大球"高把握组合。ESPN ml 无开盘价→drift规律(加注/退烧)诚实不触发。
+    //   让法国vs伊拉克这种超大热门场也能触发"超大热门→主胜/大球"高把握组合。ESPN ml 无开盘价→drift规律诚实不触发。
     const useEspn = !valid(so.euro) && valid(so.euroEspn);
     const euClose = valid(so.euro) ? so.euro : (useEspn ? so.euroEspn : null);
     const euOpen = valid(so.euro) ? so.euroInit : null;
     const t = euClose ? comboTriggers({ euClose, euOpen, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null }) : null;
-    if (!t) { out.push([r.match, r.wld ?? "—", "⚠️本场收盘欧赔+ESPN盘均未抓到·引擎不触发(缺不编)", "—", "⚠️缺"]); continue; }
+    if (!t) { out.push([r.match, "⚠️收盘欧赔+ESPN盘均未抓到(缺不编)", "引擎不触发", "看主表方向", buyScoreOf(r.msv), buyHfOf(r.mhv), "—"]); continue; }
+    const f = t.features;
     const strong = t.triggers.filter((x) => x.tier === "高" || x.tier === "中");
     const warn = t.triggers.filter((x) => x.tier === "提醒" || x.tier === "倾向");
     if (strong.length) firedN++;
-    const espnNote = useEspn ? "（欧赔取ESPN/DK真盘·500此盘1X2未开售）\n" : "";
-    // 大白话"怎么买":买玩法的→"买【X】(命中N%·因为触发条件)";可靠度/风险→提示;无→看主表
-    const buyLines = strong.map((x) => {
-      const hit = `命中${pc(x.hitRate.te)}`;
-      if (x.market === "胜平负" || x.market === "大小球") return `👉买【${x.predict}】(${hit}·因为${x.why})`;
-      if (x.market === "可靠度") return `👉主推热门偏可靠·可作胆(${hit})`;
-      return `${x.predict}(${hit})`;
-    });
-    const buyCell = espnNote + (buyLines.length ? buyLines.join("\n") : "本场无高把握组合 → 按主表方向研判即可(不硬凑)");
-    const warnCell = warn.length ? warn.map((x) => `${tierIcon[x.tier]}${x.predict}(${pc(x.hitRate.te)})·${x.why}`).join("\n") : "—";
-    out.push([r.match, r.wld ?? "—", buyCell, warnCell, useEspn ? "✅ESPN/DK真盘补(500未开售)" : "✅实测组合(回测12458场+截图验证)"]);
+    // ① 明确触发条件=本场四类数据实际值(✅实测,ESPN补的标来源)
+    const condCell = `${useEspn ? "(欧赔=ESPN/DK真盘·500未开售)\n" : ""}`
+      + `欧赔:热门${f.favHome ? "主" : "客"}队${dec(f.favOdds)}·平赔${dec(f.drawOdds)}\n`
+      + `盘口:亚盘让${f.ahAbs == null ? "—(未抓到)" : f.ahAbs}\n`
+      + `资金动向:${f.drift ?? "—(无初盘/ESPN无开盘价)"}`;
+    // ② 触发的规律(明确依据类别+命中)
+    const ruleCell = strong.length
+      ? strong.map((x) => `${tierIcon[x.tier]}${x.id}〔依据:${x.by}〕命中${pc(x.hitRate.te)}`).join("\n")
+      : "无高把握组合(本场盘口不落任何高命中桶)";
+    // ③ 倾向买方向:胜负平(组合规律 or 主表热门可靠) + 大小球(组合规律)
+    const wldBuys = strong.filter((x) => x.market === "胜平负").map((x) => `${x.predict}(${pc(x.hitRate.te)})`);
+    const ouBuys = strong.filter((x) => x.market === "大小球").map((x) => `${x.predict}(${pc(x.hitRate.te)})`);
+    const rely = strong.some((x) => x.market === "可靠度");
+    const favName = r.msv?.wld != null ? DIR_LABEL[r.msv.wld] : null;
+    const wldLine = wldBuys.length ? `胜负平→${wldBuys.join("/")}`
+      : rely && favName ? `胜负平→跟主表${favName}(热门被加注·偏可靠可作胆56%)`
+        : favName ? `胜负平→跟主表${favName}(本场无组合加成)` : "胜负平→看主表";
+    const ouLine = ouBuys.length ? `大小球→${ouBuys.join("/")}` : "大小球→看主表(无组合加成)";
+    const dirCell = `${wldLine}\n${ouLine}`;
+    // ④ 比分/半全场(顺方向·✅500真盘)
+    const warnCell = warn.length ? warn.map((x) => `${tierIcon[x.tier]}${x.predict}(${pc(x.hitRate.te)})`).join("\n") : "—";
+    out.push([r.match, condCell, ruleCell, dirCell, buyScoreOf(r.msv), buyHfOf(r.mhv), warnCell]);
   }
-  out.push([""], [`━━ 共${rows.length}场,其中${firedN}场触发高/中命中组合。规律来源=全7赛季12458场walk-forward(TRAIN/TEST双稳)+353真竞彩截图交叉验证+庄家意图21405场。非下注edge(打不过收盘线),只标高把握/危险盘供选择性出手;无触发的场如实标"按主表研判",不硬凑。`]);
+  out.push([""], [`━━ 共${rows.length}场,其中${firedN}场触发高/中命中组合。每场=①明确触发条件(本场欧赔/平赔/让球线/资金动向实际值·✅实测)②触发的规律+依据类别③倾向买方向/比分/半全场(比分半全场=✅500盘顺方向真实热门)。规律来源=全7赛季12458场walk-forward+353真竞彩截图+庄家意图21405场。诚实:高命中≠盈利(打不过收盘线),只标高把握/危险盘供选择性出手;无组合的场如实"看主表",不硬凑。`]);
   return { name: "组合触发", rows: out };
 }
 
