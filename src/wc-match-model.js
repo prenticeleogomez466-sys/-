@@ -14,7 +14,7 @@ import { eloToLambdas } from "./national-elo-source.js";
 import { buildDerivedScoreModel, bestScoreFromMatrix, handicapLadder, totalGoalsBands, scoreProbFromMatrix } from "./derived-score-model.js";
 import { halfFullJoint } from "./halftime-fulltime-model.js";
 import { devig } from "./market-devig.js";
-import { recentForm, headToHead } from "./wc-national-form.js";
+import { recentForm, headToHead, loadIntlHistory } from "./wc-national-form.js";
 import { matchPathScenario } from "./wc-qualification-scenario.js";
 import { getDataSubdir } from "./paths.js";
 
@@ -75,7 +75,7 @@ export function predictWcMatch(homeZh, awayZh, fixture = {}, marketOdds = null, 
   const formCache = opts.formCache || null;
   const formHome = formCache && hp?.en ? recentForm(formCache, hp.en) : null;
   const formAway = formCache && ap?.en ? recentForm(formCache, ap.en) : null;
-  const h2h = formCache && hp?.en && ap?.en ? headToHead(formCache, hp.en, ap.en) : null;
+  const h2h = formCache && hp?.en && ap?.en ? headToHead(formCache, hp.en, ap.en, 6, loadIntlHistory().matches) : null;
   if (!prior || !hp?.elo || !ap?.elo) {
     return { error: `WC 模型无法解析(缺 Elo 先验):${homeZh}(${hp?.elo ?? "缺"}) / ${awayZh}(${ap?.elo ?? "缺"})` };
   }

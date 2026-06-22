@@ -48,7 +48,7 @@ import { snapshotEuroProvenance } from "../src/market-data-store.js";
 // 2026-06-14 情报系统(展示层·不动概率):预测/确认首发+阵型 / 伤停 / 近期热身 / 新闻动机聚合 → 「情报详情」sheet。
 //   复用已采集层(advanced:sync 的 layers.lineups/injuries/news)+ 国家队近赛缓存 + 预测首发缓存;缺即标缺不编。
 import { loadAdvancedData } from "../src/advanced-data-store.js";
-import { loadNationalResults, recentForm, headToHead } from "../src/wc-national-form.js";
+import { loadNationalResults, recentForm, headToHead, loadIntlHistory } from "../src/wc-national-form.js";
 import { canonicalTeamName } from "../src/team-aliases.js";
 import { buildMatchIntel } from "../src/match-intel.js";
 import { handicapSanity, histUpsetRate } from "../src/handicap-sanity.js";
@@ -97,7 +97,10 @@ const isJc = (p) => p.fixture?.marketType === "jingcai";
 const isWorldCupGame = (p) => String(p.fixture?.competition ?? "").includes("世界杯");
 const JC_ONLY = process.argv.includes("--jconly");
 if (JC_ONLY) console.log("--jconly(2026-06-10 新语义):竞彩在售场含世界杯单场,开赛期间不再剔除世界杯。");
-const picked = preds.filter((p) => isJc(p) || isWorldCupGame(p));
+// 竞彩交付只收:竞彩在售(jingcai)+ 真有竞彩盘的世界杯场;ESPN播种(marketType=worldcup-seed·无竞彩赔率)
+// 只喂 wc:predict 逐场预测,不进竞彩主表(否则让球透明双数缺→真钱闸红;无赔率的场本就不能当竞彩推荐)。
+const isWcSeed = (p) => p.fixture?.marketType === "worldcup-seed";
+const picked = preds.filter((p) => isJc(p) || (isWorldCupGame(p) && !isWcSeed(p)));
 const byMatch = new Map();
 for (const p of picked) {
   const key = `${p.fixture.homeTeam}|${p.fixture.awayTeam}`;
@@ -678,7 +681,7 @@ for (const p of games) {
   // 交锋史(H2H深化):coverage(ESPN近期)为主;空则退国家队近2年缓存真实交手(headToHead),仍无→如实标缺
   let h2hList = h2hToStatsList(covFor(p)?.h2h);
   if (!h2hList || !h2hList.length) {
-    const nh = headToHead(natCache, p.fixture.homeTeam, p.fixture.awayTeam);
+    const nh = headToHead(natCache, p.fixture.homeTeam, p.fixture.awayTeam, 6, loadIntlHistory().matches);
     if (nh?.list?.length) h2hList = nh.list.map((x) => ({ date: x.date, score: x.score, res: x.r }));
   }
   intelByMatch[key] = buildMatchIntel({

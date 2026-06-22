@@ -3,7 +3,7 @@
 //   直接 === 比对全 miss → 近期/热身赛列恒空。两侧过 canonicalTeamName 后中/英任一形式都要命中。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { recentForm, headToHead } from "../src/wc-national-form.js";
+import { recentForm, headToHead, loadIntlHistory } from "../src/wc-national-form.js";
 import { englishTeamName } from "../src/team-aliases.js";
 
 const cache = {
@@ -31,6 +31,21 @@ test("headToHead 中文名命中英文缓存", () => {
   const h = headToHead(cache, "德国", "日本");
   assert.ok(h);
   assert.equal(h.played, 1);
+});
+
+test("headToHead extra 参数纯净:不传 extra 只用 cache(单测隔离)", () => {
+  const h = headToHead(cache, "德国", "日本", 6, []);
+  assert.equal(h.played, 1); // 只 cache 里那1场,不被真库污染
+});
+
+test("headToHead extra=49k历史库 → 补深老交手(西班牙-沙特真有历史)", () => {
+  const hist = loadIntlHistory();
+  assert.ok(hist.matches.length > 1000, "49k历史库应已加载");
+  const h = headToHead({ matches: [] }, "西班牙", "沙特阿拉伯", 6, hist.matches);
+  assert.ok(h && h.played >= 1, "西班牙-沙特历史交手应被补上(2006世界杯等)");
+  // 真无交手的对阵仍诚实返回 null(不编)
+  const none = headToHead({ matches: [] }, "比利时", "伊朗", 6, hist.matches);
+  assert.equal(none, null, "真无交手→null 不编");
 });
 
 test("englishTeamName 反查:今日 8 队都有英文别名(GDELT 检索用)", () => {

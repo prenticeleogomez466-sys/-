@@ -8,6 +8,29 @@ import { canonicalTeamName } from "./team-aliases.js";
 
 const CACHE = join(getDataSubdir("world-cup"), "2026", "wc-national-results.json");
 
+// 49k 国际赛全历史库(martj42,data/intl-results/results.csv)——补 H2H 深度:2年ESPN缓存只覆盖近期,
+//   老交手(西班牙-沙特2006世界杯/埃及-新西兰1999等)会漏=“可补而未补”,违完整补齐铁律。模块级 memo 防重复解析。
+let _histMemo = null;
+export function loadIntlHistory() {
+  if (_histMemo) return _histMemo;
+  const csv = join(getDataSubdir("..") || "D:/football-model", "data", "intl-results", "results.csv");
+  const csvFallback = "D:/football-model/data/intl-results/results.csv";
+  const path = existsSync(csv) ? csv : csvFallback;
+  if (!existsSync(path)) { _histMemo = { matches: [] }; return _histMemo; }
+  const matches = [];
+  try {
+    const lines = readFileSync(path, "utf8").split(/\r?\n/);
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(","); if (c.length < 5) continue;
+      const hg = Number(c[3]), ag = Number(c[4]);
+      if (!Number.isFinite(hg) || !Number.isFinite(ag)) continue; // NA/未赛跳过
+      matches.push({ date: c[0], home: c[1], away: c[2], homeGoals: hg, awayGoals: ag, competition: c[5] || "" });
+    }
+  } catch { /* 解析失败=空,标缺不编 */ }
+  _histMemo = { matches };
+  return _histMemo;
+}
+
 export function loadNationalResults() {
   if (!existsSync(CACHE)) return { fetchedAt: null, matches: [] };
   try { return JSON.parse(readFileSync(CACHE, "utf8")); } catch { return { fetchedAt: null, matches: [] }; }
@@ -46,10 +69,19 @@ export function recentForm(cache, team, n = 5) {
 }
 
 /** 两队 H2H(从 a 视角,队名中/英皆可)。无交手返回 null。 */
-export function headToHead(cache, a, b, n = 6) {
+// extra=额外赛果池(如 loadIntlHistory().matches 49k全历史),与 cache 去重合并补深H2H老交手;
+// 默认 [] → 纯函数,只用传入 cache(单测隔离不受真库影响)。生产由 wc-match-predict 传 49k 库。
+export function headToHead(cache, a, b, n = 6, extra = []) {
   const A = canon(a), B = canon(b);
-  if (!A || !B || !cache?.matches?.length) return null;
-  const ms = cache.matches.filter((m) =>
+  if (!A || !B) return null;
+  let pool = cache?.matches || [];
+  if (extra && extra.length) {
+    const seen = new Set(pool.map((m) => `${m.date}|${homeName(m)}|${awayName(m)}`));
+    pool = [...pool];
+    for (const m of extra) { const k = `${m.date}|${m.home}|${m.away}`; if (!seen.has(k)) { seen.add(k); pool.push(m); } }
+  }
+  if (!pool.length) return null;
+  const ms = pool.filter((m) =>
     (isTeam(homeName(m), A) && isTeam(awayName(m), B)) || (isTeam(homeName(m), B) && isTeam(awayName(m), A)))
     .sort((a2, b2) => b2.date.localeCompare(a2.date)).slice(0, n);
   if (!ms.length) return null;
