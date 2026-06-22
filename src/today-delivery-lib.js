@@ -17,6 +17,7 @@ import { handicapResultBand, htResultBand, teamGoalsBand, htGoalsBand, anomalyVs
 import { assessStrengthVsMarket, ppgOf } from "./strength-market-match.js";
 import { assessMatchOdds, payoutVerdict } from "./odds-value-lib.js";
 import { bookmakerIntent } from "./bookmaker-intent.js";
+import { comboTriggers } from "./combo-triggers.js";
 import { playerDisplay } from "./player-name-zh.js";
 import { formationPosture } from "./lineup-source.js";
 
@@ -1062,6 +1063,34 @@ export function buildOddsValueSheet({ date, rows }) {
   out.push(["现状", "—", "—", "—", "真CLV需采集收盘线(临场封盘价);本系统赔率快照 final(收盘)目前未采集→真CLV暂只能事后算,赛前用上方「CLV风险(市场一致性)」作代理。", "", ""]);
   out.push(["实证基线", "—", "—", "—", "backtest:clv(45788场)实证:纯模型 pick 平均 CLV −0.063%(无独立 edge)·逆市真分歧场 −0.796%(高风险)→ 坐实模型本质市场跟随器,跟随盘口漂移亦是反指(命中41.7%<跟开盘热门52.4%),不作下注 edge。", "", ""]);
   return { name: "返还率与盘口动向", rows: out, _withData: withData };
+}
+
+// ── 组合触发工作表(2026-06-22 用户:把所有验证过的交叉组合规律合成引擎,每场自动标触发条)──
+//   引擎=src/combo-triggers.js(12458场全7赛季walk-forward挖的高命中组合 + 庄家意图 + 用户让球分线手感,
+//   353真竞彩截图独立验证可迁移)。诚实:高命中≠盈利(打不过收盘线),价值=选择性出手把命中率拉到65-78%+标危险盘。
+//   全覆盖分档:每场都给;落在高命中组合→高/中信心+主推该市场;无组合→如实"普通·按主表研判"。让球过盘无高命中点(庄家做平)。
+export function buildComboTriggerSheet({ date, rows }) {
+  const banner = `🎯 交叉组合触发器 · ${date} · 把五大联赛全7赛季12458场回测出的高命中交叉组合 + 庄家意图(退烧热门=坑/加注=可靠) + 用户让球分线手感,合成一个引擎,每场自动标"触发了哪些规律·预测什么·历史命中多少·几档信心"。【诚实】高命中≠盈利(公开盘打不过收盘线),引擎价值=只在高把握组合出手把命中率从基线拉到65-78%、并标危险盘避坑;让球过盘(让胜/让平/让负)被庄家做到≈掷硬币,无高命中组合,如实不出。完整规则全表/逐场/验证见 桌面\\足球推荐\\组合触发器\\xlsx。`;
+  const header = ["对阵", "盘口主推(主表)", "触发的高/中命中组合(预测·信心·历史命中)", "避坑/倾向提醒", "数据标签"];
+  const out = [[banner], header];
+  const tierIcon = { 高: "🟢高", 中: "🟡中", 提醒: "⚠️避坑", 倾向: "·倾向" };
+  let firedN = 0;
+  for (const r of rows) {
+    const so = r.sanityOdds ?? {};
+    const euOk = so.euro && [so.euro.home, so.euro.draw, so.euro.away].every((x) => Number(x) > 1);
+    const t = euOk ? comboTriggers({ euClose: so.euro, euOpen: so.euroInit, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null }) : null;
+    if (!t) { out.push([r.match, r.wld ?? "—", "⚠️本场收盘欧赔未抓全·引擎不触发(缺不编)", "—", "⚠️缺"]); continue; }
+    const strong = t.triggers.filter((x) => x.tier === "高" || x.tier === "中");
+    const warn = t.triggers.filter((x) => x.tier === "提醒" || x.tier === "倾向");
+    if (strong.length) firedN++;
+    const strongCell = strong.length
+      ? strong.map((x) => `${tierIcon[x.tier]}[${x.market}]${x.predict}(历史命中${Math.round(x.hitRate.te * 100)}%)`).join("\n")
+      : "无高命中组合·本场普通(按主表研判)";
+    const warnCell = warn.length ? warn.map((x) => `${tierIcon[x.tier]}${x.predict}`).join("\n") : "—";
+    out.push([r.match, r.wld ?? "—", strongCell, warnCell, "✅实测组合(回测12458场+截图验证)"]);
+  }
+  out.push([""], [`━━ 共${rows.length}场,其中${firedN}场触发高/中命中组合。规律来源=全7赛季12458场walk-forward(TRAIN/TEST双稳)+353真竞彩截图交叉验证+庄家意图21405场。非下注edge(打不过收盘线),只标高把握/危险盘供选择性出手。`]);
+  return { name: "组合触发", rows: out };
 }
 
 // ── 爆冷研判工作表(2026-06-16 用户:细胞级展开·只接引擎已算的 OOS 验证信号,零臆造)──

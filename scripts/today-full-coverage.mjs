@@ -18,7 +18,7 @@ import {
   wcPriorCells, handicapVerdictParts, parlaySafety, PARLAY_ORDER_NOTE,
   renderH2hCell, renderAsianDualCell, renderEuroRefCell, threeColumnCoherence,
   auditCell, buildAuditSheet, buildFourteenSheetRows, buildIntelSheet, buildDecisionAidsSheet,
-  buildHandicapSanitySheet, buildUpsetAnalysisSheet, buildOddsValueSheet, buildRadarDetailSheet,
+  buildHandicapSanitySheet, buildUpsetAnalysisSheet, buildOddsValueSheet, buildRadarDetailSheet, buildComboTriggerSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
   XLSX_HEADERS, h2hToStatsList, marketWldPrimary,
@@ -856,6 +856,7 @@ const sheets = [
   buildHandicapSanitySheet({ date, rows }),
   buildOddsValueSheet({ date, rows }),
   buildUpsetAnalysisSheet({ date, rows }),
+  buildComboTriggerSheet({ date, rows }), // 2026-06-22 交叉组合触发器(高命中组合+庄家意图+用户让球分线规则,每场自动标·全覆盖分档)
   buildDecisionAidsSheet({ date, rows }),
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
