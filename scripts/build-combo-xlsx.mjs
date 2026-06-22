@@ -47,13 +47,13 @@ for (const a of Object.values(agg).sort((x, y) => (y.k / y.n) - (x.k / x.n))) {
 
 // Sheet4: 逐让球线规律(平手→让3+),读football-data全7赛季
 import path from "node:path";
-const DIR = "D:/football-model/data/footballdata", LG = ["D1", "E0", "F1", "I1", "SP1"], SE = ["1920", "2021", "2122", "2223", "2324", "2425", "2526"];
+const DIRS = ["D:/football-model/data/footballdata", "D:/football-model/data/footballdata-extra"]; // 五大+17低级别(补深让球线)
 const pcsv = (t) => { const L = t.split(/\r?\n/).filter((l) => l.trim()); const H = L[0].replace(/^﻿/, "").split(","); const I = (n) => H.indexOf(n); return L.slice(1).map((l) => { const c = l.split(","); return (n) => { const j = I(n); return j >= 0 ? c[j] : undefined; }; }); };
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const trip = (h, d, a) => (h > 1 && d > 1 && a > 1 ? { home: h, draw: d, away: a } : null);
 const fd = [];
-for (const lg of LG) for (const sea of SE) { const f = path.join(DIR, `${lg}_${sea}.csv`); if (!fs.existsSync(f)) continue; for (const g of pcsv(fs.readFileSync(f, "utf8"))) { const fh = num(g("FTHG")), fa = num(g("FTAG")); if (fh === null || fa === null) continue; const euC = trip(num(g("AvgCH")), num(g("AvgCD")), num(g("AvgCA"))) ?? trip(num(g("B365CH")), num(g("B365CD")), num(g("B365CA"))); if (!euC) continue; const ahC = num(g("AHCh")) ?? num(g("AHh")); if (ahC === null) continue; fd.push({ favHome: euC.home <= euC.away, ahAbs: Math.abs(ahC), gd: fh - fa, goals: fh + fa, res: fh > fa ? "home" : fh < fa ? "away" : "draw" }); } }
-const LINES = [["平手(0)", 0, 0.125], ["让0.25", 0.125, 0.375], ["让0.5", 0.375, 0.625], ["让0.75", 0.625, 0.875], ["让1", 0.875, 1.125], ["让1.25", 1.125, 1.375], ["让1.5", 1.375, 1.625], ["让1.75", 1.625, 1.875], ["让2", 1.875, 2.125], ["让2.25", 2.125, 2.375], ["让2.5", 2.375, 2.625], ["让2.75", 2.625, 2.875], ["让3+", 2.875, 99]];
+for (const D of DIRS) { if (!fs.existsSync(D)) continue; for (const fn of fs.readdirSync(D)) { if (!fn.endsWith(".csv")) continue; for (const g of pcsv(fs.readFileSync(path.join(D, fn), "utf8"))) { const fh = num(g("FTHG")), fa = num(g("FTAG")); if (fh === null || fa === null) continue; const euC = trip(num(g("AvgCH")), num(g("AvgCD")), num(g("AvgCA"))) ?? trip(num(g("B365CH")), num(g("B365CD")), num(g("B365CA"))); if (!euC) continue; const ahC = num(g("AHCh")) ?? num(g("AHh")); if (ahC === null) continue; fd.push({ favHome: euC.home <= euC.away, ahAbs: Math.abs(ahC), gd: fh - fa, goals: fh + fa, res: fh > fa ? "home" : fh < fa ? "away" : "draw" }); } } }
+const LINES = [["平手(0)", 0, 0.125], ["让0.25", 0.125, 0.375], ["让0.5", 0.375, 0.625], ["让0.75", 0.625, 0.875], ["让1", 0.875, 1.125], ["让1.25", 1.125, 1.375], ["让1.5", 1.375, 1.625], ["让1.75", 1.625, 1.875], ["让2", 1.875, 2.125], ["让2.25", 2.125, 2.375], ["让2.5", 2.375, 2.625], ["让2.75", 2.625, 2.875], ["让3", 2.875, 3.125], ["让3.25+", 3.125, 99]];
 const rt = (rows, fn) => rows.length ? rows.filter(fn).length / rows.length : 0;
 const s4 = [["神选·逐让球线交叉规律 · 五大联赛全7赛季12458场 · 不同盘口不同组合内容"], ["让球线", "样本N", "主胜", "平局", "客胜", "大球", "小球", "让胜", "让平", "让负", "该线倾向(大白话)"]];
 for (const [nm, lo, hi] of LINES) {

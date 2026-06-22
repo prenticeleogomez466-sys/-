@@ -6,13 +6,13 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-const DIR = "D:/football-model/data/footballdata", LG = ["D1", "E0", "F1", "I1", "SP1"], SE = ["1920", "2021", "2122", "2223", "2324", "2425", "2526"];
+const DIRS = ["D:/football-model/data/footballdata", "D:/football-model/data/footballdata-extra"]; // 五大+17低级别/更多联赛(补深让球线样本)
 function pcsv(t) { const L = t.split(/\r?\n/).filter((l) => l.trim()); const H = L[0].replace(/^﻿/, "").split(","); const I = (n) => H.indexOf(n); return L.slice(1).map((l) => { const c = l.split(","); return (n) => { const j = I(n); return j >= 0 ? c[j] : undefined; }; }); }
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
 const trip = (h, d, a) => (h > 1 && d > 1 && a > 1 ? { home: h, draw: d, away: a } : null);
 const pc = (x) => (x * 100).toFixed(0) + "%";
 const all = [];
-for (const lg of LG) for (const sea of SE) { const f = path.join(DIR, `${lg}_${sea}.csv`); if (!fs.existsSync(f)) continue; for (const g of pcsv(fs.readFileSync(f, "utf8"))) { const fh = num(g("FTHG")), fa = num(g("FTAG")); if (fh === null || fa === null) continue; const euC = trip(num(g("AvgCH")), num(g("AvgCD")), num(g("AvgCA"))) ?? trip(num(g("B365CH")), num(g("B365CD")), num(g("B365CA"))); if (!euC) continue; const euO = trip(num(g("AvgH")), num(g("AvgD")), num(g("AvgA"))) ?? trip(num(g("B365H")), num(g("B365D")), num(g("B365A"))); const ahC = num(g("AHCh")) ?? num(g("AHh")); if (ahC === null) continue; const d = g("Date") || ""; all.push({ euC, euO, line: ahC, gd: fh - fa, goals: fh + fa, res: fh > fa ? "home" : fh < fa ? "away" : "draw", date: d }); } }
+for (const D of DIRS) { if (!fs.existsSync(D)) continue; for (const fn of fs.readdirSync(D)) { if (!fn.endsWith(".csv")) continue; for (const g of pcsv(fs.readFileSync(path.join(D, fn), "utf8"))) { const fh = num(g("FTHG")), fa = num(g("FTAG")); if (fh === null || fa === null) continue; const euC = trip(num(g("AvgCH")), num(g("AvgCD")), num(g("AvgCA"))) ?? trip(num(g("B365CH")), num(g("B365CD")), num(g("B365CA"))); if (!euC) continue; const euO = trip(num(g("AvgH")), num(g("AvgD")), num(g("AvgA"))) ?? trip(num(g("B365H")), num(g("B365D")), num(g("B365A"))); const ahC = num(g("AHCh")) ?? num(g("AHh")); if (ahC === null) continue; const d = g("Date") || ""; all.push({ euC, euO, line: ahC, gd: fh - fa, goals: fh + fa, res: fh > fa ? "home" : fh < fa ? "away" : "draw", date: d }); } } }
 all.sort((a, b) => { const k = (s) => { const m = String(s.date).split("/"); if (m.length < 3) return 0; let y = m[2]; if (y.length === 2) y = (Number(y) > 50 ? "19" : "20") + y; return +y * 1e4 + +m[1] * 100 + +m[0]; }; return k(a) - k(b); });
 const dev = (o) => { const i = [1 / o.home, 1 / o.draw, 1 / o.away], s = i[0] + i[1] + i[2]; return { home: i[0] / s, draw: i[1] / s, away: i[2] / s }; };
 function feat(m) { const favHome = m.euC.home <= m.euC.away, favSide = favHome ? "home" : "away"; const di = dev(m.euC), dio = m.euO ? dev(m.euO) : null; const drift = dio ? (di[favSide] - dio[favSide] > 0.02 ? "加注" : di[favSide] - dio[favSide] < -0.02 ? "退烧" : "平稳") : null; const L = m.line; const margin = m.gd + L; const cover = margin > 0.25 ? "让胜" : margin < -0.25 ? "让负" : "让平"; return { favHome, favOdds: m.euC[favSide], drawOdds: m.euC.draw, drift, ahAbs: Math.abs(L), cover, over: m.goals > 2.5, res: m.res }; }
@@ -20,11 +20,11 @@ const F = all.map(feat);
 const split = Math.floor(F.length * 0.7), TR = F.slice(0, split), TE = F.slice(split);
 
 // 让球线分箱(细到每0.25一档,平手到3+)
-const LINES = [["平手(0)", 0, 0.125], ["让0.25", 0.125, 0.375], ["让0.5", 0.375, 0.625], ["让0.75", 0.625, 0.875], ["让1", 0.875, 1.125], ["让1.25", 1.125, 1.375], ["让1.5", 1.375, 1.625], ["让1.75", 1.625, 1.875], ["让2", 1.875, 2.125], ["让2.25", 2.125, 2.375], ["让2.5", 2.375, 2.625], ["让2.75", 2.625, 2.875], ["让3+", 2.875, 99]];
+const LINES = [["平手(0)", 0, 0.125], ["让0.25", 0.125, 0.375], ["让0.5", 0.375, 0.625], ["让0.75", 0.625, 0.875], ["让1", 0.875, 1.125], ["让1.25", 1.125, 1.375], ["让1.5", 1.375, 1.625], ["让1.75", 1.625, 1.875], ["让2", 1.875, 2.125], ["让2.25", 2.125, 2.375], ["让2.5", 2.375, 2.625], ["让2.75", 2.625, 2.875], ["让3", 2.875, 3.125], ["让3.25+", 3.125, 99]];
 const inBand = (m, lo, hi) => m.ahAbs >= lo && m.ahAbs < hi;
 const rate = (rows, fn) => { const n = rows.length; return n ? rows.filter(fn).length / n : 0; };
 
-console.log("████ 逐让球线·交叉组合规律 · 五大联赛全7赛季12458场 ████\n");
+console.log(`████ 逐让球线·交叉组合规律 · 五大+17低级别联赛全7赛季 ${F.length}场 ████\n`);
 console.log("让球线     N    主胜/平/客胜      大球/小球    让胜/让平/让负      该线最强子组合(OOS双稳)");
 for (const [name, lo, hi] of LINES) {
   const g = F.filter((m) => inBand(m, lo, hi));
