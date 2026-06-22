@@ -505,6 +505,7 @@ const rows = games.map((p, i) => {
     sanityOdds: {
       euro: s.europeanOdds?.current ?? null,                                   // 胜负平/欧洲赔率(让0直胜){home,draw,away}
       euroInit: s.europeanOdds?.initial ?? null,                               // 欧赔初盘(线/赔率移动分析)
+      euroEspn: c?.espnOdds?.ml ?? null,                                       // ESPN/DK moneyline 欧赔(补500悬殊盘1X2未开售场,供组合引擎触发超大热门规律·真盘非编造)
       hcp: s.handicapOdds?.current ?? null,                                    // 让球胜负平(竞彩让球后){home,draw,away}
       hcpInit: s.handicapOdds?.initial ?? null,                               // 让球初盘
       jcLine: s.jingcaiHandicap?.line ?? null,                                 // 竞彩官方让球线

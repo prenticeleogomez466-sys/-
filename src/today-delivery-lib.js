@@ -1121,12 +1121,18 @@ export function buildComboTriggerSheet({ date, rows }) {
   let firedN = 0;
   for (const r of rows) {
     const so = r.sanityOdds ?? {};
-    const euOk = so.euro && [so.euro.home, so.euro.draw, so.euro.away].every((x) => Number(x) > 1);
-    const t = euOk ? comboTriggers({ euClose: so.euro, euOpen: so.euroInit, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null }) : null;
-    if (!t) { out.push([r.match, r.wld ?? "—", "⚠️本场收盘欧赔未抓全·引擎不触发(缺不编)", "—", "⚠️缺"]); continue; }
+    const valid = (e) => e && [e.home, e.draw, e.away].every((x) => Number(x) > 1);
+    // 悬殊盘 500 的 1X2 常未开售→so.euro 缺;按"缺口能补就补"铁律回退 ESPN/DK moneyline 真盘(非编造),
+    //   让法国vs伊拉克这种超大热门场也能触发"超大热门→主胜/大球"高把握组合。ESPN ml 无开盘价→drift规律(加注/退烧)诚实不触发。
+    const useEspn = !valid(so.euro) && valid(so.euroEspn);
+    const euClose = valid(so.euro) ? so.euro : (useEspn ? so.euroEspn : null);
+    const euOpen = valid(so.euro) ? so.euroInit : null;
+    const t = euClose ? comboTriggers({ euClose, euOpen, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null }) : null;
+    if (!t) { out.push([r.match, r.wld ?? "—", "⚠️本场收盘欧赔+ESPN盘均未抓到·引擎不触发(缺不编)", "—", "⚠️缺"]); continue; }
     const strong = t.triggers.filter((x) => x.tier === "高" || x.tier === "中");
     const warn = t.triggers.filter((x) => x.tier === "提醒" || x.tier === "倾向");
     if (strong.length) firedN++;
+    const espnNote = useEspn ? "（欧赔取ESPN/DK真盘·500此盘1X2未开售）\n" : "";
     // 大白话"怎么买":买玩法的→"买【X】(命中N%·因为触发条件)";可靠度/风险→提示;无→看主表
     const buyLines = strong.map((x) => {
       const hit = `命中${pc(x.hitRate.te)}`;
@@ -1134,9 +1140,9 @@ export function buildComboTriggerSheet({ date, rows }) {
       if (x.market === "可靠度") return `👉主推热门偏可靠·可作胆(${hit})`;
       return `${x.predict}(${hit})`;
     });
-    const buyCell = buyLines.length ? buyLines.join("\n") : "本场无高把握组合 → 按主表方向研判即可(不硬凑)";
+    const buyCell = espnNote + (buyLines.length ? buyLines.join("\n") : "本场无高把握组合 → 按主表方向研判即可(不硬凑)");
     const warnCell = warn.length ? warn.map((x) => `${tierIcon[x.tier]}${x.predict}(${pc(x.hitRate.te)})·${x.why}`).join("\n") : "—";
-    out.push([r.match, r.wld ?? "—", buyCell, warnCell, "✅实测组合(回测12458场+截图验证)"]);
+    out.push([r.match, r.wld ?? "—", buyCell, warnCell, useEspn ? "✅ESPN/DK真盘补(500未开售)" : "✅实测组合(回测12458场+截图验证)"]);
   }
   out.push([""], [`━━ 共${rows.length}场,其中${firedN}场触发高/中命中组合。规律来源=全7赛季12458场walk-forward(TRAIN/TEST双稳)+353真竞彩截图交叉验证+庄家意图21405场。非下注edge(打不过收盘线),只标高把握/危险盘供选择性出手;无触发的场如实标"按主表研判",不硬凑。`]);
   return { name: "组合触发", rows: out };
