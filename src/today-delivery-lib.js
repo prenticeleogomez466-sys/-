@@ -1578,16 +1578,14 @@ export function advCellText(r, advDataPresent) {
 
 // ── xlsx 25列(2026-06-11 升级:20列专业版 + 世界杯模型先验列组3列 + 让球真实裁决列 + 串关安全度列;
 //    列头注明模型归属——"足球大模型"模型列 vs "市场锚"赔率列 vs "世界杯模型"先验列,两模型贡献一眼分清) ──
-export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事)",
-  "胜负平(盘口✅主推·模型🔶次选)", "胜平负赔率✅(市场锚)",
-  "🌍世界杯模型·Elo先验三概率(洲际校正)", "🌍世界杯模型·场馆λ乘子", "🏆世界杯模型·出线/夺冠%",
-  "让球方向🔶(模型真实裁决·可与胜平负不同向)",
-  "竞彩让球(模型让/受让后胜平负vs市场)", "竞彩让球赔率✅", "博彩亚盘✅(DK+titan007双源)",
-  "信号面板✅(欧赔异动·亚盘水位·让球盘资金·共振/背离·阵容)",
-  "比分(盘口✅真实热门主推+模型🔶次行)", "比分赔率✅", "半全场(盘口✅真实热门主推+模型🔶次行)", "半全场赔率✅", "大小球✅", "进球分布✅",
-  "主队近5✅", "客队近5✅", "H2H(本地49k历史库)", "攻防画像", "信心档", "💰建议注金🔶(基础100元分层)", "串关安全度", "🔴对抗证伪(三视角·只标注不弃赛)",
-  "🎯综合研判·最终建议(盘口+情报+异动·大白话)",
-  "🌍世界杯小组形势(当前积分+面临问题·末轮胜平负出线推演)"];
+// 2026-06-23 用户裁决:砍冗余·汇总一张主表(核心版)。一张表=所有比赛全推荐,符合组合条件的高确定性场特别拎出来。
+//   情报/盘口合理性/返还率/爆冷/决策辅助下沉到各自专属 sheet(情报详情/组合触发全量/数据审计/14场);主表只留决策最有用的。
+//   ⚠️合法改列=显式跑 freeze-delivery-contract.mjs --write 重冻+过用户(增减都要过用户)。
+export const XLSX_HEADERS = ["#", "开赛", "对阵(赛事·情景)",
+  "🎯盘口主推(方向·赔率·信心★)",
+  "🔥组合触发·三问最可能(胜平负/大小球/让球·命中%·★≥70高确定性)",
+  "让球(让N球后胜平负·主推vs市场)", "比分主推✅", "大小球✅",
+  "📌研判(看好谁·为什么·风险·一句话)", "💰注金🔶(基础100元分层)"];
 
 // ── 综合研判·最终建议(2026-06-18 用户:把情报详情+盘口合理性的实时分析揉进竞彩完整·重新给推荐) ──
 //   纯组合现成字段(盘口主推/信心/盘口合理性深浅/实时核查关键情报+异动+最终建议),不新增推断、不编造。
@@ -1729,20 +1727,69 @@ export function buildAnomalyRadar(r) {
 export function upsetOutcome(r) {
   const dirM = String(r.wld || r.primary?.text || "").match(/(主胜|平局|客胜)/);
   const fav = dirM ? dirM[1] : null;
-  const cold = fav === "主胜" ? "客队偷分(平或客胜)" : fav === "客胜" ? "主队偷分(平或主胜)" : null;
-  const drawScore = r.upsetMarketDraw?.score || null;
+  // 热门不胜%(逐场不同·真实):优先爆冷诊断,退市场隐含;favProb=盘口热门隐含胜率
+  const notWin = r.upsetDiag?.baseUpsetProb != null ? Math.round(r.upsetDiag.baseUpsetProb * 100)
+    : (Number.isFinite(r.notWinPct) ? Math.round(r.notWinPct) : null);
+  const favProb = r.sanity?.favProb != null ? Math.round(r.sanity.favProb * 100) : null;
   const drawPct = r.drawImpliedPct != null ? Math.round(r.drawImpliedPct * 100) : null;
-  const lvl = r.upset?.level;
-  if (!cold && !drawScore && lvl == null) return null;
+  const drawScore = r.upsetMarketDraw?.score || null;
+  // 本就五五开(热门隐含<48%):谈不上"爆冷"——别再硬套"最可能1-1"模板(2026-06-23 用户:所有都写1-1=敷衍)
+  if (favProb != null && favProb < 48) return `本就接近五五开(热门隐含${favProb}%),平或任一方取胜都正常·谈不上"爆冷",别单场当胆`;
+  if (!fav && notWin == null) return null;
+  const who = fav === "主胜" ? "客队" : fav === "客胜" ? "主队" : null;
   const bits = [];
-  if (drawScore) bits.push(`最可能踢成平局 ${drawScore}`);
-  else if (drawPct != null && drawPct >= 28) bits.push(`平局概率 ${drawPct}%`);
-  if (cold) bits.push(cold);
-  if (lvl === "高") bits.push("爆冷风险高");
-  return bits.length ? bits.join("、") : null;
+  if (notWin != null) bits.push(`热门不胜≈${notWin}%`);            // ←逐场不同,取代千篇一律的1-1
+  if (who) bits.push(`冷路=${who}偷分(平或爆冷胜)`);
+  // 平局格只在平局隐含真偏高(≥30%)时点,且明确"众数非预测",不当每场标配
+  if (drawPct != null && drawPct >= 30) bits.push(`平局隐含${drawPct}%偏高${drawScore ? `·被逼平多走${drawScore}(众数·非预测)` : ""}`);
+  return bits.length ? bits.join("·") : null;
 }
 
 export function synthesisCell(r) { return buildAnomalyRadar(r).short; }
+
+// ── 组合触发·三问最可能(2026-06-23 用户核心诉求:组合触发每场都用·给最可能结果·命中≥70%标★高确定性) ──
+//   复用 synthesize(cross-market 走势组合 + fire-pockets 高命中口袋,均五大全7赛季过测):胜平负/大小球/让球各取最可能。
+//   诚实:高命中≠盈利(收盘已定价);今天全WC/芬超·口袋是五大联赛校准·结构可迁移确切%非WC真值。命中只帮"挑最可能+筛场"。
+function synthFromRow(r) {
+  const so = r.sanityOdds ?? {};
+  const valid = (e) => e && [e.home, e.draw, e.away].every((x) => Number(x) > 1);
+  const euClose = valid(so.euro) ? so.euro : (valid(so.euroEspn) ? so.euroEspn : null);
+  if (!euClose) return null;
+  return synthesize({ euClose, euOpen: valid(so.euro) ? so.euroInit : null, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null,
+    ouClose: so.over25, ouOpen: so.over25Init, waterHomeClose: so.ahHomeWater, waterHomeOpen: so.ahHomeWaterInit, waterAwayClose: so.ahAwayWater, waterAwayOpen: so.ahAwayWaterInit });
+}
+const hitNum = (hit) => { const n = parseInt(String(hit ?? "").replace(/[^0-9]/g, ""), 10); return Number.isFinite(n) ? n : 0; };
+// 取首行 / 取‖前段(主推段)——三处渲染共用(主sheet/手机/英文),保持核心版精简一致。
+export const firstLineOf = (s) => String(s ?? "").split("\n")[0];
+export const beforeBarOf = (s) => String(s ?? "").split("‖")[0].replace(/[｜|]\s*$/, "").trim();
+// 本场是否"符合组合条件·高确定性"=任一市场有≥70%命中的过测出手口袋。
+export function comboHighCertainty(r) {
+  const s = synthFromRow(r); if (!s) return null;
+  const mk = s.markets;
+  const best = [["胜平负", mk.胜负平], ["大小球", mk.大小球]].filter(([, m]) => m?.出手 && hitNum(m.命中) >= 70)
+    .map(([k, m]) => ({ market: k, dir: m.方向, hit: hitNum(m.命中), cond: m.条件 }))
+    .sort((a, b) => b.hit - a.hit)[0];
+  return best || null;
+}
+export function comboThreeQCell(r) {
+  const s = synthFromRow(r); if (!s) return "⚠️无欧赔·组合触发不可算";
+  const mk = s.markets;
+  const star = (m) => (hitNum(m.命中) >= 70 ? "★" : "");
+  const q = (label, m) => m?.出手 ? `${label}:${m.方向}·命中${m.命中}${star(m)}` : `${label}:无高命中→看主表`;
+  const hcq = mk.让球?.出手 ? `让球:${mk.让球.方向}·命中${mk.让球.命中}` : `让球:${mk.让球?.结论 ?? "过盘无高命中点(庄家做平)"}`;
+  return [q("胜平负", mk.胜负平), q("大小球", mk.大小球), hcq].join("\n");
+}
+
+// ── 紧凑研判(2026-06-23 重写·用户:别啰嗦堆字·一句话给"看好谁+为什么+最重风险";删"若爆冷1-1"模板) ──
+//   看好谁+为什么=directCall(已逐场差异化·按主导信号分支);风险=异动雷达里最严重那一条因子(只取1条·不堆砌)。
+export function tightVerdict(r) {
+  const call = directCall(r);
+  const rad = buildAnomalyRadar(r);
+  const topF = rad.factors.find((f) => f.sev === "🔴") || rad.factors.find((f) => f.sev === "🟡");
+  // 风险只补 directCall 没覆盖到的(避免重复):directCall 已含证伪/分歧/平局时不再追加同类
+  const dup = topF && new RegExp(topF.cat.replace(/[★].*/, "")).test(call);
+  return topF && !dup ? `${call}｜${topF.sev}${topF.cat}` : call;
+}
 
 // ── 研判详情 sheet(异动雷达全文下沉处:主表保持精简,这里给排序后的完整因子分栏) ──
 export function buildRadarDetailSheet({ date, rows }) {
@@ -1765,16 +1812,24 @@ export function buildRadarDetailSheet({ date, rows }) {
 }
 
 export function buildXlsxSheets({ date, rows, banner, advDataPresent, recordLine = null, stakeNote = null }) {
-  // 对阵列附加行:每场情景研判(🏆赛会 出线/夺冠% 已移到专属"世界杯模型"列,不再塞对阵格)
-  const matchCell = (r) => `${r.match}(${r.comp})${r.scen ? `\n情景:${r.scen}` : ""}`; // 爆冷研判移出→独立sheet(主表干净)
+  // 对阵列:对阵(赛事)+情景一行(2026-06-23 核心版:WC先验/赛会/近5/H2H/亚盘/信号面板/半全场等已下沉专属sheet)
+  const matchCell = (r) => `${r.match}(${r.comp})${r.wcLine ? `\n🏆${r.wcLine}` : ""}${r.scen ? `\n情景:${r.scen}` : ""}`;
+  const firstLine = (s) => String(s ?? "").split("\n")[0];
+  const beforeBar = (s) => String(s ?? "").split("‖")[0].replace(/[｜|]\s*$/, "").trim();
+  // 🎯盘口主推格:主推方向+赔率(取胜负平首行)+信心档,符合组合高确定性条件→★(用户:高确定性场特别拎出来)
+  const pickCell = (r) => {
+    const head = firstLine(r.wld).replace(/^盘口主推[✅]?\s*/, "");
+    const hc = comboHighCertainty(r);
+    return `${head}\n${r.tier}(${Math.round(r.conf)})${hc ? ` ★高确定性(${hc.market}${hc.dir}命中${hc.hit}%)` : ""}`;
+  };
   const xrows = rows.map((r) => [String(r.idx), r.ko, matchCell(r),
-    r.wld, r.euro,
-    r.wcElo ?? "—", r.wcLambda ?? "—", r.wcTourney ?? (r.wcLine || "—"),
+    pickCell(r),
+    comboThreeQCell(r),
     r.hv?.text ?? "⚠️让球真实裁决缺",
-    r.hcView, r.hc, r.asian, r.signals ?? "⚠️未拼装", `${r.score}〔${r.scoreSrc}〕`, r.scoreMkt, `${r.halffull}〔${r.hfSrc}〕`, r.hfMkt, r.ouReal, r.dist,
-    `${r.homeRec} ${r.homeLast5}`, `${r.awayRec} ${r.awayLast5}`, r.h2h, r.profile, `${r.tier}(${Math.round(r.conf)})`,
-    r.stake?.text ?? "—(档位缺不给金额)",
-    r.parlay?.text ?? "⚠️未评", advCellText(r, advDataPresent), synthesisCell(r), r.wcGroupCell ?? "—"]);
+    beforeBar(r.score),
+    firstLine(r.ouReal),
+    tightVerdict(r),
+    r.stake?.text ?? "—(档位缺不给金额)"]);
   // 战绩行/注金口径行紧跟 banner(2026-06-12 用户裁决:战绩透明化进表头;缺=不出该行,不留空假象)
   const headRows = [[`⚡ 神选 · 竞彩完整覆盖 · ${date}`], [banner],
     ...(recordLine ? [[recordLine]] : []), ...(stakeNote ? [[stakeNote]] : [])];
@@ -1861,7 +1916,9 @@ export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, 
     (r.stake ? `<div class="drow"><b>💰建议注金🔶</b>${esc(r.stake.text)}<span class="g">(分层建议)</span></div>` : "") +
     (r.parlay ? `<div class="drow"><b>串关</b>${esc(r.parlay.text)}</div>` : "") +
     (r.adv ? `<div class="adv"><b>${esc(r.adv.label)}${r.adv.ev != null ? ` · EV=${r.adv.ev}` : ""}</b><br>${esc(r.adv.kill)}<br><span class="g">三视角对抗证伪·只标注风险</span></div>` : "");
-  const trs = rows.map((r) => `<tr class="r" onclick="tg(this)"><td class="m">${esc(r.match)}${r.adv && /证伪/.test(r.adv.label) ? ' <span class="kx">🔴</span>' : ""} <span class="ar">▾</span><i>${esc(r.ko)} · ${esc(r.comp)}</i></td><td><span class="b" style="background:${tierColor(r.tier)}">${Math.round(r.conf)}</span>${r.stake ? `<span class="stk">💰${r.stake.stake}</span>` : ""}</td><td>${esc(wldS(r.wld))}</td><td>${esc(r.hcP.line)}</td><td>${esc(scoreS(r.score))}</td><td>${esc(hfS(r.halffull))}</td><td>${esc(ouS(r.ouReal))}</td></tr><tr class="d"><td colspan="7">${detail(r)}</td></tr>`).join("");
+  // 🔥组合触发三问头条(2026-06-23 核心版:每场最可能结果直接进核心表,高确定性★)
+  const comboS = (r) => { const hc = comboHighCertainty(r); return hc ? `★${hc.market}${hc.dir} ${hc.hit}%` : "—"; };
+  const trs = rows.map((r) => `<tr class="r" onclick="tg(this)"><td class="m">${esc(r.match)}${comboHighCertainty(r) ? ' <span class="kx" style="color:#e65100">★</span>' : ""}${r.adv && /证伪/.test(r.adv.label) ? ' <span class="kx">🔴</span>' : ""} <span class="ar">▾</span><i>${esc(r.ko)} · ${esc(r.comp)}</i></td><td><span class="b" style="background:${tierColor(r.tier)}">${Math.round(r.conf)}</span>${r.stake ? `<span class="stk">💰${r.stake.stake}</span>` : ""}</td><td>${esc(wldS(r.wld))}</td><td>${esc(comboS(r))}</td><td>${esc(r.hcP.line)}</td><td>${esc(scoreS(r.score))}</td><td>${esc(ouS(r.ouReal))}</td></tr><tr class="d"><td colspan="7">${detail(r)}</td></tr>`).join("");
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>神选·竞彩·${date}</title>
 <style>*{box-sizing:border-box}body{font-family:-apple-system,"Microsoft YaHei",system-ui,sans-serif;margin:0;background:#eef1f5;color:#1c2530;-webkit-text-size-adjust:100%}.wrap{max-width:720px;margin:0 auto;padding:14px 10px 40px}
 .top{background:linear-gradient(135deg,#4A148C,#7b1fa2);color:#fff;border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 6px 18px rgba(74,20,140,.28)}.top h1{font-size:18px;margin:0 0 3px;font-weight:700}.top .sub{font-size:12px;opacity:.88}.legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}.legend span{font-size:11px;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:20px}
@@ -1887,7 +1944,7 @@ ${recordLine ? `<div class="rec">${esc(recordLine)}</div>` : ""}
 <div class="risk">${riskBody}</div>
 ${stakeSum ? `<div class="rec" style="border-left-color:#7b1fa2">${esc(stakeSum)}</div>` : ""}
 <div class="hint">👇 点任意一行 = 展开该场全部赔率/近5/H2H/攻防/建议注金</div>
-<table class="core"><thead><tr><th>对阵 ▾</th><th>信心/注金</th><th>胜负平</th><th>让球</th><th>比分</th><th>半全</th><th>大小</th></tr></thead><tbody>${trs}</tbody></table>
+<table class="core"><thead><tr><th>对阵 ▾(★=高确定性)</th><th>信心/注金</th><th>胜负平</th><th>🔥组合</th><th>让球</th><th>比分</th><th>大小</th></tr></thead><tbody>${trs}</tbody></table>
 ${renderParlayHtmlSection(parlayPlan, { compact: true })}
 <a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(20列全字段·含对抗证伪)</a>
 <div class="foot">真实端到端(${date})。5赔种=500竞彩XML(欧赔/让球/比分/半全场/总进球de-vig),亚盘+未开售场欧赔=ESPN/DraftKings,近5/H2H=ESPN。让球(让/受让后胜平负)=模型与市场两套数·分歧大以市场为准。缺口(国家队真xG/老H2H)诚实标。${esc(auditFoot)}</div>
@@ -1910,7 +1967,7 @@ export function resolveHtmlWriteTarget({ existingHtml, date, canonicalPath, date
 // ── 英文固定URL页 football.html(手机收藏夹固定地址;缺陷#16:跟随当日,与 xlsx/手机页同源同日期) ──
 export function renderEnglishHtml({ date, rows, riskNote, intlN, wcN, banner, auditFoot, parlayPlan = null, recordLine = null, stakeSum = null }) {
   const br = (s) => esc(s).replace(/\n/g, "<br>");
-  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}${r.sanity?.band ? `<br><span style="color:#888;font-size:11px">📐热门隐含${Math.round(r.sanity.favProb * 100)}%${sanityVerdictLabel(r.sanity).tag}(正常${Math.round(r.sanity.band.p5 * 100)}–${Math.round(r.sanity.band.p95 * 100)}%)</span>` : ""}${r.upsetDiag ? `<br><span style="color:#888;font-size:11px">🎲${esc(r.upsetDiag.upsetType ?? "")}·热门不胜${Math.round(r.upsetDiag.baseUpsetProb * 100)}%${r.drawImpliedPct >= 0.30 ? "·🔴防平" : ""}</span>` : ""}</td><td>${esc(r.wld)}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(r.hcView)}</td><td>${esc(r.score)}〔${esc(r.scoreSrc)}〕</td><td>${esc(r.halffull)}〔${esc(r.hfSrc)}〕</td><td>${esc(r.ouReal)}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
+  const trs = rows.map((r) => `<tr><td>${esc(r.ko)}</td><td><b>${esc(r.match)}</b><br><span style="color:#7e57c2;font-size:11px">${esc(r.comp)}</span>${r.wcLine ? `<br><span style="font-size:11px">🏆 ${esc(r.wcLine)}</span>` : ""}${r.wcElo && r.wcElo !== "—" ? `<br><span style="color:#6a1b9a;font-size:11px">🌍世界杯模型 ${esc(r.wcElo)}·λ${esc(r.wcLambda ?? "—")}</span>` : ""}${r.scen ? `<br><span style="color:#888;font-size:11px">情景:${esc(r.scen)}</span>` : ""}${r.sanity?.band ? `<br><span style="color:#888;font-size:11px">📐热门隐含${Math.round(r.sanity.favProb * 100)}%${sanityVerdictLabel(r.sanity).tag}(正常${Math.round(r.sanity.band.p5 * 100)}–${Math.round(r.sanity.band.p95 * 100)}%)</span>` : ""}${r.upsetDiag ? `<br><span style="color:#888;font-size:11px">🎲${esc(r.upsetDiag.upsetType ?? "")}·热门不胜${Math.round(r.upsetDiag.baseUpsetProb * 100)}%${r.drawImpliedPct >= 0.30 ? "·🔴防平" : ""}</span>` : ""}</td><td>${esc(firstLineOf(r.wld))}<br><span style="color:#888;font-size:11px">${esc(r.tier)}${comboHighCertainty(r) ? " ★高确定性" : ""}</span></td><td>${br(comboThreeQCell(r))}</td><td>${r.hv ? br(r.hv.text) : "—"}</td><td>${esc(beforeBarOf(r.score))}</td><td>${esc(firstLineOf(r.ouReal))}</td><td>${br(tightVerdict(r))}</td><td>${esc(r.tier)}<br>${Math.round(r.conf)}</td><td>${esc(r.stake?.text ?? "—")}</td><td>${esc(r.parlay?.text ?? "—")}</td></tr>`).join("");
   return `<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>⚡神选·足球·${date}</title>
@@ -1932,7 +1989,7 @@ ${recordLine ? `<div class="note" style="border-color:#2e7d32;background:#f1f8e9
 ${riskNote ? `<div class="note">${esc(riskNote)}</div>` : ""}
 ${stakeSum ? `<div class="note" style="border-color:#7b1fa2;background:#f3e5f5">${esc(stakeSum)}</div>` : ""}
 <h2>竞彩 · ${rows.length} 场(${esc(competitionBreakdown(rows))})</h2>
-<table><tr><th>开赛</th><th>对阵</th><th>胜负平</th><th>让球真实裁决</th><th>让球(模型vs市场)</th><th>比分</th><th>半全场</th><th>大小球</th><th>信心</th><th>💰注金🔶</th><th>串关</th></tr>${trs}</table>
+<table><tr><th>开赛</th><th>对阵(情景)</th><th>🎯盘口主推</th><th>🔥组合触发·三问最可能</th><th>让球真实裁决</th><th>比分</th><th>大小球</th><th>📌研判</th><th>信心</th><th>💰注金🔶</th><th>串关</th></tr>${trs}</table>
 ${renderParlayHtmlSection(parlayPlan)}
 <a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(20列·含对抗证伪)</a>
 <div class="foot">本页与 手机页/桌面 xlsx 同一渲染出口(today-full-coverage)生成 · 真实端到端(${date})。${esc(auditFoot)}</div>

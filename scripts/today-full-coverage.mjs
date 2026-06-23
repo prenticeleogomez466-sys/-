@@ -887,23 +887,20 @@ const contentAudit = [
 ];
 
 // ── xlsx(25列专业版 + 数据审计 + 14场闸裁决,经 xlsx-writer:深紫FF4A148C表头/banner跨列合并/内容感知行高/冻结筛选) ──
+// 2026-06-23 用户裁决:砍冗余·只留最有用的。主表(核心版)汇总所有比赛+组合触发高确定性标★;
+//   情报单独·串关·数据审计·组合触发全量·14场保留;删 研判详情/盘口合理性/返还率/爆冷研判/决策辅助(精华已并进主表/组合触发)。
 const sheets = [
   ...buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length), recordLine: recordLine?.text ?? null, stakeNote: stakeSum.note }),
-  buildRadarDetailSheet({ date, rows }), // 2026-06-19 异动雷达全文(主表综合研判格已降至≤2行,长文下沉此 sheet)
+  buildComboTriggerSheet({ date, rows }), // 组合触发全量明细(高命中组合+庄家意图+用户让球分线规则·逐场触发·全覆盖分档)
   buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
-  buildAuditSheet({ date, rows, contentAudit, intelByMatch }), // 2026-06-20 末3维(初盘异动/阵容/伤病红牌)采集完整性·从signals+情报真值派生
-  buildIntelSheet({ date, rows, intelByMatch }),
-  buildHandicapSanitySheet({ date, rows }),
-  buildOddsValueSheet({ date, rows }),
-  buildUpsetAnalysisSheet({ date, rows }),
-  buildComboTriggerSheet({ date, rows }), // 2026-06-22 交叉组合触发器(高命中组合+庄家意图+用户让球分线规则,每场自动标·全覆盖分档)
-  buildDecisionAidsSheet({ date, rows }),
+  buildAuditSheet({ date, rows, contentAudit, intelByMatch }), // 数据审计(可追溯·逐场逐赔种来源+缺口标注)
+  buildIntelSheet({ date, rows, intelByMatch }), // 情报详情(单独·预测首发XI/阵型/伤停/近赛/交锋/小组形势)
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
-// 硬闸(2026-06-16 用户:两sheet接进一条龙自动出·做实):盘口合理性/爆冷研判必在,缺=fail-loud拒认交付
-const REQUIRED_SHEETS = ["盘口合理性", "爆冷研判"];
+// 硬闸:核心交付表必在,缺=fail-loud拒认交付(2026-06-23 改为核心版必含表:主表+组合触发+数据审计+情报详情)
+const REQUIRED_SHEETS = ["竞彩完整", "组合触发", "数据审计", "情报详情"];
 const missingSheets = REQUIRED_SHEETS.filter((n) => !sheets.some((s) => s.name === n));
-if (missingSheets.length) { console.error(`🔴 必含工作表缺失(拒认成功交付):${missingSheets.join("、")}——盘口合理性/爆冷研判须每天自动出。`); process.exit(1); }
+if (missingSheets.length) { console.error(`🔴 必含工作表缺失(拒认成功交付):${missingSheets.join("、")}——核心版必含表:竞彩完整/组合触发/数据审计/情报详情。`); process.exit(1); }
 if (outBase) mkdirSync(outBase, { recursive: true });
 // 权威产物=桌面稳定子文件夹(2026-06-11 EBUSY 根修:用户常开着桌面根 xlsx 在看,WPS/Excel 文件锁
 //   不该让整条交付链第一步就崩死)。先写子文件夹权威份,桌面根/手机站副本降级 best-effort。

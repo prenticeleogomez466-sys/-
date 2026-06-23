@@ -184,17 +184,16 @@ test("三面同源:xlsx标题/手机页/英文页日期一致,双日期互不污
   });
   for (const [i, o] of outputs.entries()) {
     const other = outputs[1 - i].date;
-    // xlsx:标题行 + banner 行都是本日期;29列专业版列数不缩水(2026-06-22 +🌍世界杯小组形势;2026-06-18 +🎯综合研判)
+    // xlsx:标题行 + banner 行都是本日期;核心版10列不缩水(2026-06-23 用户裁决:砍冗余·汇总一张主表)
     assert.equal(o.sheets[0].rows[0][0], `⚡ 神选 · 竞彩完整覆盖 · ${o.date}`);
     assert.match(o.sheets[0].rows[1][0], new RegExp(o.date));
-    assert.equal(XLSX_HEADERS.length, 29);
-    assert.equal(o.sheets[0].rows[2].length, 29);
-    assert.match(o.sheets[0].rows[2][26], /对抗证伪/);
-    assert.match(o.sheets[0].rows[2][27], /综合研判/);
-    assert.match(o.sheets[0].rows[2][5], /世界杯模型/);
-    assert.match(o.sheets[0].rows[2][8], /真实裁决/);
-    assert.match(o.sheets[0].rows[2][24], /建议注金/);
-    assert.match(o.sheets[0].rows[2][25], /串关/);
+    assert.equal(XLSX_HEADERS.length, 10);
+    assert.equal(o.sheets[0].rows[2].length, 10); // rows[2]=表头行(无recordLine/stakeNote时)
+    assert.match(o.sheets[0].rows[2][3], /盘口主推/);
+    assert.match(o.sheets[0].rows[2][4], /组合触发.*三问最可能/);
+    assert.match(o.sheets[0].rows[2][5], /让球.*主推vs市场/);
+    assert.match(o.sheets[0].rows[2][8], /研判/);
+    assert.match(o.sheets[0].rows[2][9], /注金/);
     // 手机页:标题 + 下载链接 + 落款日期均=本日期
     assert.match(o.mobile, new RegExp(`<title>神选·竞彩·${o.date}</title>`));
     assert.match(o.mobile, new RegExp(`jingcai-${o.date}\\.xlsx`));
