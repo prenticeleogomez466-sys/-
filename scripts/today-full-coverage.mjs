@@ -150,6 +150,19 @@ const recStr = (side) => side.record5?.n
 // 对手名中文化(2026-06-20 用户:表内不留英文):canon 命中中文用中文,未收录保留原简称(不瞎译·守不编造铁律)
 const oppZh = (x) => { const c = canonicalTeamName(x.oppName ?? ""); return /[一-鿿]/.test(c) ? c : (x.oppAbbr ?? x.oppName ?? "?"); };
 const last5Str = (side) => side.last5?.length ? side.last5.map((x) => `${x.res}${x.gf}-${x.ga}(${x.homeAway === "home" ? "主" : "客"}${oppZh(x)})`).join(" ") : "";
+// coverage.last5 → recentForm 同形 formObj(2026-06-23 修:让「情报近期」与「近5✅」同源 coverage,
+//   杜绝两处近赛对阵/战绩不一致——根因=情报近期原读陈旧 wc-national 缓存(06-09·缺 fifa.world 端点),
+//   coverage.last5 是每日 fetch-match-coverage 直查球队赛程的最新完整战绩。本队视角 gf-ga,对手名复用 oppZh)。
+const covForm = (side) => {
+  const l5 = side?.last5;
+  if (!l5?.length) return null;
+  let w = 0, d = 0, l = 0;
+  const list = l5.map((x) => {
+    if (x.res === "胜") w++; else if (x.res === "平") d++; else l++;
+    return { date: x.date, ha: x.homeAway === "home" ? "主" : "客", vs: oppZh(x), r: x.res, score: `${x.gf}-${x.ga}` };
+  });
+  return { played: l5.length, record: `${w}胜${d}平${l}负`, w, d, l, list };
+};
 // H2H 从当前主队视角 gf-ga(h2h=主队历史筛对手,gf/ga 即主队)
 const h2hStr = (c) => c?.h2h?.length ? c.h2h.map((x) => `${x.date} ${c.home.zh}${x.gf}-${x.ga}(${x.res})`).join(" / ") : "近赛季窗口无交锋(ESPN免费源限近赛季)";
 const profileStr = (c) => {
@@ -228,9 +241,19 @@ const devigHalfFullHT = (top) => {
   if (!(inv > 0) || sum.home === 0 || sum.draw === 0 || sum.away === 0) return null;
   return { home: sum.home / inv, draw: sum.draw / inv, away: sum.away / inv, books: top.length };
 };
-const asianStr = (eo) => eo?.asian?.line != null
-  ? `让${eo.asian.line} 主${eo.asian.homeOdds}/客${eo.asian.awayOdds}${eo.asian.openLine && eo.asian.openLine !== eo.asian.line ? `(开${eo.asian.openLine}→异动)` : ""} ✅${eo.source}`
-  : "⚠️未取到(亚盘源降级,无免费源)";
+// 2026-06-23 修:外盘亚盘(The Odds API/ESPN-DK)主显 + 500亚盘(odds.xml)交叉。两源让球线分歧≥0.25→明示"双源分歧"
+//   不再只显一个源装作一致(瓦萨场踩坑:外盘平手看好主队 vs 500让-0.25偏客)。line500=500 odds.xml 主队视角让球线。
+const asianStr = (eo, line500 = null) => {
+  if (eo?.asian?.line == null) {
+    // 外盘缺:若 500 有亚盘线则诚实给出 500 线(标源),而非一律"未取到"
+    return Number.isFinite(Number(line500)) ? `让${line500} ✅500亚盘(odds.xml)·外盘(DK/The Odds API)未取到` : "⚠️未取到(亚盘源降级,无免费源)";
+  }
+  const base = `让${eo.asian.line} 主${eo.asian.homeOdds}/客${eo.asian.awayOdds}${eo.asian.openLine && eo.asian.openLine !== eo.asian.line ? `(开${eo.asian.openLine}→异动)` : ""} ✅${eo.source}`;
+  if (Number.isFinite(Number(line500)) && Math.abs(Number(line500) - Number(eo.asian.line)) >= 0.25) {
+    return `${base} ｜ ⚠️500亚盘让${line500}(与外盘线差${(Number(eo.asian.line) - Number(line500)).toFixed(2)}·两源分歧·勿当一致)`;
+  }
+  return base;
+};
 // 透明让球视图:模型过盘 + 市场de-vig 两套数(带队名),分歧大按铁律标"市场更准·谨慎"。
 // 修2026-06-09:旧 simpleHandicapCell 头条用市场de-vig却配模型"把握"标签,阿根廷出"40%·把握低"与模型67%自相矛盾。
 const hcParts = (p, s) => {
@@ -459,7 +482,7 @@ const rows = games.map((p, i) => {
     scoreSrc: msv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC", hfSrc: mhv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC",
     // 真实赔率(✅500实测 + ESPN/DK与titan007双源亚盘 + 外盘欧赔参考;coverage 缺 → 诚实标缺不编)
     euro: (s.europeanOdds?.current || cov) ? euroStr(s, c) : COV_MISS,
-    asian: cov ? (c?.asianHandicap ? renderAsianDualCell(c.asianHandicap) : asianStr(c?.espnOdds)) : COV_MISS,
+    asian: cov ? (c?.asianHandicap ? renderAsianDualCell(c.asianHandicap) : asianStr(c?.espnOdds, s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null)) : COV_MISS,
     hc: hcStr(p, s),
     ouReal: ouRealStr(s, p), dist: distStr(s),
     scoreMkt: scoreMktStr(s), hfMkt: hfMktStr(s),
@@ -693,8 +716,9 @@ for (const p of games) {
     newsLayer: layerFor("news", p.fixture.id),
     predictedHome: pred?.home ?? null,
     predictedAway: pred?.away ?? null,
-    homeForm: recentForm(natCache, canonicalTeamName(p.fixture.homeTeam)),
-    awayForm: recentForm(natCache, canonicalTeamName(p.fixture.awayTeam)),
+    // 2026-06-23 修:优先 coverage.last5(与近5✅列同源·最新完整)→ 与主表近5一致;coverage 缺该队才回退国家队缓存。
+    homeForm: covForm(covFor(p)?.home) ?? recentForm(natCache, canonicalTeamName(p.fixture.homeTeam)),
+    awayForm: covForm(covFor(p)?.away) ?? recentForm(natCache, canonicalTeamName(p.fixture.awayTeam)),
     webIntel: web,
     h2hList, // 结构化交锋史(ESPN近期→国家队近2年缓存回退)→ h2hStats 深化统计,填补⚠️空缺
   });
