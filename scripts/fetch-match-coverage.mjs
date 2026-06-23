@@ -11,12 +11,15 @@ import { loadFixtures } from "../src/fixture-store.js";
 import { buildCoverageTargets, loadZhToEn } from "../src/coverage-targets.js";
 import { resolveDeliveryDate } from "../src/today-delivery-lib.js";
 import { clubLeagueForm, clubLeagueH2H } from "../src/club-league-form.js";
+import { fetchOddsApiRotating, listOddsApiKeys } from "../src/odds-api-rotation.js";
 
 // 日期:必传合法 YYYY-MM-DD 或缺省=本机 UTC+8 当日;非法 fail-loud 退出(2026-06-10 缺陷#20:废写死历史日期默认)。
 let DATE;
 try { DATE = resolveDeliveryDate(process.argv[2]); }
 catch (e) { console.error(`❌ ${e.message}`); process.exit(1); }
-const KEY = process.env.ODDS_API_KEY;
+// 2026-06-23 修:用多 key 轮换(8 个免费 key),不再只认死掉的主 ODDS_API_KEY——
+//   主 key 401 时旧逻辑直接放弃→芬超亚盘/世界杯totals全缺;轮换会切到有效 key(实测 key#1 剩 414 配额)。
+const HAS_KEY = listOddsApiKeys().length > 0;
 
 // 抓取目标动态生成(2026-06-10,审计rank2):废 7 场硬编码——从当日 fixtures store 收
 //   竞彩在售(jingcai)+ 世界杯场(shengfucai),对阵去重;中文→英文用 groups.json 反查 +
@@ -105,12 +108,11 @@ async function fetchEspnOdds(date) {
 
 // ── Odds API totals(世界杯大小球) ──
 async function fetchWcTotals() {
-  if (!KEY) return { ok: false, reason: "无 ODDS_API_KEY" };
-  const url = `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${KEY}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
-  const r = await fetch(url);
-  if (r.status !== 200) return { ok: false, reason: `HTTP ${r.status}` };
-  const remaining = r.headers.get("x-requests-remaining");
-  const events = await r.json();
+  if (!HAS_KEY) return { ok: false, reason: "无 ODDS_API_KEY" };
+  const rot = await fetchOddsApiRotating((k) => `https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=${k}&regions=eu&markets=h2h,totals&oddsFormat=decimal`);
+  if (!rot.ok) return { ok: false, reason: rot.quotaExhausted ? `全${rot.attempts.length}key配额尽(401/429)` : (rot.error || `HTTP ${rot.status}`) };
+  const remaining = rot.remaining;
+  const events = await rot.response.json();
   const median = (a) => { const s = a.filter((x) => x > 0).sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
   const byPair = {};
   for (const ev of Array.isArray(events) ? events : []) {
@@ -161,7 +163,7 @@ function buildClubEnToZh() {
 
 // 返回 { `${homeZh}|${awayZh}`: { line(主队视角让球), homeOdds, awayOdds, books, source } }(中文键,主循环精确查)。
 async function fetchClubLeagueAsian(leagues) {
-  if (!KEY) return {};
+  if (!HAS_KEY) return {};
   const median = (a) => { const s = a.filter((x) => Number.isFinite(x)).sort((x, y) => x - y); return s.length ? (s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2) : null; };
   const enToZh = buildClubEnToZh();
   const resolve = (en) => enToZh[normTeamEn(en)]?.zh ?? null; // 解不出=不编,跳过该场
@@ -170,10 +172,10 @@ async function fetchClubLeagueAsian(leagues) {
     const sport = CLUB_LEAGUE_SPORTKEY[lg];
     if (!sport) continue;
     try {
-      // US 区给亚盘让球线(quarter handicap);取各家主队让球线/水位中位作共识
-      const r = await fetch(`https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${KEY}&regions=us&markets=spreads&oddsFormat=decimal`);
-      if (r.status !== 200) { console.error(`  俱乐部亚盘 ${lg}: HTTP ${r.status}`); continue; }
-      const events = await r.json();
+      // US 区给亚盘让球线(quarter handicap);取各家主队让球线/水位中位作共识。多key轮换。
+      const rot = await fetchOddsApiRotating((k) => `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${k}&regions=us&markets=spreads&oddsFormat=decimal`);
+      if (!rot.ok) { console.error(`  俱乐部亚盘 ${lg}: ${rot.quotaExhausted ? `全${rot.attempts.length}key配额尽(401/429)` : (rot.error || `HTTP ${rot.status}`)}`); continue; }
+      const events = await rot.response.json();
       let hit = 0;
       for (const ev of Array.isArray(events) ? events : []) {
         const pts = [], hw = [], aw = [];
