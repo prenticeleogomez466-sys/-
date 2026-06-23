@@ -1820,6 +1820,18 @@ function threeQBlockHtml(r) {
     `<div class="rbuy g">命中=五大全7赛季TEST真实双稳值;高命中≠盈利(收盘已定价)。让球过盘无高命中口袋。</div></div>`;
 }
 
+// 联赛构成摘要(2026-06-23 修:芬超等俱乐部联赛绝不冒充"国际赛"——按真实 competition 分类计数,
+//   世界杯单独成桶,按场数降序拼成 "6芬兰超级联赛+4世界杯单场"。空 competition 兜底"竞彩",不再默认"国际赛"。
+//   根因:旧 banner 把"非世界杯"一律写成"国际赛",违反诚实铁律(芬超是芬兰俱乐部联赛非国际赛)。三处(banner/手机页/英文页)同源。
+export function competitionBreakdown(rows) {
+  const m = new Map();
+  for (const r of rows || []) {
+    const name = /世界杯/.test(r.comp || "") ? "世界杯单场" : (String(r.comp || "").trim() || "竞彩");
+    m.set(name, (m.get(name) ?? 0) + 1);
+  }
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v}${k}`).join("+");
+}
+
 // ── 手机页(核心7列 + 点行展开全部;2026-06-09 用户选定专业版,绝不简化) ──
 export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, counts, degradeNote, parlayPlan = null, recordLine = null, stakeSum = null }) {
   // 头条副标题=逐赔种真计数(buildCoverageSubtitle 内部 fail-loud:counts 缺/非法直接 throw,绝不默认自吹"全覆盖")。
@@ -1870,7 +1882,7 @@ table.core th{background:#4A148C;color:#fff;padding:10px 4px;font-weight:600;fon
 .rf{font-size:11.5px;line-height:1.5;padding:3px 0;border-top:1px dashed #f0e6fb;color:#3a3550}.rf:first-of-type{border-top:none}.rf b{color:#7e22ce;margin:0 4px 0 2px}.rtag{font-size:10px;color:#8b5cf6;background:#f3e8ff;border-radius:6px;padding:0 5px;margin-right:3px}
 .rbuy{margin-top:6px;padding-top:5px;border-top:1px solid #ede0fb;font-size:11.5px;color:#9333ea;font-weight:600}
 .foot{color:#9aa3af;font-size:11px;margin:12px 6px 0;line-height:1.55}</style></head><body><div class="wrap">
-<div class="top"><h1>⚡ 神选 · 竞彩推荐</h1><div class="sub">${date} · ${rows.length}场${intlN ? ` 国际赛${intlN}` : ""}${wcN ? ` 世界杯${wcN}` : ""} · ${esc(coverageSub)}</div><div class="legend"><span>✅ 实测真盘</span><span>🔶 模型推断</span><span>⚠️ 缺口标缺不编</span></div></div>
+<div class="top"><h1>⚡ 神选 · 竞彩推荐</h1><div class="sub">${date} · ${rows.length}场 · ${esc(competitionBreakdown(rows))} · ${esc(coverageSub)}</div><div class="legend"><span>✅ 实测真盘</span><span>🔶 模型推断</span><span>⚠️ 缺口标缺不编</span></div></div>
 ${recordLine ? `<div class="rec">${esc(recordLine)}</div>` : ""}
 <div class="risk">${riskBody}</div>
 ${stakeSum ? `<div class="rec" style="border-left-color:#7b1fa2">${esc(stakeSum)}</div>` : ""}
@@ -1919,7 +1931,7 @@ tr:nth-child(even) td{background:#faf8fd}
 ${recordLine ? `<div class="note" style="border-color:#2e7d32;background:#f1f8e9">${esc(recordLine)}</div>` : ""}
 ${riskNote ? `<div class="note">${esc(riskNote)}</div>` : ""}
 ${stakeSum ? `<div class="note" style="border-color:#7b1fa2;background:#f3e5f5">${esc(stakeSum)}</div>` : ""}
-<h2>竞彩 · ${rows.length} 场(${intlN}国际赛 + ${wcN}世界杯单场)</h2>
+<h2>竞彩 · ${rows.length} 场(${esc(competitionBreakdown(rows))})</h2>
 <table><tr><th>开赛</th><th>对阵</th><th>胜负平</th><th>让球真实裁决</th><th>让球(模型vs市场)</th><th>比分</th><th>半全场</th><th>大小球</th><th>信心</th><th>💰注金🔶</th><th>串关</th></tr>${trs}</table>
 ${renderParlayHtmlSection(parlayPlan)}
 <a class="dl" href="jingcai-${date}.xlsx?t=${Date.now() % 100000}">⬇ 下载完整 xlsx(20列·含对抗证伪)</a>

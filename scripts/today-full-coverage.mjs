@@ -21,7 +21,7 @@ import {
   buildHandicapSanitySheet, buildUpsetAnalysisSheet, buildOddsValueSheet, buildRadarDetailSheet, buildComboTriggerSheet,
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
-  XLSX_HEADERS, h2hToStatsList, marketWldPrimary,
+  XLSX_HEADERS, h2hToStatsList, marketWldPrimary, competitionBreakdown,
 } from "../src/today-delivery-lib.js";
 // 2026-06-15 用户裁决:盘口推荐为主、模型只当参考 → 信心/注金按真盘口热门概率定档(selectionTier 本就吃市场隐含)
 import { selectionTier } from "../src/selection-tier.js";
@@ -136,7 +136,8 @@ const covFor = (p) => cov?.matches?.find((m) => (p.fixture.homeTeam || "").inclu
 
 const ko = (p) => { const k = p.fixture?.kickoff; return k && /\d{2}:\d{2}/.test(k) ? k.slice(5, 16) : (k?.slice(5, 10) ?? ""); };
 const isWc = isWorldCupGame; // 动态判定(2026-06-10,替代旧 WC_SINGLES 硬名单)
-const compTag = (p) => (isWc(p) ? "世界杯·单场" : (p.fixture.competition || "国际赛"));
+// 2026-06-23 修:competition 缺时兜底"竞彩"(中性),绝不默认"国际赛"——芬超等俱乐部联赛/未知联赛冒充国际赛违反诚实铁律。
+const compTag = (p) => (isWc(p) ? "世界杯·单场" : (p.fixture.competition || "竞彩"));
 
 // 补全层渲染(全真实,缺标缺)
 // 2026-06-12 诚实标注:ESPN 实取不足5场时(如美国仅4场)明标"仅N场",不让"近5"表头冒充满额。
@@ -834,7 +835,7 @@ const parlayAdvBanner = advKilled.length
 const fourteenNote = fourteen?.available
   ? `14场/任选9:本期可发(见"14场·任选9"工作表,世界杯腿一律不当胆)。`
   : `14场/任选9:今日不发——${fourteen?.note ?? (fourteenFacts[0]?.[1] ?? "无本期映射")}(详见"数据审计"表内容审计区)。`;
-const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${intlN}国际赛+${wcN}世界杯单场。🎯口径(2026-06-15用户裁决):盘口推荐为主、模型只当参考——每场主推方向/信心档/注金均由500竞彩真盘口de-vig热门定(1X2未开售的悬殊盘退让球档),模型概率仅附"参考X%·与盘口同向/分歧",分歧时铁律以盘口为准。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、H2H(49k历史库无记录·未逐场独立核实是否真零交锋·库覆盖有限如法/塞2002交手过未收),已⚠️标不编。${cohNote}${parlayNote}${fourteenNote}${riskNote}盘口=市场有效共识(1X2打不过收盘线),模型本质市场跟随器无独立edge、只作对照,买不买你定。`;
+const BANNER = `🔴 完整覆盖交付(${date}):${rows.length}场=${competitionBreakdown(rows)}。🎯口径(2026-06-15用户裁决):盘口推荐为主、模型只当参考——每场主推方向/信心档/注金均由500竞彩真盘口de-vig热门定(1X2未开售的悬殊盘退让球档),模型概率仅附"参考X%·与盘口同向/分歧",分歧时铁律以盘口为准。赔率覆盖(逐赔种实数):${buildOddsCoverageLine(counts)};${covNote}。${degradeNote}真缺口:国家队真xG(FBref Cloudflare墙)、H2H(49k历史库无记录·未逐场独立核实是否真零交锋·库覆盖有限如法/塞2002交手过未收),已⚠️标不编。${cohNote}${parlayNote}${fourteenNote}${riskNote}盘口=市场有效共识(1X2打不过收盘线),模型本质市场跟随器无独立edge、只作对照,买不买你定。`;
 // 审计背书(缺陷#17修):全部从本次 rows + adversarial/<date>.json 动态生成;无当日审计文件 → 不写"已审计"背书句。
 const auditFoot = buildAuditFoot({ rows, advData });
 

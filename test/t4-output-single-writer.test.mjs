@@ -12,7 +12,7 @@ import {
   resolveDeliveryDate, buildOddsFillCounts, buildDegradeNote, buildOddsCoverageLine,
   buildCoverageSubtitle,
   buildAuditFoot, advCellText, buildXlsxSheets, XLSX_HEADERS, renderMobileHtml, renderEnglishHtml,
-  resolveHtmlWriteTarget,
+  resolveHtmlWriteTarget, competitionBreakdown,
 } from "../src/today-delivery-lib.js";
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -124,6 +124,28 @@ test("renderMobileHtml:5赔种全满 → 头条才写'全覆盖'且带真计数;
   const mobile = renderMobileHtml({ date: "2026-06-10", rows: [fullRow], riskNote: "", intlN: 1, wcN: 0, auditFoot: "", counts, degradeNote: "" });
   assert.match(mobile, /5赔种全覆盖\(1\/1真计数核验\)/);
   assert.throws(() => renderMobileHtml({ date: "2026-06-10", rows: rows2, riskNote: "", intlN: 2, wcN: 0, auditFoot: "" }), /counts 缺失\/非法/);
+});
+
+// ── ②b 联赛构成:芬超等俱乐部联赛绝不冒充"国际赛"(2026-06-23 根因修) ──
+test("competitionBreakdown:芬超按真实联赛名计数,绝不标'国际赛';世界杯单独成桶", () => {
+  const rows = [
+    { comp: "芬兰超级联赛" }, { comp: "芬兰超级联赛" }, { comp: "芬兰超级联赛" },
+    { comp: "芬兰超级联赛" }, { comp: "芬兰超级联赛" }, { comp: "芬兰超级联赛" },
+    { comp: "世界杯·单场" }, { comp: "世界杯·单场" }, { comp: "世界杯·单场" }, { comp: "世界杯·单场" },
+  ];
+  const s = competitionBreakdown(rows);
+  assert.match(s, /6芬兰超级联赛/, "6场芬超须按真实联赛名计数");
+  assert.match(s, /4世界杯单场/, "世界杯单独成桶");
+  assert.doesNotMatch(s, /国际赛/, "俱乐部联赛绝不冒充国际赛");
+  // 三处同源:手机页/英文页 banner 都用真实联赛构成、不出现"6国际赛"
+  const counts = buildOddsFillCounts(rows.map((r, i) => ({ ...mkRow(i + 1), comp: r.comp })));
+  const mobile = renderMobileHtml({ date: "2026-06-23", rows: rows.map((r, i) => ({ ...mkRow(i + 1), comp: r.comp })), riskNote: "", intlN: 6, wcN: 4, auditFoot: "", counts, degradeNote: "" });
+  assert.match(mobile, /6芬兰超级联赛/);
+  assert.doesNotMatch(mobile, /国际赛6|6 国际赛|国际赛6/);
+});
+test("competitionBreakdown:空 competition 兜底'竞彩',不默认'国际赛'", () => {
+  assert.match(competitionBreakdown([{ comp: "" }, { comp: null }]), /2竞彩/);
+  assert.doesNotMatch(competitionBreakdown([{ comp: "" }]), /国际赛/);
 });
 
 // ── ③ 审计背书动态生成(缺当日 adversarial 文件 → 不写"已审计"句) ──
