@@ -18,6 +18,7 @@ import { assessStrengthVsMarket, ppgOf } from "./strength-market-match.js";
 import { assessMatchOdds, payoutVerdict } from "./odds-value-lib.js";
 import { bookmakerIntent } from "./bookmaker-intent.js";
 import { comboTriggers, RULES as COMBO_RULES } from "./combo-triggers.js";
+import { synthesize } from "./cross-market-synthesizer.js";
 import { playerDisplay } from "./player-name-zh.js";
 import { formationPosture } from "./lineup-source.js";
 
@@ -1175,6 +1176,30 @@ export function buildComboTriggerSheet({ date, rows }) {
     out.push([r.match, condCell, ruleCell, buyScoreOf(r.msv), buyHfOf(r.mhv), warnCell]);
   }
   out.push([""], [`━━ 共${rows.length}场,其中${firedN}场触发高/中命中组合。读法:条件列=本场欧赔/平赔/亚盘让球线/资金动向实际值(✅实测);规律列=触发了哪条→倾向买什么方向(括号=触发依据类别+命中区间);比分/半全场=✅500盘顺方向真实热门。诚实:高命中≠盈利(打不过收盘线),只供选择性出手+避坑;无组合的场如实"看主表"。`]);
+
+  // ── 🎯 无死角·每场三问(2026-06-23 用户:每场都要能回答 看胜负平/看大小球/看让球,优先用五大全7赛季过测高命中口袋)──
+  out.push([""], ["🎯 无死角·每场三问 · 看胜负平 / 看大小球 / 看让球(五大联赛12458场过测·只在高命中口袋出手,其余诚实沉默)"]);
+  out.push(["对阵", "①看胜负平(方向·命中)", "②看大小球(方向·命中)", "③看让球(过盘)", "防平/看胜负研判"]);
+  let fireWld = 0, fireOu = 0;
+  for (const r of rows) {
+    const so = r.sanityOdds ?? {};
+    const valid = (e) => e && [e.home, e.draw, e.away].every((x) => Number(x) > 1);
+    const useEspn = !valid(so.euro) && valid(so.euroEspn);
+    const euClose = valid(so.euro) ? so.euro : (useEspn ? so.euroEspn : null);
+    if (!euClose) { out.push([r.match, "⚠️欧赔未抓到", "⚠️欧赔未抓到", "—", "缺赔率"]); continue; }
+    const s = synthesize({ euClose, euOpen: valid(so.euro) ? so.euroInit : null, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null,
+      ouClose: so.over25, ouOpen: so.over25Init, waterHomeClose: so.ahHomeWater, waterHomeOpen: so.ahHomeWaterInit, waterAwayClose: so.ahAwayWater, waterAwayOpen: so.ahAwayWaterInit });
+    if (!s) { out.push([r.match, "—", "—", "—", "—"]); continue; }
+    const mk = s.markets;
+    const wldCell = mk.胜负平.出手 ? `🎯${mk.胜负平.方向}·${mk.胜负平.命中}${mk.胜负平.条件 ? `(${mk.胜负平.条件})` : ""}` : `沉默·${mk.胜负平.方向}`;
+    const ouCell = mk.大小球.出手 ? `🎯${mk.大小球.方向}·${mk.大小球.命中}${mk.大小球.条件 ? `(${mk.大小球.条件})` : ""}` : "沉默·看主表";
+    const hCell = mk.让球.结论;
+    const drCell = s.drawRisk ? `${s.drawRisk.tier}(估平${Math.round(s.drawRisk.drawRateEst * 100)}%)·${s.drawRisk.direction === "draw-guard" ? "🔴防平" : s.drawRisk.direction === "decisive" ? "🟢看胜负" : "中性"}` : "—";
+    if (mk.胜负平.出手) fireWld++;
+    if (mk.大小球.出手) fireOu++;
+    out.push([r.match, wldCell, ouCell, hCell, drCell]);
+  }
+  out.push([`━━ 三问出手:胜负平${fireWld}场 / 大小球${fireOu}场 / 让球过盘0场(庄家做平·无高命中口袋·诚实不出手)。深让球盘想玩让球→玩"让球后胜平负的胜"(=热门赢)。命中=五大全7赛季TEST真实双稳值;命中高≠盈利。`]);
   return { name: "组合触发", rows: out };
 }
 
@@ -1773,6 +1798,28 @@ function radarBlockHtml(r) {
   return `<div class="drow radar"><b>🎯异动雷达·综合研判(方向跟盘口主推·只标风险不改概率)</b>${fs}${upsetLine}<div class="rbuy">🎯怎么打:${esc(rad.how)}</div></div>`;
 }
 
+// ── 🎯无死角三问卡(手机页·看胜负平/看大小球/看让球·五大过测高命中口袋·只在口袋出手) ──
+function threeQBlockHtml(r) {
+  const so = r.sanityOdds ?? {};
+  const valid = (e) => e && [e.home, e.draw, e.away].every((x) => Number(x) > 1);
+  const useEspn = !valid(so.euro) && valid(so.euroEspn);
+  const euClose = valid(so.euro) ? so.euro : (useEspn ? so.euroEspn : null);
+  if (!euClose) return "";
+  const s = synthesize({ euClose, euOpen: valid(so.euro) ? so.euroInit : null, ahLineClose: so.ahLine ?? so.jcLine, ahLineOpen: so.ahLineInit ?? null,
+    ouClose: so.over25, ouOpen: so.over25Init, waterHomeClose: so.ahHomeWater, waterHomeOpen: so.ahHomeWaterInit, waterAwayClose: so.ahAwayWater, waterAwayOpen: so.ahAwayWaterInit });
+  if (!s) return "";
+  const mk = s.markets;
+  const wld = mk.胜负平.出手 ? `🎯${esc(mk.胜负平.方向)} <b>${esc(mk.胜负平.命中)}</b>${mk.胜负平.条件 ? ` <span class="g">(${esc(mk.胜负平.条件)})</span>` : ""}` : `<span class="g">沉默·${esc(mk.胜负平.方向)}</span>`;
+  const ou = mk.大小球.出手 ? `🎯${esc(mk.大小球.方向)} <b>${esc(mk.大小球.命中)}</b>${mk.大小球.条件 ? ` <span class="g">(${esc(mk.大小球.条件)})</span>` : ""}` : `<span class="g">沉默·看主表</span>`;
+  const dr = s.drawRisk ? `${esc(s.drawRisk.tier)}(估平${Math.round(s.drawRisk.drawRateEst * 100)}%)·${s.drawRisk.direction === "draw-guard" ? '<span class="w2">🔴防平</span>' : s.drawRisk.direction === "decisive" ? "🟢看胜负" : "中性"}` : "—";
+  return `<div class="drow radar"><b>🎯无死角三问(五大过测高命中口袋·只在口袋出手)</b>` +
+    `<div class="rf">①看胜负平: ${wld}</div>` +
+    `<div class="rf">②看大小球: ${ou}</div>` +
+    `<div class="rf">③看让球: <span class="g">${esc(mk.让球.结论)}</span></div>` +
+    `<div class="rf">防平研判: ${dr}</div>` +
+    `<div class="rbuy g">命中=五大全7赛季TEST真实双稳值;高命中≠盈利(收盘已定价)。让球过盘无高命中口袋。</div></div>`;
+}
+
 // ── 手机页(核心7列 + 点行展开全部;2026-06-09 用户选定专业版,绝不简化) ──
 export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, counts, degradeNote, parlayPlan = null, recordLine = null, stakeSum = null }) {
   // 头条副标题=逐赔种真计数(buildCoverageSubtitle 内部 fail-loud:counts 缺/非法直接 throw,绝不默认自吹"全覆盖")。
@@ -1780,7 +1827,7 @@ export function renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, 
   // 降级句(buildDegradeNote 产物)进手机页头条 risk 块——与 xlsx banner 同口径,头条不再只有平局/硬币档提示。
   const riskBody = [degradeNote, riskNote || "只给信心+风险提示,方向以盘口为准。"].filter(Boolean).map((s) => esc(s)).join("<br>");
   const br = (s) => esc(s).replace(/\n/g, "<br>");
-  const detail = (r) => radarBlockHtml(r) + (r.primary ? `<div class="drow"><b>🎯盘口主推</b>${esc(r.primary.text)}<br><span class="g">${esc(r.primary.ref)}</span></div>` : "") +
+  const detail = (r) => radarBlockHtml(r) + threeQBlockHtml(r) + (r.primary ? `<div class="drow"><b>🎯盘口主推</b>${esc(r.primary.text)}<br><span class="g">${esc(r.primary.ref)}</span></div>` : "") +
     (r.wcLine ? `<div class="drow"><b>🏆赛会</b>${esc(r.wcLine)}</div>` : "") +
     (r.wcElo && r.wcElo !== "—" ? `<div class="drow"><b>🌍世界杯模型</b>Elo先验 ${esc(r.wcElo)}<br><span class="ind">场馆λ ${esc(r.wcLambda ?? "—")}</span></div>` : "") +
     (r.scen ? `<div class="drow"><b>情景</b>${esc(r.scen)}</div>` : "") +
