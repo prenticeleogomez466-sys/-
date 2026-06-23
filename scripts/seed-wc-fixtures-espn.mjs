@@ -56,7 +56,9 @@ for (const d of dates) {
       const st = e.status && e.status.type;
       const fx = {
         id: `espnwc-${dateStr}-${hZh}-${aZh}`, date: dateStr, kickoff: ko || `${dateStr} 00:00`,
-        competition: "世界杯", homeTeam: hZh, awayTeam: aZh, round: "", marketType: "shengfucai",
+        // marketType=worldcup-seed(非jingcai/shengfucai)→只喂 wc:predict(按competition含世界杯取),
+        // 不进竞彩主交付表(竞彩表只收500真竞彩在售场·有官方让球线),避免污染交付+审计红。
+        competition: "世界杯", homeTeam: hZh, awayTeam: aZh, round: "", marketType: "worldcup-seed",
         tags: ["worldcup", "espn-seed"], source: "espn-fifa.world-seed", officialStatus: "",
       };
       if (st && st.completed && home.score != null && away.score != null) fx.result = { home: Number(home.score), away: Number(away.score), halfHome: null, halfAway: null };

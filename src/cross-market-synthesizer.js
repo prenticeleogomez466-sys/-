@@ -9,7 +9,7 @@
  * 诚实(signal_backtest_findings + draw_blindspot):命中高≠盈利(收盘已定价);本合成器=选择性出手+防平避坑的
  *   决策辅助,不保证赚钱、不打败收盘线。纯函数无IO,不擅改主概率(决策辅助层)。
  */
-import { comboTriggers, parseLine } from "./combo-triggers.js";
+import { comboTriggers, parseLine, RULE_DIMS } from "./combo-triggers.js";
 import { assessDrawRisk } from "./draw-risk-model.js";
 import { firePockets } from "./fire-pockets.js";
 
@@ -33,17 +33,22 @@ export function synthesize(m) {
   // 投票:combo里"胜平负/可靠度/风险"类触发(热门可靠/危险) + draw-risk(防平/看胜负)。
   const wldTrig = ct.triggers.filter((t) => t.market === "胜平负" || t.market === "可靠度" || t.market === "风险");
   let favScore = 0, drawScore = 0;
-  const dims = new Set();
+  const dims = new Set();          // 展示用:本场全部触发涉及的真实数据维度并集
+  const favDims = new Set();       // 仅指向"热门(主/客胜)"方向的真实数据维度(RULE_DIMS)
+  const drawDims = new Set();      // 仅指向"平局/防平"方向的真实数据维度
+  const addDims = (target, t) => { for (const d of (RULE_DIMS[t.id] || [])) { target.add(d); dims.add(d); } };
   for (const t of wldTrig) {
     const w = (tierW[t.tier] ?? 0.2) * Math.max(0, (t.hitRate?.te ?? 0.5) - (t.lift != null ? 0 : 0));
-    if (t.predict === "主胜" || t.predict === "客胜") { favScore += w; dims.add("走势·" + (t.by || t.src)); }
-    else if (/平/.test(t.predict)) { drawScore += w; dims.add("盘口·平倾向"); }
-    else if (/危险|防爆/.test(t.predict)) { drawScore += w * 0.5; dims.add("庄家意图·危险"); }
+    if (t.predict === "主胜" || t.predict === "客胜") { favScore += w; addDims(favDims, t); }
+    else if (/平/.test(t.predict)) { drawScore += w; addDims(drawDims, t); }
+    else if (/危险|防爆/.test(t.predict)) { drawScore += w * 0.5; addDims(drawDims, t); }
   }
-  // draw-risk 计票(维度=平赔体系,独立于走势)
+  // draw-risk 计票:其信号本质来自"平赔档"(高平赔→看胜负 / 低平赔→防平),只贡献"平赔档"这一个维度——
+  //   要"交叉验证通过"仍需另一条独立维度(让球线/欧赔/负赔/走势)的规律同向,不把同源平赔信息重复计成两维
+  //   (2026-06-22 用户铁律:一个买方向须 ≥2 个互相独立的维度)。
   if (dr) {
-    if (dr.direction === "draw-guard") { drawScore += (dr.tier === "强防平" ? 0.9 : 0.5); dims.add("平赔体系·防平"); }
-    else if (dr.direction === "decisive") { favScore += (dr.tier === "强看胜负" ? 0.9 : 0.5); dims.add("平赔体系·看胜负"); }
+    if (dr.direction === "draw-guard") { drawScore += (dr.tier === "强防平" ? 0.9 : 0.5); drawDims.add("平赔档"); dims.add("平赔档"); }
+    else if (dr.direction === "decisive") { favScore += (dr.tier === "强看胜负" ? 0.9 : 0.5); favDims.add("平赔档"); dims.add("平赔档"); }
   }
 
   // 共识方向 + 模式
@@ -83,8 +88,12 @@ export function synthesize(m) {
     ouWhy = top ? `${top.id}(TEST命中${Math.round((top.hitRate?.te ?? 0) * 100)}%)` : null;
   }
 
-  // 交叉验证:方向维度≥2 个独立来源
-  const crossValidated = dims.size >= 2;
+  // 交叉验证(2026-06-22 用户铁律):按"最终共识方向"的真实数据维度并集 ≥2 个互相独立维度才算通过。
+  //   单选热门→看 favDims;防平/背平价值/平局→看 drawDims;无强共识的保守双选→取两侧并集(宽松)。
+  const pickDims = mode === "单选热门" ? favDims
+    : (guard || dr?.valueDrawPocket || /平/.test(pick)) ? drawDims
+    : new Set([...favDims, ...drawDims]);
+  const crossValidated = pickDims.size >= 2;
 
   // ── 无死角三问(2026-06-23 用户):每场直接回答 看胜负平/看大小球/看让球,优先用五大过测高命中口袋 ──
   const fp = firePockets(m);
@@ -103,7 +112,7 @@ export function synthesize(m) {
   };
 
   return {
-    oneXtwo: { pick, mode, confidence, why, crossValidated, favScore: Number(favScore.toFixed(2)), drawScore: Number(drawScore.toFixed(2)), dims: [...dims] },
+    oneXtwo: { pick, mode, confidence, why, crossValidated, favScore: Number(favScore.toFixed(2)), drawScore: Number(drawScore.toFixed(2)), dims: [...dims], crossDims: [...pickDims] },
     overUnder: ouPick ? { pick: ouPick, confidence: ouConf, why: ouWhy } : null,
     drawRisk: dr ? { tier: dr.tier, drawRateEst: dr.drawRateEst, direction: dr.direction, advice: dr.advice, valueDrawPocket: dr.valueDrawPocket } : null,
     markets, // 无死角三问
