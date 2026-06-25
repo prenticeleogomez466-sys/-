@@ -51,7 +51,8 @@ export async function runDailyRecap(date, options = {}) {
   const attribution = attributeRecap(nextLedger);
   const detailRows = targetRows.map(toRecapDetailRow);
   // 结尾【自检】(daily-recap-system-prompt output_format):全覆盖/穷尽免费源/单总表/⏳均有理由/0假结算。
-  const selfcheck = buildSelfcheck(targetDate, targetRows, syncResults);
+  const selfcheck = buildSelfcheck(targetDate, targetRows, syncResults, fixtures);
+  const emptyWindow = detectEmptyWindow(targetRows, fixtures);
   const summaryPath = join(exportDir, `daily-recap-${targetDate}.json`);
   const masterPath = join(exportDir, "football-recap-master.xlsx");
   const pendingRescanReport = { rescanned: pendingRescan.rescanned, settled: pendingRescan.settled, window: pendingRescan.window };
@@ -74,7 +75,8 @@ export async function runDailyRecap(date, options = {}) {
   //   未硬接的客观原因:其 eventsround 按"整轮"返回(非单日),需 leagueId 注册表+季次推断+整季逐轮抓取再按
   //   日期过滤,且返回 shape 为 homeGoals/awayGoals(非 result),非 <15 行轻接;按要求不破坏现有同步,本次不动。
   const backupSourceNote = "建议接入 TheSportsDB 作 ESPN 盲区备源,但本次未动:其按整轮(非单日)返回,需 leagueId 注册表+季次推断+shape 适配,非轻量接入,硬接有破坏现有同步风险。";
-  return { ok: true, date: targetDate, summary, attribution, selfcheck, pendingRescan: pendingRescanReport, backupSourceNote, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
+  const alert = emptyWindow.isEmptyWindow ? `🔴 空窗告警:${targetDate} ${emptyWindow.message}` : null;
+  return { ok: true, date: targetDate, alert, summary, attribution, selfcheck, pendingRescan: pendingRescanReport, backupSourceNote, dailyMetrics, paths: { summaryPath, masterPath, ledgerPath, ...dDrivePaths }, syncResults, sync };
 }
 
 // 读 backfill provenance(scripts/backfill-results.mjs 落),诚实推导该业务日穷尽过哪些免费赛果源。
@@ -94,7 +96,25 @@ export function backfillFreeSources(date, dir = exportDir, now = Date.now()) {
 }
 
 // 结尾【自检】对象:逐项核对 daily-recap-system-prompt 的 5 条 output 要求(诚实返回真值,不强行报✓)。
-function buildSelfcheck(date, rows, syncResults) {
+// 空窗硬闸(2026-06-25):当日有比赛却 0 条推荐 → 上游"出表"漏跑(实证根因:FootballModel-DailyEvolution
+//   计划任务 06-10 起被禁用,之后仅靠手动 npm run today,06-24 漏跑 → 复盘默默跑出 0/0/0 蒙混)。
+//   复盘绝不能静默放行,必须亮红。仅在"确有比赛"时报警——真·空场日(无赛)不误报(铁律:不造假/不误杀)。
+export function detectEmptyWindow(rows, fixtures) {
+  const scheduledMatches = Array.isArray(fixtures) ? fixtures.length : 0;
+  const recommended = Array.isArray(rows) ? rows.length : 0;
+  const isEmptyWindow = recommended === 0 && scheduledMatches > 0;
+  return {
+    isEmptyWindow,
+    scheduledMatches,
+    recommended,
+    message: isEmptyWindow
+      ? `当日有 ${scheduledMatches} 场比赛但 0 条推荐 → 上游出表疑似漏跑(查 FootballModel-DailyEvolution 计划任务是否被禁用 / 当天是否漏跑 npm run today)`
+      : null
+  };
+}
+
+function buildSelfcheck(date, rows, syncResults, fixtures = []) {
+  const emptyWindow = detectEmptyWindow(rows, fixtures);
   const pendingRows = rows.filter((row) => !(row.actualStatus === "settled" || row.actual));
   const pendingWithReason = pendingRows.filter((row) => typeof row.pendingReason === "string" && row.pendingReason.trim());
   // 0 假结算:已结算行必须带 actualScore(来自真抓赛果),无比分却标 settled 即视为可疑假结算。
@@ -105,6 +125,9 @@ function buildSelfcheck(date, rows, syncResults) {
   //   syncResults 为空 → 读 backfill provenance 报告诚实推导查过哪些免费源,绝不硬编码(no-fabrication)。
   if (!freeSources.length) freeSources = backfillFreeSources(date);
   return {
+    出表未漏跑: !emptyWindow.isEmptyWindow,
+    当日比赛数: emptyWindow.scheduledMatches,
+    ...(emptyWindow.isEmptyWindow ? { "🔴空窗告警": emptyWindow.message } : {}),
     全覆盖: rows.length > 0,
     覆盖场次: rows.length,
     穷尽免费源: freeSources.length > 0,
@@ -647,5 +670,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     syncArtifacts: !args.includes("--no-sync")
   });
   console.log(JSON.stringify(result, null, 2));
+  if (result.alert) {
+    const bar = "=".repeat(64);
+    console.error(`\n${bar}\n${result.alert}\n${bar}\n`);
+  }
   if (!result.ok) process.exitCode = 1;
 }
