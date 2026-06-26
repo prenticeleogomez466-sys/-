@@ -74,3 +74,29 @@ export function hasIntlXg() {
   const d = loadIntlXg();
   return !d.missing && Object.keys(d.teams).length > 0;
 }
+
+/**
+ * 两队事件级 xG 交叉核观察串(主表综合研判 / 世界杯逐场共用)。
+ * 纯读已有 StatsBomb 汇总,独立于赔率/Elo;任一队无开放样本→标缺不编,全无→返回 null。
+ * @param {string} homeName 主队名(中/英) @param {string} awayName 客队名(中/英)
+ * @param {"主队"|"客队"|null} favSide 盘口/Elo 热门方(用于标分歧;null 或"热门"则不判分歧)
+ * @returns {string|null} 大白话观察串,或 null(无任一队样本)
+ */
+export function xgCrossCheckNote(homeName, awayName, favSide = null) {
+  if (!hasIntlXg()) return null;
+  const h = teamXgProfile(homeName), a = teamXgProfile(awayName);
+  if (!h && !a) return null;
+  const sign = (v) => (v >= 0 ? "+" : "");
+  if (h && a) {
+    const edge = h.xgDiffPerGame - a.xgDiffPerGame; // 主−客 净xG/场
+    const xgFav = edge > 0.05 ? "主队" : edge < -0.05 ? "客队" : "均势";
+    const diverge = favSide && favSide !== "热门" && xgFav !== "均势" && xgFav !== favSide;
+    const fin = [
+      Math.abs(h.finishingPerGame) >= 0.3 ? `${h.team}临门${h.finishingPerGame > 0 ? "高效+" : ""}${h.finishingPerGame.toFixed(2)}` : null,
+      Math.abs(a.finishingPerGame) >= 0.3 ? `${a.team}临门${a.finishingPerGame > 0 ? "高效+" : ""}${a.finishingPerGame.toFixed(2)}` : null,
+    ].filter(Boolean).join("·");
+    return `净xG/场 ${h.team}${sign(h.xgDiffPerGame)}${h.xgDiffPerGame.toFixed(2)}(${h.matches}场) vs ${a.team}${sign(a.xgDiffPerGame)}${a.xgDiffPerGame.toFixed(2)}(${a.matches}场)→xG更看好${xgFav}${diverge ? `·⚠️与盘口热门(${favSide})分歧,值得人工复核` : favSide && xgFav === favSide ? "·与盘口同向" : ""}${fin ? `;${fin}` : ""}`;
+  }
+  const one = h || a, who = h ? "主队" : "客队";
+  return `${who}(${one.team})大赛净xG/场${sign(one.xgDiffPerGame)}${one.xgDiffPerGame.toFixed(2)}(攻${one.xgForPerGame.toFixed(2)}/防${one.xgAgainstPerGame.toFixed(2)},${one.matches}场);对手无开放xG样本(标缺不编)`;
+}

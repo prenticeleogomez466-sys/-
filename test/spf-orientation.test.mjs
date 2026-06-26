@@ -64,6 +64,20 @@ test("定向:平票/零样本返回 uncertain(绝不硬猜兜底)", () => {
   assert.equal(tie.voteB, 1);
 });
 
+test("定向平票结构兜底:离散度平票但场次不等 → 少的 feed=1X2(让球⊇胜平负);场次相等仍 uncertain", () => {
+  // 全均势 → 离散度 0:0 平票;但 mapA 3场 < mapB 5场 → 结构兜底判 A 是 1X2(场次少)
+  const flat = (n) => new Map(Array.from({ length: n }, (_, i) => [`70${i + 1}`, { win: "2.5", draw: "3.1", lost: "2.8" }]));
+  const r = orientRowMaps(flat(3), flat(5));
+  assert.equal(r.orientation, ORIENT_A_IS_1X2, "场次少(3<5)的 A 应判为 1X2");
+  assert.equal(r.tiebreak, "size");
+  // 反向:mapA 多 → B 是 1X2
+  assert.equal(orientRowMaps(flat(6), flat(4)).orientation, ORIENT_B_IS_1X2);
+  // 场次相等 → 结构无信息 → 维持 uncertain 阻断(绝不硬猜)
+  const eq = orientRowMaps(flat(4), flat(4));
+  assert.equal(eq.orientation, ORIENT_UNCERTAIN);
+  assert.equal(eq.tiebreak, undefined);
+});
+
 test("swapGuardViolation:互换残留命中(让球离散度远高于胜平负);正确方向/悬殊场 euro=null 不误伤", () => {
   const euroOk = { current: { home: 1.17, draw: 5.35, away: 11.5 } };
   const hcOk = { current: { home: 3.11, draw: 3.36, away: 1.96 } };

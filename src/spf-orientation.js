@@ -48,13 +48,33 @@ export function orientRowPairs(pairs, { factor = 1.3 } = {}) {
 
 /**
  * 便捷形:两个 Map(matchnum → 最新行),按键交集对齐后投票。
+ *
+ * 2026-06-25(平票结构兜底):离散度投票平票(voteA===voteB 且 sampled>0)时,
+ *   过去一律 uncertain 阻断;但今天实盘暴露离散度此时本就失效——多为真·均势场,
+ *   两 feed 都不离散,3:3 是噪声票。改用**竞彩市场结构事实**做兜底定向(不靠离散度):
+ *   极悬殊场(如 突尼斯vs荷兰)竞彩**只卖让球、不卖胜平负**,故 让球 feed ⊇ 胜平负 feed。
+ *   平票时谁场次**少**谁就是 1X2(胜平负),场次**多**的是让球盘。
+ *   仅在两 feed 场次不等时启用;场次相等则保持 uncertain 阻断(绝不硬猜)。
+ *   方向定反=06-09 级真钱事故,故此兜底只在"结构上有信息(场次差)"时动用。
  */
 export function orientRowMaps(mapA, mapB, opts) {
   const pairs = [];
   for (const [key, a] of mapA ?? []) {
     if (mapB?.has?.(key)) pairs.push({ a, b: mapB.get(key) });
   }
-  return orientRowPairs(pairs, opts);
+  const vote = orientRowPairs(pairs, opts);
+  if (vote.orientation !== ORIENT_UNCERTAIN || vote.sampled === 0) return vote;
+  // 离散度平票(sampled>0):用「让球 ⊇ 胜平负」结构事实兜底——场次少的 feed = 1X2。
+  const sizeA = mapA?.size ?? 0;
+  const sizeB = mapB?.size ?? 0;
+  if (sizeA !== sizeB) {
+    return {
+      ...vote,
+      orientation: sizeA < sizeB ? ORIENT_A_IS_1X2 : ORIENT_B_IS_1X2,
+      tiebreak: "size", sizeA, sizeB,
+    };
+  }
+  return vote; // 场次相等 → 真不可证,维持 uncertain 阻断
 }
 
 /**

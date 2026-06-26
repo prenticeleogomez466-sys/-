@@ -265,7 +265,7 @@ function doubleChanceBand(favP) {
 //   与 backtest-double-chance 同口径。中低档(市场热门<0.65)单选命中物理偏低 → recommended=true,
 //   daily-report 主推双选(回测:中档单62%→双84%、弱档单50%→双78%);强档(≥0.65)仍单关。
 //   只升玩法建议、不改 prediction.pick.code(复盘 1X2 仍按 primary 结算,口径一致;双选另列单独结算)。
-export function computeDoubleChance(ranked, marketImplied = null, env = process.env) {
+export function computeDoubleChance(ranked, marketImplied = null, env = process.env, competition = null) {
   if (!Array.isArray(ranked) || ranked.length < 3) return null;
   const minDraw = Number(env.DOUBLE_CHANCE_MIN_DRAW ?? 0.28);
   const maxLeader = Number(env.DOUBLE_CHANCE_MAX_LEADER ?? 0.55);
@@ -290,6 +290,13 @@ export function computeDoubleChance(ranked, marketImplied = null, env = process.
   //   >0.70 命中持平仅多覆盖降赔率=甜点。放宽让更多均势场主推双选接住平局,直击根因。
   const recommended = marketFavProb < 0.70; // 中低档主推双选;强档(≥0.70)仍单关(胆码)
   const draw = modelProb.get("1") ?? 0;
+  // 平局风险告警·世界杯/国家队限定(2026-06-25,WC小组赛42场实证):国际大赛超级大热(≥70%)被
+  //   防守型弱队逼平率高达~33%(俱乐部同档单选77%无此现象→双选回测45811场证全局改动会毁俱乐部价值,
+  //   故只在国际大赛限定告警,不改 recommended/不改概率,守铁律"未回测验证不动主推" + 用户"只提示不替弃赛")。
+  const isIntlTournament = /世界杯|世预赛|国家队|欧洲杯|美洲杯|欧国联|nations|world\s*cup/i.test(String(competition || ""));
+  const drawRiskCaution = (isIntlTournament && marketFavProb >= 0.70 && favCode !== "1")
+    ? { flag: true, note: `⚠️ 平局风险(国际大赛):超级大热(${(marketFavProb * 100).toFixed(0)}%)在世界杯小组赛常被逼平(实证~33%),保护可双选 ${pickLabel}(${shortCode})` }
+    : { flag: false };
   const note = recommended
     ? `市场热门仅${(marketFavProb * 100).toFixed(0)}%·单选命中偏低(回测~${(band.single * 100).toFixed(0)}%) → 建议双选 ${pickLabel}(${shortCode})覆盖,回测命中~${(band.double * 100).toFixed(0)}%`
     : (draw >= minDraw && favCode !== "1" && (modelProb.get(favCode) ?? 0) < maxLeader
@@ -304,9 +311,10 @@ export function computeDoubleChance(ranked, marketImplied = null, env = process.
     drawProbability: round(draw),
     marketFavProb,
     recommended,
+    drawRiskCaution,
     backtestHit: band.double,
     singleBacktestHit: band.single,
-    note,
+    note: drawRiskCaution.flag ? `${note} ｜${drawRiskCaution.note}` : note,
   };
 }
 
@@ -864,6 +872,15 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
           };
         })()
       : null;
+    // 组合效应门控(2026-06-25,世界杯42场实证):大热(1X2热门≥60%)× 深让线(|线|≥1球)→
+    //   历史让球命中仅 33%(7/21,对照浅线<1球 100%/3),根因=强队被防守型弱队逼平/小胜让不过。
+    //   只标低信心告警(同 skellamCheck 通道),不改方向/概率/不替弃赛(用户硬规则)。
+    const favP = Number(ranked[0]?.probability) || 0;
+    const deepLine = Math.abs(Number(handicapLine) || 0) >= 1;
+    const dirIsTeam = ranked[0]?.code === "3" || ranked[0]?.code === "0";
+    const comboCaution = (favP >= 0.6 && deepLine && dirIsTeam)
+      ? { flag: true, severity: "高", note: `⚠️ 让球低信心:大热(${pctOrEmpty(favP)})让${Math.abs(handicapLine)}球深线 — 世界杯实证此组合让球仅命中~33%(强队常被逼平/小胜让不过),建议降档或不挂金额` }
+      : { flag: false };
     return {
       line: handicapLine,
       lineSource: handicapLineSource,
@@ -874,6 +891,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
       expectedGoalDiff: goalDiff,
       coverProbability,
       handicapWld,
+      comboCaution,
       coverBreakdown: coverInfo?.cover ?? null,
       modelFairLine: coverInfo?.modelFairLine ?? null,
       // 让球强化(2026-06-01):多档盘口(-2~+2)覆盖率阶梯 + 模型公平线。
@@ -914,7 +932,7 @@ export function predictFixture(fixture, marketSnapshots = [], index = 0, options
     pick: ranked[0],
     secondaryPick: ranked[1],
     // 双选(双重机会)建议:均势场覆盖平局风险(单选平命中物理上限~28%,见 computeDoubleChance)。
-    doubleChance: computeDoubleChance(ranked, oddsProbabilities ?? null, options.env ?? process.env),
+    doubleChance: computeDoubleChance(ranked, oddsProbabilities ?? null, options.env ?? process.env, fixture?.competition),
     risk,
     confidence,
     // 纯市场隐含概率(去vig)—— 选择分层的 sharp 信号(回测证明优于模型信心)。
