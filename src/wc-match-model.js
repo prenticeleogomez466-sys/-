@@ -17,6 +17,7 @@ import { devig } from "./market-devig.js";
 import { recentForm, headToHead, loadIntlHistory } from "./wc-national-form.js";
 import { matchPathScenario } from "./wc-qualification-scenario.js";
 import { getDataSubdir } from "./paths.js";
+import { teamXgProfile, hasIntlXg } from "./statsbomb-xg-source.js";
 
 // 小组赛【名次→淘汰赛路径】透明观察:懒加载 bracket/groups(中文队名→组字母),解析本场两队所属组的第1/第2名半区与R32对手位次。
 let _wcBracket = null, _zhToGroup = null;
@@ -137,6 +138,28 @@ export function predictWcMatch(homeZh, awayZh, fixture = {}, marketOdds = null, 
   if (formHome) factors.push({ key: "主队近况", detail: `${hp.en} 近${formHome.played}:${formHome.record}(${formHome.gf}:${formHome.ga})`, weight: 30, tag: "✅实测(只作观察)" });
   if (formAway) factors.push({ key: "客队近况", detail: `${ap.en} 近${formAway.played}:${formAway.record}(${formAway.gf}:${formAway.ga})`, weight: 30, tag: "✅实测(只作观察)" });
   if (h2h) factors.push({ key: "H2H", detail: `近${h2h.played}次交手 ${h2h.summary}`, weight: 25, tag: "✅实测(只作观察)" });
+  // 事件级 xG 交叉核(StatsBomb 开放数据·2018/2022世界杯+Euro2020/2024 射门级真 xG)——独立于赔率/Elo 的强度信号,
+  //   仅作透明观察(大赛小样本3-26场,不进概率·遵 gateFusionOff/no-fabrication);缺样本标缺不编。
+  if (hasIntlXg()) {
+    const hxg = teamXgProfile(hp.en) || teamXgProfile(homeZh);
+    const axg = teamXgProfile(ap.en) || teamXgProfile(awayZh);
+    if (hxg && axg) {
+      const xgEdge = hxg.xgDiffPerGame - axg.xgDiffPerGame; // 主−客 净xG/场
+      const xgFav = xgEdge > 0.05 ? "主队" : xgEdge < -0.05 ? "客队" : "均势";
+      const eloFav = eloGap > 0 ? "主队" : eloGap < 0 ? "客队" : "均势";
+      const diverge = xgFav !== "均势" && eloFav !== "均势" && xgFav !== eloFav;
+      const finNote = [
+        Math.abs(hxg.finishingPerGame) >= 0.3 ? `${hp.en}临门${hxg.finishingPerGame > 0 ? "高效+" : ""}${hxg.finishingPerGame.toFixed(2)}` : null,
+        Math.abs(axg.finishingPerGame) >= 0.3 ? `${ap.en}临门${axg.finishingPerGame > 0 ? "高效+" : ""}${axg.finishingPerGame.toFixed(2)}` : null,
+      ].filter(Boolean).join("·");
+      const sign = (v) => (v >= 0 ? "+" : "");
+      const detail = `净xG/场 ${hp.en}${sign(hxg.xgDiffPerGame)}${hxg.xgDiffPerGame.toFixed(2)}(${hxg.matches}场) vs ${ap.en}${sign(axg.xgDiffPerGame)}${axg.xgDiffPerGame.toFixed(2)}(${axg.matches}场) → xG更看好${xgFav}${diverge ? `·⚠️与Elo(看好${eloFav})分歧,值得人工复核` : xgFav === eloFav ? "·与Elo同向" : ""}${finNote ? `;${finNote}` : ""}`;
+      factors.push({ key: "事件级xG(StatsBomb)", detail, weight: diverge ? 35 : 22, tag: "🔶事件级xG观察(大赛小样本·独立于赔率Elo·不改概率)" });
+    } else if (hxg || axg) {
+      const one = hxg || axg, who = hxg ? hp.en : ap.en;
+      factors.push({ key: "事件级xG(StatsBomb)", detail: `${who} 大赛净xG/场${one.xgDiffPerGame >= 0 ? "+" : ""}${one.xgDiffPerGame.toFixed(2)}(攻${one.xgForPerGame.toFixed(2)}/防${one.xgAgainstPerGame.toFixed(2)},${one.matches}场);对手无开放xG样本(标缺不编)`, weight: 18, tag: "🔶事件级xG观察(单边·不改概率)" });
+    }
+  }
   factors.sort((a, b) => b.weight - a.weight);
 
   // ── 爆冷场景(2026-06-16 用户:检到爆冷必给"若爆冷会出什么"的具体比分/半全场/大小球·拿真盘说话)──

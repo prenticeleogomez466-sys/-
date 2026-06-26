@@ -3,11 +3,12 @@
 用法: python scripts/check-wc-xlsx.py <xlsx路径>
 输出: 单行JSON {ok, cols, errors[], warnings[], matches:[{home,away}]} 到 stdout。
 
-口径(2026-06-23 用户裁决:主表精简到10列核心版·砍冗余汇总一张主表):
-主表10列 = # / 开赛 / 对阵(赛事·情景) / 🎯盘口主推 / 🔥组合触发·三问最可能 /
-           让球(让N球后胜平负·主推vs市场) / 比分主推 / 大小球 / 📌研判 / 💰注金。
-情报/盘口合理性/返还率/爆冷/决策辅助/半全场/Elo先验等已下沉到专属sheet,主表不再含。
-本检查器只验 10列主表;契约冻结在 scripts/delivery-contract.json,改列须重冻并过用户。
+口径(2026-06-25 用户裁决:对阵后加三套胜负平1X2赔率列=14列):
+主表14列 = # / 开赛 / 对阵(赛事·情景) / 欧洲胜负平赔率 / 竞彩胜负平赔率 / 让球胜负平赔率 /
+           🎯盘口主推 / 🔥组合触发·三问最可能 / 让球(让N球后胜平负·主推vs市场) /
+           比分主推 / 半全场主推 / 大小球 / 📌研判 / 💰注金。
+情报/盘口合理性/返还率/爆冷/决策辅助/Elo先验等已下沉到专属sheet,主表不再含。
+本检查器验 14列主表;契约冻结在 scripts/delivery-contract.json,改列须重冻并过用户。
 
 仍守的硬口径:让球列必须带 让/受让后胜平负%(模型)vs%(市场)+与胜平负同/不同向标注;
 盘口主推必须带方向(p%)或"未开售"原因+信心档徽章;比分主推标来源+≥3档降序;
@@ -22,9 +23,9 @@ import openpyxl
 # 10列核心版关键列(子串匹配真实列头;# 为锚列单独处理)
 REQUIRED_HEADERS = [
     "开赛", "对阵", "盘口主推", "组合触发", "让球",
-    "比分", "大小球", "研判", "注金",
+    "比分", "半全场", "大小球", "研判", "注金",
 ]
-EXPECTED_COLS = 10
+EXPECTED_COLS = 14
 PURPLE = "FF4A148C"
 GARBAGE = re.compile(r"undefined|\bNaN\b|\bNone\b|\{\{|&lt;span")
 TIER = re.compile(r"[🟢🟡🟠⚪]")  # 信心档徽章(已并入盘口主推列)
@@ -58,9 +59,14 @@ def main(path):
     stripped = [re.sub(r"^[^\w一-鿿]+", "", h) for h in headers]
     col = {}
     for kw in REQUIRED_HEADERS:
-        idx = next((i + 1 for i, h in enumerate(stripped) if h.startswith(kw)), None)
-        if idx is None:  # 退而求其次:含kw但不是组合触发那列
-            idx = next((i + 1 for i, h in enumerate(headers) if kw in h and "组合触发" not in h), None)
+        if kw == "让球":
+            # 2026-06-25 三套1X2赔率列加入后,"让球胜负平赔率"列也以"让球"开头→必须排除,
+            #   只认真正的让球真实裁决列"让球(让N球后胜平负·主推vs市场)"(不含"胜负平赔率")。
+            idx = next((i + 1 for i, h in enumerate(stripped) if h.startswith("让球") and "胜负平赔率" not in h), None)
+        else:
+            idx = next((i + 1 for i, h in enumerate(stripped) if h.startswith(kw)), None)
+        if idx is None:  # 退而求其次:含kw但不是组合触发/三套赔率那列
+            idx = next((i + 1 for i, h in enumerate(headers) if kw in h and "组合触发" not in h and "胜负平赔率" not in h), None)
         if idx is None:
             errors.append(f"缺列: {kw}")
         else:
@@ -78,7 +84,11 @@ def main(path):
         errors.append(f"表头深紫{PURPLE}仅{purple}/{ncols}格(排版标准被改坏)")
 
     for r in range(head_row + 1, ws.max_row + 1):
-        if ws.cell(r, 1).value is None:
+        c1 = str(ws.cell(r, 1).value or "")
+        # 2026-06-23 串关推荐已并入「竞彩完整」底部:遇到串关分区标记即停止比赛行校验(其下为串关分区,非比赛行)
+        if "串关" in c1 or c1.startswith("━━━"):
+            break
+        if ws.cell(r, 1).value is None or c1.strip() == "":
             continue
         row_name = f"行{r}"
         cells = {kw: str(ws.cell(r, c).value or "") for kw, c in col.items()}
