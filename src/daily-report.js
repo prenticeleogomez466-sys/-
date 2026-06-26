@@ -461,12 +461,14 @@ export function simpleHandicapCell(prediction) {
   const m = head.match(/(\d+)%/);
   const p = m ? Number(m[1]) / 100 : null;
   const note = p == null ? "" : v.multi && !v.flipped ? "·把握低" : p >= 0.58 ? "·较稳" : p < 0.45 ? "·偏险" : "";
+  // 组合效应门控(2026-06-25,WC实证):大热×深让线让球仅~33%命中 → 附低信心告警,只提示不抑制(用户硬规则)。
+  const combo = prediction.handicapPick?.comboCaution?.flag ? ` ｜${prediction.handicapPick.comboCaution.note}` : "";
   // 深让盘 favorite 翻转(handicap-favorite-flip-label-fix-3,2026-06-08):主选已=真实最高过盘方向
   //   (head 取自翻转后的 v.headline),次选改为 wld 锚的主推方向(让球主胜/让球客胜)以保留对1X2方向的指引,
   //   避免与翻转后主选同向重复。跳过下面 top2WldCodes(c2) 映射(那会与翻转主选同向或矛盾)。
   if (v.flipped) {
     const sec = v.anchorSide ? ` / 次选 ${v.anchorSide}${Number.isFinite(v.anchorP) ? `(${Math.round(v.anchorP * 100)}%)` : ""}·跟1X2方向` : "";
-    return `主选 ${head}${note}${line}${sec}`;
+    return `主选 ${head}${note}${line}${sec}${combo}`;
   }
   // 主选+次选(2026-06-08 规格):让球方向跟随胜负平主选/次选。次选映射:平局→走盘(让球退款)、主胜→让球主胜、
   //   客胜→让球客胜;次选概率取真泊松让球三态(handicapWld),与胜负平次选同向,保证四列同向。
@@ -475,7 +477,7 @@ export function simpleHandicapCell(prediction) {
   const hLabel = { "3": "让球主胜", "1": "走盘", "0": "让球客胜" };
   const hProb = { "3": hw.home, "1": hw.push, "0": hw.away };
   const sec = c2 && hLabel[c2] ? ` / 次选 ${hLabel[c2]}${Number.isFinite(hProb[c2]) ? `(${Math.round(hProb[c2] * 100)}%)` : ""}` : "";
-  return `主选 ${head}${note}${line}${sec}`;
+  return `主选 ${head}${note}${line}${sec}${combo}`;
 }
 
 // 胜负平前二方向(2026-06-08 用户规格):四列统一以「主选+次选」两个方向为锚。
@@ -668,6 +670,8 @@ function handicapRecommendText(prediction) {
   // Skellam 独立交叉校验(2026-05-30):矩阵与 Skellam 让球分歧大时附「低信心」提示,
   // 让用户自己判断下不下——只提示、不抑制玩法(用户硬规则)。
   const sk = h.skellamCheck && !h.skellamCheck.agree ? ` ｜${h.skellamCheck.note}` : "";
+  // 组合效应门控(2026-06-25,WC实证):大热×深让线让球仅~33%命中 → 附低信心告警,只提示不抑制(用户硬规则)。
+  const combo = h.comboCaution?.flag ? ` ｜${h.comboCaution.note}` : "";
   // 让球玩法最优方向(DC-τ argmax,leak-safe 回测 +4.37pp 覆盖命中 vs 跟 wld 主推方向):
   //   方向(头条)仍锚 wld(用户硬规则 2026-05-29:玩让球买的就是主推方向、不纠结)。
   //   但当"让球这门独立玩法"的最优方向与 wld 不一致时,把它标注出来供用户自己选——不替弃赛、不改头条。
@@ -676,7 +680,7 @@ function handicapRecommendText(prediction) {
   const optimal = (hw && hw.pickCode && h.directionCode && hw.pickCode !== h.directionCode)
     ? ` ｜🎯让球玩法最优: ${hw.pick} ${pct(hw.probability)}(${hw.source === "market-asian-water" ? "亚盘水位" : "DC-τ"},回测+4.4pp,与主推不同向)`
     : "";
-  return `让 ${lineStr} → ${h.direction}${cover}${sk}${optimal}`;
+  return `让 ${lineStr} → ${h.direction}${cover}${sk}${combo}${optimal}`;
 }
 
 // 信心从裸数字变成"等级(数字)"对用户更友好
@@ -879,6 +883,9 @@ function toLedgerRow(prediction) {
   const snap = prediction.marketSnapshot;
   const euBet = snap?.europeanOdds?.current ?? snap?.europeanOdds?.final;
   const euOpen = snap?.europeanOdds?.initial;
+  // 大小球(2.5)预测落盘(2026-06-25 补数据缺口):此前 OU 预测从不入 ledger → 该维度永远无法自学习。
+  //   _ouFusion 由 deepFusionAnalysis 惰性写入(与行 980 渲染同款惰性模式)。
+  const ouFusion = prediction._ouFusion ?? (deepFusionAnalysis(prediction), prediction._ouFusion);
   return {
     date: fixture.date,
     sequence: fixture.sequence,
@@ -900,6 +907,12 @@ function toLedgerRow(prediction) {
     handicapLine: prediction.handicapPick?.line ?? "",
     handicapWld: prediction.handicapPick?.handicapWld?.pick ?? "",
     handicapWldCode: prediction.handicapPick?.handicapWld?.pickCode ?? "",
+    // 让球组合门控告警落盘(2026-06-25):大热×深让线低信心,供复盘统计该门控是否真避开了让球绞肉区。
+    handicapComboCaution: prediction.handicapPick?.comboCaution?.flag ?? false,
+    // 大小球(2.5)预测(2026-06-25):pick 形如「大球(>2.5)/小球(<2.5)/接近2.5·中性」,中性结算不计命中。
+    ouLine: 2.5,
+    ouPick: ouFusion?.pick ?? "",
+    ouBlendOver: ouFusion?.blendOver ?? "",
     probabilityHome: prediction.probabilities.home,
     probabilityDraw: prediction.probabilities.draw,
     probabilityAway: prediction.probabilities.away,

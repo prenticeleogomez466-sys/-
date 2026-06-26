@@ -18,7 +18,9 @@ import "../src/env.js";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { isWorldCupWindow } from "../src/odds-api-rotation.js";
+import { extractSynthesisFragment, injectSynthesisFragment } from "../src/today-delivery-lib.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -85,6 +87,36 @@ step({ title: "⑥ 标准交付 today-full-coverage(盘口为主·三处同源)"
 step({ title: "⑥b-1 配套·盘口标准区间(深浅临界)", script: "build-odds-reference-bands.mjs", optional: true });
 step({ title: "⑥b-2 配套·盘口共性挖掘与触发条件", script: "export-handicap-patterns-xlsx.mjs", optional: true });
 step({ title: "⑥b-3 配套·模型全面体检与提升", script: "export-scorecard-xlsx.mjs", optional: true });
+// ⑥b-4 全维度综合判读:生成配套xlsx + 捕获 <FRAGMENT> 综合判读段注入手机页(交付夹 + webshare 主通路)
+{
+  const title = "⑥b-4 配套·全维度综合判读(组合触发+盘口+全数据融合)";
+  console.log(`\n── ${title} ──`);
+  const r = spawnSync(node, [S("build-full-synthesis.mjs"), `--date=${date}`], { encoding: "utf8", timeout: 600000 });
+  if (r.stdout) process.stdout.write(r.stdout);
+  if (r.stderr) process.stderr.write(r.stderr);
+  if (r.status !== 0) {
+    warnings.push(`${title} 非0退出(软步骤:综合判读段未注入)`);
+    console.error(`⚠️ ${title} 非0退出(软步骤:相关段诚实跳过、不阻断)`);
+  } else {
+    const fragment = extractSynthesisFragment(r.stdout || "");
+    if (!fragment) warnings.push("build-full-synthesis 未输出 <FRAGMENT> 段(综合判读未注入手机页)");
+    else {
+      const targets = [
+        `C:/Users/Administrator/Desktop/足球推荐/${date}/今日足球推荐.html`,
+        `D:/Temp/webshare_lingdao/今日足球推荐.html`,
+      ];
+      for (const t of targets) {
+        try {
+          if (!existsSync(t)) continue;
+          writeFileSync(t, injectSynthesisFragment(readFileSync(t, "utf8"), fragment), "utf8");
+          console.log(`  ✅ 全维度综合判读段已注入 ${t}`);
+        } catch (e) {
+          warnings.push(`综合判读注入失败 ${t}: ${e.message}`);
+        }
+      }
+    }
+  }
+}
 
 // ⑦ 本地硬闸(关键:红=拒交付)
 {

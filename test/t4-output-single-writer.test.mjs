@@ -184,20 +184,30 @@ test("三面同源:xlsx标题/手机页/英文页日期一致,双日期互不污
   });
   for (const [i, o] of outputs.entries()) {
     const other = outputs[1 - i].date;
-    // xlsx:标题行 + banner 行都是本日期;核心版10列不缩水(2026-06-23 用户裁决:砍冗余·汇总一张主表)
+    // xlsx:标题行 + banner 行都是本日期;核心版11列(2026-06-23晚:半全场加回主表)
     assert.equal(o.sheets[0].rows[0][0], `⚡ 神选 · 竞彩完整覆盖 · ${o.date}`);
     assert.match(o.sheets[0].rows[1][0], new RegExp(o.date));
-    assert.equal(XLSX_HEADERS.length, 10);
-    assert.equal(o.sheets[0].rows[2].length, 10); // rows[2]=表头行(无recordLine/stakeNote时)
-    assert.match(o.sheets[0].rows[2][3], /盘口主推/);
-    assert.match(o.sheets[0].rows[2][4], /组合触发.*三问最可能/);
-    assert.match(o.sheets[0].rows[2][5], /让球.*主推vs市场/);
-    assert.match(o.sheets[0].rows[2][8], /研判/);
-    assert.match(o.sheets[0].rows[2][9], /注金/);
+    assert.equal(XLSX_HEADERS.length, 14);
+    assert.equal(o.sheets[0].rows[2].length, 14); // rows[2]=表头行(无recordLine/stakeNote时);2026-06-25:对阵后加三套1X2列→14列
+    assert.match(o.sheets[0].rows[2][3], /欧洲胜负平赔率/);
+    assert.match(o.sheets[0].rows[2][4], /竞彩胜负平赔率/);
+    assert.match(o.sheets[0].rows[2][5], /让球胜负平赔率/);
+    assert.match(o.sheets[0].rows[2][6], /盘口主推/);
+    assert.match(o.sheets[0].rows[2][7], /组合触发.*条件.*触发规律.*三问/);
+    assert.match(o.sheets[0].rows[2][8], /让球.*主推vs市场/);
+    assert.match(o.sheets[0].rows[2][9], /比分主推/);
+    assert.match(o.sheets[0].rows[2][10], /半全场主推/);
+    assert.match(o.sheets[0].rows[2][11], /大小球/);
+    assert.match(o.sheets[0].rows[2][12], /研判/);
+    assert.match(o.sheets[0].rows[2][13], /注金/);
     // 手机页:标题 + 下载链接 + 落款日期均=本日期
     assert.match(o.mobile, new RegExp(`<title>神选·竞彩·${o.date}</title>`));
     assert.match(o.mobile, new RegExp(`jingcai-${o.date}\\.xlsx`));
     assert.match(o.mobile, new RegExp(`真实端到端\\(${o.date}\\)`));
+    // 2026-06-25 用户令:手机页每场须三套胜负平(1X2)赔率独立块(欧洲🔶/竞彩✅/让球✅·完整主平客)
+    assert.match(o.mobile, /欧洲胜负平/);
+    assert.match(o.mobile, /竞彩胜负平/);
+    assert.match(o.mobile, /让球胜负平/);
     // 英文固定URL页:标题=本日期
     assert.match(o.english, new RegExp(`⚡神选·足球·${o.date}`));
     assert.match(o.english, new RegExp(`jingcai-${o.date}\\.xlsx`));

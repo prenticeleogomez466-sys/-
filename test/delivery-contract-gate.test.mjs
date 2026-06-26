@@ -16,7 +16,7 @@ test("防废闸:真实契约 + 真实活列头 + 干净交付页 → 零违规",
 
 test("契约自洽:buildContract 冻结的列头 == 活的 XLSX_HEADERS(冻结即活值,无手抄漂移)", () => {
   assert.deepEqual(contract.xlsxHeaders, XLSX_HEADERS);
-  assert.equal(contract.xlsxHeaderCount, 10); // 2026-06-23 用户裁决:核心版精简到10列(主表汇总+组合触发★·余下沉专属sheet,重冻)
+  assert.equal(contract.xlsxHeaderCount, 14); // 2026-06-25 用户令:对阵后加三套1X2赔率列→14列(重冻)
 });
 
 test("喂毒①:列数被砍(10→4,0613式自搓表) → 必拦", () => {

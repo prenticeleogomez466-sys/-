@@ -57,6 +57,26 @@ if (existsSync(WEBDIR)) {
   }
 } else record("html-garbage", "SKIP", `${WEBDIR} 不存在`);
 
+// ── 2c) 三套胜负平(1X2)赔率列硬闸(2026-06-25 用户令:欧洲/竞彩/让球三套各独立成列·完整主平客·每次实时) ──
+//   ①主表列头逐字含三列;②已交付手机页须三套块齐全、每场都渲染(竞彩胜负平块数≥1)。缺=FAIL,html未出=SKIP(诚实不冒充)。
+{
+  const need = ["欧洲胜负平赔率", "竞彩胜负平赔率", "让球胜负平赔率"];
+  const headerHas = need.every((h) => XLSX_HEADERS.some((c) => c.includes(h)));
+  if (!headerHas) record("s4-tri-wld-cols", "FAIL", `主表列头缺三套1X2赔率列(应含 ${need.join("/")})——改列须 freeze --write 重冻`);
+  else record("s4-tri-wld-cols", "PASS", "主表三套1X2赔率列齐(欧洲🔶/竞彩✅/让球✅·主平客)");
+
+  const mobilePath = path.join(WEBDIR, "今日足球推荐.html");
+  if (existsSync(mobilePath)) {
+    const txt = readFileSync(mobilePath, "utf8");
+    const labels = ["欧洲胜负平", "竞彩胜负平", "让球胜负平"];
+    const missing = labels.filter((l) => !txt.includes(l));
+    const cnt = (txt.match(/竞彩胜负平/g) || []).length; // 每场展开渲染一块 → 计数应≥1且≈场数
+    if (missing.length) record("s4-tri-wld-mobile", "FAIL", `手机页缺三套1X2块: ${missing.join("/")}(每场须三套各成块)`);
+    else if (cnt < 1) record("s4-tri-wld-mobile", "FAIL", "手机页无竞彩胜负平赔率块(每场须渲染)");
+    else record("s4-tri-wld-mobile", "PASS", `手机页三套1X2块齐(竞彩胜负平块×${cnt}·欧洲/让球同源)`);
+  } else record("s4-tri-wld-mobile", "SKIP", `${mobilePath} 不存在(父级实跑后校验)`);
+}
+
 // ── 2b) 交付契约硬闸(2026-06-13 焊死版式漂移/野页): 列序/列数逐字冻结 + webshare 白名单 ──
 //   根治 0607/0613"每次进化把表格弄乱/另起手机页":出表那刻列变样或冒野页 → 红拒交付。
 //   合法改列/白名单=显式跑 freeze-delivery-contract.mjs --write 重冻并提交(增减都要过用户)。

@@ -22,7 +22,11 @@ import {
   // 2026-06-11 用户裁决:四玩法方向各自独立真实裁决(比分/半全场主推=各自盘口de-vig真实热门)+ 全信号面板 + 方向矩阵审计
   marketScoreView, marketHalfFullView, buildSignalPanel, directionMatrixAudit, DIR_LABEL,
   XLSX_HEADERS, h2hToStatsList, marketWldPrimary, competitionBreakdown,
+  buildWcScenarioSheet, // 2026-06-25 用户令:世界杯积分情景专表(积分榜/赛果/末轮胜平负出线/假设积分/复盘归因)
 } from "../src/today-delivery-lib.js";
+// 2026-06-25 用户令:世界杯积分榜+末轮胜平负出线情景+假设积分推演(纯函数lib,IO在此脚本侧)
+import { computeWcScenarios, buildWcQualByMatch } from "../src/wc-standings-scenarios.js";
+import { getExportDir } from "../src/paths.js";
 // 2026-06-15 用户裁决:盘口推荐为主、模型只当参考 → 信心/注金按真盘口热门概率定档(selectionTier 本就吃市场隐含)
 import { selectionTier } from "../src/selection-tier.js";
 import { isSoftLeague } from "../src/honest-pass-gate.js"; // 2026-06-18 工作流②:soft-league 判定集中化(防两处正则分叉)
@@ -290,12 +294,14 @@ const hcViewStr = (p, s) => { const h = hcParts(p, s); return `${h.line} ‖ 模
 //   分歧一律以盘口为准·铁证"分歧越大市场越对")。mkPrimary 已含盘口de-vig热门+模型方向/%/同向判定。
 //   1X2未开售(mkPrimary.code==null·悬殊盘只让球)→ 退回 simpleWldCell(保留⛔未开售/⚠️直胜仅参考真实性闸)。
 function wldCellMarketLed(p, mkPrimary) {
-  if (!mkPrimary || mkPrimary.code == null) return simpleWldCell(p);
+  // 平局保护告警·世界杯/国家队限定(2026-06-25,WC42场实证):超级大热≥70%在小组赛常被逼平(~33%)→ 附双选保护提示。
+  const drawTag = p.doubleChance?.drawRiskCaution?.flag ? `\n${p.doubleChance.drawRiskCaution.note}` : "";
+  if (!mkPrimary || mkPrimary.code == null) return `${simpleWldCell(p)}${drawTag}`;
   const home = p.fixture.homeTeam, away = p.fixture.awayTeam;
   const named = (c) => c === "3" ? `${home}主胜` : c === "0" ? `${away}客胜` : c === "1" ? "平局" : "—";
   const modelTxt = mkPrimary.modelCode != null ? `${named(mkPrimary.modelCode)}${mkPrimary.modelPct != null ? `(${mkPrimary.modelPct}%)` : ""}` : "模型缺";
   const tag = mkPrimary.agree ? "·与盘口同向" : "·⚠️与盘口分歧(以盘口为准)";
-  return `盘口主推✅ ${mkPrimary.dir}(${mkPrimary.pct}%·@${mkPrimary.odds})\n模型🔶次选 ${modelTxt}${tag}`;
+  return `盘口主推✅ ${mkPrimary.dir}(${mkPrimary.pct}%·@${mkPrimary.odds})\n模型🔶次选 ${modelTxt}${tag}${drawTag}`;
 }
 
 // ── 盘口为主决策(2026-06-15 用户裁决:盘口推荐为主,模型只当参考)──
@@ -447,6 +453,7 @@ const rows = games.map((p, i) => {
     hw: p.handicapPick?.handicapWld ?? null, marketDist: hcP.mkDist,
     lineReal: s.jingcaiHandicap?.line != null, // 2026-06-13:仅真竞彩官方线才出过盘分析,线缺=标缺不冒充
     stale: s.jingcaiHandicap?.stale === true, // 2026-06-16 裁决A:保留的上次真线,标"可能过时"
+    comboCaution: p.handicapPick?.comboCaution ?? null, // 2026-06-25:大热×深让线低信心告警
   });
   const adv = advFor(p);
   // ── 四玩法独立真实裁决(2026-06-11 用户裁决):比分/半全场主推=各自500盘口de-vig真实热门(✅市场,可与胜负平不同向),
@@ -482,6 +489,7 @@ const rows = games.map((p, i) => {
     scoreSrc: msv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC", hfSrc: mhv.fromMarket ? "主推✅500盘口·次行🔶方向视图" : "🔶DC",
     // 真实赔率(✅500实测 + ESPN/DK与titan007双源亚盘 + 外盘欧赔参考;coverage 缺 → 诚实标缺不编)
     euro: (s.europeanOdds?.current || cov) ? euroStr(s, c) : COV_MISS,
+    euroRef: c?.euroRef ?? null,                                              // 欧洲外盘百家欧赔均值(titan007·三套1X2列「欧洲胜负平」用·🔶方向参考)
     asian: cov ? (c?.asianHandicap ? renderAsianDualCell(c.asianHandicap) : asianStr(c?.espnOdds, s.asianHandicap?.current?.line ?? s.asianHandicap?.initial?.line ?? null)) : COV_MISS,
     hc: hcStr(p, s),
     ouReal: ouRealStr(s, p), dist: distStr(s),
@@ -889,14 +897,40 @@ const contentAudit = [
 // ── xlsx(25列专业版 + 数据审计 + 14场闸裁决,经 xlsx-writer:深紫FF4A148C表头/banner跨列合并/内容感知行高/冻结筛选) ──
 // 2026-06-23 用户裁决:砍冗余·只留最有用的。主表(核心版)汇总所有比赛+组合触发高确定性标★;
 //   情报单独·串关·数据审计·组合触发全量·14场保留;删 研判详情/盘口合理性/返还率/爆冷研判/决策辅助(精华已并进主表/组合触发)。
+// ── 世界杯积分情景(2026-06-25 用户令:积分榜/赛果/末轮胜平负出线/假设积分/复盘归因写进交付)──
+//   纯真实数据:scen=真实赛果推演;recap=逐场复盘快照。任一缺则诚实降级(scen=null → 专表标缺·内嵌/手机板块自动不出)。
+let wcScen = null, wcQualByMatch = null, wcRecapNote = null, wcRecapRows = null;
+try { wcScen = computeWcScenarios(); wcQualByMatch = buildWcQualByMatch(wcScen); }
+catch (e) { console.warn(`⚠️ 世界杯积分情景计算跳过(${e.message})——非世界杯期或数据缺,如实不出。`); }
+try {
+  const snap = JSON.parse(readFileSync(`${getExportDir()}/worldcup-match-recap.json`, "utf8"));
+  wcRecapRows = Array.isArray(snap?.rows) ? snap.rows : null;
+  const settled = (wcRecapRows || []).filter((r) => r.status === "settled" && r.actual);
+  if (settled.length) {
+    const hit = settled.filter((r) => r.hit === true).length;
+    const miss = settled.filter((r) => r.hit === false);
+    const drawMiss = miss.filter((r) => r.actual === "平局" && r.primary !== "平局").length;
+    const mktAlsoWrong = miss.filter((r) => r.marketHit === false).length;
+    const modelOnly = miss.filter((r) => r.marketHit === true).length;
+    wcRecapNote = `已结算${settled.length}场,模型方向中${hit}错${miss.length};其中"推胜负实为平"${drawMiss}场(平局盲区),连盘口也猜错${mktAlsoWrong}场=真冷门,仅模型错${modelOnly}场。结论:末轮势均力敌且双方平即可的场,主推转双选保平,别单押热门净胜。`;
+  }
+} catch { /* 复盘快照缺=诚实不出复盘归因段 */ }
+
+const coreSheets = buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length), recordLine: recordLine?.text ?? null, stakeNote: stakeSum.note, wcQualByMatch });
+// 2026-06-23 用户裁决:串关推荐并进「竞彩完整」一张表(不再独立 sheet),逐场行下方追加串关分区——更直观、一表全看。
+//   只追加行、不改 10 列表头本身 → 不破 freeze-delivery-contract(契约只冻结列序/列数)。
+const parlaySheet = buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner });
+const mainSheet = coreSheets.find((s) => s.name === "竞彩完整");
+if (mainSheet) mainSheet.rows.push([""], ["━━━ 🔗 串关推荐(并入竞彩完整·混合过关·每注100元口径) ━━━"], ...parlaySheet.rows);
 const sheets = [
-  ...buildXlsxSheets({ date, rows, banner: BANNER, advDataPresent: !!(advData && Object.keys(advData).length), recordLine: recordLine?.text ?? null, stakeNote: stakeSum.note }),
+  ...coreSheets,
   buildComboTriggerSheet({ date, rows }), // 组合触发全量明细(高命中组合+庄家意图+用户让球分线规则·逐场触发·全覆盖分档)
-  buildParlaySheet({ date, plan: parlayPlan, jqsFetchedAt: jqsRaw?.fetchedAt ?? null, advBanner: parlayAdvBanner }),
   buildAuditSheet({ date, rows, contentAudit, intelByMatch }), // 数据审计(可追溯·逐场逐赔种来源+缺口标注)
   buildIntelSheet({ date, rows, intelByMatch }), // 情报详情(单独·预测首发XI/阵型/伤停/近赛/交锋/小组形势)
   { name: "14场·任选9", rows: buildFourteenSheetRows({ date, fourteen, periodFacts: fourteenFacts }) },
 ];
+// 世界杯积分情景专表(仅世界杯期/有真实赛果时插入;无数据则不加这张表,诚实不留空壳)
+if (wcScen && wcScen.groups?.length) sheets.push(buildWcScenarioSheet({ date, scen: wcScen, recapRows: wcRecapRows }));
 // 硬闸:核心交付表必在,缺=fail-loud拒认交付(2026-06-23 改为核心版必含表:主表+组合触发+数据审计+情报详情)
 const REQUIRED_SHEETS = ["竞彩完整", "组合触发", "数据审计", "情报详情"];
 const missingSheets = REQUIRED_SHEETS.filter((n) => !sheets.some((s) => s.name === n));
@@ -914,7 +948,7 @@ writeXlsxWorkbook(xlsxTarget, sheets);
 // 重出旧日期绝不顶掉 —— 改写日期命名副本 足球推荐-<date>.html / football-<date>.html,固定URL保最新。
 const readIfExists = (p) => { try { return readFileSync(p, "utf8"); } catch { return null; } };
 // 头条副标题=逐赔种真计数 + 降级句进头条(2026-06-10 审计确认缺陷:禁硬编码"5赔种全覆盖"假声明,三面同口径)。
-const html = renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, counts, degradeNote, parlayPlan, recordLine: recordLine?.text ?? null, stakeSum: stakeSum.note });
+const html = renderMobileHtml({ date, rows, riskNote, intlN, wcN, auditFoot, counts, degradeNote, parlayPlan, recordLine: recordLine?.text ?? null, stakeSum: stakeSum.note, wcScen, wcRecapNote });
 let htmlTarget = outBase ? `${outBase}/今日足球推荐.html` : "D:/Temp/webshare_lingdao/今日足球推荐.html";
 if (!outBase) {
   const mob = resolveHtmlWriteTarget({
