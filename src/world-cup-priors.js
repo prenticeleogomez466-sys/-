@@ -65,7 +65,16 @@ function load() {
     if (/^\d/.test(ha.trim()) || /^\d/.test(aw.trim()) || ha.includes("announced") || ha.includes("winner") || ha.includes("runner")) continue;
     pairCity.set([normTeam(m.homeTeam), normTeam(m.awayTeam)].sort().join("|"), m.venueCity);
   }
-  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, matchDatesDoc, matchOddsDoc, venueByCity, teamGroup, zh, zhToEn, pairCity };
+  // 淘汰赛兜底:对阵为占位(2A/2B…),队名查不到 pairCity → 改按开赛【时刻】定位承办城市。
+  //   单淘汰非并行,淘汰赛(round≥4)各场 dateUtc 全唯一,故时刻即可无歧义定位(小组赛会并行→不入此表,
+  //   小组赛队名为真本就走 pairCity)。键=UTC 毫秒瞬时。(2026-06-26: R32 南非vs加拿大 venue=null 修)
+  const utcCityKnockout = new Map();
+  for (const m of Object.values(matchDatesDoc?.matchDate ?? {})) {
+    if (!m?.dateUtc || !m?.venueCity || !(Number(m.round) >= 4)) continue;
+    const inst = Date.parse(String(m.dateUtc).replace(" ", "T"));
+    if (Number.isFinite(inst)) utcCityKnockout.set(inst, m.venueCity);
+  }
+  _cache = { venuesDoc, groupsDoc, formatDoc, matchVenuesDoc, matchDatesDoc, matchOddsDoc, venueByCity, teamGroup, zh, zhToEn, pairCity, utcCityKnockout };
   return _cache;
 }
 
@@ -232,7 +241,7 @@ export function worldCupVenue(fixture) {
   }
   // 无显式场馆字段(每日竞彩 fixture 常如此:只带队名+日期)→ 按真实对阵查承办城市 → venue。
   //   这是世界杯海拔/天气 λ 在每日推荐路径上真正生效的桥(2026-06-07 体检修:此前 venue 恒 null、乘子恒 1)。
-  const { pairCity } = load();
+  const { pairCity, utcCityKnockout } = load();
   const h = normTeam(toEnTeam(fixture.homeTeam)), a = normTeam(toEnTeam(fixture.awayTeam));
   if (h && a) {
     const city = pairCity.get([h, a].sort().join("|"));
@@ -241,7 +250,23 @@ export function worldCupVenue(fixture) {
       if (hit) return hit;
     }
   }
+  // 淘汰赛兜底:队名是真(2A/2B 已出线确定),但赛程表对应行仍是占位 → pairCity 查不到。
+  //   按开赛时刻(竞彩 kickoff 为北京时间 UTC+8)对到 FIFA 赛号承办城市。淘汰赛时刻唯一,不撞车。
+  const koInst = beijingKickoffToUtc(fixture.kickoff ?? fixture.matchDate);
+  if (koInst != null && utcCityKnockout?.has(koInst)) {
+    const city = utcCityKnockout.get(koInst);
+    const hit = venueByCity.get(String(city).toLowerCase()) ?? venueByCity.get(String(city));
+    if (hit) return hit;
+  }
   return null;
+}
+
+// 竞彩 kickoff(北京时间 UTC+8,形如 "2026-06-29 03:00",无时区标记)→ UTC 毫秒瞬时;解析失败→null。
+function beijingKickoffToUtc(kickoff) {
+  const mt = String(kickoff ?? "").trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!mt) return null;
+  const [, y, mo, d, h, mi] = mt.map(Number);
+  return Date.UTC(y, mo - 1, d, h, mi) - 8 * 3600 * 1000;
 }
 
 /**
